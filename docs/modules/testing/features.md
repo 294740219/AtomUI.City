@@ -13,7 +13,7 @@
 | AUC-TESTING-005 | Plugin Test Host | Implemented | PluginTestHost, PluginTestHostBuilder | PluginTestHostTests |
 | AUC-TESTING-006 | Routing Test Host | Implemented | RoutingTestHost, RoutingTestHostBuilder | RoutingTestHostTests |
 | AUC-TESTING-007 | Source Generation Kit | Implemented | SourceGenerationTestCase, GeneratedSourceSnapshot | SourceGenerationTestKitTests |
-| AUC-TESTING-008 | AOT Check | Ready to Start Product Implementation | AotCompatibilityCheck, AotCompatibilityDiagnostic | AotCompatibilityCheckTests |
+| AUC-TESTING-008 | AOT Check | Implemented | AotCompatibilityCheck, AotCompatibilityDiagnostic | AotCompatibilityCheckTests |
 | AUC-TESTING-009 | Test Layers | Ready to Start Product Implementation | TestLayerAttribute, TestLayerNames | TestLayerTests |
 
 ## Feature 硬门禁
@@ -133,7 +133,7 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-TESTING-008 AOT Check
 
 Feature ID: `AUC-TESTING-008`
-Status: Ready to Start Product Implementation
+Status: Implemented
 Goal: 提供 AOT/trimming 风险检查工具。
 Public Contract: AotCompatibilityCheck, AotCompatibilityDiagnostic
 Runtime / Build Behavior: 检查 runtime reflection scan、dynamic code、unbounded Activator 等禁止模式。

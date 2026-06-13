@@ -37,6 +37,40 @@ public sealed class AotCompatibilityCheckTests
     }
 
     [Fact]
+    public void ForbidDefaultAotPatternsReportsReflectionActivatorAndDynamicCode()
+    {
+        var check = AotCompatibilityCheck
+            .Create()
+            .ForbidDefaultAotPatterns();
+
+        var diagnostics = check.Evaluate(
+            [
+                new SourceFile("Reflection.cs", "var types = assembly.Assembly.GetTypes();"),
+                new SourceFile("Activator.cs", "var instance = Activator.CreateInstance(type);"),
+                new SourceFile("DynamicCode.cs", "var method = new DynamicMethod(\"m\", null, Type.EmptyTypes);"),
+            ]);
+
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Id == "AOT001");
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Id == "AOT002");
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Id == "AOT003");
+    }
+
+    [Fact]
+    public async Task EvaluateObservesCancellationToken()
+    {
+        using var cancellation = new CancellationTokenSource();
+        await cancellation.CancelAsync();
+
+        var check = AotCompatibilityCheck
+            .Create()
+            .ForbidPattern("AOT001", "Assembly.GetTypes");
+
+        Assert.Throws<OperationCanceledException>(() => check.Evaluate(
+            [new SourceFile("Reflection.cs", "var types = assembly.Assembly.GetTypes();")],
+            cancellation.Token));
+    }
+
+    [Fact]
     public void EvaluateDiagnosticsRejectExternalListMutation()
     {
         var check = AotCompatibilityCheck

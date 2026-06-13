@@ -11,7 +11,7 @@
 | AUC-TESTING-005 | Yes | Yes | PluginTestHostTests | Product Implementation Exists | Verified | 断言 load/unload、contribution、owner revoke。 | None for Phase 2 slice | Implemented |
 | AUC-TESTING-006 | Yes | Yes | RoutingTestHostTests | Product Implementation Exists | Verified | 断言 route build、match、navigation helper。 | None for Phase 2 slice | Implemented |
 | AUC-TESTING-007 | Yes | Yes | SourceGenerationTestKitTests | Product Implementation Exists | Verified | 断言 generated source snapshot、diagnostics、references。 | None for Phase 2 slice | Implemented |
-| AUC-TESTING-008 | Yes | Yes | AotCompatibilityCheckTests | Baseline Exists | Required | 断言反射扫描、dynamic code、trimming 风险诊断。 | Required | Ready to Start Product Implementation |
+| AUC-TESTING-008 | Yes | Yes | AotCompatibilityCheckTests | Product Implementation Exists | Verified | 断言反射扫描、dynamic code、trimming 风险诊断。 | None for Phase 2 slice | Implemented |
 | AUC-TESTING-009 | Yes | Yes | TestLayerTests | Baseline Exists | Required | 断言 Unit/Contract/Integration/Platform/Dogfood 分层标记。 | Required | Ready to Start Product Implementation |
 
 ## 更新规则

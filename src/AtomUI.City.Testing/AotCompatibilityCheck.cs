@@ -18,12 +18,28 @@ public sealed class AotCompatibilityCheck
         ArgumentException.ThrowIfNullOrWhiteSpace(diagnosticId);
         ArgumentException.ThrowIfNullOrWhiteSpace(pattern);
 
-        _forbiddenPatterns.Add(new ForbiddenAotPattern(diagnosticId, pattern));
+        if (!_forbiddenPatterns.Any(existing =>
+                string.Equals(existing.DiagnosticId, diagnosticId, StringComparison.Ordinal)
+                && string.Equals(existing.Pattern, pattern, StringComparison.Ordinal)))
+        {
+            _forbiddenPatterns.Add(new ForbiddenAotPattern(diagnosticId, pattern));
+        }
 
         return this;
     }
 
-    public IReadOnlyList<AotCompatibilityDiagnostic> Evaluate(IEnumerable<SourceFile> sources)
+    public AotCompatibilityCheck ForbidDefaultAotPatterns()
+    {
+        ForbidPattern("AOT001", "Assembly.GetTypes");
+        ForbidPattern("AOT002", "Activator.CreateInstance");
+        ForbidPattern("AOT003", "DynamicMethod");
+
+        return this;
+    }
+
+    public IReadOnlyList<AotCompatibilityDiagnostic> Evaluate(
+        IEnumerable<SourceFile> sources,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(sources);
 
@@ -31,8 +47,12 @@ public sealed class AotCompatibilityCheck
 
         foreach (var source in sources)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             foreach (var pattern in _forbiddenPatterns)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 if (source.Text.Contains(pattern.Pattern, StringComparison.Ordinal))
                 {
                     diagnostics.Add(new AotCompatibilityDiagnostic(
