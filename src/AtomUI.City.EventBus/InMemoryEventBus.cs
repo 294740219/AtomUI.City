@@ -113,6 +113,9 @@ public sealed class InMemoryEventBus : IEventBus
         EventPublishOptions? options = null,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(eventData);
+        cancellationToken.ThrowIfCancellationRequested();
+
         return await PublishCoreAsync(
                 eventData,
                 options,
@@ -194,6 +197,8 @@ public sealed class InMemoryEventBus : IEventBus
         EventPublishOptions? options = null,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(eventData);
+
         var descriptor = _contractRegistry.GetOrCreate<TEvent>();
         var eventId = Guid.NewGuid();
 

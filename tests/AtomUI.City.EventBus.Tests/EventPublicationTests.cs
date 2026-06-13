@@ -29,6 +29,37 @@ public sealed class EventPublicationTests
     }
 
     [Fact]
+    public async Task PublishAsyncRejectsNullEvent()
+    {
+        var eventBus = new InMemoryEventBus();
+
+        await Assert.ThrowsAsync<ArgumentNullException>(async () =>
+            await eventBus.PublishAsync<TestEvent>(null!));
+    }
+
+    [Fact]
+    public async Task PublishAsyncObservesAlreadyCanceledTokenWithoutSubscriptions()
+    {
+        var eventBus = new InMemoryEventBus();
+        using var cancellation = new CancellationTokenSource();
+        await cancellation.CancelAsync();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(async () =>
+            await eventBus.PublishAsync(
+                new TestEvent("cancel"),
+                cancellationToken: cancellation.Token));
+    }
+
+    [Fact]
+    public async Task PostAsyncRejectsNullEvent()
+    {
+        var eventBus = new InMemoryEventBus();
+
+        await Assert.ThrowsAsync<ArgumentNullException>(async () =>
+            await eventBus.PostAsync<TestEvent>(null!));
+    }
+
+    [Fact]
     public async Task PublishAsyncSupportsSyncAndAsyncHandlers()
     {
         var eventBus = new InMemoryEventBus();
