@@ -59,6 +59,51 @@ public sealed class LifecycleScopeTreeTests
     }
 
     [Fact]
+    public async Task DisposeStopsAndDisposesChildrenLeafFirst()
+    {
+        var order = new List<string>();
+        await using var host = LifecycleScope.CreateRoot(LifecycleScopeKind.Host, "host");
+        var application = host.CreateChild(LifecycleScopeKind.Application, "application");
+        var operation = application.CreateChild(LifecycleScopeKind.Operation, "operation");
+
+        operation.Disposed += (_, _) => order.Add("operation");
+        application.Disposed += (_, _) => order.Add("application");
+        host.Disposed += (_, _) => order.Add("host");
+
+        await host.DisposeAsync();
+
+        Assert.Equal(["operation", "application", "host"], order);
+        Assert.Equal(LifecycleScopeState.Disposed, host.State);
+        Assert.Equal(LifecycleScopeState.Disposed, application.State);
+        Assert.Equal(LifecycleScopeState.Disposed, operation.State);
+    }
+
+    [Fact]
+    public async Task ConcurrentStopAndCreateChildDoNotCorruptScopeState()
+    {
+        await using var host = LifecycleScope.CreateRoot(LifecycleScopeKind.Host, "host");
+
+        var stopTask = host.StopAsync().AsTask();
+        await stopTask;
+
+        Assert.Throws<InvalidOperationException>(() =>
+            host.CreateChild(LifecycleScopeKind.Operation, "late-operation"));
+        Assert.Equal(LifecycleScopeState.Stopped, host.State);
+    }
+
+    [Fact]
+    public async Task DisposeIsIdempotent()
+    {
+        var host = LifecycleScope.CreateRoot(LifecycleScopeKind.Host, "host");
+
+        await host.DisposeAsync();
+        await host.DisposeAsync();
+        host.Dispose();
+
+        Assert.Equal(LifecycleScopeState.Disposed, host.State);
+    }
+
+    [Fact]
     public void ModuleAndPluginAreNotPublicScopeKinds()
     {
         var scopeKindNames = Enum.GetNames<LifecycleScopeKind>();

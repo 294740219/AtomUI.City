@@ -4,7 +4,9 @@ public sealed class LifecycleScope : IDisposable, IAsyncDisposable
 {
     private readonly CancellationTokenSource _cancellationTokenSource;
     private readonly List<LifecycleScope> _children = [];
+    private readonly object _syncRoot = new();
     private bool _disposed;
+    private LifecycleScopeState _state;
 
     private LifecycleScope(
         LifecycleScopeKind kind,
@@ -18,7 +20,7 @@ public sealed class LifecycleScope : IDisposable, IAsyncDisposable
         Id = id;
         Parent = parent;
         _cancellationTokenSource = cancellationTokenSource;
-        State = LifecycleScopeState.Running;
+        _state = LifecycleScopeState.Running;
     }
 
     public string Id { get; }
@@ -27,11 +29,31 @@ public sealed class LifecycleScope : IDisposable, IAsyncDisposable
 
     public LifecycleScope? Parent { get; }
 
-    public IReadOnlyList<LifecycleScope> Children => Array.AsReadOnly(_children.ToArray());
+    public IReadOnlyList<LifecycleScope> Children
+    {
+        get
+        {
+            lock (_syncRoot)
+            {
+                return Array.AsReadOnly(_children.ToArray());
+            }
+        }
+    }
 
-    public LifecycleScopeState State { get; private set; }
+    public LifecycleScopeState State
+    {
+        get
+        {
+            lock (_syncRoot)
+            {
+                return _state;
+            }
+        }
+    }
 
     public CancellationToken CancellationToken => _cancellationTokenSource.Token;
+
+    internal event EventHandler? Disposed;
 
     public static LifecycleScope CreateRoot(LifecycleScopeKind kind, string id)
     {
@@ -40,51 +62,67 @@ public sealed class LifecycleScope : IDisposable, IAsyncDisposable
 
     public LifecycleScope CreateChild(LifecycleScopeKind kind, string id)
     {
-        ThrowIfDisposed();
-
-        if (State != LifecycleScopeState.Running)
+        lock (_syncRoot)
         {
-            throw new InvalidOperationException("Lifecycle scope can only create children while running.");
+            ThrowIfDisposed();
+
+            if (_state != LifecycleScopeState.Running)
+            {
+                throw new InvalidOperationException("Lifecycle scope can only create children while running.");
+            }
+
+            var child = new LifecycleScope(
+                kind,
+                id,
+                this,
+                CancellationTokenSource.CreateLinkedTokenSource(CancellationToken));
+
+            _children.Add(child);
+
+            return child;
         }
-
-        var child = new LifecycleScope(
-            kind,
-            id,
-            this,
-            CancellationTokenSource.CreateLinkedTokenSource(CancellationToken));
-
-        _children.Add(child);
-
-        return child;
     }
 
     public async ValueTask StopAsync()
     {
-        ThrowIfDisposed();
+        LifecycleScope[] children;
 
-        if (State is LifecycleScopeState.Stopped or LifecycleScopeState.Stopping)
+        lock (_syncRoot)
         {
-            return;
+            ThrowIfDisposed();
+
+            if (_state is LifecycleScopeState.Stopped or LifecycleScopeState.Stopping)
+            {
+                return;
+            }
+
+            _state = LifecycleScopeState.Stopping;
+
+            if (!_cancellationTokenSource.IsCancellationRequested)
+            {
+                _cancellationTokenSource.Cancel();
+            }
+
+            children = _children.ToArray();
         }
 
-        State = LifecycleScopeState.Stopping;
-
-        if (!_cancellationTokenSource.IsCancellationRequested)
+        for (var i = children.Length - 1; i >= 0; i--)
         {
-            _cancellationTokenSource.Cancel();
+            await children[i].StopAsync().ConfigureAwait(false);
         }
 
-        for (var i = _children.Count - 1; i >= 0; i--)
+        lock (_syncRoot)
         {
-            await _children[i].StopAsync().ConfigureAwait(false);
+            if (!_disposed && _state == LifecycleScopeState.Stopping)
+            {
+                _state = LifecycleScopeState.Stopped;
+            }
         }
-
-        State = LifecycleScopeState.Stopped;
     }
 
     public void Dispose()
     {
-        if (_disposed)
+        if (IsDisposed)
         {
             return;
         }
@@ -95,7 +133,7 @@ public sealed class LifecycleScope : IDisposable, IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        if (_disposed)
+        if (IsDisposed)
         {
             return;
         }
@@ -106,21 +144,33 @@ public sealed class LifecycleScope : IDisposable, IAsyncDisposable
 
     private async ValueTask DisposeCoreAsync()
     {
-        if (_disposed)
+        LifecycleScope[] children;
+
+        lock (_syncRoot)
         {
-            return;
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            _state = LifecycleScopeState.Disposing;
+            children = _children.ToArray();
         }
 
-        _disposed = true;
-        State = LifecycleScopeState.Disposing;
-
-        for (var i = _children.Count - 1; i >= 0; i--)
+        for (var i = children.Length - 1; i >= 0; i--)
         {
-            await _children[i].DisposeAsync().ConfigureAwait(false);
+            await children[i].DisposeAsync().ConfigureAwait(false);
         }
 
         _cancellationTokenSource.Dispose();
-        State = LifecycleScopeState.Disposed;
+
+        lock (_syncRoot)
+        {
+            _state = LifecycleScopeState.Disposed;
+        }
+
+        Disposed?.Invoke(this, EventArgs.Empty);
     }
 
     private void ThrowIfDisposed()
@@ -128,6 +178,17 @@ public sealed class LifecycleScope : IDisposable, IAsyncDisposable
         if (_disposed)
         {
             throw new ObjectDisposedException(nameof(LifecycleScope));
+        }
+    }
+
+    private bool IsDisposed
+    {
+        get
+        {
+            lock (_syncRoot)
+            {
+                return _disposed;
+            }
         }
     }
 }
