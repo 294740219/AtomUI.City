@@ -1,4 +1,7 @@
 using AtomUI.City.Testing;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Text;
+using System.Text;
 
 namespace AtomUI.City.Testing.Tests;
 
@@ -58,4 +61,48 @@ public sealed class SourceGenerationTestKitTests
         Assert.Single(testCase.Sources);
         Assert.Single(testCase.ExpectedDiagnostics);
     }
+
+    [Fact]
+    public void RunExecutesSourceGeneratorAndReturnsStableSnapshot()
+    {
+        var result = SourceGenerationTestCase
+            .Create("hello generator")
+            .AddSource("Input.cs", "namespace Input { public sealed class Marker {} }")
+            .Run(new HelloGenerator());
+
+        Assert.Contains("// <generated-source hint=\"Hello.g.cs\">", result.Snapshot.Text, StringComparison.Ordinal);
+        Assert.Contains("public sealed class Hello", result.Snapshot.Text, StringComparison.Ordinal);
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Fact]
+    public async Task RunObservesCancellationToken()
+    {
+        using var cancellation = new CancellationTokenSource();
+        await cancellation.CancelAsync();
+
+        var testCase = SourceGenerationTestCase
+            .Create("hello generator")
+            .AddSource("Input.cs", "namespace Input { public sealed class Marker {} }");
+
+        Assert.Throws<OperationCanceledException>(() => testCase.Run(new HelloGenerator(), cancellation.Token));
+    }
+
+#pragma warning disable RS1042
+    private sealed class HelloGenerator : ISourceGenerator
+    {
+        public void Initialize(GeneratorInitializationContext context)
+        {
+        }
+
+        public void Execute(GeneratorExecutionContext context)
+        {
+            context.AddSource(
+                "Hello.g.cs",
+                SourceText.From(
+                    "namespace Generated { public sealed class Hello {} }",
+                    Encoding.UTF8));
+        }
+    }
+#pragma warning restore RS1042
 }

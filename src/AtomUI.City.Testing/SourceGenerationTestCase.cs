@@ -1,4 +1,8 @@
 using System.Collections.ObjectModel;
+using System.Text;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Text;
 
 namespace AtomUI.City.Testing;
 
@@ -46,5 +50,56 @@ public sealed class SourceGenerationTestCase
         _expectedDiagnostics.Add(new ExpectedDiagnostic(id));
 
         return this;
+    }
+
+    public SourceGenerationTestResult Run(
+        ISourceGenerator generator,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(generator);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var syntaxTrees = _sources
+            .Select(source => CSharpSyntaxTree.ParseText(
+                SourceText.From(source.Text, Encoding.UTF8),
+                path: source.Path,
+                cancellationToken: cancellationToken))
+            .ToArray();
+        var compilation = CSharpCompilation.Create(
+            Name,
+            syntaxTrees,
+            CreateReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(generator);
+
+        cancellationToken.ThrowIfCancellationRequested();
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var outputCompilation,
+            out var generatorDiagnostics,
+            cancellationToken);
+
+        var generatedSources = driver
+            .GetRunResult()
+            .Results
+            .SelectMany(result => result.GeneratedSources)
+            .Select(source => new GeneratedSource(source.HintName, source.SourceText.ToString()))
+            .ToArray();
+
+        return new SourceGenerationTestResult(
+            GeneratedSourceSnapshot.Create(generatedSources),
+            generatorDiagnostics,
+            outputCompilation.GetDiagnostics(cancellationToken));
+    }
+
+    private static IReadOnlyList<MetadataReference> CreateReferences()
+    {
+        return AppDomain
+            .CurrentDomain
+            .GetAssemblies()
+            .Where(assembly => !assembly.IsDynamic && !string.IsNullOrEmpty(assembly.Location))
+            .Select(assembly => MetadataReference.CreateFromFile(assembly.Location))
+            .Cast<MetadataReference>()
+            .ToArray();
     }
 }

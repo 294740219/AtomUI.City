@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
     <ProjectReference Include="../AtomUI.City.Core/AtomUI.City.Core.csproj" />
     <ProjectReference Include="../AtomUI.City.Data/AtomUI.City.Data.csproj" />
     <ProjectReference Include="../AtomUI.City.EventBus/AtomUI.City.EventBus.csproj" />
