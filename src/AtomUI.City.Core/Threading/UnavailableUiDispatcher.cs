@@ -1,8 +1,10 @@
+using AtomUI.City.Diagnostics;
+
 namespace AtomUI.City.Threading;
 
 public sealed class UnavailableUiDispatcher : IUiDispatcher
 {
-    private const string ErrorMessage = "UI dispatcher is not available. Register an IUiDispatcher implementation from Presentation or Testing before building the application host.";
+    private const string ErrorMessage = $"{HostDiagnosticIds.DispatcherUnavailable}: UI dispatcher is not available. Register an IUiDispatcher implementation from Presentation or Testing before building the application host.";
 
     public bool CheckAccess()
     {

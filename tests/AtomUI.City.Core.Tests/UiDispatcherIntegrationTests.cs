@@ -1,3 +1,4 @@
+using AtomUI.City.Diagnostics;
 using AtomUI.City.Hosting;
 using AtomUI.City.Threading;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,6 +18,29 @@ public sealed class UiDispatcherIntegrationTests
 
         Assert.False(dispatcher.CheckAccess());
         Assert.Contains("UI dispatcher", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task UnavailableDispatcherRejectsDispatchWithStableDiagnosticCode()
+    {
+        var dispatcher = new UnavailableUiDispatcher();
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            dispatcher.InvokeAsync(() => { }).AsTask());
+
+        Assert.Contains(HostDiagnosticIds.DispatcherUnavailable, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task UnavailableDispatcherHonorsPreCanceledToken()
+    {
+        var dispatcher = new UnavailableUiDispatcher();
+        using var cancellationTokenSource = new CancellationTokenSource();
+
+        await cancellationTokenSource.CancelAsync();
+
+        await Assert.ThrowsAsync<TaskCanceledException>(() =>
+            dispatcher.InvokeAsync(() => throw new InvalidOperationException("must not run"), cancellationTokenSource.Token).AsTask());
     }
 
     [Fact]
