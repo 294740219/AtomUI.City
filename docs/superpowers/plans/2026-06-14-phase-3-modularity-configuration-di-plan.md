@@ -22,4 +22,4 @@
 - [x] 写服务注册阶段边界失败测试：模块捕获 `ModuleServiceCollection` 后，Host Build 结束继续 mutating 必须失败。
 - [x] 实现 `ModuleServiceCollection.Freeze()` 并在 `ModuleRegistry.ConfigureServicesAsync` 完成后冻结。
 - [x] 同步 `docs/modules/core/features.md` 和 `docs/modules/core/implementation-plan.md`，把 Phase 3 覆盖的 Core 功能状态更新为已验证，并保持中文描述。
-- [ ] 运行完整门禁：`dotnet test tests/AtomUI.City.Core.Tests/AtomUI.City.Core.Tests.csproj`、`dotnet build AtomUICity.slnx`、`dotnet test AtomUICity.slnx --no-build`、`bash engineering/check-docs.sh`、`bash engineering/check-public-api.sh`、`git diff --check`。
+- [x] 运行完整门禁：`dotnet test tests/AtomUI.City.Core.Tests/AtomUI.City.Core.Tests.csproj`、`dotnet build AtomUICity.slnx`、`dotnet test AtomUICity.slnx --no-build`、`bash engineering/check-docs.sh`、`bash engineering/check-public-api.sh`、`git diff --check`。
