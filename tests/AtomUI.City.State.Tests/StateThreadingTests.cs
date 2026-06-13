@@ -1,3 +1,4 @@
+using AtomUI.City.Diagnostics;
 using AtomUI.City.State;
 using AtomUI.City.Threading;
 
@@ -73,20 +74,68 @@ public sealed class StateThreadingTests
     }
 
     [Fact]
-    public void BackgroundSubscriptionUsesBackgroundDispatchPolicy()
+    public async Task BackgroundSubscriptionUsesBackgroundDispatchPolicy()
     {
         var state = new WritableState<int>(0);
-        var observed = 0;
+        var observed = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
         var options = StateSubscriptionOptions.Background();
 
         state.OnChange(
-            args => observed = args.NewValue,
+            args => observed.SetResult(args.NewValue),
             options);
 
         state.SetValue(9);
 
-        Assert.Equal(9, observed);
+        Assert.Equal(9, await observed.Task.WaitAsync(TimeSpan.FromSeconds(5)));
         Assert.Equal(StateDispatchPolicy.Background, options.DispatchPolicy);
+    }
+
+    [Fact]
+    public async Task BackgroundSubscriptionDoesNotBlockSetValue()
+    {
+        var state = new WritableState<int>(0);
+        using var releaseHandler = new ManualResetEventSlim(false);
+        var handlerEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        state.OnChange(
+            _ =>
+            {
+                handlerEntered.SetResult();
+                Assert.True(releaseHandler.Wait(TimeSpan.FromSeconds(5)));
+            },
+            StateSubscriptionOptions.Background());
+
+        var setValue = Task.Run(() => state.SetValue(1));
+
+        await handlerEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var completedBeforeRelease = await Task.WhenAny(
+            setValue,
+            Task.Delay(TimeSpan.FromSeconds(1))) == setValue;
+
+        releaseHandler.Set();
+
+        await setValue.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.True(completedBeforeRelease);
+    }
+
+    [Fact]
+    public async Task BackgroundSubscriptionRecordsHandlerFailures()
+    {
+        var diagnostics = new CompletingDiagnostics();
+        var state = new WritableState<int>(0, diagnostics: diagnostics);
+
+        state.OnChange(
+            _ => throw new InvalidOperationException("bad background"),
+            StateSubscriptionOptions.Background());
+
+        state.SetValue(1);
+
+        var record = await diagnostics.NextRecord.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(StateDiagnosticIds.SubscriptionHandlerFailed, record.Code);
+        Assert.Equal(HostDiagnosticSeverity.Error, record.Severity);
+        Assert.Contains("bad background", record.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -169,6 +218,23 @@ public sealed class StateThreadingTests
             CancellationToken cancellationToken = default)
         {
             return callback(cancellationToken);
+        }
+    }
+
+    private sealed class CompletingDiagnostics : IHostDiagnostics
+    {
+        private readonly InMemoryHostDiagnostics _inner = new();
+        private readonly TaskCompletionSource<HostDiagnosticRecord> _nextRecord = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public IReadOnlyList<HostDiagnosticRecord> Records => _inner.Records;
+
+        public Task<HostDiagnosticRecord> NextRecord => _nextRecord.Task;
+
+        public void Write(HostDiagnosticRecord record)
+        {
+            _inner.Write(record);
+            _nextRecord.TrySetResult(record);
         }
     }
 }
