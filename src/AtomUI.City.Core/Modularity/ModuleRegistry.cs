@@ -1,3 +1,4 @@
+using AtomUI.City.Diagnostics;
 using AtomUI.City.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -32,6 +33,19 @@ public sealed class ModuleRegistry : IModuleRegistry
         return new ModuleRegistry(OrderByDependencies(entries));
     }
 
+    internal static ModuleRegistry CreateForTesting(IReadOnlyList<Type> moduleTypes)
+    {
+        ArgumentNullException.ThrowIfNull(moduleTypes);
+
+        var registrations = moduleTypes
+            .Select(moduleType => new ModuleRegistration(
+                moduleType,
+                () => (IModule)Activator.CreateInstance(moduleType)!))
+            .ToArray();
+
+        return Create(registrations);
+    }
+
     public async ValueTask ConfigureServicesAsync(
         ApplicationContext applicationContext,
         IServiceCollection services,
@@ -46,20 +60,36 @@ public sealed class ModuleRegistry : IModuleRegistry
         }
 
         var context = new ServiceConfigurationContext(applicationContext, services);
+        var diagnostics = TryGetDiagnostics(services);
 
         foreach (var entry in _orderedEntries)
         {
-            await entry.Module.PreConfigureServicesAsync(context, cancellationToken).ConfigureAwait(false);
+            await InvokeModuleAsync(
+                entry,
+                diagnostics,
+                "PreConfigureServices",
+                token => entry.Module.PreConfigureServicesAsync(context, token),
+                cancellationToken).ConfigureAwait(false);
         }
 
         foreach (var entry in _orderedEntries)
         {
-            await entry.Module.ConfigureServicesAsync(context, cancellationToken).ConfigureAwait(false);
+            await InvokeModuleAsync(
+                entry,
+                diagnostics,
+                "ConfigureServices",
+                token => entry.Module.ConfigureServicesAsync(context, token),
+                cancellationToken).ConfigureAwait(false);
         }
 
         foreach (var entry in _orderedEntries)
         {
-            await entry.Module.PostConfigureServicesAsync(context, cancellationToken).ConfigureAwait(false);
+            await InvokeModuleAsync(
+                entry,
+                diagnostics,
+                "PostConfigureServices",
+                token => entry.Module.PostConfigureServicesAsync(context, token),
+                cancellationToken).ConfigureAwait(false);
         }
 
         _servicesConfigured = true;
@@ -79,10 +109,16 @@ public sealed class ModuleRegistry : IModuleRegistry
         }
 
         var context = new ContributionConfigurationContext(applicationContext, services);
+        var diagnostics = services.GetService<IHostDiagnostics>();
 
         foreach (var entry in _orderedEntries)
         {
-            await entry.Module.ConfigureContributionsAsync(context, cancellationToken).ConfigureAwait(false);
+            await InvokeModuleAsync(
+                entry,
+                diagnostics,
+                "ConfigureContributions",
+                token => entry.Module.ConfigureContributionsAsync(context, token),
+                cancellationToken).ConfigureAwait(false);
         }
 
         _contributionsConfigured = true;
@@ -102,20 +138,36 @@ public sealed class ModuleRegistry : IModuleRegistry
         }
 
         var context = new ApplicationInitializationContext(applicationContext, services);
+        var diagnostics = services.GetService<IHostDiagnostics>();
 
         foreach (var entry in _orderedEntries)
         {
-            await entry.Module.OnPreApplicationInitializationAsync(context, cancellationToken).ConfigureAwait(false);
+            await InvokeModuleAsync(
+                entry,
+                diagnostics,
+                "OnPreApplicationInitialization",
+                token => entry.Module.OnPreApplicationInitializationAsync(context, token),
+                cancellationToken).ConfigureAwait(false);
         }
 
         foreach (var entry in _orderedEntries)
         {
-            await entry.Module.OnApplicationInitializationAsync(context, cancellationToken).ConfigureAwait(false);
+            await InvokeModuleAsync(
+                entry,
+                diagnostics,
+                "OnApplicationInitialization",
+                token => entry.Module.OnApplicationInitializationAsync(context, token),
+                cancellationToken).ConfigureAwait(false);
         }
 
         foreach (var entry in _orderedEntries)
         {
-            await entry.Module.OnPostApplicationInitializationAsync(context, cancellationToken).ConfigureAwait(false);
+            await InvokeModuleAsync(
+                entry,
+                diagnostics,
+                "OnPostApplicationInitialization",
+                token => entry.Module.OnPostApplicationInitializationAsync(context, token),
+                cancellationToken).ConfigureAwait(false);
         }
 
         _initialized = true;
@@ -136,10 +188,17 @@ public sealed class ModuleRegistry : IModuleRegistry
 
         _shutdown = true;
         var context = new ApplicationShutdownContext(applicationContext, services);
+        var diagnostics = services.GetService<IHostDiagnostics>();
 
         for (var index = _orderedEntries.Count - 1; index >= 0; index--)
         {
-            await _orderedEntries[index].Module.OnApplicationShutdownAsync(context, cancellationToken).ConfigureAwait(false);
+            var entry = _orderedEntries[index];
+            await InvokeModuleAsync(
+                entry,
+                diagnostics,
+                "OnApplicationShutdown",
+                token => entry.Module.OnApplicationShutdownAsync(context, token),
+                cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -166,12 +225,23 @@ public sealed class ModuleRegistry : IModuleRegistry
     private static IReadOnlyList<ModuleEntry> OrderByDependencies(IReadOnlyList<ModuleEntry> entries)
     {
         var entriesByType = entries.ToDictionary(entry => entry.Descriptor.ModuleType);
+        var duplicateId = entries
+            .GroupBy(entry => entry.Descriptor.Name, StringComparer.Ordinal)
+            .FirstOrDefault(group => group.Count() > 1);
+
+        if (duplicateId is not null)
+        {
+            throw new InvalidOperationException(
+                $"Duplicate module id '{duplicateId.Key}' declared by {string.Join(", ", duplicateId.Select(entry => entry.Descriptor.ModuleType.FullName))}.");
+        }
+
         var ordered = new List<ModuleEntry>();
         var visitStates = new Dictionary<Type, ModuleVisitState>();
+        var path = new Stack<Type>();
 
         foreach (var entry in entries)
         {
-            Visit(entry, entriesByType, visitStates, ordered);
+            Visit(entry, entriesByType, visitStates, ordered, path);
         }
 
         return ordered;
@@ -181,7 +251,8 @@ public sealed class ModuleRegistry : IModuleRegistry
         ModuleEntry entry,
         IReadOnlyDictionary<Type, ModuleEntry> entriesByType,
         IDictionary<Type, ModuleVisitState> visitStates,
-        ICollection<ModuleEntry> ordered)
+        ICollection<ModuleEntry> ordered,
+        Stack<Type> path)
     {
         if (visitStates.TryGetValue(entry.Descriptor.ModuleType, out var state))
         {
@@ -190,17 +261,24 @@ public sealed class ModuleRegistry : IModuleRegistry
                 return;
             }
 
+            var cyclePath = path
+                .Reverse()
+                .SkipWhile(type => type != entry.Descriptor.ModuleType)
+                .Append(entry.Descriptor.ModuleType)
+                .Select(type => type.FullName);
+
             throw new InvalidOperationException(
-                $"Module dependency graph contains a cycle at '{entry.Descriptor.ModuleType.FullName}'.");
+                $"Module dependency graph contains a cycle: {string.Join(" -> ", cyclePath)}.");
         }
 
         visitStates.Add(entry.Descriptor.ModuleType, ModuleVisitState.Visiting);
+        path.Push(entry.Descriptor.ModuleType);
 
         foreach (var dependency in entry.Descriptor.Dependencies)
         {
             if (entriesByType.TryGetValue(dependency.ModuleType, out var dependencyEntry))
             {
-                Visit(dependencyEntry, entriesByType, visitStates, ordered);
+                Visit(dependencyEntry, entriesByType, visitStates, ordered, path);
                 continue;
             }
 
@@ -212,7 +290,67 @@ public sealed class ModuleRegistry : IModuleRegistry
         }
 
         visitStates[entry.Descriptor.ModuleType] = ModuleVisitState.Visited;
+        path.Pop();
         ordered.Add(entry);
+    }
+
+    private static IHostDiagnostics? TryGetDiagnostics(IServiceCollection services)
+    {
+        return services
+            .LastOrDefault(descriptor => descriptor.ServiceType == typeof(IHostDiagnostics))
+            ?.ImplementationInstance as IHostDiagnostics;
+    }
+
+    private static async ValueTask InvokeModuleAsync(
+        ModuleEntry entry,
+        IHostDiagnostics? diagnostics,
+        string stage,
+        Func<CancellationToken, ValueTask> invoke,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await invoke(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            WriteModuleFailure(diagnostics, entry, stage, exception);
+
+            throw;
+        }
+    }
+
+    private static void WriteModuleFailure(
+        IHostDiagnostics? diagnostics,
+        ModuleEntry entry,
+        string stage,
+        Exception exception)
+    {
+        if (diagnostics is null)
+        {
+            return;
+        }
+
+        try
+        {
+            diagnostics.Write(new HostDiagnosticRecord(
+                HostDiagnosticIds.ModuleLifecycleFailed,
+                "Module lifecycle stage failed.",
+                HostDiagnosticSeverity.Error)
+            {
+                Context = new Dictionary<string, string?>
+                {
+                    ["moduleId"] = entry.Descriptor.Name,
+                    ["moduleType"] = entry.Descriptor.ModuleType.FullName,
+                    ["stage"] = stage,
+                    ["exceptionType"] = exception.GetType().FullName,
+                },
+            });
+        }
+        catch
+        {
+            // Diagnostics must not replace the original module failure.
+        }
     }
 
     private sealed record ModuleEntry(ModuleDescriptor Descriptor, IModule Module);

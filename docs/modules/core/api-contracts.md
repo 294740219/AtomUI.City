@@ -8,7 +8,7 @@
 | --- | --- | --- | --- |
 | Hosting | ApplicationHost, ApplicationHostBuilder, IApplicationHost, IApplicationContext | 构建和持有应用 Host。 | Build 后冻结；Start/Stop 幂等；Dispose 后 mutating API 失败。 |
 | Lifecycle | LifecycleStage, LifecyclePipeline, LifecycleScope | 阶段、中间件和所有权树。 | 按 stage 稳定执行；leaf-first 释放；异常进入 diagnostics。 |
-| Modularity | ModuleBase, IModule, ModuleDescriptor, DependsOnAttribute | 模块声明、依赖和生命周期钩子。 | 配置、服务注册、初始化、关闭严格分阶段。 |
+| Modularity | ModuleBase, IModule, ModuleDescriptor, DependsOnAttribute, ModuleServiceCollection | 模块声明、依赖和生命周期钩子。 | 配置、服务注册、初始化、关闭严格分阶段。 |
 | DependencyInjection | ServiceAttribute, ScopedServiceAttribute, ExposeServicesAttribute, dependency marker interfaces | AOT 友好的服务声明。 | 不依赖运行时扫描作为唯一发现方式。 |
 | Threading | IUiDispatcher, UnavailableUiDispatcher | UI 调度抽象。 | Core 不绑定 UI 平台。 |
 | Diagnostics | IHostDiagnostics, HostDiagnosticRecord, HostDiagnosticIds | Host 级诊断。 | 现有诊断码保持兼容，目标诊断码新增需迁移。 |
@@ -216,6 +216,56 @@
 | AOT / Trimming | 支持 generator 输出，不要求运行时扫描。 |
 | Breaking Change Rules | 修改默认 id、依赖排序或 descriptor 字段含义属于 breaking change。 |
 | Tests | `ModuleDescriptorTests` 断言默认 id、显式 id、依赖排序和错误诊断。 |
+
+### `ModuleServiceCollection`
+
+| Field | Contract |
+| --- | --- |
+| Type | `ModuleServiceCollection` |
+| Namespace | `AtomUI.City.Modularity` |
+| Assembly | `AtomUI.City.Core` |
+| Stability | Preview |
+| Feature | AUC-CORE-004 |
+| Purpose | 在 module service configuration 阶段暴露受控 service registration collection。 |
+| Owner | Module registry |
+| Created By | `ServiceConfigurationContext`。 |
+| Lifetime | 只在 module service configuration 阶段有效。 |
+| DI Lifetime | 不进入 DI；包装 Host build 阶段的 `IServiceCollection`。 |
+| Thread Safety | 与底层 `IServiceCollection` 一致，不保证并发写安全。 |
+| Disposal | 无资源；Host Build 结束后 module 不应继续持有。 |
+| Nullability | service descriptor 不得为空。 |
+| Cancellation | 无取消语义。 |
+| Failure Behavior | 调用临时 provider 创建入口必须失败，防止 module 解析运行期服务。 |
+| Diagnostics | 触发 guard 时由 module lifecycle 记录 `AUCHOST106`。 |
+| Plugin Boundary | 插件 module 只能通过该 collection 注册受控服务，不能写 Host runtime provider。 |
+| AOT / Trimming | 不执行扫描，不依赖 dynamic code。 |
+| Breaking Change Rules | 修改临时 provider guard、注册转发语义或生命周期属于 breaking change。 |
+| Tests | `ApplicationHostModuleLifecycleTests` 断言禁止 `BuildServiceProvider` 并记录诊断。 |
+
+### `ModuleServiceCollectionBuildGuardExtensions`
+
+| Field | Contract |
+| --- | --- |
+| Type | `ModuleServiceCollectionBuildGuardExtensions` |
+| Namespace | `AtomUI.City.Modularity` |
+| Assembly | `AtomUI.City.Core` |
+| Stability | Preview |
+| Feature | AUC-CORE-004 |
+| Purpose | 用更具体的 extension method 阻止 module service configuration 阶段创建临时 provider。 |
+| Owner | Module registry |
+| Created By | 静态扩展类型。 |
+| Lifetime | 编译期 API。 |
+| DI Lifetime | 不进入 DI。 |
+| Thread Safety | 无状态。 |
+| Disposal | 无释放。 |
+| Nullability | services 为 null 时抛 `ArgumentNullException`。 |
+| Cancellation | 无取消语义。 |
+| Failure Behavior | `BuildServiceProvider(ModuleServiceCollection)` 始终抛 `InvalidOperationException`。 |
+| Diagnostics | module registry 捕获异常后写 `AUCHOST106`。 |
+| Plugin Boundary | 插件 module 同样受 guard 约束。 |
+| AOT / Trimming | 静态扩展方法，不依赖 reflection。 |
+| Breaking Change Rules | 放宽或移除 guard 属于 breaking change。 |
+| Tests | `ApplicationHostModuleLifecycleTests` 断言 guard message 和 diagnostics context。 |
 
 ### `DependsOnAttribute`
 
@@ -588,6 +638,24 @@ Diagnostics: child stop 或 dispose 失败写 AUCHOST104。
 Tests: LifecycleScopeTreeTests。
 ```
 
+### `ModuleServiceCollectionBuildGuardExtensions.BuildServiceProvider`
+
+```text
+Method: ModuleServiceCollectionBuildGuardExtensions.BuildServiceProvider
+Feature: AUC-CORE-004
+Purpose: 阻止 module service configuration 阶段创建临时 ServiceProvider。
+Parameters: services 不能为 null。
+Return: 无成功返回。
+Nullability: services 为 null 时抛 ArgumentNullException。
+Cancellation: 无。
+Exceptions or Result: 始终抛 InvalidOperationException，错误消息必须说明禁止创建 temporary service provider。
+Idempotency: 每次调用都失败，不产生副作用。
+Concurrency: 无共享状态。
+Side Effects: 不构建 provider，不解析任何服务。
+Diagnostics: module registry 捕获异常后写 AUCHOST106，context 包含 moduleType 和 stage。
+Tests: ApplicationHostModuleLifecycleTests。
+```
+
 ## Public 类型覆盖
 
 | Type | 分类 | Review 规则 |
@@ -632,6 +700,8 @@ Tests: LifecycleScopeTreeTests。
 | `ModuleDependencyDescriptor` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `ModuleDescriptor` | 关键 contract | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `ModuleRegistry` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `ModuleServiceCollection` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `ModuleServiceCollectionBuildGuardExtensions` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `ServiceConfigurationContext` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `IUiDispatcher` | 关键 contract | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `UnavailableUiDispatcher` | 关键 contract | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |

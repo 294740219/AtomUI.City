@@ -5,6 +5,35 @@ namespace AtomUI.City.Core.Tests;
 public sealed class ModuleDescriptorTests
 {
     [Fact]
+    public void ModuleGraphFailureRecordsMissingDependencyPath()
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            ModuleRegistry.CreateForTesting([typeof(DependsOnMissingModule)]));
+
+        Assert.Contains(typeof(DependsOnMissingModule).FullName!, exception.Message, StringComparison.Ordinal);
+        Assert.Contains(typeof(MissingModule).FullName!, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ModuleGraphFailureRecordsCyclePath()
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            ModuleRegistry.CreateForTesting([typeof(CycleStartModule), typeof(CycleEndModule)]));
+
+        Assert.Contains(typeof(CycleStartModule).FullName!, exception.Message, StringComparison.Ordinal);
+        Assert.Contains(typeof(CycleEndModule).FullName!, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ModuleGraphFailureRecordsDuplicateModuleId()
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            ModuleRegistry.CreateForTesting([typeof(DuplicateModuleA), typeof(DuplicateModuleB)]));
+
+        Assert.Contains("DuplicateModule", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void DependenciesRejectExternalListMutation()
     {
         var sourceDependencies = new List<ModuleDependencyDescriptor>
@@ -31,4 +60,21 @@ public sealed class ModuleDescriptorTests
     private sealed class DependencyModule : ModuleBase;
 
     private sealed class ReplacementModule : ModuleBase;
+
+    [DependsOn(typeof(MissingModule))]
+    private sealed class DependsOnMissingModule : ModuleBase;
+
+    private sealed class MissingModule : ModuleBase;
+
+    [DependsOn(typeof(CycleEndModule))]
+    private sealed class CycleStartModule : ModuleBase;
+
+    [DependsOn(typeof(CycleStartModule))]
+    private sealed class CycleEndModule : ModuleBase;
+
+    [Module("DuplicateModule")]
+    private sealed class DuplicateModuleA : ModuleBase;
+
+    [Module("DuplicateModule")]
+    private sealed class DuplicateModuleB : ModuleBase;
 }

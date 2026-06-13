@@ -13,10 +13,10 @@ public sealed class ServiceConfigurationContext
         ArgumentNullException.ThrowIfNull(services);
 
         ApplicationContext = applicationContext;
-        Services = services;
+        Services = services as ModuleServiceCollection ?? new ModuleServiceCollection(services);
     }
 
     public ApplicationContext ApplicationContext { get; }
 
-    public IServiceCollection Services { get; }
+    public ModuleServiceCollection Services { get; }
 }

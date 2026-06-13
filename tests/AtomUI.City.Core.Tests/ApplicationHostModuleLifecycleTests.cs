@@ -1,3 +1,4 @@
+using AtomUI.City.Diagnostics;
 using AtomUI.City.Hosting;
 using AtomUI.City.Modularity;
 using Microsoft.Extensions.DependencyInjection;
@@ -115,6 +116,44 @@ public sealed class ApplicationHostModuleLifecycleTests
         Assert.Equal(typeof(CoreModule), registry.Modules[0].ModuleType);
     }
 
+    [Fact]
+    public void ModuleConfigureServicesRejectsTemporaryProviderCreationAndRecordsDiagnostic()
+    {
+        var diagnostics = new InMemoryHostDiagnostics();
+        var builder = ApplicationHost.CreateBuilder();
+
+        builder.ConfigureServices(services => services.AddSingleton<IHostDiagnostics>(diagnostics));
+        builder.UseModule<TemporaryProviderModule>();
+
+        var exception = Assert.Throws<InvalidOperationException>(() => builder.Build());
+
+        Assert.Contains("temporary service provider", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(diagnostics.Records, record =>
+            record.Code == HostDiagnosticIds.ModuleLifecycleFailed &&
+            record.Context["moduleType"] == typeof(TemporaryProviderModule).FullName &&
+            record.Context["stage"] == "ConfigureServices");
+    }
+
+    [Fact]
+    public async Task ModuleShutdownRunsInReverseDependencyOrder()
+    {
+        ModuleRecorder.Reset();
+        var builder = ApplicationHost.CreateBuilder();
+
+        builder
+            .UseModule<FeatureModule>()
+            .UseModule<FoundationModule>();
+
+        await using var host = builder.Build();
+
+        await host.StartAsync();
+        await host.StopAsync();
+
+        Assert.Equal(
+            ["foundation:init", "feature:init", "feature:shutdown", "foundation:shutdown"],
+            ModuleRecorder.Calls);
+    }
+
     private interface ICoreService;
 
     private sealed class CoreService : ICoreService;
@@ -172,6 +211,41 @@ public sealed class ApplicationHostModuleLifecycleTests
             ModuleRecorder.Record("Async:OnApplicationShutdown.Start");
             await Task.Yield();
             ModuleRecorder.Record("Async:OnApplicationShutdown.End");
+        }
+    }
+
+    private sealed class TemporaryProviderModule : ModuleBase
+    {
+        public override void ConfigureServices(ServiceConfigurationContext context)
+        {
+            context.Services.BuildServiceProvider();
+        }
+    }
+
+    private sealed class FoundationModule : ModuleBase
+    {
+        public override void OnApplicationInitialization(ApplicationInitializationContext context)
+        {
+            ModuleRecorder.Record("foundation:init");
+        }
+
+        public override void OnApplicationShutdown(ApplicationShutdownContext context)
+        {
+            ModuleRecorder.Record("foundation:shutdown");
+        }
+    }
+
+    [DependsOn(typeof(FoundationModule))]
+    private sealed class FeatureModule : ModuleBase
+    {
+        public override void OnApplicationInitialization(ApplicationInitializationContext context)
+        {
+            ModuleRecorder.Record("feature:init");
+        }
+
+        public override void OnApplicationShutdown(ApplicationShutdownContext context)
+        {
+            ModuleRecorder.Record("feature:shutdown");
         }
     }
 

@@ -72,11 +72,12 @@ public sealed class ApplicationHostBuilder : IApplicationHostBuilder
         _built = true;
 
         var moduleRegistry = ModuleRegistry.Create(moduleRegistrations);
+        var buildDiagnostics = GetOrCreateBuildDiagnostics();
 
         _builder.Services.AddSingleton(context);
         _builder.Services.AddSingleton<IApplicationContext>(context);
         _builder.Services.AddSingleton(Options.Create(hostOptions));
-        _builder.Services.TryAddSingleton<IHostDiagnostics, InMemoryHostDiagnostics>();
+        _builder.Services.TryAddSingleton<IHostDiagnostics>(buildDiagnostics);
         _builder.Services.TryAddSingleton<IUiDispatcher, UnavailableUiDispatcher>();
         _builder.Services.TryAddSingleton<IModuleRegistry>(moduleRegistry);
 
@@ -137,6 +138,15 @@ public sealed class ApplicationHostBuilder : IApplicationHostBuilder
         }
 
         return context;
+    }
+
+    private IHostDiagnostics GetOrCreateBuildDiagnostics()
+    {
+        var existing = _builder.Services
+            .LastOrDefault(descriptor => descriptor.ServiceType == typeof(IHostDiagnostics))
+            ?.ImplementationInstance as IHostDiagnostics;
+
+        return existing ?? new InMemoryHostDiagnostics();
     }
 
     private void ThrowIfBuilt()
