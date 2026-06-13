@@ -36,39 +36,67 @@ public sealed class ModuleTestHost : IDisposable, IAsyncDisposable
 
         foreach (var module in Modules)
         {
-            await module.Module.PreConfigureServicesAsync(CreateServiceConfigurationContext()).ConfigureAwait(false);
+            await InvokeModuleStageAsync(
+                module,
+                "PreConfigureServices",
+                "AUCTEST301",
+                () => module.Module.PreConfigureServicesAsync(CreateServiceConfigurationContext())).ConfigureAwait(false);
         }
 
         foreach (var module in Modules)
         {
-            await module.Module.ConfigureServicesAsync(CreateServiceConfigurationContext()).ConfigureAwait(false);
+            await InvokeModuleStageAsync(
+                module,
+                "ConfigureServices",
+                "AUCTEST301",
+                () => module.Module.ConfigureServicesAsync(CreateServiceConfigurationContext())).ConfigureAwait(false);
         }
 
         foreach (var module in Modules)
         {
-            await module.Module.PostConfigureServicesAsync(CreateServiceConfigurationContext()).ConfigureAwait(false);
+            await InvokeModuleStageAsync(
+                module,
+                "PostConfigureServices",
+                "AUCTEST301",
+                () => module.Module.PostConfigureServicesAsync(CreateServiceConfigurationContext())).ConfigureAwait(false);
         }
 
         _serviceProvider = _services.BuildServiceProvider();
 
         foreach (var module in Modules)
         {
-            await module.Module.ConfigureContributionsAsync(CreateContributionConfigurationContext()).ConfigureAwait(false);
+            await InvokeModuleStageAsync(
+                module,
+                "ConfigureContributions",
+                "AUCTEST301",
+                () => module.Module.ConfigureContributionsAsync(CreateContributionConfigurationContext())).ConfigureAwait(false);
         }
 
         foreach (var module in Modules)
         {
-            await module.Module.OnPreApplicationInitializationAsync(CreateApplicationInitializationContext()).ConfigureAwait(false);
+            await InvokeModuleStageAsync(
+                module,
+                "OnPreApplicationInitialization",
+                "AUCTEST301",
+                () => module.Module.OnPreApplicationInitializationAsync(CreateApplicationInitializationContext())).ConfigureAwait(false);
         }
 
         foreach (var module in Modules)
         {
-            await module.Module.OnApplicationInitializationAsync(CreateApplicationInitializationContext()).ConfigureAwait(false);
+            await InvokeModuleStageAsync(
+                module,
+                "OnApplicationInitialization",
+                "AUCTEST301",
+                () => module.Module.OnApplicationInitializationAsync(CreateApplicationInitializationContext())).ConfigureAwait(false);
         }
 
         foreach (var module in Modules)
         {
-            await module.Module.OnPostApplicationInitializationAsync(CreateApplicationInitializationContext()).ConfigureAwait(false);
+            await InvokeModuleStageAsync(
+                module,
+                "OnPostApplicationInitialization",
+                "AUCTEST301",
+                () => module.Module.OnPostApplicationInitializationAsync(CreateApplicationInitializationContext())).ConfigureAwait(false);
         }
 
         _initialized = true;
@@ -87,7 +115,12 @@ public sealed class ModuleTestHost : IDisposable, IAsyncDisposable
         {
             for (var index = Modules.Count - 1; index >= 0; index--)
             {
-                await Modules[index].Module.OnApplicationShutdownAsync(CreateApplicationShutdownContext()).ConfigureAwait(false);
+                var module = Modules[index];
+                await InvokeModuleStageAsync(
+                    module,
+                    "OnApplicationShutdown",
+                    "AUCTEST302",
+                    () => module.Module.OnApplicationShutdownAsync(CreateApplicationShutdownContext())).ConfigureAwait(false);
             }
         }
 
@@ -142,6 +175,26 @@ public sealed class ModuleTestHost : IDisposable, IAsyncDisposable
     private IServiceProvider GetServiceProvider()
     {
         return _serviceProvider ?? throw new InvalidOperationException("Module test host has not been initialized.");
+    }
+
+    private async ValueTask InvokeModuleStageAsync(
+        ModuleTestRecord module,
+        string stage,
+        string diagnosticCode,
+        Func<ValueTask> invoke)
+    {
+        try
+        {
+            await invoke().ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            _host.Diagnostics.Add(
+                diagnosticCode,
+                $"Module '{module.Name}' ({module.Module.GetType().FullName}) failed during {stage}: {exception.GetType().FullName}.");
+
+            throw;
+        }
     }
 
     private async ValueTask DisposeServiceProviderAsync()

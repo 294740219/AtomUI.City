@@ -67,6 +67,43 @@ public sealed class ModuleTestHostTests
     }
 
     [Fact]
+    public void BuildFailsWhenRequiredDependencyIsMissing()
+    {
+        var builder = ModuleTestHost.CreateBuilder()
+            .UseModule("App", new DependsOnMissingModule());
+
+        var exception = Assert.Throws<InvalidOperationException>(() => builder.Build());
+
+        Assert.Contains(nameof(DependsOnMissingModule), exception.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(MissingModule), exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task InitializeAsyncRecordsDiagnosticsWhenModuleStageFails()
+    {
+        await using var host = ModuleTestHost.CreateBuilder()
+            .UseModule("Failing", new FailingInitializationModule())
+            .Build();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(async () => await host.InitializeAsync());
+
+        Assert.True(host.Host.Diagnostics.Contains("AUCTEST301"));
+    }
+
+    [Fact]
+    public async Task ShutdownAsyncRecordsDiagnosticsWhenModuleStageFails()
+    {
+        await using var host = ModuleTestHost.CreateBuilder()
+            .UseModule("Failing", new FailingShutdownModule())
+            .Build();
+
+        await host.InitializeAsync();
+        await Assert.ThrowsAsync<InvalidOperationException>(async () => await host.ShutdownAsync());
+
+        Assert.True(host.Host.Diagnostics.Contains("AUCTEST302"));
+    }
+
+    [Fact]
     public async Task ShutdownAsyncRunsModulesInReverseRegistrationOrder()
     {
         var calls = new List<string>();
@@ -171,4 +208,25 @@ public sealed class ModuleTestHostTests
 
     [DependsOn(typeof(CoreModule))]
     private sealed class AppModule(List<string> calls) : RecordingModule("App", calls);
+
+    [DependsOn(typeof(MissingModule))]
+    private sealed class DependsOnMissingModule : ModuleBase;
+
+    private sealed class MissingModule : ModuleBase;
+
+    private sealed class FailingInitializationModule : ModuleBase
+    {
+        public override void OnApplicationInitialization(ApplicationInitializationContext context)
+        {
+            throw new InvalidOperationException("module initialization failed");
+        }
+    }
+
+    private sealed class FailingShutdownModule : ModuleBase
+    {
+        public override void OnApplicationShutdown(ApplicationShutdownContext context)
+        {
+            throw new InvalidOperationException("module shutdown failed");
+        }
+    }
 }
