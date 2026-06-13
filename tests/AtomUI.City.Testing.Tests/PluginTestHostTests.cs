@@ -5,6 +5,30 @@ namespace AtomUI.City.Testing.Tests;
 public sealed class PluginTestHostTests
 {
     [Fact]
+    public void BuildFreezesPluginTestHostBuilder()
+    {
+        var builder = PluginTestHost.CreateBuilder()
+            .UsePlugin("Sample.Plugin", "1.0.0");
+
+        using var host = builder.Build();
+
+        Assert.Throws<InvalidOperationException>(() => builder.UsePlugin("Other.Plugin", "1.0.0"));
+        Assert.Throws<InvalidOperationException>(() => builder.Build());
+    }
+
+    [Fact]
+    public void BuildRejectsDuplicatePluginIds()
+    {
+        var builder = PluginTestHost.CreateBuilder()
+            .UsePlugin("Sample.Plugin", "1.0.0")
+            .UsePlugin("Sample.Plugin", "2.0.0");
+
+        var exception = Assert.Throws<InvalidOperationException>(() => builder.Build());
+
+        Assert.Contains("Sample.Plugin", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task InstallAsyncCreatesPluginRecordInTestDirectory()
     {
         await using var host = PluginTestHost
