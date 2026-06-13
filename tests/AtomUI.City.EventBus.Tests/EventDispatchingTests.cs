@@ -49,6 +49,13 @@ public sealed class EventDispatchingTests
         Assert.Equal(EventDispatchPolicy.Background, Assert.Single(result.Deliveries).DispatchPolicy);
     }
 
+    [Fact]
+    public void SubscriptionOptionsRejectUnknownErrorPolicy()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            EventSubscriptionOptions.Serialized.WithErrorPolicy((EventErrorPolicy)999));
+    }
+
     private sealed record TestEvent(string Value);
 
     private sealed class RecordingDispatcher : IUiDispatcher

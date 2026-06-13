@@ -50,6 +50,14 @@ public sealed class EventSubscriptionOptions
 
     public EventSubscriptionOptions WithErrorPolicy(EventErrorPolicy errorPolicy)
     {
+        if (!Enum.IsDefined(errorPolicy))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(errorPolicy),
+                errorPolicy,
+                "Event error policy is not supported.");
+        }
+
         return new EventSubscriptionOptions(
             DispatchPolicy,
             UiDispatcher,
