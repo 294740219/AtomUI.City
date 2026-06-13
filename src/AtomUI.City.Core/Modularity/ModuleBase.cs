@@ -6,6 +6,9 @@ public abstract class ModuleBase : IModule
         ServiceConfigurationContext context,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(context);
+        cancellationToken.ThrowIfCancellationRequested();
+
         PreConfigureServices(context);
 
         return ValueTask.CompletedTask;
@@ -19,6 +22,9 @@ public abstract class ModuleBase : IModule
         ServiceConfigurationContext context,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(context);
+        cancellationToken.ThrowIfCancellationRequested();
+
         ConfigureServices(context);
 
         return ValueTask.CompletedTask;
@@ -32,6 +38,9 @@ public abstract class ModuleBase : IModule
         ServiceConfigurationContext context,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(context);
+        cancellationToken.ThrowIfCancellationRequested();
+
         PostConfigureServices(context);
 
         return ValueTask.CompletedTask;
@@ -45,6 +54,9 @@ public abstract class ModuleBase : IModule
         ContributionConfigurationContext context,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(context);
+        cancellationToken.ThrowIfCancellationRequested();
+
         ConfigureContributions(context);
 
         return ValueTask.CompletedTask;
@@ -58,6 +70,9 @@ public abstract class ModuleBase : IModule
         ApplicationInitializationContext context,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(context);
+        cancellationToken.ThrowIfCancellationRequested();
+
         OnPreApplicationInitialization(context);
 
         return ValueTask.CompletedTask;
@@ -71,6 +86,9 @@ public abstract class ModuleBase : IModule
         ApplicationInitializationContext context,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(context);
+        cancellationToken.ThrowIfCancellationRequested();
+
         OnApplicationInitialization(context);
 
         return ValueTask.CompletedTask;
@@ -84,6 +102,9 @@ public abstract class ModuleBase : IModule
         ApplicationInitializationContext context,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(context);
+        cancellationToken.ThrowIfCancellationRequested();
+
         OnPostApplicationInitialization(context);
 
         return ValueTask.CompletedTask;
@@ -97,6 +118,9 @@ public abstract class ModuleBase : IModule
         ApplicationShutdownContext context,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(context);
+        cancellationToken.ThrowIfCancellationRequested();
+
         OnApplicationShutdown(context);
 
         return ValueTask.CompletedTask;

@@ -55,6 +55,28 @@ public sealed class ModuleDescriptorTests
         Assert.False(descriptor.Dependencies[0].Optional);
     }
 
+    [Fact]
+    public void ModuleDescriptorRejectsNonModuleType()
+    {
+        var exception = Assert.Throws<ArgumentException>(() => new ModuleDescriptor(
+            "Invalid",
+            typeof(string),
+            version: null,
+            description: null,
+            []));
+
+        Assert.Contains(nameof(IModule), exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ModuleDependencyDescriptorRejectsNonModuleType()
+    {
+        var exception = Assert.Throws<ArgumentException>(() =>
+            new ModuleDependencyDescriptor(typeof(string), optional: false));
+
+        Assert.Contains(nameof(IModule), exception.Message, StringComparison.Ordinal);
+    }
+
     private sealed class TestModule : ModuleBase;
 
     private sealed class DependencyModule : ModuleBase;

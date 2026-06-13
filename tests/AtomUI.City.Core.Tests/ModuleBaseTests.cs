@@ -56,6 +56,79 @@ public sealed class ModuleBaseTests
         await module.OnApplicationShutdownAsync(new ApplicationShutdownContext(applicationContext, serviceProvider));
     }
 
+    [Fact]
+    public async Task AsyncLifecycleMethodsRejectNullContext()
+    {
+        var module = new EmptyModule();
+
+        await Assert.ThrowsAsync<ArgumentNullException>(async () => await module.PreConfigureServicesAsync(null!));
+        await Assert.ThrowsAsync<ArgumentNullException>(async () => await module.ConfigureServicesAsync(null!));
+        await Assert.ThrowsAsync<ArgumentNullException>(async () => await module.PostConfigureServicesAsync(null!));
+        await Assert.ThrowsAsync<ArgumentNullException>(async () => await module.ConfigureContributionsAsync(null!));
+        await Assert.ThrowsAsync<ArgumentNullException>(async () => await module.OnPreApplicationInitializationAsync(null!));
+        await Assert.ThrowsAsync<ArgumentNullException>(async () => await module.OnApplicationInitializationAsync(null!));
+        await Assert.ThrowsAsync<ArgumentNullException>(async () => await module.OnPostApplicationInitializationAsync(null!));
+        await Assert.ThrowsAsync<ArgumentNullException>(async () => await module.OnApplicationShutdownAsync(null!));
+    }
+
+    [Fact]
+    public async Task AsyncLifecycleMethodsObserveCancellationBeforeSynchronousConvenienceMethod()
+    {
+        var applicationContext = new ApplicationContext();
+        var services = new ServiceCollection();
+        using var serviceProvider = services.BuildServiceProvider();
+        using var cancellation = new CancellationTokenSource();
+        var calls = new List<string>();
+        var module = new RecordingModule(calls);
+
+        cancellation.Cancel();
+
+        await AssertCanceledBeforeSyncCall(
+            token => module.PreConfigureServicesAsync(new ServiceConfigurationContext(applicationContext, services), token),
+            calls,
+            cancellation.Token);
+        await AssertCanceledBeforeSyncCall(
+            token => module.ConfigureServicesAsync(new ServiceConfigurationContext(applicationContext, services), token),
+            calls,
+            cancellation.Token);
+        await AssertCanceledBeforeSyncCall(
+            token => module.PostConfigureServicesAsync(new ServiceConfigurationContext(applicationContext, services), token),
+            calls,
+            cancellation.Token);
+        await AssertCanceledBeforeSyncCall(
+            token => module.ConfigureContributionsAsync(new ContributionConfigurationContext(applicationContext, serviceProvider), token),
+            calls,
+            cancellation.Token);
+        await AssertCanceledBeforeSyncCall(
+            token => module.OnPreApplicationInitializationAsync(new ApplicationInitializationContext(applicationContext, serviceProvider), token),
+            calls,
+            cancellation.Token);
+        await AssertCanceledBeforeSyncCall(
+            token => module.OnApplicationInitializationAsync(new ApplicationInitializationContext(applicationContext, serviceProvider), token),
+            calls,
+            cancellation.Token);
+        await AssertCanceledBeforeSyncCall(
+            token => module.OnPostApplicationInitializationAsync(new ApplicationInitializationContext(applicationContext, serviceProvider), token),
+            calls,
+            cancellation.Token);
+        await AssertCanceledBeforeSyncCall(
+            token => module.OnApplicationShutdownAsync(new ApplicationShutdownContext(applicationContext, serviceProvider), token),
+            calls,
+            cancellation.Token);
+    }
+
+    private static async Task AssertCanceledBeforeSyncCall(
+        Func<CancellationToken, ValueTask> invoke,
+        List<string> calls,
+        CancellationToken cancellationToken)
+    {
+        calls.Clear();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(async () => await invoke(cancellationToken));
+
+        Assert.Empty(calls);
+    }
+
     private sealed class RecordingModule(List<string> calls) : ModuleBase
     {
         public override void PreConfigureServices(ServiceConfigurationContext context)

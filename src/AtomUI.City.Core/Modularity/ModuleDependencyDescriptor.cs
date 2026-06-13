@@ -6,6 +6,13 @@ public sealed class ModuleDependencyDescriptor
     {
         ArgumentNullException.ThrowIfNull(moduleType);
 
+        if (!typeof(IModule).IsAssignableFrom(moduleType))
+        {
+            throw new ArgumentException(
+                $"Module dependency type '{moduleType.FullName}' must implement {nameof(IModule)}.",
+                nameof(moduleType));
+        }
+
         ModuleType = moduleType;
         Optional = optional;
     }
