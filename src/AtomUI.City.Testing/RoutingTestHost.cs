@@ -5,9 +5,12 @@ public sealed class RoutingTestHost
     internal RoutingTestHost(IReadOnlyList<RouteTestDefinition> routes)
     {
         Routes = Array.AsReadOnly(routes.ToArray());
+        Diagnostics = new TestDiagnostics();
     }
 
     public IReadOnlyList<RouteTestDefinition> Routes { get; }
+
+    public TestDiagnostics Diagnostics { get; }
 
     public static RoutingTestHostBuilder CreateBuilder()
     {
@@ -54,7 +57,19 @@ public sealed class RoutingTestHost
             }
         }
 
+        Diagnostics.Add("AUCTEST501", $"Route not found for path '{path}'.");
+
         return RouteTestMatch.NotFound();
+    }
+
+    public ValueTask<RouteTestMatch> NavigateAsync(
+        string path,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return ValueTask.FromResult(Match(path));
     }
 
     private static string[] SplitPath(string path)

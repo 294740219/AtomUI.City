@@ -11,7 +11,7 @@
 | AUC-TESTING-003 | Deterministic Scheduler | Implemented | DeterministicScheduler | SharedTestUtilitiesTests |
 | AUC-TESTING-004 | Module Test Host | Implemented | ModuleTestHost, ModuleTestHostBuilder | ModuleTestHostTests |
 | AUC-TESTING-005 | Plugin Test Host | Implemented | PluginTestHost, PluginTestHostBuilder | PluginTestHostTests |
-| AUC-TESTING-006 | Routing Test Host | Ready to Start Product Implementation | RoutingTestHost, RoutingTestHostBuilder | RoutingTestHostTests |
+| AUC-TESTING-006 | Routing Test Host | Implemented | RoutingTestHost, RoutingTestHostBuilder | RoutingTestHostTests |
 | AUC-TESTING-007 | Source Generation Kit | Ready to Start Product Implementation | SourceGenerationTestCase, GeneratedSourceSnapshot | SourceGenerationTestKitTests |
 | AUC-TESTING-008 | AOT Check | Ready to Start Product Implementation | AotCompatibilityCheck, AotCompatibilityDiagnostic | AotCompatibilityCheckTests |
 | AUC-TESTING-009 | Test Layers | Ready to Start Product Implementation | TestLayerAttribute, TestLayerNames | TestLayerTests |
@@ -105,7 +105,7 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-TESTING-006 Routing Test Host
 
 Feature ID: `AUC-TESTING-006`
-Status: Ready to Start Product Implementation
+Status: Implemented
 Goal: 测试 route graph、match 和 navigation。
 Public Contract: RoutingTestHost, RoutingTestHostBuilder
 Runtime / Build Behavior: 构造 route definitions，执行 match/navigation helper。

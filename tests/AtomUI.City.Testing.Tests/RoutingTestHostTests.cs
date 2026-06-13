@@ -62,6 +62,34 @@ public sealed class RoutingTestHostTests
     }
 
     [Fact]
+    public void MatchRecordsDiagnosticsWhenRouteIsNotFound()
+    {
+        var host = RoutingTestHost
+            .CreateBuilder()
+            .MapRoute("customer-details", "/customers/{id}", typeof(CustomerDetailsViewModel))
+            .Build();
+
+        host.Match("/orders/42");
+
+        Assert.True(host.Diagnostics.Contains("AUCTEST501"));
+    }
+
+    [Fact]
+    public async Task NavigateAsyncObservesCancellationToken()
+    {
+        using var cancellation = new CancellationTokenSource();
+        await cancellation.CancelAsync();
+        var host = RoutingTestHost
+            .CreateBuilder()
+            .MapRoute("customer-details", "/customers/{id}", typeof(CustomerDetailsViewModel))
+            .Build();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            async () => await host.NavigateAsync("/customers/42", cancellation.Token));
+        Assert.False(host.Diagnostics.Contains("AUCTEST501"));
+    }
+
+    [Fact]
     public void RoutesRejectExternalMutation()
     {
         var host = RoutingTestHost
