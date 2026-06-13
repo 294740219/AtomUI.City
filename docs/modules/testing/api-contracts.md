@@ -865,6 +865,40 @@
 | Diagnostics | `Diagnostics` 保存 generator diagnostics；`CompilationDiagnostics` 保存 output compilation diagnostics。 |
 | Tests | `SourceGenerationTestKitTests`。 |
 
+### `AotCompatibilityCheck.ForbidDefaultAotPatterns`
+
+| Field | Contract |
+| --- | --- |
+| Feature | AUC-TESTING-008 |
+| Purpose | 注册 Testing 内置 AOT 风险规则，包括 runtime reflection scan、unbounded activator 和 dynamic code。 |
+| Parameters | 无。 |
+| Return | 当前 `AotCompatibilityCheck`。 |
+| Nullability | 无。 |
+| Cancellation | 无。 |
+| Exceptions or Result | 重复注册同一 diagnostic id 和 pattern 时不重复添加。 |
+| Idempotency | 幂等。 |
+| Concurrency | 配置阶段不保证线程安全。 |
+| Side Effects | 修改内部 forbidden pattern rule set。 |
+| Diagnostics | Evaluate 时返回匹配 diagnostics。 |
+| Tests | `AotCompatibilityCheckTests`。 |
+
+### `AotCompatibilityCheck.Evaluate`
+
+| Field | Contract |
+| --- | --- |
+| Feature | AUC-TESTING-008 |
+| Purpose | 扫描 source files，返回命中的 AOT risk diagnostics。 |
+| Parameters | `sources` 不能为 null；`cancellationToken` 在每个 source 和 rule 扫描前观察。 |
+| Return | immutable `AotCompatibilityDiagnostic` snapshot。 |
+| Nullability | `sources` 不接受 null；返回集合不为空。 |
+| Cancellation | token 取消时抛 `OperationCanceledException`，不返回部分 diagnostics。 |
+| Exceptions or Result | source 为 null 时由枚举访问抛出；pattern match 不抛异常。 |
+| Idempotency | 同一输入重复 Evaluate 返回等价 diagnostics。 |
+| Concurrency | rule set 不变时可并发 Evaluate。 |
+| Side Effects | 无。 |
+| Diagnostics | diagnostic message 包含 source path 和 pattern。 |
+| Tests | `AotCompatibilityCheckTests`。 |
+
 ## Public 类型覆盖
 
 | Type | 分类 | Review 规则 |
