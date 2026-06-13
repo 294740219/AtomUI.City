@@ -644,6 +644,125 @@
 | Diagnostics | shutdown 失败写 `AUCTEST302`；内部 Host dispose 写 `AUCTEST001`。 |
 | Tests | `ModuleTestHostTests`。 |
 
+### `PluginTestHostBuilder.UsePlugin`
+
+| Field | Contract |
+| --- | --- |
+| Feature | AUC-TESTING-005 |
+| Purpose | 声明测试插件包 id 和 version。 |
+| Parameters | `id` 和 `version` 不能为空或空白。 |
+| Return | 当前 `PluginTestHostBuilder`。 |
+| Nullability | `id` 和 `version` 不接受 null。 |
+| Cancellation | 无。 |
+| Exceptions or Result | 参数非法抛 `ArgumentException`；Build 后调用抛 `InvalidOperationException`。 |
+| Idempotency | 每次调用追加一个 package；duplicate plugin id 在 Build 时失败。 |
+| Concurrency | 配置阶段不保证线程安全。 |
+| Side Effects | 只修改 builder 内部 package registration。 |
+| Diagnostics | Build 前不写诊断。 |
+| Tests | `PluginTestHostTests`。 |
+
+### `PluginTestHostBuilder.Build`
+
+| Field | Contract |
+| --- | --- |
+| Feature | AUC-TESTING-005 |
+| Purpose | 冻结 builder，验证 duplicate plugin id，并创建内部 `TestHost`。 |
+| Parameters | 无。 |
+| Return | 新的 `PluginTestHost`。 |
+| Nullability | 返回值不能为空。 |
+| Cancellation | 同步构建，不接收 token。 |
+| Exceptions or Result | 重复 Build 或 duplicate plugin id 抛 `InvalidOperationException`。 |
+| Idempotency | 每个 builder 只允许成功 Build 一次。 |
+| Concurrency | Build 必须外部串行。 |
+| Side Effects | 创建内部 `TestHost` 和 plugin-host 临时目录。 |
+| Diagnostics | 插件 unload/revoke 行为写入返回 Host 的 diagnostics。 |
+| Tests | `PluginTestHostTests`。 |
+
+### `PluginTestHost.InstallAsync`
+
+| Field | Contract |
+| --- | --- |
+| Feature | AUC-TESTING-005 |
+| Purpose | 在测试目录中安装声明过的插件 package，并写入最小 `plugin.json`。 |
+| Parameters | `pluginId` 不能为空或空白；`cancellationToken` 在 IO 前观察。 |
+| Return | `PluginTestRecord`。 |
+| Nullability | `pluginId` 不接受 null；返回值不能为空。 |
+| Cancellation | token 取消时抛 `OperationCanceledException`，不提交 install record。 |
+| Exceptions or Result | 未声明 package 抛 `KeyNotFoundException`；Dispose 后调用抛 `ObjectDisposedException`。 |
+| Idempotency | 同一插件重复 install 返回并更新同一 record，状态为 Installed。 |
+| Concurrency | 同一 plugin id lifecycle 由测试串行驱动。 |
+| Side Effects | 创建测试插件目录和 manifest 文件。 |
+| Diagnostics | install 成功不写诊断；失败由异常暴露。 |
+| Tests | `PluginTestHostTests`。 |
+
+### `PluginTestHost.ActivateAsync` 和 `PluginTestHost.DeactivateAsync`
+
+| Field | Contract |
+| --- | --- |
+| Feature | AUC-TESTING-005 |
+| Purpose | 切换已安装插件的测试状态。 |
+| Parameters | `pluginId` 不能为空或空白；`cancellationToken` 在状态变更前观察。 |
+| Return | 更新后的 `PluginTestRecord`。 |
+| Nullability | `pluginId` 不接受 null；返回值不能为空。 |
+| Cancellation | token 取消时抛 `OperationCanceledException`，不提交状态变更。 |
+| Exceptions or Result | 未安装插件抛 `KeyNotFoundException`；Dispose 后调用抛 `ObjectDisposedException`。 |
+| Idempotency | 重复 activate/deactivate 将状态稳定设置为目标状态。 |
+| Concurrency | 同一 plugin id lifecycle 由测试串行驱动。 |
+| Side Effects | 修改 record state。 |
+| Diagnostics | 成功状态切换不写诊断。 |
+| Tests | `PluginTestHostTests`。 |
+
+### `PluginTestHost.RegisterContribution`
+
+| Field | Contract |
+| --- | --- |
+| Feature | AUC-TESTING-005 |
+| Purpose | 记录插件贡献 owner，用于 unload 或 Dispose 时断言 revoke。 |
+| Parameters | `pluginId` 和 `contributionId` 不能为空或空白。 |
+| Return | 更新后的 `PluginTestRecord`。 |
+| Nullability | 参数不接受 null；返回值不能为空。 |
+| Cancellation | 无。 |
+| Exceptions or Result | 未安装插件抛 `KeyNotFoundException`；Dispose 后调用抛 `ObjectDisposedException`。 |
+| Idempotency | 同一 contribution id 重复注册只保留一个 owner entry。 |
+| Concurrency | 同一 plugin id 由测试串行驱动。 |
+| Side Effects | 修改 record contributions snapshot。 |
+| Diagnostics | register 成功不写诊断；unload revoke 写 `AUCTEST401`。 |
+| Tests | `PluginTestHostTests`。 |
+
+### `PluginTestHost.UnloadAsync`
+
+| Field | Contract |
+| --- | --- |
+| Feature | AUC-TESTING-005 |
+| Purpose | 卸载测试插件，撤销该插件的所有 contribution owner。 |
+| Parameters | `pluginId` 不能为空或空白；`cancellationToken` 在状态变更前观察。 |
+| Return | 更新后的 `PluginTestRecord`。 |
+| Nullability | `pluginId` 不接受 null；返回值不能为空。 |
+| Cancellation | token 取消时抛 `OperationCanceledException`，不提交 unload。 |
+| Exceptions or Result | 未安装插件抛 `KeyNotFoundException`；Dispose 后调用抛 `ObjectDisposedException`。 |
+| Idempotency | 重复 unload 保持 Unloaded 状态，不重复增加 revoke counter。 |
+| Concurrency | 同一 plugin id lifecycle 由测试串行驱动。 |
+| Side Effects | 清空 contributions，设置 state 为 Unloaded。 |
+| Diagnostics | 撤销至少一个 contribution 时写 `AUCTEST401`，消息包含 plugin id 和 revoke count。 |
+| Tests | `PluginTestHostTests`。 |
+
+### `PluginTestHost.Dispose` 和 `PluginTestHost.DisposeAsync`
+
+| Field | Contract |
+| --- | --- |
+| Feature | AUC-TESTING-005 |
+| Purpose | 自动 unload 所有未卸载插件并释放内部 `TestHost`。 |
+| Parameters | 无。 |
+| Return | `Dispose` 无返回；`DisposeAsync` 返回释放完成的 `ValueTask`。 |
+| Nullability | 无。 |
+| Cancellation | Dispose 不接收 token。 |
+| Exceptions or Result | 重复 Dispose 幂等；Dispose 后 mutating API 抛 `ObjectDisposedException`。 |
+| Idempotency | 幂等，不重复增加 revoke counter。 |
+| Concurrency | 单测试线程串行释放。 |
+| Side Effects | 清空所有 record contributions，设置未卸载 record 为 Unloaded。 |
+| Diagnostics | 自动 revoke contribution 时写 `AUCTEST401`；内部 Host dispose 写 `AUCTEST001`。 |
+| Tests | `PluginTestHostTests`。 |
+
 ## Public 类型覆盖
 
 | Type | 分类 | Review 规则 |
