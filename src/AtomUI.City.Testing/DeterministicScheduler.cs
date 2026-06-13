@@ -1,8 +1,19 @@
 namespace AtomUI.City.Testing;
 
-public sealed class DeterministicScheduler
+public sealed class DeterministicScheduler : IDisposable
 {
     private readonly PriorityQueue<ScheduledWorkItem, DateTimeOffset> _scheduledWork = new();
+    private bool _disposed;
+
+    public DeterministicScheduler()
+        : this(new TestDiagnostics())
+    {
+    }
+
+    public DeterministicScheduler(TestDiagnostics diagnostics)
+    {
+        ArgumentNullException.ThrowIfNull(diagnostics);
+    }
 
     public DateTimeOffset Now { get; private set; } = DateTimeOffset.UnixEpoch;
 
@@ -11,6 +22,7 @@ public sealed class DeterministicScheduler
     public void Schedule(TimeSpan delay, Action callback)
     {
         ArgumentNullException.ThrowIfNull(callback);
+        ThrowIfDisposed();
 
         if (delay < TimeSpan.Zero)
         {
@@ -23,6 +35,8 @@ public sealed class DeterministicScheduler
 
     public void AdvanceBy(TimeSpan duration)
     {
+        ThrowIfDisposed();
+
         if (duration < TimeSpan.Zero)
         {
             throw new ArgumentOutOfRangeException(nameof(duration), duration, "Duration cannot be negative.");
@@ -34,10 +48,31 @@ public sealed class DeterministicScheduler
 
     public void RunDueWork()
     {
+        ThrowIfDisposed();
+
         while (_scheduledWork.TryPeek(out var workItem, out var dueAt) && dueAt <= Now)
         {
             _scheduledWork.Dequeue();
             workItem.Callback();
+        }
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        _scheduledWork.Clear();
+    }
+
+    private void ThrowIfDisposed()
+    {
+        if (_disposed)
+        {
+            throw new ObjectDisposedException(nameof(DeterministicScheduler));
         }
     }
 

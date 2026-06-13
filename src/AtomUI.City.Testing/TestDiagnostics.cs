@@ -6,6 +6,7 @@ public sealed class TestDiagnostics
 {
     private readonly List<TestDiagnosticEntry> _entries = [];
     private readonly ReadOnlyCollection<TestDiagnosticEntry> _readOnlyEntries;
+    private bool _frozen;
 
     public TestDiagnostics()
     {
@@ -19,6 +20,11 @@ public sealed class TestDiagnostics
         ArgumentException.ThrowIfNullOrWhiteSpace(code);
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
 
+        if (_frozen)
+        {
+            throw new ObjectDisposedException(nameof(TestDiagnostics));
+        }
+
         _entries.Add(new TestDiagnosticEntry(code, message, layer));
     }
 
@@ -27,5 +33,10 @@ public sealed class TestDiagnostics
         ArgumentException.ThrowIfNullOrWhiteSpace(code);
 
         return _entries.Any(entry => string.Equals(entry.Code, code, StringComparison.Ordinal));
+    }
+
+    internal void Freeze()
+    {
+        _frozen = true;
     }
 }

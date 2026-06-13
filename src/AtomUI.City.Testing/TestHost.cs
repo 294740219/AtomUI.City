@@ -53,7 +53,11 @@ public sealed class TestHost : IDisposable, IAsyncDisposable
 
         _disposed = true;
         StopAsync().AsTask().GetAwaiter().GetResult();
+        Dispatcher.Dispose();
+        Scheduler.Dispose();
+        Diagnostics.Add("AUCTEST001", $"Test host disposed. Directory: {Directory.RootPath}");
         Directory.Dispose();
+        Diagnostics.Freeze();
     }
 
     public async ValueTask DisposeAsync()
@@ -65,6 +69,10 @@ public sealed class TestHost : IDisposable, IAsyncDisposable
 
         _disposed = true;
         await StopAsync().ConfigureAwait(false);
+        Dispatcher.Dispose();
+        Scheduler.Dispose();
+        Diagnostics.Add("AUCTEST001", $"Test host disposed. Directory: {Directory.RootPath}");
         Directory.Dispose();
+        Diagnostics.Freeze();
     }
 }

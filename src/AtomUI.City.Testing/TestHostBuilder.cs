@@ -7,10 +7,12 @@ public sealed class TestHostBuilder
     private readonly Dictionary<string, object?> _properties = new(StringComparer.Ordinal);
     private string? _directoryName;
     private bool _keepDirectoryOnDispose;
+    private bool _built;
 
     public TestHostBuilder UseProperty(string key, object? value)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        ThrowIfBuilt();
 
         _properties[key] = value;
 
@@ -20,6 +22,7 @@ public sealed class TestHostBuilder
     public TestHostBuilder UseDirectoryName(string name)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ThrowIfBuilt();
 
         _directoryName = name;
 
@@ -28,6 +31,8 @@ public sealed class TestHostBuilder
 
     public TestHostBuilder KeepDirectoryOnDispose()
     {
+        ThrowIfBuilt();
+
         _keepDirectoryOnDispose = true;
 
         return this;
@@ -35,6 +40,8 @@ public sealed class TestHostBuilder
 
     public TestHost Build()
     {
+        ThrowIfBuilt();
+
         var applicationContext = new ApplicationContext();
 
         foreach (var property in _properties)
@@ -42,11 +49,24 @@ public sealed class TestHostBuilder
             applicationContext.Properties[property.Key] = property.Value;
         }
 
+        var diagnostics = new TestDiagnostics();
+        var directory = TestDirectory.Create(_directoryName ?? "host", _keepDirectoryOnDispose);
+
+        _built = true;
+
         return new TestHost(
             applicationContext,
-            TestDirectory.Create(_directoryName ?? "host", _keepDirectoryOnDispose),
-            new FakeUiDispatcher(),
-            new DeterministicScheduler(),
-            new TestDiagnostics());
+            directory,
+            new FakeUiDispatcher(diagnostics),
+            new DeterministicScheduler(diagnostics),
+            diagnostics);
+    }
+
+    private void ThrowIfBuilt()
+    {
+        if (_built)
+        {
+            throw new InvalidOperationException("The test host builder has already built a host and is frozen.");
+        }
     }
 }
