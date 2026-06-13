@@ -21,12 +21,18 @@ public sealed class PluginTestHost : IDisposable, IAsyncDisposable
         return new PluginTestHostBuilder();
     }
 
-    public ValueTask<PluginTestRecord> InstallAsync(string pluginId)
+    public ValueTask<PluginTestRecord> InstallAsync(
+        string pluginId,
+        CancellationToken cancellationToken = default)
     {
+        ThrowIfDisposed();
+        cancellationToken.ThrowIfCancellationRequested();
+
         var package = GetPackage(pluginId);
         var installPath = Path.Combine(Host.Directory.RootPath, "plugins", "installed", package.Id, package.Version);
 
         Directory.CreateDirectory(installPath);
+        cancellationToken.ThrowIfCancellationRequested();
         File.WriteAllText(
             Path.Combine(installPath, "plugin.json"),
             $$"""
@@ -42,8 +48,13 @@ public sealed class PluginTestHost : IDisposable, IAsyncDisposable
         return ValueTask.FromResult(record);
     }
 
-    public ValueTask<PluginTestRecord> ActivateAsync(string pluginId)
+    public ValueTask<PluginTestRecord> ActivateAsync(
+        string pluginId,
+        CancellationToken cancellationToken = default)
     {
+        ThrowIfDisposed();
+        cancellationToken.ThrowIfCancellationRequested();
+
         var record = GetRecord(pluginId);
 
         record.State = PluginTestState.Active;
@@ -51,8 +62,13 @@ public sealed class PluginTestHost : IDisposable, IAsyncDisposable
         return ValueTask.FromResult(record);
     }
 
-    public ValueTask<PluginTestRecord> DeactivateAsync(string pluginId)
+    public ValueTask<PluginTestRecord> DeactivateAsync(
+        string pluginId,
+        CancellationToken cancellationToken = default)
     {
+        ThrowIfDisposed();
+        cancellationToken.ThrowIfCancellationRequested();
+
         var record = GetRecord(pluginId);
 
         record.State = PluginTestState.Inactive;
@@ -60,10 +76,28 @@ public sealed class PluginTestHost : IDisposable, IAsyncDisposable
         return ValueTask.FromResult(record);
     }
 
-    public ValueTask<PluginTestRecord> UnloadAsync(string pluginId)
+    public PluginTestRecord RegisterContribution(string pluginId, string contributionId)
     {
+        ThrowIfDisposed();
+        ArgumentException.ThrowIfNullOrWhiteSpace(contributionId);
+
         var record = GetRecord(pluginId);
 
+        record.AddContribution(contributionId);
+
+        return record;
+    }
+
+    public ValueTask<PluginTestRecord> UnloadAsync(
+        string pluginId,
+        CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var record = GetRecord(pluginId);
+
+        RevokeContributions(record);
         record.State = PluginTestState.Unloaded;
 
         return ValueTask.FromResult(record);
@@ -77,6 +111,7 @@ public sealed class PluginTestHost : IDisposable, IAsyncDisposable
         }
 
         _disposed = true;
+        UnloadRecords();
         Host.Dispose();
     }
 
@@ -88,6 +123,7 @@ public sealed class PluginTestHost : IDisposable, IAsyncDisposable
         }
 
         _disposed = true;
+        UnloadRecords();
         await Host.DisposeAsync().ConfigureAwait(false);
     }
 
@@ -113,5 +149,40 @@ public sealed class PluginTestHost : IDisposable, IAsyncDisposable
         }
 
         return record;
+    }
+
+    private void UnloadRecords()
+    {
+        foreach (var record in _records.Values)
+        {
+            RevokeContributions(record);
+
+            if (record.State != PluginTestState.Unloaded)
+            {
+                record.State = PluginTestState.Unloaded;
+            }
+        }
+    }
+
+    private void RevokeContributions(PluginTestRecord record)
+    {
+        var revokedCount = record.RevokeContributions();
+
+        if (revokedCount == 0)
+        {
+            return;
+        }
+
+        Host.Diagnostics.Add(
+            "AUCTEST401",
+            $"Plugin '{record.Id}' revoked {revokedCount} contribution owner(s).");
+    }
+
+    private void ThrowIfDisposed()
+    {
+        if (_disposed)
+        {
+            throw new ObjectDisposedException(nameof(PluginTestHost));
+        }
     }
 }

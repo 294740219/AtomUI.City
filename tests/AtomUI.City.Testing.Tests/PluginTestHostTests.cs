@@ -61,6 +61,57 @@ public sealed class PluginTestHostTests
     }
 
     [Fact]
+    public async Task UnloadAsyncRevokesPluginContributionsAndRecordsDiagnostics()
+    {
+        await using var host = PluginTestHost
+            .CreateBuilder()
+            .UsePlugin("Sample.Plugin", "1.0.0")
+            .Build();
+
+        await host.InstallAsync("Sample.Plugin");
+        await host.ActivateAsync("Sample.Plugin");
+        var record = host.RegisterContribution("Sample.Plugin", "main-menu");
+
+        await host.UnloadAsync("Sample.Plugin");
+
+        Assert.Empty(record.Contributions);
+        Assert.Equal(1, record.RevokedContributionCount);
+        Assert.True(host.Host.Diagnostics.Contains("AUCTEST401"));
+    }
+
+    [Fact]
+    public async Task PluginLifecycleMethodsObserveCancellationToken()
+    {
+        using var cancellation = new CancellationTokenSource();
+        await cancellation.CancelAsync();
+        await using var host = PluginTestHost
+            .CreateBuilder()
+            .UsePlugin("Sample.Plugin", "1.0.0")
+            .Build();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            async () => await host.InstallAsync("Sample.Plugin", cancellation.Token));
+    }
+
+    [Fact]
+    public async Task DisposeUnloadsPluginsAndRejectsMutableUse()
+    {
+        var host = PluginTestHost
+            .CreateBuilder()
+            .UsePlugin("Sample.Plugin", "1.0.0")
+            .Build();
+
+        var record = await host.InstallAsync("Sample.Plugin");
+        await host.ActivateAsync("Sample.Plugin");
+        host.RegisterContribution("Sample.Plugin", "main-menu");
+        await host.DisposeAsync();
+
+        Assert.Equal(PluginTestState.Unloaded, record.State);
+        Assert.Empty(record.Contributions);
+        Assert.Throws<ObjectDisposedException>(() => host.RegisterContribution("Sample.Plugin", "after"));
+    }
+
+    [Fact]
     public async Task RecordsExposeStableSnapshot()
     {
         await using var host = PluginTestHost

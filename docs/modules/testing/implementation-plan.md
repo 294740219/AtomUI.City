@@ -8,7 +8,7 @@
 | AUC-TESTING-002 | Yes | Yes | FakeUiDispatcherTests | Product Implementation Exists | Verified | 断言 queue、UI 线程识别、异常、pending count。 | None for Phase 2 slice | Implemented |
 | AUC-TESTING-003 | Yes | Yes | SharedTestUtilitiesTests | Product Implementation Exists | Verified | 断言虚拟时间推进、任务顺序、异常记录。 | None for Phase 2 slice | Implemented |
 | AUC-TESTING-004 | Yes | Yes | ModuleTestHostTests | Product Implementation Exists | Verified | 断言 module graph、lifecycle、diagnostics。 | None for Phase 2 slice | Implemented |
-| AUC-TESTING-005 | Yes | Yes | PluginTestHostTests | Baseline Exists | Required | 断言 load/unload、contribution、owner revoke。 | Required | Ready to Start Product Implementation |
+| AUC-TESTING-005 | Yes | Yes | PluginTestHostTests | Product Implementation Exists | Verified | 断言 load/unload、contribution、owner revoke。 | None for Phase 2 slice | Implemented |
 | AUC-TESTING-006 | Yes | Yes | RoutingTestHostTests | Baseline Exists | Required | 断言 route build、match、navigation helper。 | Required | Ready to Start Product Implementation |
 | AUC-TESTING-007 | Yes | Yes | SourceGenerationTestKitTests | Baseline Exists | Required | 断言 generated source snapshot、diagnostics、references。 | Required | Ready to Start Product Implementation |
 | AUC-TESTING-008 | Yes | Yes | AotCompatibilityCheckTests | Baseline Exists | Required | 断言反射扫描、dynamic code、trimming 风险诊断。 | Required | Ready to Start Product Implementation |

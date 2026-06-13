@@ -10,7 +10,7 @@
 | AUC-TESTING-002 | Fake Dispatcher | Implemented | FakeUiDispatcher, FakeUiWorkItem | FakeUiDispatcherTests |
 | AUC-TESTING-003 | Deterministic Scheduler | Implemented | DeterministicScheduler | SharedTestUtilitiesTests |
 | AUC-TESTING-004 | Module Test Host | Implemented | ModuleTestHost, ModuleTestHostBuilder | ModuleTestHostTests |
-| AUC-TESTING-005 | Plugin Test Host | Ready to Start Product Implementation | PluginTestHost, PluginTestHostBuilder | PluginTestHostTests |
+| AUC-TESTING-005 | Plugin Test Host | Implemented | PluginTestHost, PluginTestHostBuilder | PluginTestHostTests |
 | AUC-TESTING-006 | Routing Test Host | Ready to Start Product Implementation | RoutingTestHost, RoutingTestHostBuilder | RoutingTestHostTests |
 | AUC-TESTING-007 | Source Generation Kit | Ready to Start Product Implementation | SourceGenerationTestCase, GeneratedSourceSnapshot | SourceGenerationTestKitTests |
 | AUC-TESTING-008 | AOT Check | Ready to Start Product Implementation | AotCompatibilityCheck, AotCompatibilityDiagnostic | AotCompatibilityCheckTests |
@@ -91,7 +91,7 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-TESTING-005 Plugin Test Host
 
 Feature ID: `AUC-TESTING-005`
-Status: Ready to Start Product Implementation
+Status: Implemented
 Goal: 测试插件安装、加载、卸载和贡献撤销。
 Public Contract: PluginTestHost, PluginTestHostBuilder
 Runtime / Build Behavior: 加载测试插件包，跟踪 state、contribution 和 owner revoke。
