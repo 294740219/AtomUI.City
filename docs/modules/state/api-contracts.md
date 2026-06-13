@@ -17,7 +17,7 @@
 | Method | Purpose | Parameters | Return | Failure Behavior | Cancellation | Concurrency / Idempotency |
 | --- | --- | --- | --- | --- | --- | --- |
 | IWritableState<T>.Set | 写入状态。 | value。 | 新 version。 | 写入拒绝、callback 失败。 | 同步提交，不隐式切线程。 | 并发写串行化。 |
-| IReadOnlyState<T>.Subscribe | 订阅状态。 | handler/options。 | IStateSubscription。 | disposed state 失败。 | 调度由 StateDispatchPolicy。 | dispose 后不再通知。 |
+| IReadOnlyState<T>.Subscribe | 订阅状态。 | handler/options。 | IStateSubscription。 | disposed state 失败；handler 失败写 diagnostics。 | 调度由 StateDispatchPolicy；Background 不得阻塞状态提交。 | dispose 后不再通知。 |
 | StateDefinition.Create | 创建状态定义。 | key、lifetime、access、snapshotPolicy、schemaVersion 必须有效。 | StateDefinition<T>。 | 未知 enum 或 schemaVersion 小于 1 抛 `ArgumentOutOfRangeException`。 | 无。 | 创建结果不可变。 |
 | StateSnapshotEntry constructor | 创建快照条目。 | stateName/valueType/version/schemaVersion 必须有效。 | StateSnapshotEntry。 | version 小于 0 或 schemaVersion 小于 1 抛 `ArgumentOutOfRangeException`。 | 无。 | record init 属性只用于不可变快照载体。 |
 | StateSnapshot constructor | 创建快照。 | entries 不得为 null，且不得包含 null 项。 | StateSnapshot。 | entries 为 null 抛 `ArgumentNullException`；包含 null 项抛 `ArgumentException`。 | 无。 | entries 创建后不可变。 |

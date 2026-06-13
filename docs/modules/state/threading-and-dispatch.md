@@ -103,7 +103,7 @@ State Core 不直接依赖 Avalonia Dispatcher。
 | Immediate | 当前线程通知。 |
 | Queued | 排队后统一通知。 |
 | Dispatcher | 切到 UI dispatcher。 |
-| Background | 后台调度。 |
+| Background | 后台投递；不得阻塞状态提交，handler 失败必须写 diagnostics。 |
 
 Presentation 负责把 Dispatcher 接入 State。Core 只定义抽象。
 
@@ -139,5 +139,6 @@ OperationScope 取消后不应继续提交状态更新。
 | 锁外通知 | Unit | handler 重入不会死锁。 |
 | 顺序通知 | Unit | 同一 key 通知顺序稳定。 |
 | UI 调度 | Unit | fake dispatcher 收到 UI 订阅。 |
+| Background 调度 | Unit | handler 阻塞时 SetValue 先返回，handler 失败写 diagnostics。 |
 | Scope 停用 | Unit | 停用后不再投递 UI 更新。 |
 | late result | Unit | Operation 取消后不提交状态。 |
