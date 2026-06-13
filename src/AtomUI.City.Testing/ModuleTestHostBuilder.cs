@@ -58,38 +58,32 @@ public sealed class ModuleTestHostBuilder
             throw new InvalidOperationException($"Duplicate module name '{duplicateName.Key}'.");
         }
 
-        var duplicateType = modules
-            .GroupBy(module => module.Module.GetType())
-            .FirstOrDefault(group => group.Count() > 1);
-
-        if (duplicateType is not null)
-        {
-            throw new InvalidOperationException($"Duplicate module type '{duplicateType.Key.FullName}'.");
-        }
-
-        var modulesByType = modules.ToDictionary(module => module.Module.GetType());
+        var entries = modules
+            .Select((module, index) => new ModuleGraphEntry(module, index, module.Module.GetType()))
+            .ToArray();
+        var modulesByType = entries
+            .GroupBy(entry => entry.ModuleType)
+            .ToDictionary(group => group.Key, group => group.First());
         var ordered = new List<ModuleTestRecord>();
-        var visitStates = new Dictionary<Type, ModuleVisitState>();
-        var path = new Stack<Type>();
+        var visitStates = new Dictionary<ModuleGraphEntry, ModuleVisitState>();
+        var path = new Stack<ModuleGraphEntry>();
 
-        foreach (var module in modules)
+        foreach (var entry in entries)
         {
-            Visit(module, modulesByType, visitStates, ordered, path);
+            Visit(entry, modulesByType, visitStates, ordered, path);
         }
 
         return ordered;
     }
 
     private static void Visit(
-        ModuleTestRecord module,
-        IReadOnlyDictionary<Type, ModuleTestRecord> modulesByType,
-        IDictionary<Type, ModuleVisitState> visitStates,
+        ModuleGraphEntry entry,
+        IReadOnlyDictionary<Type, ModuleGraphEntry> modulesByType,
+        IDictionary<ModuleGraphEntry, ModuleVisitState> visitStates,
         ICollection<ModuleTestRecord> ordered,
-        Stack<Type> path)
+        Stack<ModuleGraphEntry> path)
     {
-        var moduleType = module.Module.GetType();
-
-        if (visitStates.TryGetValue(moduleType, out var state))
+        if (visitStates.TryGetValue(entry, out var state))
         {
             if (state == ModuleVisitState.Visited)
             {
@@ -98,18 +92,18 @@ public sealed class ModuleTestHostBuilder
 
             var cyclePath = path
                 .Reverse()
-                .SkipWhile(type => type != moduleType)
-                .Append(moduleType)
-                .Select(type => type.FullName);
+                .SkipWhile(pathEntry => pathEntry != entry)
+                .Append(entry)
+                .Select(pathEntry => pathEntry.ModuleType.FullName);
 
             throw new InvalidOperationException(
                 $"Module dependency graph contains a cycle: {string.Join(" -> ", cyclePath)}.");
         }
 
-        visitStates.Add(moduleType, ModuleVisitState.Visiting);
-        path.Push(moduleType);
+        visitStates.Add(entry, ModuleVisitState.Visiting);
+        path.Push(entry);
 
-        foreach (var dependency in GetDependencies(moduleType))
+        foreach (var dependency in GetDependencies(entry.ModuleType))
         {
             if (modulesByType.TryGetValue(dependency.ModuleType, out var dependencyModule))
             {
@@ -120,13 +114,13 @@ public sealed class ModuleTestHostBuilder
             if (!dependency.Optional)
             {
                 throw new InvalidOperationException(
-                    $"Module '{moduleType.FullName}' depends on missing module '{dependency.ModuleType.FullName}'.");
+                    $"Module '{entry.ModuleType.FullName}' depends on missing module '{dependency.ModuleType.FullName}'.");
             }
         }
 
-        visitStates[moduleType] = ModuleVisitState.Visited;
+        visitStates[entry] = ModuleVisitState.Visited;
         path.Pop();
-        ordered.Add(module);
+        ordered.Add(entry.Module);
     }
 
     private static IEnumerable<DependsOnAttribute> GetDependencies(Type moduleType)
@@ -141,4 +135,6 @@ public sealed class ModuleTestHostBuilder
         Visiting,
         Visited,
     }
+
+    private sealed record ModuleGraphEntry(ModuleTestRecord Module, int Index, Type ModuleType);
 }

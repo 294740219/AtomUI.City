@@ -104,6 +104,34 @@ public sealed class ModuleTestHostTests
     }
 
     [Fact]
+    public async Task InitializeAsyncPassesCancellationTokenToModules()
+    {
+        var module = new CancellationObservingModule();
+        using var cancellation = new CancellationTokenSource();
+        await using var host = ModuleTestHost.CreateBuilder()
+            .UseModule("Cancellable", module)
+            .Build();
+
+        await host.InitializeAsync(cancellation.Token);
+
+        Assert.Equal(cancellation.Token, module.ObservedToken);
+    }
+
+    [Fact]
+    public async Task InitializeAsyncObservesCanceledTokenWithoutRecordingFailureDiagnostic()
+    {
+        using var cancellation = new CancellationTokenSource();
+        await cancellation.CancelAsync();
+        await using var host = ModuleTestHost.CreateBuilder()
+            .UseModule("Cancellable", new CancellationObservingModule())
+            .Build();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await host.InitializeAsync(cancellation.Token));
+
+        Assert.False(host.Host.Diagnostics.Contains("AUCTEST301"));
+    }
+
+    [Fact]
     public async Task ShutdownAsyncRunsModulesInReverseRegistrationOrder()
     {
         var calls = new List<string>();
@@ -227,6 +255,21 @@ public sealed class ModuleTestHostTests
         public override void OnApplicationShutdown(ApplicationShutdownContext context)
         {
             throw new InvalidOperationException("module shutdown failed");
+        }
+    }
+
+    private sealed class CancellationObservingModule : ModuleBase
+    {
+        public CancellationToken ObservedToken { get; private set; }
+
+        public override ValueTask PreConfigureServicesAsync(
+            ServiceConfigurationContext context,
+            CancellationToken cancellationToken = default)
+        {
+            ObservedToken = cancellationToken;
+            cancellationToken.ThrowIfCancellationRequested();
+
+            return ValueTask.CompletedTask;
         }
     }
 }

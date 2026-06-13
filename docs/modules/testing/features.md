@@ -9,7 +9,7 @@
 | AUC-TESTING-001 | Test Host | Implemented | TestHost, TestHostBuilder | TestHostTests |
 | AUC-TESTING-002 | Fake Dispatcher | Implemented | FakeUiDispatcher, FakeUiWorkItem | FakeUiDispatcherTests |
 | AUC-TESTING-003 | Deterministic Scheduler | Implemented | DeterministicScheduler | SharedTestUtilitiesTests |
-| AUC-TESTING-004 | Module Test Host | Ready to Start Product Implementation | ModuleTestHost, ModuleTestHostBuilder | ModuleTestHostTests |
+| AUC-TESTING-004 | Module Test Host | Implemented | ModuleTestHost, ModuleTestHostBuilder | ModuleTestHostTests |
 | AUC-TESTING-005 | Plugin Test Host | Ready to Start Product Implementation | PluginTestHost, PluginTestHostBuilder | PluginTestHostTests |
 | AUC-TESTING-006 | Routing Test Host | Ready to Start Product Implementation | RoutingTestHost, RoutingTestHostBuilder | RoutingTestHostTests |
 | AUC-TESTING-007 | Source Generation Kit | Ready to Start Product Implementation | SourceGenerationTestCase, GeneratedSourceSnapshot | SourceGenerationTestKitTests |
@@ -77,7 +77,7 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-TESTING-004 Module Test Host
 
 Feature ID: `AUC-TESTING-004`
-Status: Ready to Start Product Implementation
+Status: Implemented
 Goal: 测试模块依赖图和生命周期。
 Public Contract: ModuleTestHost, ModuleTestHostBuilder
 Runtime / Build Behavior: 注册模块、执行 lifecycle、捕获 diagnostics。

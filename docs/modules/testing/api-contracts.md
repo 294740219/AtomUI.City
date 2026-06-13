@@ -553,7 +553,7 @@
 | Nullability | `name` 和 `module` 不接受 null。 |
 | Cancellation | 无。 |
 | Exceptions or Result | 参数非法抛 `ArgumentException` 或 `ArgumentNullException`；Build 后调用抛 `InvalidOperationException`。 |
-| Idempotency | 每次调用追加一个模块；duplicate module name 或 module type 在 Build 时失败。 |
+| Idempotency | 每次调用追加一个模块；duplicate module name 在 Build 时失败；同一 module type 可用不同 name 注册多个测试实例。 |
 | Concurrency | 配置阶段不保证线程安全。 |
 | Side Effects | 只修改 builder 内部 module registration。 |
 | Diagnostics | Build 前不写诊断；生命周期失败由 `ModuleTestHost` 写 diagnostics。 |

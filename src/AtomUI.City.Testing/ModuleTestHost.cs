@@ -27,12 +27,14 @@ public sealed class ModuleTestHost : IDisposable, IAsyncDisposable
         return new ModuleTestHostBuilder();
     }
 
-    public async ValueTask InitializeAsync()
+    public async ValueTask InitializeAsync(CancellationToken cancellationToken = default)
     {
         if (_initialized)
         {
             return;
         }
+
+        cancellationToken.ThrowIfCancellationRequested();
 
         foreach (var module in Modules)
         {
@@ -40,7 +42,9 @@ public sealed class ModuleTestHost : IDisposable, IAsyncDisposable
                 module,
                 "PreConfigureServices",
                 "AUCTEST301",
-                () => module.Module.PreConfigureServicesAsync(CreateServiceConfigurationContext())).ConfigureAwait(false);
+                () => module.Module.PreConfigureServicesAsync(
+                    CreateServiceConfigurationContext(),
+                    cancellationToken)).ConfigureAwait(false);
         }
 
         foreach (var module in Modules)
@@ -49,7 +53,9 @@ public sealed class ModuleTestHost : IDisposable, IAsyncDisposable
                 module,
                 "ConfigureServices",
                 "AUCTEST301",
-                () => module.Module.ConfigureServicesAsync(CreateServiceConfigurationContext())).ConfigureAwait(false);
+                () => module.Module.ConfigureServicesAsync(
+                    CreateServiceConfigurationContext(),
+                    cancellationToken)).ConfigureAwait(false);
         }
 
         foreach (var module in Modules)
@@ -58,9 +64,12 @@ public sealed class ModuleTestHost : IDisposable, IAsyncDisposable
                 module,
                 "PostConfigureServices",
                 "AUCTEST301",
-                () => module.Module.PostConfigureServicesAsync(CreateServiceConfigurationContext())).ConfigureAwait(false);
+                () => module.Module.PostConfigureServicesAsync(
+                    CreateServiceConfigurationContext(),
+                    cancellationToken)).ConfigureAwait(false);
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         _serviceProvider = _services.BuildServiceProvider();
 
         foreach (var module in Modules)
@@ -69,7 +78,9 @@ public sealed class ModuleTestHost : IDisposable, IAsyncDisposable
                 module,
                 "ConfigureContributions",
                 "AUCTEST301",
-                () => module.Module.ConfigureContributionsAsync(CreateContributionConfigurationContext())).ConfigureAwait(false);
+                () => module.Module.ConfigureContributionsAsync(
+                    CreateContributionConfigurationContext(),
+                    cancellationToken)).ConfigureAwait(false);
         }
 
         foreach (var module in Modules)
@@ -78,7 +89,9 @@ public sealed class ModuleTestHost : IDisposable, IAsyncDisposable
                 module,
                 "OnPreApplicationInitialization",
                 "AUCTEST301",
-                () => module.Module.OnPreApplicationInitializationAsync(CreateApplicationInitializationContext())).ConfigureAwait(false);
+                () => module.Module.OnPreApplicationInitializationAsync(
+                    CreateApplicationInitializationContext(),
+                    cancellationToken)).ConfigureAwait(false);
         }
 
         foreach (var module in Modules)
@@ -87,7 +100,9 @@ public sealed class ModuleTestHost : IDisposable, IAsyncDisposable
                 module,
                 "OnApplicationInitialization",
                 "AUCTEST301",
-                () => module.Module.OnApplicationInitializationAsync(CreateApplicationInitializationContext())).ConfigureAwait(false);
+                () => module.Module.OnApplicationInitializationAsync(
+                    CreateApplicationInitializationContext(),
+                    cancellationToken)).ConfigureAwait(false);
         }
 
         foreach (var module in Modules)
@@ -96,19 +111,22 @@ public sealed class ModuleTestHost : IDisposable, IAsyncDisposable
                 module,
                 "OnPostApplicationInitialization",
                 "AUCTEST301",
-                () => module.Module.OnPostApplicationInitializationAsync(CreateApplicationInitializationContext())).ConfigureAwait(false);
+                () => module.Module.OnPostApplicationInitializationAsync(
+                    CreateApplicationInitializationContext(),
+                    cancellationToken)).ConfigureAwait(false);
         }
 
         _initialized = true;
     }
 
-    public async ValueTask ShutdownAsync()
+    public async ValueTask ShutdownAsync(CancellationToken cancellationToken = default)
     {
         if (_shutdown)
         {
             return;
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         _shutdown = true;
 
         if (_initialized)
@@ -120,7 +138,9 @@ public sealed class ModuleTestHost : IDisposable, IAsyncDisposable
                     module,
                     "OnApplicationShutdown",
                     "AUCTEST302",
-                    () => module.Module.OnApplicationShutdownAsync(CreateApplicationShutdownContext())).ConfigureAwait(false);
+                    () => module.Module.OnApplicationShutdownAsync(
+                        CreateApplicationShutdownContext(),
+                        cancellationToken)).ConfigureAwait(false);
             }
         }
 
@@ -186,6 +206,10 @@ public sealed class ModuleTestHost : IDisposable, IAsyncDisposable
         try
         {
             await invoke().ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception exception)
         {
