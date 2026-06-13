@@ -4,15 +4,15 @@
 
 ## Feature 索引
 
-| Feature ID | 名称 | 状态 | Public Contract | 主测试 |
+| Feature ID | 名称 | 状态 | 公开合同 | 主测试 |
 | --- | --- | --- | --- | --- |
-| AUC-CORE-001 | Application Host Builder | Ready to Start Product Implementation | ApplicationHostBuilder, ApplicationHostOptions, IApplicationHostBuilder | ApplicationHostBuilderTests; ApplicationHostRuntimeTests |
-| AUC-CORE-002 | Lifecycle Pipeline | Ready to Start Product Implementation | LifecyclePipeline, LifecyclePipelineBuilder, LifecycleStage | LifecycleMiddlewarePipelineTests; ApplicationHostLifecycleIntegrationTests |
-| AUC-CORE-003 | Lifecycle Scope Tree | Ready to Start Product Implementation | LifecycleScope, LifecycleScopeKind, LifecycleScopeState | LifecycleScopeTreeTests |
-| AUC-CORE-004 | Module Contract | Ready to Start Product Implementation | ModuleBase, IModule, ModuleDescriptor, DependsOnAttribute | ModuleAttributeTests; ModuleBaseTests; ModuleDescriptorTests |
-| AUC-CORE-005 | DI Registration Markers | Ready to Start Product Implementation | ServiceAttribute, ScopedServiceAttribute, ExposeServicesAttribute, marker interfaces | ServiceRegistrationAttributeTests |
-| AUC-CORE-006 | Host Diagnostics | Ready to Start Product Implementation | IHostDiagnostics, HostDiagnosticRecord, HostDiagnosticIds | HostDiagnosticsTests |
-| AUC-CORE-007 | UI Dispatcher Contract | Ready to Start Product Implementation | IUiDispatcher, UnavailableUiDispatcher | UiDispatcherIntegrationTests |
+| AUC-CORE-001 | Application Host Builder | 已实现并通过产品合同测试 | ApplicationHostBuilder, ApplicationHostOptions, IApplicationHostBuilder | ApplicationHostBuilderTests; ApplicationHostRuntimeTests |
+| AUC-CORE-002 | Lifecycle Pipeline | 已实现并通过产品合同测试 | LifecyclePipeline, LifecyclePipelineBuilder, LifecycleStage | LifecycleMiddlewarePipelineTests; ApplicationHostLifecycleIntegrationTests |
+| AUC-CORE-003 | Lifecycle Scope Tree | 已实现并通过产品合同测试 | LifecycleScope, LifecycleScopeKind, LifecycleScopeState | LifecycleScopeTreeTests |
+| AUC-CORE-004 | Module Contract | 已实现并通过产品合同测试 | ModuleBase, IModule, ModuleDescriptor, ModuleOrigin, DependsOnAttribute, ServiceConfigurationContext | ModuleAttributeTests; ModuleBaseTests; ModuleDescriptorTests; ApplicationHostModuleLifecycleTests |
+| AUC-CORE-005 | DI Registration Markers | 已实现并通过产品合同测试 | ServiceAttribute, ScopedServiceAttribute, ExposeServicesAttribute, 标记接口 | ServiceRegistrationAttributeTests |
+| AUC-CORE-006 | Host Diagnostics | 已实现并通过产品合同测试 | IHostDiagnostics, HostDiagnosticRecord, HostDiagnosticIds | HostDiagnosticsTests |
+| AUC-CORE-007 | UI Dispatcher Contract | 已实现并通过产品合同测试 | IUiDispatcher, UnavailableUiDispatcher | UiDispatcherIntegrationTests |
 
 ## Feature 硬门禁
 
@@ -36,7 +36,7 @@
 ## AUC-CORE-001 Application Host Builder
 
 Feature ID: `AUC-CORE-001`
-Status: Ready to Start Product Implementation
+Status: 已实现并通过产品合同测试
 Goal: 构建 Host、冻结注册入口、创建 ApplicationContext。
 Public Contract: ApplicationHostBuilder, ApplicationHostOptions, IApplicationHostBuilder
 Runtime / Build Behavior: 构建 Host、冻结注册入口、创建 ApplicationContext。
@@ -49,7 +49,7 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-CORE-002 Lifecycle Pipeline
 
 Feature ID: `AUC-CORE-002`
-Status: Ready to Start Product Implementation
+Status: 已实现并通过产品合同测试
 Goal: 按阶段执行 middleware，支持取消、异常聚合和幂等停止。
 Public Contract: LifecyclePipeline, LifecyclePipelineBuilder, LifecycleStage
 Runtime / Build Behavior: 按阶段执行 middleware，支持取消、异常聚合和幂等停止。
@@ -62,7 +62,7 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-CORE-003 Lifecycle Scope Tree
 
 Feature ID: `AUC-CORE-003`
-Status: Ready to Start Product Implementation
+Status: 已实现并通过产品合同测试
 Goal: 表达 application/module/plugin contribution/operation 所有权树。
 Public Contract: LifecycleScope, LifecycleScopeKind, LifecycleScopeState
 Runtime / Build Behavior: 表达 application/module/plugin contribution/operation 所有权树。
@@ -75,22 +75,22 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-CORE-004 Module Contract
 
 Feature ID: `AUC-CORE-004`
-Status: Ready to Start Product Implementation
+Status: 已实现并通过产品合同测试
 Goal: 模块声明、依赖、配置、服务注册和初始化钩子。
-Public Contract: ModuleBase, IModule, ModuleDescriptor, DependsOnAttribute
-Runtime / Build Behavior: 模块声明、依赖、配置、服务注册和初始化钩子。
-Failure Behavior: 循环依赖、缺失依赖、重复 id 失败；默认 id 使用类型全名。
+Public Contract: ModuleBase, IModule, ModuleDescriptor, ModuleOrigin, DependsOnAttribute, ServiceConfigurationContext
+Runtime / Build Behavior: 模块声明、依赖、PreConfigure 配置、服务注册阶段边界和初始化钩子。
+Failure Behavior: 非模块类型、循环依赖、缺失依赖、重复 id、非法 origin、插件 descriptor 缺失 plugin id、服务配置阶段后继续 mutation 失败；默认 id 使用类型全名。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 implementation plan 中追踪。
 Tests: `ModuleAttributeTests; ModuleBaseTests; ModuleDescriptorTests`。
-Required Assertions: 断言依赖排序、默认 id、显式 id、配置阶段禁止解析运行时服务。
+Required Assertions: 断言依赖排序、默认 id、显式 id、模块来源、PreConfigure 顺序、配置阶段禁止解析运行时服务、配置阶段结束后拒绝继续修改服务注册。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 ## AUC-CORE-005 DI Registration Markers
 
 Feature ID: `AUC-CORE-005`
-Status: Ready to Start Product Implementation
+Status: 已实现并通过产品合同测试
 Goal: 声明服务 lifetime 和暴露服务。
-Public Contract: ServiceAttribute, ScopedServiceAttribute, ExposeServicesAttribute, marker interfaces
+Public Contract: ServiceAttribute, ScopedServiceAttribute, ExposeServicesAttribute, 标记接口
 Runtime / Build Behavior: 声明服务 lifetime 和暴露服务。
 Failure Behavior: 冲突 lifetime 或服务类型无效必须失败或诊断。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
@@ -101,7 +101,7 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-CORE-006 Host Diagnostics
 
 Feature ID: `AUC-CORE-006`
-Status: Ready to Start Product Implementation
+Status: 已实现并通过产品合同测试
 Goal: 记录 Host 构建、启动、停止和失败上下文。
 Public Contract: IHostDiagnostics, HostDiagnosticRecord, HostDiagnosticIds
 Runtime / Build Behavior: 记录 Host 构建、启动、停止和失败上下文。
@@ -114,7 +114,7 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-CORE-007 UI Dispatcher Contract
 
 Feature ID: `AUC-CORE-007`
-Status: Ready to Start Product Implementation
+Status: 已实现并通过产品合同测试
 Goal: 为 Presentation 提供调度抽象和不可用实现。
 Public Contract: IUiDispatcher, UnavailableUiDispatcher
 Runtime / Build Behavior: 为 Presentation 提供调度抽象和不可用实现。

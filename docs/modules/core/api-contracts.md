@@ -8,7 +8,7 @@
 | --- | --- | --- | --- |
 | Hosting | ApplicationHost, ApplicationHostBuilder, IApplicationHost, IApplicationContext | 构建和持有应用 Host。 | Build 后冻结；Start/Stop 幂等；Dispose 后 mutating API 失败。 |
 | Lifecycle | LifecycleStage, LifecyclePipeline, LifecycleScope | 阶段、中间件和所有权树。 | 按 stage 稳定执行；leaf-first 释放；异常进入 diagnostics。 |
-| Modularity | ModuleBase, IModule, ModuleDescriptor, DependsOnAttribute, ModuleServiceCollection | 模块声明、依赖和生命周期钩子。 | 配置、服务注册、初始化、关闭严格分阶段。 |
+| Modularity | ModuleBase, IModule, ModuleDescriptor, ModuleOrigin, DependsOnAttribute, ServiceConfigurationContext, ModuleServiceCollection | 模块声明、依赖、配置阶段和生命周期钩子。 | 配置、服务注册、初始化、关闭严格分阶段；PreConfigure 按模块拓扑顺序执行；配置阶段对象结束后冻结。 |
 | DependencyInjection | ServiceAttribute, ScopedServiceAttribute, ExposeServicesAttribute, dependency marker interfaces | AOT 友好的服务声明。 | 不依赖运行时扫描作为唯一发现方式。 |
 | Threading | IUiDispatcher, UnavailableUiDispatcher | UI 调度抽象。 | Core 不绑定 UI 平台。 |
 | Diagnostics | IHostDiagnostics, HostDiagnosticRecord, HostDiagnosticIds | Host 级诊断。 | 现有诊断码保持兼容，目标诊断码新增需迁移。 |
@@ -184,13 +184,13 @@
 | Thread Safety | 单个 module 实例的 lifecycle hook 由 module system 串行调用。 |
 | Disposal | 如果 module 实例实现 dispose，Host shutdown 按 module 逆序释放。 |
 | Nullability | context 参数不允许为空。 |
-| Cancellation | Initialize/Shutdown 异步 hook 必须观察 token。 |
+| Cancellation | 所有 async hook 在进入同步便利方法前必须观察 token；Initialize/Shutdown 异步 hook 必须观察 token。 |
 | Failure Behavior | hook 抛异常时当前阶段失败并记录 module 诊断；shutdown 继续后续 module 清理。 |
 | Diagnostics | 诊断包含 module id、module type、stage。 |
 | Plugin Boundary | 插件 module 只能写插件 service scope 和受控 contribution。 |
 | AOT / Trimming | 模块发现默认依赖显式注册或 generated manifest。 |
 | Breaking Change Rules | 修改 hook 顺序、context 能力或默认 module id 规则属于 breaking change。 |
-| Tests | `ModuleBaseTests` 断言 hook 顺序、context、异常和 shutdown 行为。 |
+| Tests | `ModuleBaseTests` 断言 hook 顺序、null context、取消、异常和 shutdown 行为。 |
 
 ### `ModuleDescriptor`
 
@@ -201,21 +201,71 @@
 | Assembly | `AtomUI.City.Core` |
 | Stability | Preview |
 | Feature | AUC-CORE-004 |
-| Purpose | 描述模块 id、type、依赖、owner 和 source。 |
+| Purpose | 描述模块 id、type、依赖、origin、plugin owner 和 source。 |
 | Owner | Module registry |
 | Created By | Attribute reader、generated manifest 或显式注册。 |
 | Lifetime | immutable descriptor；可在 Host 生命周期内共享读取。 |
 | DI Lifetime | 不作为服务实例注册。 |
 | Thread Safety | 不可变，可并发读取。 |
 | Disposal | 无释放。 |
-| Nullability | module id、module type、source 不得为空。 |
+| Nullability | module id、module type、origin 不得为空；plugin origin 必须提供 plugin id；application origin 不允许提供 plugin id。 |
 | Cancellation | 无取消语义。 |
-| Failure Behavior | 缺失 id/type、重复 id、循环依赖或缺失依赖导致 graph build 失败。 |
+| Failure Behavior | 缺失 id/type、非 `IModule` 类型、重复 id、循环依赖、缺失依赖或非法 origin 导致 graph build 失败。 |
 | Diagnostics | 诊断包含 module id、type、dependency path。 |
-| Plugin Boundary | 插件 module descriptor 必须包含 plugin owner。 |
+| Plugin Boundary | 插件 module descriptor 必须设置 `Origin = Plugin` 并包含稳定 plugin id；application module 不得携带 plugin id。 |
 | AOT / Trimming | 支持 generator 输出，不要求运行时扫描。 |
 | Breaking Change Rules | 修改默认 id、依赖排序或 descriptor 字段含义属于 breaking change。 |
-| Tests | `ModuleDescriptorTests` 断言默认 id、显式 id、依赖排序和错误诊断。 |
+| Tests | `ModuleDescriptorTests` 断言默认 id、显式 id、依赖排序、origin、plugin id、非模块类型和错误诊断。 |
+
+### `ModuleOrigin`
+
+| Field | Contract |
+| --- | --- |
+| Type | `ModuleOrigin` |
+| Namespace | `AtomUI.City.Modularity` |
+| Assembly | `AtomUI.City.Core` |
+| Stability | Preview |
+| Feature | AUC-CORE-004 |
+| Purpose | 标识模块描述来自应用静态模块还是插件模块。 |
+| Owner | Module descriptor |
+| Created By | `ModuleDescriptor` 构造或 generated manifest。 |
+| Lifetime | enum metadata，无运行期状态。 |
+| DI Lifetime | 不进入 DI。 |
+| Thread Safety | 无 mutable state。 |
+| Disposal | 无释放。 |
+| Nullability | 不适用；未知 enum 值必须被 descriptor 拒绝。 |
+| Cancellation | 无取消语义。 |
+| Failure Behavior | `ModuleDescriptor` 遇到未知 origin 值抛 `ArgumentOutOfRangeException`。 |
+| Diagnostics | graph build 失败诊断必须包含 module id 和 origin。 |
+| Plugin Boundary | `Plugin` origin 必须和 plugin id 成对出现。 |
+| AOT / Trimming | enum 常量可由 generator 直接输出。 |
+| Breaking Change Rules | 删除、重命名或改变 enum 值语义属于 breaking change。 |
+| Tests | `ModuleDescriptorTests` 断言默认 application origin 和 plugin origin 校验。 |
+
+### `ServiceConfigurationContext`
+
+| Field | Contract |
+| --- | --- |
+| Type | `ServiceConfigurationContext` |
+| Namespace | `AtomUI.City.Modularity` |
+| Assembly | `AtomUI.City.Core` |
+| Stability | Preview |
+| Feature | AUC-CORE-004 |
+| Purpose | 在模块服务配置阶段提供 application context、受控 service collection 和 early options preconfigure store。 |
+| Owner | Module registry |
+| Created By | `ModuleRegistry.ConfigureServicesAsync` 或测试代码。 |
+| Lifetime | 只在 PreConfigureServices、ConfigureServices、PostConfigureServices 阶段有效。 |
+| DI Lifetime | 不进入 DI。 |
+| Thread Safety | 与 module configuration 调度一致，由 module registry 串行调用；不保证并发写安全。 |
+| Disposal | 无外部资源；阶段结束后内部 `ModuleServiceCollection` 冻结。 |
+| Nullability | application context、services、preconfigure action 和 options instance 不得为空。 |
+| Cancellation | context 本身无取消；调用方 async hook 在进入阶段前观察 token。 |
+| Failure Behavior | null action 或 null options 抛 `ArgumentNullException`；options action 异常由当前 module stage 诊断承接。 |
+| Diagnostics | action 异常由 module registry 写 `AUCHOST106`，context 包含 moduleType 和 stage。 |
+| Plugin Boundary | 插件模块使用插件自己的 context 和 preconfigure store，不能修改 Host 全局 store。 |
+| AOT / Trimming | 不扫描程序集，不读取 runtime attributes；只执行显式注册的同步 action。 |
+| Breaking Change Rules | 修改 PreConfigure 顺序、null 行为、阶段生命周期或冻结时机属于 breaking change。 |
+| Tests | `ApplicationHostModuleLifecycleTests` 断言 PreConfigure 拓扑顺序、null 参数和阶段边界。 |
 
 ### `ModuleServiceCollection`
 
@@ -229,18 +279,18 @@
 | Purpose | 在 module service configuration 阶段暴露受控 service registration collection。 |
 | Owner | Module registry |
 | Created By | `ServiceConfigurationContext`。 |
-| Lifetime | 只在 module service configuration 阶段有效。 |
+| Lifetime | 只在 module service configuration 阶段有效；阶段结束后由 module registry 冻结。 |
 | DI Lifetime | 不进入 DI；包装 Host build 阶段的 `IServiceCollection`。 |
 | Thread Safety | 与底层 `IServiceCollection` 一致，不保证并发写安全。 |
 | Disposal | 无资源；Host Build 结束后 module 不应继续持有。 |
 | Nullability | service descriptor 不得为空。 |
 | Cancellation | 无取消语义。 |
-| Failure Behavior | 调用临时 provider 创建入口必须失败，防止 module 解析运行期服务。 |
+| Failure Behavior | 调用临时 provider 创建入口必须失败；阶段冻结后所有 mutating API 抛 `InvalidOperationException`。 |
 | Diagnostics | 触发 guard 时由 module lifecycle 记录 `AUCHOST106`。 |
 | Plugin Boundary | 插件 module 只能通过该 collection 注册受控服务，不能写 Host runtime provider。 |
 | AOT / Trimming | 不执行扫描，不依赖 dynamic code。 |
 | Breaking Change Rules | 修改临时 provider guard、注册转发语义或生命周期属于 breaking change。 |
-| Tests | `ApplicationHostModuleLifecycleTests` 断言禁止 `BuildServiceProvider` 并记录诊断。 |
+| Tests | `ApplicationHostModuleLifecycleTests` 断言禁止 `BuildServiceProvider`、冻结后拒绝 mutation 并记录诊断。 |
 
 ### `ModuleServiceCollectionBuildGuardExtensions`
 
@@ -656,6 +706,60 @@ Diagnostics: module registry 捕获异常后写 AUCHOST106，context 包含 modu
 Tests: ApplicationHostModuleLifecycleTests。
 ```
 
+### `ServiceConfigurationContext.PreConfigure`
+
+```text
+Method: ServiceConfigurationContext.PreConfigure<TOptions>
+Feature: AUC-CORE-004
+Purpose: 注册早期 options 默认值或模块约定。
+Parameters: configure 不能为 null。
+Return: void。
+Nullability: configure 为 null 时抛 ArgumentNullException。
+Cancellation: 无；action 必须是同步、短执行、无 IO 的配置动作。
+Exceptions or Result: action 本身不在注册时执行；执行异常由 ExecutePreConfigure 调用所在模块阶段承接。
+Idempotency: 每次调用追加一个 action，不去重。
+Concurrency: module registry 串行调用；不保证并发写安全。
+Side Effects: 只写当前 ServiceConfigurationContext 的 preconfigure store。
+Diagnostics: action 执行异常由 module registry 记录 module lifecycle failure。
+Tests: ApplicationHostModuleLifecycleTests。
+```
+
+### `ServiceConfigurationContext.ExecutePreConfigure`
+
+```text
+Method: ServiceConfigurationContext.ExecutePreConfigure<TOptions>
+Feature: AUC-CORE-004
+Purpose: 对指定 options instance 按注册顺序执行早期配置动作。
+Parameters: options 不能为 null。
+Return: void。
+Nullability: options 为 null 时抛 ArgumentNullException。
+Cancellation: 无；调用者所在 async hook 必须在进入阶段前观察 token。
+Exceptions or Result: action 抛出的异常原样向上抛出，并由 module registry 记录当前阶段诊断。
+Idempotency: 每次调用都会重新执行当前 TOptions 的全部 action。
+Concurrency: 不保证并发执行安全；由模块配置阶段串行调用。
+Side Effects: 修改传入的 options instance，不创建 ServiceProvider。
+Diagnostics: action 失败诊断包含 moduleType 和 stage。
+Tests: ApplicationHostModuleLifecycleTests。
+```
+
+### `ModuleServiceCollection` mutating APIs
+
+```text
+Method: ModuleServiceCollection.Add/Clear/Insert/Remove/RemoveAt/index setter
+Feature: AUC-CORE-004
+Purpose: 在模块服务配置阶段转发受控服务注册，并在阶段结束后拒绝继续修改。
+Parameters: service descriptor 或 index 遵守 IServiceCollection 原始规则。
+Return: 与 IServiceCollection 原始 mutating API 一致。
+Nullability: service descriptor 为 null 时遵守底层 collection 或 DI 扩展方法的参数异常。
+Cancellation: 无。
+Exceptions or Result: 服务配置阶段结束后抛 InvalidOperationException。
+Idempotency: Freeze 后重复 mutating 调用稳定失败。
+Concurrency: 不保证并发写安全。
+Side Effects: 冻结前修改底层 IServiceCollection；冻结后无副作用。
+Diagnostics: module 持有并越阶段修改时由调用方测试或上层诊断承接。
+Tests: ApplicationHostModuleLifecycleTests。
+```
+
 ## Public 类型覆盖
 
 | Type | 分类 | Review 规则 |
@@ -699,6 +803,7 @@ Tests: ApplicationHostModuleLifecycleTests。
 | `ModuleContext` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `ModuleDependencyDescriptor` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `ModuleDescriptor` | 关键 contract | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `ModuleOrigin` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `ModuleRegistry` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `ModuleServiceCollection` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `ModuleServiceCollectionBuildGuardExtensions` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
