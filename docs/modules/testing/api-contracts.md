@@ -899,6 +899,40 @@
 | Diagnostics | diagnostic message 包含 source path 和 pattern。 |
 | Tests | `AotCompatibilityCheckTests`。 |
 
+### `TestLayerNames.AllCategories` 和 `IsKnownCategory`
+
+| Field | Contract |
+| --- | --- |
+| Feature | AUC-TESTING-009 |
+| Purpose | 暴露标准测试层级 category snapshot，并判断字符串 category 是否为标准层级。 |
+| Parameters | `IsKnownCategory` 的 `category` 不能为空或空白。 |
+| Return | `AllCategories` 返回 immutable snapshot；`IsKnownCategory` 返回 bool。 |
+| Nullability | category 不接受 null。 |
+| Cancellation | 无。 |
+| Exceptions or Result | category 非法抛 `ArgumentException`。 |
+| Idempotency | 只读。 |
+| Concurrency | 可并发读取。 |
+| Side Effects | 无。 |
+| Diagnostics | 不写诊断。 |
+| Tests | `TestLayerTests`。 |
+
+### `TestLayerAttribute`
+
+| Field | Contract |
+| --- | --- |
+| Feature | AUC-TESTING-009 |
+| Purpose | 标记测试方法或测试类的标准层级。 |
+| Parameters | `TestLayer` enum 或标准 category string。 |
+| Return | Attribute metadata。 |
+| Nullability | string category 不接受 null。 |
+| Cancellation | 无。 |
+| Exceptions or Result | 未知 enum 或未知 string category 抛声明异常。 |
+| Idempotency | metadata immutable。 |
+| Concurrency | 可并发读取。 |
+| Side Effects | 无。 |
+| Diagnostics | 不写诊断；外部门禁可读取 metadata 输出缺失 layer。 |
+| Tests | `TestLayerTests`。 |
+
 ## Public 类型覆盖
 
 | Type | 分类 | Review 规则 |
