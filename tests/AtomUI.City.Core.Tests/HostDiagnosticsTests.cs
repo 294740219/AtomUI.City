@@ -7,6 +7,44 @@ namespace AtomUI.City.Core.Tests;
 public sealed class HostDiagnosticsTests
 {
     [Fact]
+    public void HostDiagnosticIdsIncludePhaseOneFailureCodes()
+    {
+        Assert.Equal("AUCHOST001", HostDiagnosticIds.HostBuilt);
+        Assert.Equal("AUCHOST002", HostDiagnosticIds.HostStarted);
+        Assert.Equal("AUCHOST003", HostDiagnosticIds.HostStopped);
+        Assert.Equal("AUCHOST101", HostDiagnosticIds.HostBuildFailed);
+        Assert.Equal("AUCHOST102", HostDiagnosticIds.HostStartFailed);
+        Assert.Equal("AUCHOST103", HostDiagnosticIds.HostStopFailed);
+        Assert.Equal("AUCHOST104", HostDiagnosticIds.LifecycleScopeCleanupFailed);
+        Assert.Equal("AUCHOST105", HostDiagnosticIds.ModuleGraphFailed);
+        Assert.Equal("AUCHOST106", HostDiagnosticIds.ModuleLifecycleFailed);
+        Assert.Equal("AUCHOST107", HostDiagnosticIds.DispatcherUnavailable);
+    }
+
+    [Fact]
+    public void DiagnosticContextRejectsExternalMutation()
+    {
+        var context = new Dictionary<string, string?>
+        {
+            ["moduleId"] = "SampleModule",
+        };
+
+        var record = new HostDiagnosticRecord(
+            HostDiagnosticIds.ModuleLifecycleFailed,
+            "Module failed.",
+            HostDiagnosticSeverity.Error)
+        {
+            Context = context,
+        };
+
+        context["moduleId"] = "Changed";
+
+        Assert.Equal("SampleModule", record.Context["moduleId"]);
+        Assert.Throws<NotSupportedException>(() =>
+            Assert.IsAssignableFrom<IDictionary<string, string?>>(record.Context)["moduleId"] = "ChangedAgain");
+    }
+
+    [Fact]
     public async Task ApplicationHostRegistersDiagnosticsAndRecordsHostLifecycleEvents()
     {
         await using var host = ApplicationHost.CreateBuilder().Build();
