@@ -15,6 +15,29 @@ public abstract class StateDefinition
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(valueType);
 
+        if (!Enum.IsDefined(lifetime))
+        {
+            throw new ArgumentOutOfRangeException(nameof(lifetime), lifetime, "State lifetime is not supported.");
+        }
+
+        if (!Enum.IsDefined(access))
+        {
+            throw new ArgumentOutOfRangeException(nameof(access), access, "State access policy is not supported.");
+        }
+
+        if (!Enum.IsDefined(snapshotPolicy))
+        {
+            throw new ArgumentOutOfRangeException(nameof(snapshotPolicy), snapshotPolicy, "State snapshot policy is not supported.");
+        }
+
+        if (schemaVersion < 1)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(schemaVersion),
+                schemaVersion,
+                "State schema version must be greater than or equal to 1.");
+        }
+
         Name = name;
         ValueType = valueType;
         Lifetime = lifetime;

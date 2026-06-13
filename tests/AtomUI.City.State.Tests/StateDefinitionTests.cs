@@ -1,0 +1,56 @@
+using AtomUI.City.State;
+
+namespace AtomUI.City.State.Tests;
+
+public sealed class StateDefinitionTests
+{
+    [Fact]
+    public void StateDefinitionRejectsUnknownLifetime()
+    {
+        var key = new StateKey<string>("AtomUI.City.Tests.InvalidLifetime");
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            StateDefinition.Create(
+                key,
+                "value",
+                lifetime: (StateLifetime)999));
+    }
+
+    [Fact]
+    public void StateDefinitionRejectsUnknownAccessPolicy()
+    {
+        var key = new StateKey<string>("AtomUI.City.Tests.InvalidAccess");
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            StateDefinition.Create(
+                key,
+                "value",
+                access: (StateAccessPolicy)999));
+    }
+
+    [Fact]
+    public void StateDefinitionRejectsUnknownSnapshotPolicy()
+    {
+        var key = new StateKey<string>("AtomUI.City.Tests.InvalidSnapshotPolicy");
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            StateDefinition.Create(
+                key,
+                "value",
+                snapshotPolicy: (StateSnapshotPolicy)999));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void StateDefinitionRejectsInvalidSchemaVersion(int schemaVersion)
+    {
+        var key = new StateKey<string>("AtomUI.City.Tests.InvalidSchema");
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            StateDefinition.Create(
+                key,
+                "value",
+                schemaVersion: schemaVersion));
+    }
+}
