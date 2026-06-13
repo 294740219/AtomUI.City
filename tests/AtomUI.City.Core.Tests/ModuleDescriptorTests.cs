@@ -77,6 +77,66 @@ public sealed class ModuleDescriptorTests
         Assert.Contains(nameof(IModule), exception.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void ModuleDescriptorDefaultsToApplicationOrigin()
+    {
+        var descriptor = new ModuleDescriptor(
+            "TestModule",
+            typeof(TestModule),
+            version: null,
+            description: null,
+            []);
+
+        Assert.Equal(ModuleOrigin.Application, descriptor.Origin);
+        Assert.Null(descriptor.PluginId);
+    }
+
+    [Fact]
+    public void ModuleDescriptorCanDescribePluginOrigin()
+    {
+        var descriptor = new ModuleDescriptor(
+            "PluginModule",
+            typeof(TestModule),
+            version: "1.0.0",
+            description: "Plugin module",
+            [],
+            ModuleOrigin.Plugin,
+            "sales-plugin");
+
+        Assert.Equal(ModuleOrigin.Plugin, descriptor.Origin);
+        Assert.Equal("sales-plugin", descriptor.PluginId);
+    }
+
+    [Fact]
+    public void PluginModuleDescriptorRequiresPluginId()
+    {
+        var exception = Assert.ThrowsAny<ArgumentException>(() => new ModuleDescriptor(
+            "PluginModule",
+            typeof(TestModule),
+            version: null,
+            description: null,
+            [],
+            ModuleOrigin.Plugin,
+            pluginId: null));
+
+        Assert.Contains("plugin", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ApplicationModuleDescriptorRejectsPluginId()
+    {
+        var exception = Assert.Throws<ArgumentException>(() => new ModuleDescriptor(
+            "ApplicationModule",
+            typeof(TestModule),
+            version: null,
+            description: null,
+            [],
+            ModuleOrigin.Application,
+            "sales-plugin"));
+
+        Assert.Contains("plugin", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     private sealed class TestModule : ModuleBase;
 
     private sealed class DependencyModule : ModuleBase;
