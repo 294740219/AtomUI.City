@@ -62,37 +62,44 @@ public sealed class ModuleRegistry : IModuleRegistry
         var context = new ServiceConfigurationContext(applicationContext, services);
         var diagnostics = TryGetDiagnostics(services);
 
-        foreach (var entry in _orderedEntries)
+        try
         {
-            await InvokeModuleAsync(
-                entry,
-                diagnostics,
-                "PreConfigureServices",
-                token => entry.Module.PreConfigureServicesAsync(context, token),
-                cancellationToken).ConfigureAwait(false);
-        }
+            foreach (var entry in _orderedEntries)
+            {
+                await InvokeModuleAsync(
+                    entry,
+                    diagnostics,
+                    "PreConfigureServices",
+                    token => entry.Module.PreConfigureServicesAsync(context, token),
+                    cancellationToken).ConfigureAwait(false);
+            }
 
-        foreach (var entry in _orderedEntries)
+            foreach (var entry in _orderedEntries)
+            {
+                await InvokeModuleAsync(
+                    entry,
+                    diagnostics,
+                    "ConfigureServices",
+                    token => entry.Module.ConfigureServicesAsync(context, token),
+                    cancellationToken).ConfigureAwait(false);
+            }
+
+            foreach (var entry in _orderedEntries)
+            {
+                await InvokeModuleAsync(
+                    entry,
+                    diagnostics,
+                    "PostConfigureServices",
+                    token => entry.Module.PostConfigureServicesAsync(context, token),
+                    cancellationToken).ConfigureAwait(false);
+            }
+
+            _servicesConfigured = true;
+        }
+        finally
         {
-            await InvokeModuleAsync(
-                entry,
-                diagnostics,
-                "ConfigureServices",
-                token => entry.Module.ConfigureServicesAsync(context, token),
-                cancellationToken).ConfigureAwait(false);
+            context.Services.Freeze();
         }
-
-        foreach (var entry in _orderedEntries)
-        {
-            await InvokeModuleAsync(
-                entry,
-                diagnostics,
-                "PostConfigureServices",
-                token => entry.Module.PostConfigureServicesAsync(context, token),
-                cancellationToken).ConfigureAwait(false);
-        }
-
-        _servicesConfigured = true;
     }
 
     public async ValueTask ConfigureContributionsAsync(

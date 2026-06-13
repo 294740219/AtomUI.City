@@ -183,6 +183,20 @@ public sealed class ApplicationHostModuleLifecycleTests
             context.ExecutePreConfigure<RecordedOptions>(null!));
     }
 
+    [Fact]
+    public async Task CapturedModuleServiceCollectionRejectsMutationAfterServiceConfigurationPhase()
+    {
+        CapturedServicesModule.CapturedServices = null;
+        var registry = ModuleRegistry.CreateForTesting([typeof(CapturedServicesModule)]);
+        var services = new ServiceCollection();
+
+        await registry.ConfigureServicesAsync(new ApplicationContext(), services);
+        var capturedServices = Assert.IsType<ModuleServiceCollection>(CapturedServicesModule.CapturedServices);
+
+        Assert.Throws<InvalidOperationException>(() =>
+            capturedServices.AddSingleton<CapturedService>());
+    }
+
     private interface ICoreService;
 
     private sealed class CoreService : ICoreService;
@@ -281,6 +295,19 @@ public sealed class ApplicationHostModuleLifecycleTests
     private sealed class RecordedOptions
     {
         public List<string> Calls { get; } = [];
+    }
+
+    private sealed class CapturedService;
+
+    private sealed class CapturedServicesModule : ModuleBase
+    {
+        public static ModuleServiceCollection? CapturedServices { get; set; }
+
+        public override void ConfigureServices(ServiceConfigurationContext context)
+        {
+            CapturedServices = context.Services;
+            context.Services.AddSingleton<CapturedService>();
+        }
     }
 
     private sealed class FoundationOptionsModule : ModuleBase
