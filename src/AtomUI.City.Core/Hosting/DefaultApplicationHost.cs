@@ -51,31 +51,67 @@ internal sealed class DefaultApplicationHost : IApplicationHost
         {
             ThrowIfDisposed();
 
-            if (_started)
-            {
-                return;
-            }
-
             if (_stopped)
             {
                 throw new InvalidOperationException("Application host cannot be started after it has stopped.");
             }
 
-            await _genericHost.StartAsync(cancellationToken).ConfigureAwait(false);
-            ApplicationScope = HostScope.CreateChild(LifecycleScopeKind.Application, "application");
-            await _moduleRegistry.ConfigureContributionsAsync(
-                (ApplicationContext)Context,
-                Services,
-                cancellationToken).ConfigureAwait(false);
-            await _moduleRegistry.InitializeAsync(
-                (ApplicationContext)Context,
-                Services,
-                cancellationToken).ConfigureAwait(false);
-            _started = true;
-            _diagnostics.Write(new HostDiagnosticRecord(
-                HostDiagnosticIds.HostStarted,
-                "Application host has started.",
-                HostDiagnosticSeverity.Info));
+            if (_started)
+            {
+                return;
+            }
+
+            var genericHostStarted = false;
+
+            try
+            {
+                await _genericHost.StartAsync(cancellationToken).ConfigureAwait(false);
+                genericHostStarted = true;
+                ApplicationScope = HostScope.CreateChild(LifecycleScopeKind.Application, "application");
+                await _moduleRegistry.ConfigureContributionsAsync(
+                    (ApplicationContext)Context,
+                    Services,
+                    cancellationToken).ConfigureAwait(false);
+                await _moduleRegistry.InitializeAsync(
+                    (ApplicationContext)Context,
+                    Services,
+                    cancellationToken).ConfigureAwait(false);
+                _started = true;
+                WriteDiagnostic(new HostDiagnosticRecord(
+                    HostDiagnosticIds.HostStarted,
+                    "Application host has started.",
+                    HostDiagnosticSeverity.Info));
+            }
+            catch (Exception exception)
+            {
+                WriteDiagnostic(new HostDiagnosticRecord(
+                    HostDiagnosticIds.HostStartFailed,
+                    "Application host failed to start.",
+                    HostDiagnosticSeverity.Error)
+                {
+                    Context = CreateExceptionContext(exception),
+                });
+
+                if (genericHostStarted)
+                {
+                    try
+                    {
+                        await _genericHost.StopAsync(CancellationToken.None).ConfigureAwait(false);
+                    }
+                    catch (Exception stopException)
+                    {
+                        WriteDiagnostic(new HostDiagnosticRecord(
+                            HostDiagnosticIds.HostStopFailed,
+                            "Application host failed to stop after startup failure.",
+                            HostDiagnosticSeverity.Error)
+                        {
+                            Context = CreateExceptionContext(stopException),
+                        });
+                    }
+                }
+
+                throw;
+            }
         }
         finally
         {
@@ -96,23 +132,41 @@ internal sealed class DefaultApplicationHost : IApplicationHost
                 return;
             }
 
-            await _moduleRegistry.ShutdownAsync(
-                (ApplicationContext)Context,
-                Services,
-                cancellationToken).ConfigureAwait(false);
-
-            if (ApplicationScope is not null)
+            try
             {
-                await ApplicationScope.StopAsync().ConfigureAwait(false);
-            }
+                await _moduleRegistry.ShutdownAsync(
+                    (ApplicationContext)Context,
+                    Services,
+                    cancellationToken).ConfigureAwait(false);
 
-            await HostScope.StopAsync().ConfigureAwait(false);
-            await _genericHost.StopAsync(cancellationToken).ConfigureAwait(false);
-            _stopped = true;
-            _diagnostics.Write(new HostDiagnosticRecord(
-                HostDiagnosticIds.HostStopped,
-                "Application host has stopped.",
-                HostDiagnosticSeverity.Info));
+                if (ApplicationScope is not null)
+                {
+                    await ApplicationScope.StopAsync().ConfigureAwait(false);
+                }
+
+                await HostScope.StopAsync().ConfigureAwait(false);
+                await _genericHost.StopAsync(cancellationToken).ConfigureAwait(false);
+                _started = false;
+                _stopped = true;
+                WriteDiagnostic(new HostDiagnosticRecord(
+                    HostDiagnosticIds.HostStopped,
+                    "Application host has stopped.",
+                    HostDiagnosticSeverity.Info));
+            }
+            catch (Exception exception)
+            {
+                _started = false;
+                _stopped = true;
+                WriteDiagnostic(new HostDiagnosticRecord(
+                    HostDiagnosticIds.HostStopFailed,
+                    "Application host failed to stop.",
+                    HostDiagnosticSeverity.Error)
+                {
+                    Context = CreateExceptionContext(exception),
+                });
+
+                throw;
+            }
         }
         finally
         {
@@ -169,5 +223,25 @@ internal sealed class DefaultApplicationHost : IApplicationHost
         {
             throw new ObjectDisposedException(nameof(DefaultApplicationHost));
         }
+    }
+
+    private void WriteDiagnostic(HostDiagnosticRecord record)
+    {
+        try
+        {
+            _diagnostics.Write(record);
+        }
+        catch
+        {
+            // Diagnostics must not prevent lifecycle cleanup.
+        }
+    }
+
+    private static IReadOnlyDictionary<string, string?> CreateExceptionContext(Exception exception)
+    {
+        return new Dictionary<string, string?>
+        {
+            ["exceptionType"] = exception.GetType().FullName,
+        };
     }
 }
