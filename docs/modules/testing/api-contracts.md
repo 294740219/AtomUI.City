@@ -831,6 +831,40 @@
 | Diagnostics | not found 写 `AUCTEST501`。 |
 | Tests | `RoutingTestHostTests`。 |
 
+### `SourceGenerationTestCase.Run`
+
+| Field | Contract |
+| --- | --- |
+| Feature | AUC-TESTING-007 |
+| Purpose | 在内存 compilation 中运行 Roslyn `ISourceGenerator`，生成稳定 snapshot 和 diagnostics。 |
+| Parameters | `generator` 不能为 null；`cancellationToken` 在 parse 和 driver 执行前观察。 |
+| Return | `SourceGenerationTestResult`。 |
+| Nullability | `generator` 不接受 null；返回值不能为空。 |
+| Cancellation | token 取消时抛 `OperationCanceledException`，不返回部分 result。 |
+| Exceptions or Result | Roslyn diagnostic 不抛出，保留在 result；generator 抛出的异常由 Roslyn diagnostic 表达。 |
+| Idempotency | 同一 test case 可重复 Run，每次创建独立 compilation 和 driver。 |
+| Concurrency | test case 输入集合只读时可并发运行。 |
+| Side Effects | 不写文件。 |
+| Diagnostics | result 暴露 driver diagnostics 和 output compilation diagnostics。 |
+| Tests | `SourceGenerationTestKitTests`。 |
+
+### `SourceGenerationTestResult`
+
+| Field | Contract |
+| --- | --- |
+| Feature | AUC-TESTING-007 |
+| Purpose | 保存 source generation run 的 snapshot 和 diagnostics。 |
+| Parameters | 由 `SourceGenerationTestCase.Run` 创建。 |
+| Return | 不适用。 |
+| Nullability | `Snapshot` 和 diagnostics 集合不得为空。 |
+| Cancellation | 无。 |
+| Exceptions or Result | diagnostics 集合为 immutable snapshot。 |
+| Idempotency | immutable result。 |
+| Concurrency | 可并发读取。 |
+| Side Effects | 无。 |
+| Diagnostics | `Diagnostics` 保存 generator diagnostics；`CompilationDiagnostics` 保存 output compilation diagnostics。 |
+| Tests | `SourceGenerationTestKitTests`。 |
+
 ## Public 类型覆盖
 
 | Type | 分类 | Review 规则 |
@@ -859,6 +893,7 @@
 | `RoutingTestHostBuilder` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `SourceFile` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `SourceGenerationTestCase` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `SourceGenerationTestResult` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `TestDiagnosticEntry` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `TestDiagnostics` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `TestDirectory` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
