@@ -38,6 +38,35 @@ public sealed class ModuleTestHostTests
     }
 
     [Fact]
+    public async Task InitializeAsyncRunsModulesInDependencyOrder()
+    {
+        var calls = new List<string>();
+        await using var host = ModuleTestHost
+            .CreateBuilder()
+            .UseModule("App", new AppModule(calls))
+            .UseModule("Core", new CoreModule(calls))
+            .Build();
+
+        await host.InitializeAsync();
+
+        Assert.True(calls.IndexOf("Core:ConfigureServices") < calls.IndexOf("App:ConfigureServices"));
+        Assert.True(calls.IndexOf("Core:OnApplicationInitialization") < calls.IndexOf("App:OnApplicationInitialization"));
+    }
+
+    [Fact]
+    public void BuildFreezesModuleTestHostBuilder()
+    {
+        var builder = ModuleTestHost.CreateBuilder()
+            .UseModule("Core", new CoreModule([]));
+
+        using var host = builder.Build();
+
+        Assert.Throws<InvalidOperationException>(() => builder.UseModule("Other", new CoreModule([])));
+        Assert.Throws<InvalidOperationException>(() => builder.UseHostProperty("next", "value"));
+        Assert.Throws<InvalidOperationException>(() => builder.Build());
+    }
+
+    [Fact]
     public async Task ShutdownAsyncRunsModulesInReverseRegistrationOrder()
     {
         var calls = new List<string>();
@@ -86,7 +115,7 @@ public sealed class ModuleTestHostTests
         Assert.Equal("Sample", host.Modules[0].Name);
     }
 
-    private sealed class RecordingModule : ModuleBase
+    private class RecordingModule : ModuleBase
     {
         private readonly List<string> _calls;
         private readonly string _name;
@@ -137,4 +166,9 @@ public sealed class ModuleTestHostTests
             _calls.Add($"{_name}:OnApplicationShutdown");
         }
     }
+
+    private sealed class CoreModule(List<string> calls) : RecordingModule("Core", calls);
+
+    [DependsOn(typeof(CoreModule))]
+    private sealed class AppModule(List<string> calls) : RecordingModule("App", calls);
 }
