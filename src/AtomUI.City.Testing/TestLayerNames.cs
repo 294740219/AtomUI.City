@@ -1,3 +1,5 @@
+using System.Collections.ObjectModel;
+
 namespace AtomUI.City.Testing;
 
 public static class TestLayerNames
@@ -12,6 +14,27 @@ public static class TestLayerNames
     public const string Generator = nameof(Generator);
     public const string Analyzer = nameof(Analyzer);
     public const string Build = nameof(Build);
+
+    public static IReadOnlyList<string> AllCategories { get; } = new ReadOnlyCollection<string>(
+        [
+            Unit,
+            Contract,
+            FrameworkIntegration,
+            RuntimeLifecycle,
+            PluginLifecycle,
+            PlatformIntegration,
+            TemplateSmoke,
+            Generator,
+            Analyzer,
+            Build,
+        ]);
+
+    public static bool IsKnownCategory(string category)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(category);
+
+        return AllCategories.Contains(category, StringComparer.Ordinal);
+    }
 
     public static string GetCategory(TestLayer layer)
     {

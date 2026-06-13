@@ -9,6 +9,20 @@ public sealed class TestLayerAttribute : Attribute
         Category = TestLayerNames.GetCategory(layer);
     }
 
+    public TestLayerAttribute(string category)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(category);
+
+        if (!Enum.TryParse<TestLayer>(category, ignoreCase: false, out var layer)
+            || !string.Equals(TestLayerNames.GetCategory(layer), category, StringComparison.Ordinal))
+        {
+            throw new ArgumentException($"Unknown test layer category '{category}'.", nameof(category));
+        }
+
+        Layer = layer;
+        Category = category;
+    }
+
     public TestLayer Layer { get; }
 
     public string Category { get; }

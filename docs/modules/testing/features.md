@@ -14,7 +14,7 @@
 | AUC-TESTING-006 | Routing Test Host | Implemented | RoutingTestHost, RoutingTestHostBuilder | RoutingTestHostTests |
 | AUC-TESTING-007 | Source Generation Kit | Implemented | SourceGenerationTestCase, GeneratedSourceSnapshot | SourceGenerationTestKitTests |
 | AUC-TESTING-008 | AOT Check | Implemented | AotCompatibilityCheck, AotCompatibilityDiagnostic | AotCompatibilityCheckTests |
-| AUC-TESTING-009 | Test Layers | Ready to Start Product Implementation | TestLayerAttribute, TestLayerNames | TestLayerTests |
+| AUC-TESTING-009 | Test Layers | Implemented | TestLayerAttribute, TestLayerNames | TestLayerTests |
 
 ## Feature 硬门禁
 
@@ -147,7 +147,7 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-TESTING-009 Test Layers
 
 Feature ID: `AUC-TESTING-009`
-Status: Ready to Start Product Implementation
+Status: Implemented
 Goal: 强制测试分层和交付追踪。
 Public Contract: TestLayerAttribute, TestLayerNames
 Runtime / Build Behavior: 标记 Unit、Contract、Integration、PlatformIntegration、TemplateSmoke、Dogfood 等层。
