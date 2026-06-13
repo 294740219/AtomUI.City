@@ -5,6 +5,33 @@ namespace AtomUI.City.Testing.Tests;
 public sealed class RoutingTestHostTests
 {
     [Fact]
+    public void BuildFreezesRoutingTestHostBuilder()
+    {
+        var builder = RoutingTestHost.CreateBuilder()
+            .MapRoute("customer-details", "/customers/{id}", typeof(CustomerDetailsViewModel));
+
+        var host = builder.Build();
+
+        Assert.Throws<InvalidOperationException>(() => builder.MapRoute("orders", "/orders/{id}", typeof(OrderDetailsViewModel)));
+        Assert.Throws<InvalidOperationException>(() => builder.Build());
+        Assert.Single(host.Routes);
+    }
+
+    [Fact]
+    public void BuildRejectsDuplicateRouteNameAndPattern()
+    {
+        var duplicateNameBuilder = RoutingTestHost.CreateBuilder()
+            .MapRoute("details", "/customers/{id}", typeof(CustomerDetailsViewModel))
+            .MapRoute("details", "/orders/{id}", typeof(OrderDetailsViewModel));
+        var duplicatePatternBuilder = RoutingTestHost.CreateBuilder()
+            .MapRoute("customers", "/customers/{id}", typeof(CustomerDetailsViewModel))
+            .MapRoute("orders", "customers/{orderId}", typeof(OrderDetailsViewModel));
+
+        Assert.Throws<InvalidOperationException>(() => duplicateNameBuilder.Build());
+        Assert.Throws<InvalidOperationException>(() => duplicatePatternBuilder.Build());
+    }
+
+    [Fact]
     public void MatchReturnsViewModelTargetAndParameters()
     {
         var host = RoutingTestHost
