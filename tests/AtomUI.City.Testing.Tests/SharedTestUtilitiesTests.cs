@@ -76,6 +76,67 @@ public sealed class SharedTestUtilitiesTests
         Assert.False(diagnostics.Contains("CITY1002"));
     }
 
+    [Fact]
+    public void DeterministicSchedulerRunsSameDueTimeWorkInScheduleOrder()
+    {
+        var scheduler = new DeterministicScheduler();
+        var calls = new List<int>();
+
+        for (var index = 0; index < 20; index++)
+        {
+            var capturedIndex = index;
+            scheduler.Schedule(TimeSpan.FromSeconds(1), () => calls.Add(capturedIndex));
+        }
+
+        scheduler.AdvanceBy(TimeSpan.FromSeconds(1));
+
+        Assert.Equal(Enumerable.Range(0, 20), calls);
+    }
+
+    [Fact]
+    public void DeterministicSchedulerRecordsExceptionsAndContinuesRemainingWork()
+    {
+        var diagnostics = new TestDiagnostics();
+        var scheduler = new DeterministicScheduler(diagnostics);
+        var calls = new List<string>();
+
+        var failedWork = scheduler.Schedule(TimeSpan.Zero, () => throw new InvalidOperationException("boom"));
+        scheduler.Schedule(TimeSpan.Zero, () => calls.Add("after"));
+
+        scheduler.RunDueWork();
+
+        Assert.True(failedWork.IsFaulted);
+        Assert.Equal("boom", failedWork.Exception?.Message);
+        Assert.True(diagnostics.Contains("AUCTEST201"));
+        Assert.Equal(["after"], calls);
+    }
+
+    [Fact]
+    public void DeterministicSchedulerSkipsCanceledWork()
+    {
+        var scheduler = new DeterministicScheduler();
+        var wasCalled = false;
+
+        var work = scheduler.Schedule(TimeSpan.Zero, () => wasCalled = true);
+        work.Cancel();
+        scheduler.RunDueWork();
+
+        Assert.False(wasCalled);
+        Assert.True(work.IsCanceled);
+        Assert.True(work.IsCompleted);
+        Assert.Equal(0, scheduler.ScheduledCount);
+    }
+
+    [Fact]
+    public void DeterministicSchedulerRejectsScheduleAfterDispose()
+    {
+        var scheduler = new DeterministicScheduler();
+
+        scheduler.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(() => scheduler.Schedule(TimeSpan.Zero, () => { }));
+    }
+
     private sealed class DelegateDisposable : IDisposable
     {
         private readonly Action _dispose;

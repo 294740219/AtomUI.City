@@ -2,7 +2,9 @@ namespace AtomUI.City.Testing;
 
 public sealed class DeterministicScheduler : IDisposable
 {
-    private readonly PriorityQueue<ScheduledWorkItem, DateTimeOffset> _scheduledWork = new();
+    private readonly PriorityQueue<DeterministicScheduledWorkItem, ScheduledWorkPriority> _scheduledWork = new();
+    private readonly TestDiagnostics _diagnostics;
+    private long _nextWorkItemId;
     private bool _disposed;
 
     public DeterministicScheduler()
@@ -12,14 +14,14 @@ public sealed class DeterministicScheduler : IDisposable
 
     public DeterministicScheduler(TestDiagnostics diagnostics)
     {
-        ArgumentNullException.ThrowIfNull(diagnostics);
+        _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
     }
 
     public DateTimeOffset Now { get; private set; } = DateTimeOffset.UnixEpoch;
 
     public int ScheduledCount => _scheduledWork.Count;
 
-    public void Schedule(TimeSpan delay, Action callback)
+    public DeterministicScheduledWorkItem Schedule(TimeSpan delay, Action callback)
     {
         ArgumentNullException.ThrowIfNull(callback);
         ThrowIfDisposed();
@@ -29,8 +31,16 @@ public sealed class DeterministicScheduler : IDisposable
             throw new ArgumentOutOfRangeException(nameof(delay), delay, "Delay cannot be negative.");
         }
 
-        var dueAt = Now.Add(delay);
-        _scheduledWork.Enqueue(new ScheduledWorkItem(callback, dueAt), dueAt);
+        var scheduledWorkItem = new DeterministicScheduledWorkItem(
+            Interlocked.Increment(ref _nextWorkItemId),
+            callback,
+            Now.Add(delay));
+
+        _scheduledWork.Enqueue(
+            scheduledWorkItem,
+            new ScheduledWorkPriority(scheduledWorkItem.DueAt, scheduledWorkItem.Id));
+
+        return scheduledWorkItem;
     }
 
     public void AdvanceBy(TimeSpan duration)
@@ -50,10 +60,10 @@ public sealed class DeterministicScheduler : IDisposable
     {
         ThrowIfDisposed();
 
-        while (_scheduledWork.TryPeek(out var workItem, out var dueAt) && dueAt <= Now)
+        while (_scheduledWork.TryPeek(out var workItem, out var priority) && priority.DueAt <= Now)
         {
             _scheduledWork.Dequeue();
-            workItem.Callback();
+            ExecuteWorkItem(workItem);
         }
     }
 
@@ -65,7 +75,25 @@ public sealed class DeterministicScheduler : IDisposable
         }
 
         _disposed = true;
-        _scheduledWork.Clear();
+
+        while (_scheduledWork.TryDequeue(out var workItem, out _))
+        {
+            workItem.Cancel();
+        }
+    }
+
+    private void ExecuteWorkItem(DeterministicScheduledWorkItem workItem)
+    {
+        try
+        {
+            workItem.Execute();
+        }
+        catch (Exception exception)
+        {
+            _diagnostics.Add(
+                "AUCTEST201",
+                $"Scheduled work item {workItem.Id} failed at {workItem.DueAt:o}: {exception.Message}");
+        }
     }
 
     private void ThrowIfDisposed()
@@ -76,5 +104,77 @@ public sealed class DeterministicScheduler : IDisposable
         }
     }
 
-    private sealed record ScheduledWorkItem(Action Callback, DateTimeOffset DueAt);
+    private readonly record struct ScheduledWorkPriority(DateTimeOffset DueAt, long Id)
+        : IComparable<ScheduledWorkPriority>
+    {
+        public int CompareTo(ScheduledWorkPriority other)
+        {
+            var dueAtComparison = DueAt.CompareTo(other.DueAt);
+
+            return dueAtComparison != 0 ? dueAtComparison : Id.CompareTo(other.Id);
+        }
+    }
+}
+
+public sealed class DeterministicScheduledWorkItem
+{
+    private readonly Action _callback;
+
+    internal DeterministicScheduledWorkItem(long id, Action callback, DateTimeOffset dueAt)
+    {
+        Id = id;
+        _callback = callback;
+        DueAt = dueAt;
+    }
+
+    public long Id { get; }
+
+    public DateTimeOffset DueAt { get; }
+
+    public bool IsCanceled { get; private set; }
+
+    public bool IsCompleted { get; private set; }
+
+    public bool IsFaulted { get; private set; }
+
+    public Exception? Exception { get; private set; }
+
+    public void Cancel()
+    {
+        if (IsCompleted)
+        {
+            return;
+        }
+
+        IsCanceled = true;
+    }
+
+    internal void Execute()
+    {
+        if (IsCompleted)
+        {
+            return;
+        }
+
+        if (IsCanceled)
+        {
+            IsCompleted = true;
+
+            return;
+        }
+
+        try
+        {
+            _callback();
+            IsCompleted = true;
+        }
+        catch (Exception exception)
+        {
+            Exception = exception;
+            IsFaulted = true;
+            IsCompleted = true;
+
+            throw;
+        }
+    }
 }
