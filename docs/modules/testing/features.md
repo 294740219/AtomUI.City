@@ -6,9 +6,9 @@
 
 | Feature ID | 名称 | 状态 | Public Contract | 主测试 |
 | --- | --- | --- | --- | --- |
-| AUC-TESTING-001 | Test Host | Ready to Start Product Implementation | TestHost, TestHostBuilder | TestHostTests |
-| AUC-TESTING-002 | Fake Dispatcher | Ready to Start Product Implementation | FakeUiDispatcher, FakeUiWorkItem | FakeUiDispatcherTests |
-| AUC-TESTING-003 | Deterministic Scheduler | Ready to Start Product Implementation | DeterministicScheduler | SharedTestUtilitiesTests |
+| AUC-TESTING-001 | Test Host | Implemented | TestHost, TestHostBuilder | TestHostTests |
+| AUC-TESTING-002 | Fake Dispatcher | Implemented | FakeUiDispatcher, FakeUiWorkItem | FakeUiDispatcherTests |
+| AUC-TESTING-003 | Deterministic Scheduler | Implemented | DeterministicScheduler | SharedTestUtilitiesTests |
 | AUC-TESTING-004 | Module Test Host | Ready to Start Product Implementation | ModuleTestHost, ModuleTestHostBuilder | ModuleTestHostTests |
 | AUC-TESTING-005 | Plugin Test Host | Ready to Start Product Implementation | PluginTestHost, PluginTestHostBuilder | PluginTestHostTests |
 | AUC-TESTING-006 | Routing Test Host | Ready to Start Product Implementation | RoutingTestHost, RoutingTestHostBuilder | RoutingTestHostTests |
@@ -35,7 +35,7 @@
 ## AUC-TESTING-001 Test Host
 
 Feature ID: `AUC-TESTING-001`
-Status: Ready to Start Product Implementation
+Status: Implemented
 Goal: 提供通用 host、service 和 diagnostics 测试工具。
 Public Contract: TestHost, TestHostBuilder
 Runtime / Build Behavior: 构建 services、diagnostics、records 和 disposable tracker。
@@ -49,7 +49,7 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-TESTING-002 Fake Dispatcher
 
 Feature ID: `AUC-TESTING-002`
-Status: Ready to Start Product Implementation
+Status: Implemented
 Goal: 提供可手动推进的 UI dispatcher。
 Public Contract: FakeUiDispatcher, FakeUiWorkItem
 Runtime / Build Behavior: 排队、运行、取消和记录 UI work item。
@@ -63,7 +63,7 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-TESTING-003 Deterministic Scheduler
 
 Feature ID: `AUC-TESTING-003`
-Status: Ready to Start Product Implementation
+Status: Implemented
 Goal: 提供虚拟时间和异步任务推进。
 Public Contract: DeterministicScheduler
 Runtime / Build Behavior: 按虚拟时间执行 delayed work，记录任务顺序。
