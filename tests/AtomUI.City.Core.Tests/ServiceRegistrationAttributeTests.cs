@@ -68,7 +68,44 @@ public sealed class ServiceRegistrationAttributeTests
         Assert.Empty(typeof(ITransientDependency).GetInterfaces());
     }
 
+    [Fact]
+    public void ServiceRegistrationMetadataReadsLifetimeAndExposedServices()
+    {
+        var metadata = ServiceRegistrationMetadata.Read(typeof(SampleSingletonService));
+
+        Assert.Equal(ServiceLifetime.Singleton, metadata.Lifetime);
+        Assert.Equal([typeof(IClock)], metadata.ExposedServiceTypes);
+    }
+
+    [Fact]
+    public void ConflictingLifetimeMarkersAreRejectedByMetadataReader()
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            ServiceRegistrationMetadata.Read(typeof(ConflictingLifetimeService)));
+
+        Assert.Contains(nameof(ConflictingLifetimeService), exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void InvalidExposedServiceTypeIsRejectedByMetadataReader()
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            ServiceRegistrationMetadata.Read(typeof(InvalidExposedService)));
+
+        Assert.Contains(nameof(InvalidExposedService), exception.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(ISystemClock), exception.Message, StringComparison.Ordinal);
+    }
+
     private interface IClock;
 
     private interface ISystemClock;
+
+    [Service(ServiceLifetime.Singleton)]
+    [ExposeServices(typeof(IClock))]
+    private sealed class SampleSingletonService : IClock;
+
+    private sealed class ConflictingLifetimeService : ISingletonDependency, IScopedDependency;
+
+    [ExposeServices(typeof(ISystemClock))]
+    private sealed class InvalidExposedService : IClock;
 }
