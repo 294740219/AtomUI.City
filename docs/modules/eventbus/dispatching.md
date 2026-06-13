@@ -1,10 +1,66 @@
-# AtomUI.City.EventBus Dispatching 设计
+# AtomUI.City.EventBus Dispatching 合同
 
-版本：v0.1
-状态：正式初版
+## 适用范围
+
+本专题属于 `AtomUI.City.EventBus` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `Dispatching` 相关实现决策，不重新定义模块边界。
+
+## 设计决策
+
+- 默认不隐式切线程。
+- 后台任务必须观察 cancellation。
+- UI 更新必须进入 Presentation dispatcher。
+
+## Public Contract
+
+- 只允许通过 `AtomUI.City.EventBus` 的 public API、attribute、options、manifest、generated output 或 DI extension 暴露本专题能力。
+- 新增 contract 必须进入 [api-contracts.md](api-contracts.md)。
+- 新增功能必须分配 Feature ID，并进入 [features.md](features.md)。
+- 修改失败行为、默认值、诊断码或生命周期状态必须进入 [compatibility.md](compatibility.md)。
+
+## 运行时边界
+
+- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
+- Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
+- 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
+
+## 失败行为
+
+- 输入无效：使用标准参数异常或模块 Result。
+- 生命周期状态非法：返回失败 Result、模块异常或稳定诊断。
+- 依赖缺失：阻止当前功能启用，不影响无关功能。
+- 插件卸载中：拒绝创建新贡献，并撤销已有贡献。
+- 释放失败：记录诊断并继续释放其他资源。
+
+## 测试要求
+
+| Feature ID | 相关能力 | 测试文件 |
+| --- | --- | --- |
+| AUC-EVENTBUS-001 | Typed Publish | EventPublicationTests |
+| AUC-EVENTBUS-002 | Subscription Lifecycle | EventSubscriptionTests |
+| AUC-EVENTBUS-003 | Contract Registry | EventContractRegistryTests |
+| AUC-EVENTBUS-004 | Dispatch Policy | EventDispatchingTests |
+| AUC-EVENTBUS-005 | Diagnostics | EventDiagnosticsTests |
+| AUC-EVENTBUS-006 | DI Registration | EventBusRegistrationTests |
+
+本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
+
+## 完成标准
+
+- 设计决策能回答对象由谁创建、谁持有、谁释放。
+- API contract、失败行为、诊断和测试矩阵一致。
+- 不出现业务领域假设。
+- 不引入 `AtomUI.City.Presentation` 等禁止依赖。
+
+## 既有细化设计内容
+
+以下内容保留上一轮设计中的专题细节。后续修改必须与本页上方合同、Feature ID、API 行为、诊断和测试矩阵保持一致。
+
+## AtomUI.City.EventBus Dispatching 设计
+
 适用范围：事件发布完成语义、Core Threading 集成、channel 队列、顺序保证、并发、背压、取消、递归发布和性能设计。
 
-## 1. 定位
+### 1. 定位
 
 Dispatching 决定事件从 publisher 到 handler 的执行路径。
 
@@ -19,9 +75,9 @@ Dispatching 复用 Core Threading：
 - Lifecycle cancellation
 - Diagnostics/ErrorPolicy
 
-## 2. PublishAsync 与 PostAsync
+### 2. PublishAsync 与 PostAsync
 
-### PublishAsync
+#### PublishAsync
 
 `PublishAsync` 是等待处理完成的发布方式。
 
@@ -38,7 +94,7 @@ Dispatching 复用 Core Threading：
 - 等待其他 channel 中无关联事件。
 - 等待事件导致的 State 后续持久化。
 
-### PostAsync
+#### PostAsync
 
 `PostAsync` 是受管排队方式。
 
@@ -54,7 +110,7 @@ Dispatching 复用 Core Threading：
 - EventBus 停止时事件按关闭策略取消或 drain。
 - 不产生未观察 Task。
 
-## 3. 禁止同步阻塞发布
+### 3. 禁止同步阻塞发布
 
 第一版不提供同步 `Publish`：
 
@@ -72,18 +128,18 @@ PublishAndWait(...)
 
 调用方必须使用 `await PublishAsync(...)` 或 `await PostAsync(...)`。
 
-## 4. DispatchPolicy
+### 4. DispatchPolicy
 
 每个订阅声明 Core `DispatchPolicy`。
 
-### Current
+#### Current
 
 - Handler 在当前发布执行上下文运行。
 - 只适合轻量、无阻塞、无需线程切换的框架内部 handler。
 - 不允许执行长耗时 IO。
 - 发布方会直接承受 handler 延迟。
 
-### UiThread
+#### UiThread
 
 - 通过 `IUiDispatcher` 投递。
 - Presentation 未 ready 时按配置等待或拒绝。
@@ -91,20 +147,20 @@ PublishAndWait(...)
 - Handler 异常进入 EventBus error policy。
 - 默认使用异步 `Post` 语义避免重入。
 
-### Background
+#### Background
 
 - 通过 Core 受管后台调度器运行。
 - 绑定订阅 owner Scope。
 - Handler 异常被观察。
 - 不允许使用裸 `Task.Run` 逃逸生命周期。
 
-### Serialized
+#### Serialized
 
 - 在订阅或指定 key 的串行队列中运行。
 - 保证一次只有一个 handler 执行。
 - 默认用于非 UI 应用 handler。
 
-## 5. InlineIfAllowed 与 Post
+### 5. InlineIfAllowed 与 Post
 
 `DispatchMode`：
 
@@ -122,7 +178,7 @@ PublishAndWait(...)
 
 使用 inline 必须保证 handler 不反向修改当前正在遍历的运行时状态。
 
-## 6. Channel Runtime
+### 6. Channel Runtime
 
 每个 channel runtime 至少包含：
 
@@ -140,7 +196,7 @@ PublishAndWait(...)
 
 Channel runtime 由 ApplicationScope 或插件私有 runtime context 持有。
 
-## 7. Serialized 模式
+### 7. Serialized 模式
 
 `Serialized` 是默认模式。
 
@@ -160,7 +216,7 @@ Event 1 accepted
 
 默认两者都串行。这样系统级状态通知的顺序最稳定。
 
-## 8. Partitioned 模式
+### 8. Partitioned 模式
 
 `Partitioned` 根据稳定 partition key 分组：
 
@@ -183,7 +239,7 @@ Partition B: Event 2 -> Event 4
 
 适合多个独立文档、会话或资源实例的事件处理。
 
-## 9. Concurrent 模式
+### 9. Concurrent 模式
 
 `Concurrent` 允许事件和 handler 并发执行。
 
@@ -204,7 +260,7 @@ Concurrent 仍然必须有：
 
 Concurrent 不等于每个事件直接 `Task.Run`。
 
-## 10. 订阅并发
+### 10. 订阅并发
 
 Channel mode 和 subscription concurrency 是两个层次。
 
@@ -223,7 +279,7 @@ EventBus 根据两者生成 dispatch plan。
 
 只有显式配置才放宽。
 
-## 11. 发布快照
+### 11. 发布快照
 
 发布开始时获取不可变订阅快照：
 
@@ -244,7 +300,7 @@ Snapshot 特性：
 
 Snapshot 允许发布与注册/撤销并发，但不能绕过 Quiescing barrier。
 
-## 12. Handler 执行策略
+### 12. Handler 执行策略
 
 同一事件的多个订阅默认可以独立调度，但发布结果需要等待它们完成。
 
@@ -262,40 +318,40 @@ Snapshot 允许发布与注册/撤销并发，但不能绕过 Quiescing barrier�
 
 如果 Host 希望整个 channel 每次只处理一个 handler，可以显式选择严格串行策略。
 
-## 13. 背压策略
+### 13. 背压策略
 
 所有 queue 都必须有有限 capacity。
 
-### Wait
+#### Wait
 
 - 等待队列出现容量。
 - 等待可取消。
 - 默认用于不能丢失的系统事件。
 - UI Thread 调用时应优先使用 `PublishAsync` 或短 timeout，避免长时间阻塞。
 
-### Reject
+#### Reject
 
 - 队列满时立即返回 rejected。
 - 适合调用方可以重试或降级的事件。
 
-### DropOldest
+#### DropOldest
 
 - 移除最早未开始事件。
 - 必须记录 dropped EventId。
 - 不适合状态转换和审计事件。
 
-### DropNewest
+#### DropNewest
 
 - 拒绝当前事件。
 - 保留已在队列中的事件。
 
-### CoalesceLatest
+#### CoalesceLatest
 
 - 相同 EventContractId、channel 和 partition key 只保留最新事件。
 - 被替换事件记录为 coalesced。
 - 适合刷新提示，不适合业务事实。
 
-## 14. 背压默认值
+### 14. 背压默认值
 
 框架不使用一个全局 capacity 适配所有 channel。
 
@@ -314,7 +370,7 @@ Snapshot 允许发布与注册/撤销并发，但不能绕过 Quiescing barrier�
 - 插件不能创建无限 capacity。
 - Drop/Coalesce 必须显式声明。
 
-## 15. UI Thread 约束
+### 15. UI Thread 约束
 
 UI handler：
 
@@ -330,7 +386,7 @@ UI handler：
 - `await` 允许 Dispatcher 继续处理消息。
 - Handler continuation 不强制回到 publisher UI context，除非调用方自己需要。
 
-## 16. Cancellation
+### 16. Cancellation
 
 Delivery token 组合：
 
@@ -350,7 +406,7 @@ EventBus shutdown token
 - Queue wait 必须可取消。
 - 取消结果与失败结果分开统计。
 
-## 17. Timeout
+### 17. Timeout
 
 可以配置：
 
@@ -367,7 +423,7 @@ Timeout 不等于强制终止 handler。
 - 标记 timeout 诊断。
 - 根据错误策略继续 drain、隔离订阅或进入 Plugin `UnloadPending`。
 
-## 18. 递归发布与重入
+### 18. 递归发布与重入
 
 Handler 中可以调用 `PublishAsync`。
 
@@ -387,7 +443,7 @@ Handler 中可以调用 `PublishAsync`。
 
 EventBus 必须输出循环诊断，而不是只表现为超时。
 
-## 19. 错误聚合
+### 19. 错误聚合
 
 `PublishAsync` 聚合每个 delivery 的结果：
 
@@ -414,7 +470,7 @@ Skipped
 
 默认不把完整 Exception 集合跨插件边界直接暴露给插件。插件私有异常应转换为稳定错误信息和诊断引用。
 
-## 20. 性能结构
+### 20. 性能结构
 
 发布热路径建议：
 
@@ -446,7 +502,7 @@ Resolve generated contract descriptor
 - 把 handler 异常变成未观察 Task。
 - 使用无法清理的静态泛型缓存。
 
-## 21. Benchmark 规划
+### 21. Benchmark 规划
 
 Benchmark 至少覆盖：
 
@@ -472,7 +528,7 @@ Benchmark 至少覆盖：
 
 第一版不在架构文档中承诺未经验证的固定性能数字。
 
-## 22. 测试要求
+### 22. 测试要求
 
 必须使用 deterministic dispatcher 测试：
 
@@ -489,7 +545,7 @@ Benchmark 至少覆盖：
 - Quiescing barrier。
 - EventBus shutdown drain。
 
-## 23. 第一版明确决策
+### 23. 第一版明确决策
 
 - 默认 channel Serialized。
 - 默认 subscription Serial。

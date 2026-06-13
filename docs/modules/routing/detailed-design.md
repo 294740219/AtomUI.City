@@ -1,10 +1,66 @@
-# AtomUI.City.Routing Detailed Design
+# AtomUI.City.Routing Detailed Design 合同
 
-版本：v0.1
-状态：正式初版
+## 适用范围
+
+本专题属于 `AtomUI.City.Routing` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `Detailed Design` 相关实现决策，不重新定义模块边界。
+
+## 设计决策
+
+- Routing 只负责 Route -> ViewModel Target。
+- 参数绑定失败必须返回导航失败结果。
+- 插件路由撤销后 route graph 必须重新发布。
+
+## Public Contract
+
+- 只允许通过 `AtomUI.City.Routing` 的 public API、attribute、options、manifest、generated output 或 DI extension 暴露本专题能力。
+- 新增 contract 必须进入 [api-contracts.md](api-contracts.md)。
+- 新增功能必须分配 Feature ID，并进入 [features.md](features.md)。
+- 修改失败行为、默认值、诊断码或生命周期状态必须进入 [compatibility.md](compatibility.md)。
+
+## 运行时边界
+
+- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
+- Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
+- 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
+
+## 失败行为
+
+- 输入无效：使用标准参数异常或模块 Result。
+- 生命周期状态非法：返回失败 Result、模块异常或稳定诊断。
+- 依赖缺失：阻止当前功能启用，不影响无关功能。
+- 插件卸载中：拒绝创建新贡献，并撤销已有贡献。
+- 释放失败：记录诊断并继续释放其他资源。
+
+## 测试要求
+
+| Feature ID | 相关能力 | 测试文件 |
+| --- | --- | --- |
+| AUC-ROUTING-001 | Route Template Syntax | RouteTemplateTests; RoutingParameterBoundaryTests |
+| AUC-ROUTING-002 | Route Definition Attributes | RouteDefinitionAttributeTests |
+| AUC-ROUTING-003 | Route Graph | RouteGraphAndMatcherTests |
+| AUC-ROUTING-004 | Route Matcher | RouteGraphAndMatcherTests |
+| AUC-ROUTING-005 | Navigation Scope | NavigationScopeTests |
+| AUC-ROUTING-006 | Guards | RouteGuardTests |
+
+本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
+
+## 完成标准
+
+- 设计决策能回答对象由谁创建、谁持有、谁释放。
+- API contract、失败行为、诊断和测试矩阵一致。
+- 不出现业务领域假设。
+- 不引入 `AtomUI.City.Presentation` 等禁止依赖。
+
+## 既有细化设计内容
+
+以下内容保留上一轮设计中的专题细节。后续修改必须与本页上方合同、Feature ID、API 行为、诊断和测试矩阵保持一致。
+
+## AtomUI.City.Routing Detailed Design
+
 适用范围：路由图、导航事务、NavigationScope、RouteScope、Guard、Resolver、Journal、插件路由、线程模型、诊断和测试。
 
-## 1. 定位
+### 1. 定位
 
 `AtomUI.City.Routing` 是应用页面进入模型的核心模块。
 
@@ -23,7 +79,7 @@ Route Graph
 
 Routing 只选择要进入的 ViewModel Target，不负责创建具体 UI 控件。ViewModel 到 View 的定位、View 创建、Outlet 控件承接和 AtomUI/Avalonia 线程适配由 `AtomUI.City.Presentation` 负责。
 
-## 2. 非目标
+### 2. 非目标
 
 Routing 不负责：
 
@@ -40,7 +96,7 @@ Routing 不负责：
 
 这些能力由 Presentation、Data、Security 或业务应用自己实现。
 
-## 3. 设计原则
+### 3. 设计原则
 
 Routing 必须遵守：
 
@@ -53,7 +109,7 @@ Routing 必须遵守：
 - Business-agnostic：框架不内置业务页面形态。
 - Testable：路由匹配、守卫、解析、事务回滚和插件撤销都必须可测试。
 
-## 4. 核心抽象
+### 4. 核心抽象
 
 | 类型 | 职责 |
 |---|---|
@@ -73,7 +129,7 @@ Routing 必须遵守：
 
 命名不额外添加 `City` 前缀。命名空间已经表达框架归属。
 
-## 5. Route Graph
+### 5. Route Graph
 
 Route Graph 是应用可进入页面的静态和动态合成结果。
 
@@ -98,7 +154,7 @@ RouteContribution
 
 详细规则见：[route-graph.md](route-graph.md)。
 
-## 6. NavigationScope
+### 6. NavigationScope
 
 `NavigationScope` 是独立导航上下文。
 
@@ -128,7 +184,7 @@ WindowScope
 
 Tab、子窗口、独立预览面板可以创建子 NavigationScope。
 
-## 7. Navigation Transaction
+### 7. Navigation Transaction
 
 导航必须是事务式流程。
 
@@ -165,7 +221,7 @@ Accept request
 
 详细规则见：[navigation.md](navigation.md)。
 
-## 8. Route Lifecycle
+### 8. Route Lifecycle
 
 活动路由生命周期：
 
@@ -194,7 +250,7 @@ Matched
 
 RouteScope 离开时必须先拒绝新 Operation，再取消 token，再停用 ActivationScope 和子 RouteScope，最后释放服务作用域。
 
-## 9. Guard、Resolver 和 Middleware
+### 9. Guard、Resolver 和 Middleware
 
 Guard 负责决策，Resolver 负责数据准备，Middleware 负责包裹导航流程。
 
@@ -213,7 +269,7 @@ Guard、Resolver 和 Middleware 必须由 Source Generator 写入 descriptor，�
 - [guards.md](guards.md)
 - [resolvers.md](resolvers.md)
 
-## 10. ViewModel Target
+### 10. ViewModel Target
 
 Routing 只输出 ViewModel Target。
 
@@ -239,7 +295,7 @@ Presentation 再根据 ViewModel 找 View。Routing 不做 ViewLocator。
 
 详细规则见：[viewmodel-target.md](viewmodel-target.md)。
 
-## 11. Journal 和 Reuse
+### 11. Journal 和 Reuse
 
 每个 NavigationScope 拥有独立 Journal。
 
@@ -262,7 +318,7 @@ Route Reuse 分为：
 
 详细规则见：[journal-and-reuse.md](journal-and-reuse.md)。
 
-## 12. Plugin 路由
+### 12. Plugin 路由
 
 插件通过 Route Contribution 加入 RouteRegistry。
 
@@ -278,7 +334,7 @@ Route Reuse 分为：
 
 详细规则见：[plugins.md](plugins.md)。
 
-## 13. Threading
+### 13. Threading
 
 同一个 NavigationScope 内导航必须串行化。
 
@@ -297,7 +353,7 @@ Route Reuse 分为：
 - Outlet 提交必须通过 `IUiDispatcher`。
 - 当前导航状态更新必须原子化。
 
-## 14. AOT 和 Source Generator
+### 14. AOT 和 Source Generator
 
 Source Generator 必须生成：
 
@@ -319,7 +375,7 @@ Source Generator 必须生成：
 - 命名约定猜测 ViewModel 或 View。
 - 动态代理作为默认路径。
 
-## 15. 错误和诊断
+### 15. 错误和诊断
 
 NavigationResult 必须区分：
 
@@ -347,7 +403,7 @@ NavigationResult 必须区分：
 
 详细规则见：[diagnostics-and-testing.md](diagnostics-and-testing.md)。
 
-## 16. 测试策略
+### 16. 测试策略
 
 Testing 包应提供：
 
@@ -362,7 +418,7 @@ Testing 包应提供：
 
 Routing 测试不应依赖真实 AtomUI/Avalonia UI。
 
-## 17. 第一版取舍
+### 17. 第一版取舍
 
 第一版不做：
 

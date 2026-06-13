@@ -14,6 +14,7 @@
 
 - 文档链接检查。
 - 设计文档和实现一致性检查。
+- 公共 API review。
 - full build。
 - full test。
 - package validation。
@@ -27,6 +28,7 @@
 
 ```text
 Confirm docs
+-> review public API
 -> run full verification
 -> pack packages
 -> validate package layout
@@ -43,6 +45,7 @@ Confirm docs
 
 - 文档和实现不一致。
 - 公共 API 未记录。
+- 公共 API review 未通过。
 - 单元测试缺失。
 - 集成测试失败。
 - AOT/trimming 诊断未处理。
@@ -69,6 +72,7 @@ Release notes 至少包含：
 | full build | Build | solution build 成功。 |
 | full test | Test | 全部测试通过。 |
 | package validation | Pack test | 包布局和元数据有效。 |
+| public API review | Contract test | public API、diagnostic、schema、generated output、CLI envelope 和 template variable 均有文档合同。 |
 | template smoke | Template test | 生成项目可 build/test。 |
 | plugin smoke | Integration | 插件安装、启用、停用、卸载链路可跑。 |
 | release notes | Docs | 版本变更可追踪。 |

@@ -1,10 +1,66 @@
-# AtomUI.City.EventBus Event Contracts 设计
+# AtomUI.City.EventBus Contracts 合同
 
-版本：v0.1
-状态：正式初版
+## 适用范围
+
+本专题属于 `AtomUI.City.EventBus` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `Contracts` 相关实现决策，不重新定义模块边界。
+
+## 设计决策
+
+- 本专题必须绑定 Feature ID。
+- 必须说明 public contract、失败行为和测试。
+- 不得只描述概念。
+
+## Public Contract
+
+- 只允许通过 `AtomUI.City.EventBus` 的 public API、attribute、options、manifest、generated output 或 DI extension 暴露本专题能力。
+- 新增 contract 必须进入 [api-contracts.md](api-contracts.md)。
+- 新增功能必须分配 Feature ID，并进入 [features.md](features.md)。
+- 修改失败行为、默认值、诊断码或生命周期状态必须进入 [compatibility.md](compatibility.md)。
+
+## 运行时边界
+
+- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
+- Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
+- 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
+
+## 失败行为
+
+- 输入无效：使用标准参数异常或模块 Result。
+- 生命周期状态非法：返回失败 Result、模块异常或稳定诊断。
+- 依赖缺失：阻止当前功能启用，不影响无关功能。
+- 插件卸载中：拒绝创建新贡献，并撤销已有贡献。
+- 释放失败：记录诊断并继续释放其他资源。
+
+## 测试要求
+
+| Feature ID | 相关能力 | 测试文件 |
+| --- | --- | --- |
+| AUC-EVENTBUS-001 | Typed Publish | EventPublicationTests |
+| AUC-EVENTBUS-002 | Subscription Lifecycle | EventSubscriptionTests |
+| AUC-EVENTBUS-003 | Contract Registry | EventContractRegistryTests |
+| AUC-EVENTBUS-004 | Dispatch Policy | EventDispatchingTests |
+| AUC-EVENTBUS-005 | Diagnostics | EventDiagnosticsTests |
+| AUC-EVENTBUS-006 | DI Registration | EventBusRegistrationTests |
+
+本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
+
+## 完成标准
+
+- 设计决策能回答对象由谁创建、谁持有、谁释放。
+- API contract、失败行为、诊断和测试矩阵一致。
+- 不出现业务领域假设。
+- 不引入 `AtomUI.City.Presentation` 等禁止依赖。
+
+## 既有细化设计内容
+
+以下内容保留上一轮设计中的专题细节。后续修改必须与本页上方合同、Feature ID、API 行为、诊断和测试矩阵保持一致。
+
+## AtomUI.City.EventBus Event Contracts 设计
+
 适用范围：事件契约身份、共享 Contract 程序集、AssemblyLoadContext、插件跨边界事件、版本兼容、对象图约束、manifest 和卸载设计。
 
-## 1. 定位
+### 1. 定位
 
 Event Contract 定义 EventBus 中可以发布什么数据，以及 Host、静态模块和运行时插件如何对同一个事件类型形成一致认识。
 
@@ -18,7 +74,7 @@ Event Contract 定义 EventBus 中可以发布什么数据，以及 Host、静�
 
 因此，Event Contract 不是普通 DTO 约定，而是 Host 和插件之间的稳定运行时边界。
 
-## 2. CLR 类型身份
+### 2. CLR 类型身份
 
 .NET 类型身份不仅由 namespace 和 type name 决定，还包括定义它的 Assembly 以及加载该 Assembly 的 `AssemblyLoadContext`。
 
@@ -45,7 +101,7 @@ Plugin ALC::MyApplication.Contracts.WorkspaceChangedEvent
 - Host 缓存插件 ALC 中的 `Type` 时会阻止插件卸载。
 - 不同插件携带不同 Contract 版本时会产生类型冲突。
 
-## 3. 跨边界 Contract 规则
+### 3. 跨边界 Contract 规则
 
 任何需要在 Host、静态模块或多个插件之间发布和订阅的事件，其事件类型及完整对象图必须：
 
@@ -58,7 +114,7 @@ Plugin ALC::MyApplication.Contracts.WorkspaceChangedEvent
 
 插件私有事件类型只能在插件私有 EventBus 平面内使用，不能进入 Host 共享事件总线。
 
-## 4. 共享 Contract 程序集
+### 4. 共享 Contract 程序集
 
 共享 Contract 程序集是由 Host 管理、由多个运行边界共同引用、由 Default AssemblyLoadContext 唯一加载的稳定契约程序集。
 
@@ -74,7 +130,7 @@ Plugin ALC::MyApplication.Contracts.WorkspaceChangedEvent
 
 业务事件不能放进 `AtomUI.City.EventBus` 框架包。框架只提供事件机制和基础 contract。
 
-## 5. 推荐加载结构
+### 5. 推荐加载结构
 
 ```text
 Default AssemblyLoadContext
@@ -93,7 +149,7 @@ Plugin B AssemblyLoadContext
 
 插件可以在构建时引用 `MyApplication.Contracts` 或 `DocumentExtension.Contracts`，但运行时不能在自己的 ALC 中再次加载这些 Assembly。
 
-## 6. Contract 解析流程
+### 6. Contract 解析流程
 
 PluginSystem 加载插件依赖时必须先查询 Host Contract Registry：
 
@@ -114,7 +170,7 @@ Plugin requests an assembly
 
 不能等到第一次事件发布时才发现类型不匹配。
 
-## 7. Host Contract Registry
+### 7. Host Contract Registry
 
 Host 维护共享契约注册表。它可以与全局 `IHostContractRegistry` 集成，并由 EventBus 暴露专用读取模型。
 
@@ -146,7 +202,7 @@ Host 维护共享契约注册表。它可以与全局 `IHostContractRegistry` �
 
 运行时发布热路径使用预构建 descriptor，不反复反射读取 Assembly 和 Attribute。
 
-## 8. EventContractId
+### 8. EventContractId
 
 EventContractId 是事件跨版本和跨加载边界的稳定身份。
 
@@ -169,7 +225,7 @@ plugin.state-changed.v1
 
 Contract Id 不用于把任意无类型 payload 转换为动态消息。运行时仍然保留强类型映射。
 
-## 9. Contract 类型设计
+### 9. Contract 类型设计
 
 跨边界事件类型应该是简单、不可变的数据契约。
 
@@ -192,7 +248,7 @@ Contract Id 不用于把任意无类型 payload 转换为动态消息。运行�
 
 不推荐使用继承层次表达事件多态。默认只进行精确 contract 匹配，避免运行时扫描继承树和产生隐式订阅范围。
 
-## 10. 完整对象图约束
+### 10. 完整对象图约束
 
 仅仅让事件根类型位于共享 Contract Assembly 还不够。事件的完整对象图也不能包含插件私有对象。
 
@@ -226,7 +282,7 @@ public sealed record DataChangedEvent(object Data);
 
 第一版不建议提供任意 object property bag。
 
-## 11. Shared Plane 与 Private Plane
+### 11. Shared Plane 与 Private Plane
 
 EventBus 存在两个逻辑平面：
 
@@ -253,7 +309,7 @@ Plugin publishes private event
 
 插件私有事件不能因为 namespace 看起来公共就进入 Shared Plane。判断依据是加载期生成并注册的 EventContract descriptor。
 
-## 12. 插件之间通信
+### 12. 插件之间通信
 
 Plugin A 不应直接引用 Plugin B 的实现程序集或私有 Contract。
 
@@ -274,7 +330,7 @@ Plugin A 发布共享事件，Plugin B 订阅共享事件。双方只依赖 Cont
 
 如果某个 contract 只存在于 Plugin A 私有 Assembly，它就只能用于 Plugin A 内部通信。
 
-## 13. Capability 与访问控制
+### 13. Capability 与访问控制
 
 共享 Contract 不表示所有插件都自动获得发布和订阅权限。
 
@@ -297,7 +353,7 @@ Plugin manifest 必须声明：
 
 Host 在插件加载前完成 capability 校验。未授权插件不能获得相应 publisher/subscriber contract。
 
-## 14. 版本兼容
+### 14. 版本兼容
 
 共享 Contract 必须采用显式兼容策略。
 
@@ -325,7 +381,7 @@ Host 在插件加载前完成 capability 校验。未授权插件不能获得相
 
 EventBus Core 不自动猜测 schema 兼容性。
 
-## 15. Host 版本选择
+### 15. Host 版本选择
 
 Host 决定最终加载的共享 Contract 版本。
 
@@ -339,7 +395,7 @@ Host 决定最终加载的共享 Contract 版本。
 
 第一版不承诺同一 Contract Assembly 的多个 major version 在同一 Shared Plane 并存。需要并存时应使用不同 Assembly identity 和不同 EventContractId。
 
-## 16. Manifest 与 Source Generator
+### 16. Manifest 与 Source Generator
 
 Source Generator 为共享 Contract 生成：
 
@@ -364,7 +420,7 @@ Source Generator 为共享 Contract 生成：
 
 Dynamic Plugin Mode 读取插件预生成的 event manifest，不扫描任意类型。
 
-## 17. 发布时校验
+### 17. 发布时校验
 
 发布 Shared Plane 事件时，EventBus 使用已注册 descriptor 校验：
 
@@ -384,7 +440,7 @@ Dynamic Plugin Mode 读取插件预生成的 event manifest，不扫描任意类
 - Requested channel。
 - Missing contract descriptor。
 
-## 18. 卸载与缓存
+### 18. 卸载与缓存
 
 Host 长期缓存只能保存 Shared Contract Plane 中由 Default ALC 加载的类型。
 
@@ -409,7 +465,7 @@ Func<PluginPrivateEvent,...>
 
 Plugin Private Plane 的所有缓存必须由插件运行时上下文持有，并在卸载前整体释放。
 
-## 19. Contract Assembly 卸载
+### 19. Contract Assembly 卸载
 
 Shared Contract Assembly 由 Default ALC 持有，生命周期通常与 Host 一致，不随单个插件卸载。
 
@@ -421,7 +477,7 @@ Shared Contract Assembly 由 Default ALC 持有，生命周期通常与 Host 一
 
 如果某个 Extension Contract 需要动态卸载，它就不能被作为 Host Shared Contract 使用。第一版不支持可卸载共享 Contract Assembly。
 
-## 20. 错误处理
+### 20. 错误处理
 
 | 场景 | 处理 |
 |---|---|
@@ -435,7 +491,7 @@ Shared Contract Assembly 由 Default ALC 持有，生命周期通常与 Host 一
 
 错误不能延迟为无法解释的 handler cast exception。
 
-## 21. 测试要求
+### 21. 测试要求
 
 必须测试：
 
@@ -450,7 +506,7 @@ Shared Contract Assembly 由 Default ALC 持有，生命周期通常与 Host 一
 - 卸载插件后 Shared Contract 仍可使用。
 - 卸载插件后 Host 不再持有插件私有 `Type` 和 delegate。
 
-## 22. 最终约束
+### 22. 最终约束
 
 任何需要在 Host、静态模块或多个插件之间发布和订阅的事件，其事件类型及完整对象图必须来自 Host 注册的共享 Contract 程序集，并由 Default AssemblyLoadContext 唯一加载。
 

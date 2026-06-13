@@ -1,16 +1,72 @@
-# AtomUI.City.Build 详细设计
+# AtomUI.City.Build Detailed Design 合同
 
-版本：v0.1
-状态：正式初版
+## 适用范围
+
+本专题属于 `AtomUI.City.Build` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `Detailed Design` 相关实现决策，不重新定义模块边界。
+
+## 设计决策
+
+- 本专题必须绑定 Feature ID。
+- 必须说明 public contract、失败行为和测试。
+- 不得只描述概念。
+
+## Public Contract
+
+- 只允许通过 `AtomUI.City.Build` 的 public API、attribute、options、manifest、generated output 或 DI extension 暴露本专题能力。
+- 新增 contract 必须进入 [api-contracts.md](api-contracts.md)。
+- 新增功能必须分配 Feature ID，并进入 [features.md](features.md)。
+- 修改失败行为、默认值、诊断码或生命周期状态必须进入 [compatibility.md](compatibility.md)。
+
+## 运行时边界
+
+- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
+- Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
+- 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
+
+## 失败行为
+
+- 输入无效：使用标准参数异常或模块 Result。
+- 生命周期状态非法：返回失败 Result、模块异常或稳定诊断。
+- 依赖缺失：阻止当前功能启用，不影响无关功能。
+- 插件卸载中：拒绝创建新贡献，并撤销已有贡献。
+- 释放失败：记录诊断并继续释放其他资源。
+
+## 测试要求
+
+| Feature ID | 相关能力 | 测试文件 |
+| --- | --- | --- |
+| AUC-BUILD-001 | Output Layout | OutputLayoutTests |
+| AUC-BUILD-002 | Package Metadata | PackageMetadataTests |
+| AUC-BUILD-003 | Project Inventory | ProjectInventoryTests |
+| AUC-BUILD-004 | Dependency Boundary | ProjectDependencyBoundaryTests |
+| AUC-BUILD-005 | Source Generator Packaging | SourceGeneratorProjectStructureTests |
+| AUC-BUILD-006 | Release Gates | PackagingReleaseGateTests; EngineeringGateTests |
+
+本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
+
+## 完成标准
+
+- 设计决策能回答对象由谁创建、谁持有、谁释放。
+- API contract、失败行为、诊断和测试矩阵一致。
+- 不出现业务领域假设。
+- 不引入 `运行时包不依赖 Build 生产程序集` 等禁止依赖。
+
+## 既有细化设计内容
+
+以下内容保留上一轮设计中的专题细节。后续修改必须与本页上方合同、Feature ID、API 行为、诊断和测试矩阵保持一致。
+
+## AtomUI.City.Build 详细设计
+
 适用范围：构建约定、输出目录、MSBuild 集成、manifest 生成、source generator、analyzer、打包、发布、增量构建、诊断和测试
 
-## 1. 定位
+### 1. 定位
 
 `AtomUI.City.Build` 是 AtomUI.City 的构建期基础设施。它负责把框架的编程范式、模块系统、路由、插件、本地化、Presentation、Data、Security、Source Generator、Analyzer 和发布约定落实到确定性的构建输出。
 
 Build 不是 CLI，也不是 Templates。CLI 调用 Build 能力，Templates 生成的项目必须符合 Build 约定。
 
-## 2. 职责
+### 2. 职责
 
 Build 负责：
 
@@ -39,7 +95,7 @@ Build 不负责：
 - 业务代码生成。
 - 真实部署平台。
 
-## 3. 构建管线
+### 3. 构建管线
 
 建议 Build 管线：
 
@@ -67,7 +123,7 @@ Restore
 - AOT 不友好行为必须尽早报 analyzer 或 build diagnostic。
 - 构建失败必须带稳定 diagnostic code。
 
-## 4. 包边界
+### 4. 包边界
 
 工程层依赖方向：
 
@@ -84,7 +140,7 @@ Testing -> Build test utilities
 - 运行时包不能依赖 Roslyn。
 - Build 可以引用 manifest contract，但不能依赖运行时 Host 执行插件加载。
 
-## 5. 输出目录
+### 5. 输出目录
 
 Build 统一输出到仓库或项目配置的 `output/` 根目录：
 
@@ -109,7 +165,7 @@ output/
 
 详细规则见：[输出目录设计](output-layout.md)。
 
-## 6. MSBuild 集成
+### 6. MSBuild 集成
 
 Build 提供：
 
@@ -123,7 +179,7 @@ Build 提供：
 
 详细规则见：[MSBuild 集成设计](msbuild-integration.md)。
 
-## 7. Manifest 生成
+### 7. Manifest 生成
 
 Build 汇总各模块 source generator 和 MSBuild item 产物，生成最终 manifest。
 
@@ -140,7 +196,7 @@ Build 汇总各模块 source generator 和 MSBuild item 产物，生成最终 ma
 
 详细规则见：[Manifest 生成设计](manifest-generation.md)。
 
-## 8. Source Generator 和 Analyzer
+### 8. Source Generator 和 Analyzer
 
 Source Generator 负责生成编译期索引和 registrar。Analyzer 负责构建期诊断。
 
@@ -151,7 +207,7 @@ Build 负责把 generator/analyzer 作为构建资产接入项目，并收敛输
 - [Source Generation 集成设计](source-generation.md)
 - [Analyzer 设计](analyzers.md)
 
-## 9. 打包和发布
+### 9. 打包和发布
 
 Build 支持：
 
@@ -167,7 +223,7 @@ Build 支持：
 - [插件打包设计](plugin-packaging.md)
 - [应用发布设计](application-packaging.md)
 
-## 10. 增量构建
+### 10. 增量构建
 
 Build 必须支持稳定增量构建：
 
@@ -179,7 +235,7 @@ Build 必须支持稳定增量构建：
 
 详细规则见：[增量构建设计](incremental-build.md)。
 
-## 11. 测试矩阵
+### 11. 测试矩阵
 
 | 功能点 | 测试类型 | 测试工具 | 必测场景 |
 |---|---|---|---|
@@ -193,7 +249,7 @@ Build 必须支持稳定增量构建：
 
 完整规则见：[诊断和测试设计](diagnostics-and-testing.md)。
 
-## 12. 完成标准
+### 12. 完成标准
 
 Build 实现任何功能点前必须满足：
 

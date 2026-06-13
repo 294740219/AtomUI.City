@@ -1,10 +1,66 @@
-# AtomUI.City.Routing Route Definition Syntax
+# AtomUI.City.Routing Route Definition Syntax 合同
 
-版本：v0.1
-状态：正式初版
+## 适用范围
+
+本专题属于 `AtomUI.City.Routing` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `Route Definition Syntax` 相关实现决策，不重新定义模块边界。
+
+## 设计决策
+
+- Routing 只负责 Route -> ViewModel Target。
+- 参数绑定失败必须返回导航失败结果。
+- 插件路由撤销后 route graph 必须重新发布。
+
+## Public Contract
+
+- 只允许通过 `AtomUI.City.Routing` 的 public API、attribute、options、manifest、generated output 或 DI extension 暴露本专题能力。
+- 新增 contract 必须进入 [api-contracts.md](api-contracts.md)。
+- 新增功能必须分配 Feature ID，并进入 [features.md](features.md)。
+- 修改失败行为、默认值、诊断码或生命周期状态必须进入 [compatibility.md](compatibility.md)。
+
+## 运行时边界
+
+- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
+- Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
+- 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
+
+## 失败行为
+
+- 输入无效：使用标准参数异常或模块 Result。
+- 生命周期状态非法：返回失败 Result、模块异常或稳定诊断。
+- 依赖缺失：阻止当前功能启用，不影响无关功能。
+- 插件卸载中：拒绝创建新贡献，并撤销已有贡献。
+- 释放失败：记录诊断并继续释放其他资源。
+
+## 测试要求
+
+| Feature ID | 相关能力 | 测试文件 |
+| --- | --- | --- |
+| AUC-ROUTING-001 | Route Template Syntax | RouteTemplateTests; RoutingParameterBoundaryTests |
+| AUC-ROUTING-002 | Route Definition Attributes | RouteDefinitionAttributeTests |
+| AUC-ROUTING-003 | Route Graph | RouteGraphAndMatcherTests |
+| AUC-ROUTING-004 | Route Matcher | RouteGraphAndMatcherTests |
+| AUC-ROUTING-005 | Navigation Scope | NavigationScopeTests |
+| AUC-ROUTING-006 | Guards | RouteGuardTests |
+
+本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
+
+## 完成标准
+
+- 设计决策能回答对象由谁创建、谁持有、谁释放。
+- API contract、失败行为、诊断和测试矩阵一致。
+- 不出现业务领域假设。
+- 不引入 `AtomUI.City.Presentation` 等禁止依赖。
+
+## 既有细化设计内容
+
+以下内容保留上一轮设计中的专题细节。后续修改必须与本页上方合同、Feature ID、API 行为、诊断和测试矩阵保持一致。
+
+## AtomUI.City.Routing Route Definition Syntax
+
 适用范围：路由声明语法、路径模板、参数绑定、RouteReference、Source Generator 契约和诊断规则。
 
-## 1. 定位
+### 1. 定位
 
 路由定义语法解决开发者如何声明应用页面入口的问题。
 
@@ -20,7 +76,7 @@ Routing 运行时负责匹配、导航、守卫、解析、RouteScope 和历史�
 - 支持模块和插件贡献。
 - 不依赖运行时程序集扫描。
 
-## 2. 设计原则
+### 2. 设计原则
 
 路由定义采用声明式 Route Map。
 
@@ -44,7 +100,7 @@ Routing 运行时负责匹配、导航、守卫、解析、RouteScope 和历史�
 - 在路由定义中表达业务流程。
 - 把不可序列化对象作为路由参数。
 
-## 3. Route Map
+### 3. Route Map
 
 Route Map 使用静态 `partial` 类型声明。
 
@@ -80,7 +136,7 @@ AtomUI.City.App.AppRoutes.Settings
 
 公共 Deep Link 路由和插件路由应显式指定稳定 `Id`。
 
-## 4. 路由类型
+### 4. 路由类型
 
 第一版建议提供以下声明类型：
 
@@ -105,7 +161,7 @@ public static partial RouteReference AdminSettings();
 
 `Admin` 不创建 ViewModel，只提供路径前缀和层级关系。
 
-## 5. Path Template
+### 5. Path Template
 
 路径模板兼容 ASP.NET Core 10 Route Template 的主要语法。
 
@@ -140,7 +196,7 @@ AtomUI.City 不支持以下 Web 专用语义：
 
 Path Template 只描述导航路径，不表达 HTTP 请求。
 
-## 6. 参数绑定
+### 6. 参数绑定
 
 参数类型必须显式声明。
 
@@ -177,7 +233,7 @@ public static partial RouteReference<SearchParameters> Search();
 
 复杂数据应进入 State、Resolver、Data 或应用自己的持久化机制。
 
-## 7. 约束
+### 7. 约束
 
 内置约束建议第一版支持：
 
@@ -219,7 +275,7 @@ public sealed partial class CultureRouteConstraint : IRouteConstraint
 
 Source Generator 应将自定义约束写入 Route Manifest。
 
-## 8. 层级、Outlet 和布局
+### 8. 层级、Outlet 和布局
 
 父子关系通过 `Parent` 显式声明。
 
@@ -250,7 +306,7 @@ public static partial RouteReference Help();
 - 命名 Outlet 不等于独立 NavigationScope。
 - 只有需要独立历史和独立并发控制时，才创建新的 NavigationScope。
 
-## 9. Guard、Resolver 和 Middleware
+### 9. Guard、Resolver 和 Middleware
 
 Guard、Resolver、Middleware 通过 Attribute 绑定。
 
@@ -274,7 +330,7 @@ public static partial RouteReference<ProfileParameters> Profile();
 
 Guard、Resolver、Middleware 不写业务流程，只表达导航阶段可复用的横切能力。
 
-## 10. Redirect
+### 10. Redirect
 
 静态重定向通过 `RedirectRoute` 声明。
 
@@ -290,7 +346,7 @@ public static partial RouteReference OldSettings();
 - 跨插件重定向只能指向 Host 共享路由或显式允许的扩展点。
 - 动态重定向由 Guard 或 Resolver 返回 `NavigationRedirect`。
 
-## 11. Route Extension Point
+### 11. Route Extension Point
 
 Host 或普通模块可以声明扩展点。
 
@@ -314,7 +370,7 @@ public static partial RouteReference PluginSettings();
 - 扩展点可以限制允许的 Outlet、权限、排序和能力。
 - 插件停用时，挂载到扩展点的路由必须随 Lease 撤销。
 
-## 12. 强类型导航
+### 12. 强类型导航
 
 日常导航使用 `RouteReference`。
 
@@ -352,7 +408,7 @@ await router.NavigateByPathAsync("details/6f9619ff-8b86-d011-b42d-00cf4fc964ff")
 
 Path 导航必须经过同一套路由匹配、Guard、Resolver 和事务流程。
 
-## 13. Source Generator 输出
+### 13. Source Generator 输出
 
 Source Generator 必须生成：
 
@@ -381,7 +437,7 @@ Source Generator 必须生成：
 - 可被测试断言。
 - 可被插件加载和卸载机制追踪来源。
 
-## 14. 诊断
+### 14. 诊断
 
 Source Generator 必须诊断：
 
@@ -416,7 +472,7 @@ Source Generator 必须诊断：
 - 路由图版本过期。
 - NavigationScope 已停止。
 
-## 15. 测试策略
+### 15. 测试策略
 
 Testing 包应支持：
 
@@ -433,7 +489,7 @@ Testing 包应支持：
 
 路由语法测试不应启动真实 UI。
 
-## 16. 第一版取舍
+### 16. 第一版取舍
 
 第一版暂不支持：
 

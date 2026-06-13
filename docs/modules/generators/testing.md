@@ -1,0 +1,35 @@
+# AtomUI.City.Generators Testing
+
+## 测试原则
+
+- 每个 Feature ID 至少有 Unit 或 Contract 测试。
+- 集成测试不能替代单元测试。
+- 生命周期、线程、插件、订阅、连接、dispatcher、source generator、build 和 template 行为必须有专项测试。
+- 诊断码必须断言 code 和关键 context。
+- 释放、取消、unload、Dispose 后行为必须有断言。
+
+## 产品级测试门禁
+
+| 必须证明的行为 | 最低测试要求 |
+| --- | --- |
+| Generator target 为 `netstandard2.0` 并作为 analyzer 分发。 | 必须有实现、测试或工程门禁证据，不能只断言流程成功。 |
+| Generator 不引用 AtomUI.City 运行时包。 | 必须有实现、测试或工程门禁证据，不能只断言流程成功。 |
+| 输出确定性排序。 | 必须有实现、测试或工程门禁证据，不能只断言流程成功。 |
+| 诊断 id 稳定，不能复用。 | 必须有实现、测试或工程门禁证据，不能只断言流程成功。 |
+
+## 测试矩阵
+
+| Feature ID | Test Type | Test File | Required Assertions | Failure Paths | Status |
+| --- | --- | --- | --- | --- | --- |
+| AUC-GENERATORS-001 | Generator | IncrementalGeneratorInfrastructureTests | 断言 incremental 输入隔离、hint name 稳定、无 runtime 依赖。 | 无关输入导致全量重算、hint name 不稳定、runtime dependency 出现必须失败。 | Required |
+| AUC-GENERATORS-002 | Generator | ModuleDependencyGraphBuilderTests; ModuleMetadataReaderTests | 断言 DependsOn 图、循环诊断、默认 module id。 | 循环依赖、重复 module、缺失依赖输出 diagnostic。 | Required |
+| AUC-GENERATORS-003 | Generator | ServiceRegistrationManifestBuilderTests; ServiceRegistrationMetadataReaderTests | 断言 lifetime、ExposeServices、显式注册和冲突诊断。 | lifetime 冲突、重复服务、不可构造类型输出 diagnostic。 | Required |
+| AUC-GENERATORS-004 | Generator | RouteManifestBuilderTests; RouteMetadataReaderTests | 断言 route attribute、template、target、排序和诊断。 | 模板非法、route 冲突、target 缺失输出 diagnostic。 | Required |
+| AUC-GENERATORS-005 | Generator | PluginManifestBuilderTests; PluginMetadataReaderTests | 断言 plugin metadata、capability、dependency、contribution。 | metadata 缺失、dependency 格式错误、重复 capability 输出 diagnostic。 | Required |
+| AUC-GENERATORS-006 | Generator | LocalizationManifestBuilderTests; LocalizationMetadataReaderTests | 断言 culture、resource、fallback、重复 key 诊断。 | culture 非法、重复 key、resource 缺失输出 diagnostic。 | Required |
+| AUC-GENERATORS-007 | Generator | PresentationViewManifestBuilderTests; PresentationViewRegistrarSourceBuilderTests | 断言 ViewFor、constructor、registrar source 和诊断。 | 构造函数不明确、ViewModel 缺失、重复 mapping 输出 diagnostic。 | Required |
+| AUC-GENERATORS-008 | Generator | GeneratorDiagnosticTests | 断言 diagnostic id、severity、message args 和 source location。 | id 复用、severity 漂移、缺少 location 必须测试失败。 | Required |
+
+## 缺口处理
+
+如果现有测试只覆盖 smoke 或 happy path，`implementation-plan.md` 必须把缺口标为 `Required`。无法单元测试的功能必须提供 Contract、RuntimeLifecycle、PluginLifecycle、Generator、Build、PlatformIntegration、TemplateSmoke 或 Dogfood 测试替代。

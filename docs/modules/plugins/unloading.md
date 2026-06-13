@@ -1,10 +1,66 @@
-# PluginSystem 卸载设计
+# AtomUI.City.PluginSystem Unloading 合同
 
-版本：v0.1
-状态：正式初版
+## 适用范围
+
+本专题属于 `AtomUI.City.PluginSystem` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `Unloading` 相关实现决策，不重新定义模块边界。
+
+## 设计决策
+
+- 插件来源对象必须绑定 plugin owner。
+- 卸载必须撤销 contribution、subscription、view lease、state 和 connection。
+- 跨插件 contract 必须位于 Host 共享程序集。
+
+## Public Contract
+
+- 只允许通过 `AtomUI.City.PluginSystem` 的 public API、attribute、options、manifest、generated output 或 DI extension 暴露本专题能力。
+- 新增 contract 必须进入 [api-contracts.md](api-contracts.md)。
+- 新增功能必须分配 Feature ID，并进入 [features.md](features.md)。
+- 修改失败行为、默认值、诊断码或生命周期状态必须进入 [compatibility.md](compatibility.md)。
+
+## 运行时边界
+
+- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
+- Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
+- 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
+
+## 失败行为
+
+- 输入无效：使用标准参数异常或模块 Result。
+- 生命周期状态非法：返回失败 Result、模块异常或稳定诊断。
+- 依赖缺失：阻止当前功能启用，不影响无关功能。
+- 插件卸载中：拒绝创建新贡献，并撤销已有贡献。
+- 释放失败：记录诊断并继续释放其他资源。
+
+## 测试要求
+
+| Feature ID | 相关能力 | 测试文件 |
+| --- | --- | --- |
+| AUC-PLUGIN-001 | Plugin Metadata | PluginDeclarationAttributeTests; PluginManifestTests |
+| AUC-PLUGIN-002 | Dependency Validation | PluginDependencyTests |
+| AUC-PLUGIN-003 | Package Installation | PluginPackageTests |
+| AUC-PLUGIN-004 | Discovery | PluginLoadingTests |
+| AUC-PLUGIN-005 | Loading | PluginLoadingTests |
+| AUC-PLUGIN-006 | MSBuild Contract | PluginMsBuildContractTests |
+
+本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
+
+## 完成标准
+
+- 设计决策能回答对象由谁创建、谁持有、谁释放。
+- API contract、失败行为、诊断和测试矩阵一致。
+- 不出现业务领域假设。
+- 不引入 `AtomUI.City.Presentation` 等禁止依赖。
+
+## 既有细化设计内容
+
+以下内容保留上一轮设计中的专题细节。后续修改必须与本页上方合同、Feature ID、API 行为、诊断和测试矩阵保持一致。
+
+## PluginSystem 卸载设计
+
 适用范围：插件停用后卸载、引用释放、卸载重试、UnloadPending 和文件删除约束
 
-## 1. 目标
+### 1. 目标
 
 插件卸载必须保证 Host 不再持有插件程序集、类型、对象、委托、事件订阅、资源或文件句柄。
 
@@ -16,7 +72,7 @@
 - 卸载失败进入可诊断的 `UnloadPending`。
 - `UnloadPending` 阻止更新和删除文件。
 
-## 2. 前置条件
+### 2. 前置条件
 
 卸载要求插件处于：
 
@@ -26,7 +82,7 @@
 
 如果插件仍为 `Active`，Host 必须先执行停用流程。
 
-## 3. 卸载流程
+### 3. 卸载流程
 
 ```text
 Ensure plugin is inactive
@@ -43,7 +99,7 @@ Ensure plugin is inactive
 -> Mark Unloaded or UnloadPending
 ```
 
-## 4. 引用释放
+### 4. 引用释放
 
 卸载前必须释放：
 
@@ -63,7 +119,7 @@ Ensure plugin is inactive
 
 任何 registry 接收插件贡献时，都必须能按 PluginId 和 ContributionId 反查并撤销。
 
-## 5. UnloadPending
+### 5. UnloadPending
 
 `UnloadPending` 表示 Host 已请求卸载，但运行时仍无法释放插件加载上下文或相关文件。
 
@@ -85,7 +141,7 @@ Ensure plugin is inactive
 - 更新操作进入 pending。
 - Host 可以在后续时机重试卸载。
 
-## 6. 卸载重试
+### 6. 卸载重试
 
 重试触发点：
 
@@ -98,7 +154,7 @@ Ensure plugin is inactive
 
 重试必须保持幂等。已经撤销的 lease 不应重复执行副作用。
 
-## 7. 文件清理
+### 7. 文件清理
 
 插件文件清理前必须满足：
 
@@ -110,7 +166,7 @@ Ensure plugin is inactive
 
 清理失败不应影响 Host 关闭，但必须记录诊断。
 
-## 8. 诊断
+### 8. 诊断
 
 卸载诊断必须能回答：
 
@@ -122,7 +178,7 @@ Ensure plugin is inactive
 - 是否还有 UI 引用。
 - 是否有 native 文件锁定。
 
-## 9. 测试要求
+### 9. 测试要求
 
 必须覆盖：
 

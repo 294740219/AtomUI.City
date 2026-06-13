@@ -1,64 +1,71 @@
 # AtomUI.City.Localization
 
-版本：v0.1
-状态：正式初版
+文档等级：Level 3
+成熟度：Partially Implemented
+执行边界：Host runtime localization service
+程序集：`AtomUI.City.Localization`
+源码：`src/AtomUI.City.Localization`
+测试：`tests/AtomUI.City.Localization.Tests`
 
-## 职责
+## 模块定位
 
-`AtomUI.City.Localization` 负责本地化资源、文化切换、语言包懒加载、文本刷新、模块化资源注册和插件资源撤销。
+桌面应用语言包、文化状态、懒加载、fallback、插件本地化和 Presentation 文案刷新。
 
-Localization 需要支持模块和插件独立贡献资源，并让 Presentation 把文化变化同步到 AtomUI/Avalonia UI。
+## 产品级硬性约束
 
-Localization 第一版必须支持：
+以下约束是本模块实现和 review 的硬门禁，违反任一条都不能标记 Feature 完成。
 
-- 按当前文化懒加载语言包。
-- 语言包放在独立 assembly 中运行时动态加载。
-- Native AOT 场景下使用 file-based locpack fallback。
-- 文化切换后 UI 热刷新。
-- 插件语言包撤销和缓存清理。
+- 语言包按当前 culture 懒加载。
+- provider 必须可撤销。
+- 缺失 key 必须诊断并走 fallback。
+- 插件语言包卸载后不得出现在 lookup。
 
-## 边界
+## 模块目标
 
-Localization 负责：
+- 按当前 culture 懒加载语言包。
+- 支持文件和独立 assembly 语言包。
 
-- 资源注册。
-- 资源查找。
-- 当前文化状态。
-- 文化切换。
-- 语言包懒加载。
-- 文本刷新通知。
-- 模块资源隔离。
-- 插件资源撤销。
-- 缺失资源诊断。
+## 明确非目标
 
-Localization 不负责：
+- 不实现控件样式。
+- 不硬编码业务翻译。
 
-- 业务翻译内容。
-- 在线翻译服务。
-- UI 控件渲染。
-- AtomUI/Avalonia 控件实现。
+## 使用者画像
 
-## 详细设计
+- 框架开发者：根据模块合同实现 public API、状态机、失败路径、诊断和测试。
+- 应用开发者：通过 DI、扩展方法、attribute、manifest、CLI 或模板使用模块能力。
+- 插件开发者：通过 Host 共享 contract、manifest 和可撤销贡献接入模块。
+- 测试开发者：根据测试矩阵验证成功路径、失败路径、线程、释放和兼容性。
 
-| 文档 | 内容 |
-|---|---|
-| [detailed-design.md](detailed-design.md) | Localization 总体架构、语言包懒加载、文化切换、AtomUI 集成、插件资源和测试策略。 |
-| [resource-model.md](resource-model.md) | Resource descriptor、resource scope、语言包、资源类型和资源分层。 |
-| [culture-management.md](culture-management.md) | 当前文化状态、用户偏好、系统文化、事务式文化切换和失败回滚。 |
-| [lazy-loading.md](lazy-loading.md) | manifest-only startup、按当前语言包懒加载、active scope 资源加载和缓存。 |
-| [language-package-assemblies.md](language-package-assemblies.md) | 独立语言包 assembly、satellite assembly、collectible ALC、Native AOT locpack fallback。 |
-| [lookup-and-fallback.md](lookup-and-fallback.md) | 查找优先级、fallback culture、missing marker、格式化和资源撤销。 |
-| [atomui-integration.md](atomui-integration.md) | Presentation bridge、AtomUI culture adapter、Avalonia ResourceDictionary 和 UI Thread 规则。 |
-| [ui-refresh.md](ui-refresh.md) | 文化变化后的 binding refresh、Window title、Route title、Command、Validation 和 Interaction 文本刷新。 |
-| [mvvm-integration.md](mvvm-integration.md) | ViewModel localizer、强类型 accessor、Command 文本、Interaction 和 culture-aware notification。 |
-| [routing-integration.md](routing-integration.md) | Route title、breadcrumb、错误路由、Resolver/Guard 文案和导航诊断本地化。 |
-| [validation-and-errors.md](validation-and-errors.md) | Validation、Data/Security error、MessageKey/MessageArgs 和运行时文化切换刷新。 |
-| [plugin-integration.md](plugin-integration.md) | 插件本地化贡献、语言包懒加载、撤销、卸载和跨插件 contract。 |
-| [source-generation.md](source-generation.md) | Resource manifest、强类型 key、descriptor、缺失 key、重复 key 和 AOT 诊断。 |
-| [diagnostics-and-testing.md](diagnostics-and-testing.md) | 缺失资源诊断、加载失败、fake culture provider、插件撤销和 UI 刷新测试。 |
+## 与 Host 的关系
 
-## 可选增强文档
+AtomUI.City.Localization 作为 Host 服务或模块贡献接入 Core 生命周期，必须在 Host start/stop/dispose 中遵守本模块状态机。
 
-- `pluralization.md`
-- `formatting.md`
-- `design-time-tooling.md`
+## 与 PluginSystem 的关系
+
+插件可以通过 manifest 或 Host 共享 contract 贡献本模块能力；所有插件来源对象必须绑定 plugin owner 并可撤销。
+
+## 与 Testing 的关系
+
+`tests/AtomUI.City.Localization.Tests` 必须覆盖 [features.md](features.md) 中每个 Feature ID。产品级完成不能只看现有测试文件存在，必须补齐 [testing.md](testing.md) 中列出的必断言行为。
+
+## 文档索引
+
+| 文档 | 用途 |
+| --- | --- |
+| [architecture.md](architecture.md) | 核心不变量、对象模型、状态机、流程、失败矩阵、性能边界。 |
+| [features.md](features.md) | Feature ID、实现合同、public contract、失败行为和验收标准。 |
+| [api-contracts.md](api-contracts.md) | API family、关键方法、参数/返回/异常/取消/并发/Dispose 后行为。 |
+| [lifecycle.md](lifecycle.md) | 模块特有生命周期、Host shutdown、插件动态变更和失败处理。 |
+| [threading.md](threading.md) | 线程边界、UI dispatcher、后台任务、并发冲突和死锁规避。 |
+| [diagnostics.md](diagnostics.md) | 现有诊断码、产品级目标诊断、上下文字段和测试断言。 |
+| [testing.md](testing.md) | 具体测试矩阵、必须断言的行为、测试类型和缺口处理。 |
+| [compatibility.md](compatibility.md) | public API、配置、manifest、snapshot、generated output、CLI envelope 和包布局兼容。 |
+| [integration.md](integration.md) | 跨模块依赖方向、生命周期、线程和失败行为。 |
+| [implementation-plan.md](implementation-plan.md) | Feature 到现有基线、缺口、必补测试和实现工作的追踪。 |
+
+## 当前成熟度状态
+
+Partially Implemented
+
+该状态表示模块已有实现基线，但还需要按产品级合同补齐实现和测试。单个功能点状态以 [implementation-plan.md](implementation-plan.md) 为准。

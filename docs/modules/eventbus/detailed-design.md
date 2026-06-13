@@ -1,10 +1,66 @@
-# AtomUI.City.EventBus Detailed Design
+# AtomUI.City.EventBus Detailed Design 合同
 
-版本：v0.1
-状态：正式初版
+## 适用范围
+
+本专题属于 `AtomUI.City.EventBus` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `Detailed Design` 相关实现决策，不重新定义模块边界。
+
+## 设计决策
+
+- 本专题必须绑定 Feature ID。
+- 必须说明 public contract、失败行为和测试。
+- 不得只描述概念。
+
+## Public Contract
+
+- 只允许通过 `AtomUI.City.EventBus` 的 public API、attribute、options、manifest、generated output 或 DI extension 暴露本专题能力。
+- 新增 contract 必须进入 [api-contracts.md](api-contracts.md)。
+- 新增功能必须分配 Feature ID，并进入 [features.md](features.md)。
+- 修改失败行为、默认值、诊断码或生命周期状态必须进入 [compatibility.md](compatibility.md)。
+
+## 运行时边界
+
+- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
+- Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
+- 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
+
+## 失败行为
+
+- 输入无效：使用标准参数异常或模块 Result。
+- 生命周期状态非法：返回失败 Result、模块异常或稳定诊断。
+- 依赖缺失：阻止当前功能启用，不影响无关功能。
+- 插件卸载中：拒绝创建新贡献，并撤销已有贡献。
+- 释放失败：记录诊断并继续释放其他资源。
+
+## 测试要求
+
+| Feature ID | 相关能力 | 测试文件 |
+| --- | --- | --- |
+| AUC-EVENTBUS-001 | Typed Publish | EventPublicationTests |
+| AUC-EVENTBUS-002 | Subscription Lifecycle | EventSubscriptionTests |
+| AUC-EVENTBUS-003 | Contract Registry | EventContractRegistryTests |
+| AUC-EVENTBUS-004 | Dispatch Policy | EventDispatchingTests |
+| AUC-EVENTBUS-005 | Diagnostics | EventDiagnosticsTests |
+| AUC-EVENTBUS-006 | DI Registration | EventBusRegistrationTests |
+
+本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
+
+## 完成标准
+
+- 设计决策能回答对象由谁创建、谁持有、谁释放。
+- API contract、失败行为、诊断和测试矩阵一致。
+- 不出现业务领域假设。
+- 不引入 `AtomUI.City.Presentation` 等禁止依赖。
+
+## 既有细化设计内容
+
+以下内容保留上一轮设计中的专题细节。后续修改必须与本页上方合同、Feature ID、API 行为、诊断和测试矩阵保持一致。
+
+## AtomUI.City.EventBus Detailed Design
+
 适用范围：进程内系统级事件总线、事件发布、事件通道、顺序与并发、背压、生命周期、插件集成、AOT/source generator、诊断和测试设计。
 
-## 1. 定位
+### 1. 定位
 
 `AtomUI.City.EventBus` 是 AtomUI.City 的进程内系统级事件通知基础设施。
 
@@ -24,7 +80,7 @@ EventBus 必须同时满足：
 
 EventBus 不是一个简单的 delegate 集合。它是建立在 Core Lifecycle、Threading、Diagnostics 和 PluginSystem Contribution 之上的框架级运行时能力。
 
-## 2. 非目标
+### 2. 非目标
 
 EventBus 不负责：
 
@@ -41,7 +97,7 @@ EventBus 不负责：
 
 未来可以增加分布式 EventBus 适配层，但它不能改变本模块进程内事件总线的生命周期、线程和插件边界。
 
-## 3. 依赖关系
+### 3. 依赖关系
 
 `AtomUI.City.EventBus` 依赖：
 
@@ -63,7 +119,7 @@ EventBus 不依赖：
 
 PluginSystem 可以依赖 EventBus contract，并通过 Contribution 向 EventBus 注册插件 handler。
 
-## 4. 核心原则
+### 4. 核心原则
 
 EventBus 遵守以下原则：
 
@@ -81,7 +137,7 @@ EventBus 遵守以下原则：
 - Handler 错误不能静默丢失。
 - 运行时发布热路径不做程序集扫描和反射调用。
 
-## 5. 核心抽象
+### 5. 核心抽象
 
 建议公共抽象：
 
@@ -105,7 +161,7 @@ EventBus 遵守以下原则：
 
 插件可以只获得受限的 `IEventPublisher` 或 `IEventSubscriber`，不应默认获得可管理整个 registry 的接口。
 
-## 6. 发布接口
+### 6. 发布接口
 
 主发布接口建议为：
 
@@ -124,7 +180,7 @@ public interface IEventPublisher
 }
 ```
 
-### PublishAsync
+#### PublishAsync
 
 `PublishAsync` 默认语义：
 
@@ -135,7 +191,7 @@ public interface IEventPublisher
 - 发布方取消只影响尚未开始或允许取消的投递。
 - Handler 失败是否使发布失败，由错误策略决定。
 
-### PostAsync
+#### PostAsync
 
 `PostAsync` 默认语义：
 
@@ -148,7 +204,7 @@ public interface IEventPublisher
 
 第一版不提供同步 `Publish`。同步等待 UI Dispatcher 或后台 handler 容易造成死锁和不可控阻塞。
 
-## 7. EventContext
+### 7. EventContext
 
 EventBus 不把裸事件对象作为唯一 handler 输入。Handler 应接收事件上下文：
 
@@ -178,7 +234,7 @@ public sealed class EventContext<TEvent>
 
 EventContext 是只读执行上下文，不允许 handler 修改事件全局元数据。
 
-## 8. 事件契约
+### 8. 事件契约
 
 事件类型默认作为强类型 contract，但运行时识别不能只依赖 CLR 类型全名。
 
@@ -201,7 +257,7 @@ plugin.state-changed.v1
 
 跨 Host、静态模块和插件边界的完整规则见：[Event Contracts 设计](contracts.md)。
 
-## 9. EventChannel
+### 9. EventChannel
 
 Channel 用于表达同一个事件类型在不同语义通道中的投递边界。
 
@@ -223,7 +279,7 @@ Channel 可用于：
 
 默认 channel 为事件 contract 的 application channel。只有需要不同调度、隔离或授权语义时才创建额外 channel。
 
-## 10. Channel 执行模式
+### 10. Channel 执行模式
 
 EventBus 不提供全局总顺序。顺序在 channel 范围内定义。
 
@@ -242,7 +298,7 @@ EventBus 不提供全局总顺序。顺序在 channel 范围内定义。
 
 高吞吐场景可以显式使用 `Partitioned` 或 `Concurrent`。
 
-## 11. 顺序保证
+### 11. 顺序保证
 
 EventBus 明确保证：
 
@@ -261,7 +317,7 @@ EventBus不保证：
 
 业务流程不能依赖订阅注册顺序。如果处理器 A 必须先于处理器 B，应使用显式工作流、Command 或服务调用，而不是 EventBus handler order。
 
-## 12. 调度模型
+### 12. 调度模型
 
 每个订阅必须声明 Core `DispatchPolicy`：
 
@@ -281,7 +337,7 @@ EventBus不保证：
 
 完整调度、队列和背压规则见：[Dispatching 设计](dispatching.md)。
 
-## 13. 订阅生命周期
+### 13. 订阅生命周期
 
 订阅必须有 owner：
 
@@ -312,7 +368,7 @@ Owner 停止后：
 
 完整规则见：[Subscriptions 设计](subscriptions.md)。
 
-## 14. 背压
+### 14. 背压
 
 所有异步 channel 和订阅队列必须有容量上限。
 
@@ -334,7 +390,7 @@ Owner 停止后：
 - 需要表达当前值时应使用 State，而不是依赖 replay 或不断发布事件。
 - UI 高频更新应优先写入 State，再由 UI 订阅状态变化。
 
-## 15. 错误策略
+### 15. 错误策略
 
 EventBus 需要定义 handler 错误策略：
 
@@ -354,7 +410,7 @@ EventBus 需要定义 handler 错误策略：
 - 插件 handler 失败默认隔离在当前插件。
 - 错误策略不能破坏 Scope 停止和插件卸载流程。
 
-## 16. 递归发布
+### 16. 递归发布
 
 Handler 可以发布新的事件，但必须防止无界递归。
 
@@ -374,7 +430,7 @@ EventContext 维护：
 - 同一个 Serialized channel 的 handler 不允许再次等待该 channel 的 `PublishAsync`。
 - 需要异步解耦递归链时使用 `PostAsync`。
 
-## 17. 高性能设计
+### 17. 高性能设计
 
 EventBus 发布热路径采用：
 
@@ -400,7 +456,7 @@ EventBus 发布热路径采用：
 
 性能优化必须通过 benchmark 验证，并同时验证正确性、顺序和卸载能力。
 
-## 18. DI 集成
+### 18. DI 集成
 
 静态 handler 可以由 DI 创建。
 
@@ -419,7 +475,7 @@ EventBus 发布热路径采用：
 - Handler 实例不能被全局静态缓存。
 - 异步释放 handler 时必须等待 `IAsyncDisposable`。
 
-## 19. Lifecycle 集成
+### 19. Lifecycle 集成
 
 EventBus 注册为 ApplicationScope 内的运行时服务。
 
@@ -447,7 +503,7 @@ Reject new publications
 
 EventBus 停止必须幂等，并受 Host shutdown timeout 约束。
 
-## 20. PluginSystem 集成
+### 20. PluginSystem 集成
 
 插件 EventBus handler 属于运行时 Contribution。
 
@@ -474,7 +530,7 @@ Reject new plugin deliveries
 
 完整插件规则见：[Plugin Integration 设计](plugins.md)。
 
-## 21. 与 State 的边界
+### 21. 与 State 的边界
 
 EventBus 和 State 的职责必须明确：
 
@@ -489,7 +545,7 @@ EventBus 和 State 的职责必须明确：
 
 EventBus v1 不提供 latest replay。需要最新值的场景必须建模为 State。
 
-## 22. AOT 与 Source Generator
+### 22. AOT 与 Source Generator
 
 EventBus 默认路径必须 AOT 友好。
 
@@ -509,7 +565,7 @@ Source Generator 负责：
 
 Dynamic Plugin Mode 可以在插件加载时读取预生成 manifest，但不应通过运行时扫描任意类型发现 handler。
 
-## 23. 公共扩展方法
+### 23. 公共扩展方法
 
 建议使用 .NET 扩展方法风格：
 
@@ -528,7 +584,7 @@ UseEventBusMiddleware
 - 不调用 `BuildServiceProvider()`。
 - 动态插件 handler 通过 Contribution 注册，不直接修改 Host Root services。
 
-## 24. 测试要求
+### 24. 测试要求
 
 EventBus 必须支持：
 
@@ -545,7 +601,7 @@ EventBus 必须支持：
 
 完整诊断和测试规则见：[Diagnostics and Testing 设计](diagnostics-and-testing.md)。
 
-## 25. 第一版明确决策
+### 25. 第一版明确决策
 
 AtomUI.City.EventBus v1 明确：
 
@@ -563,7 +619,7 @@ AtomUI.City.EventBus v1 明确：
 - 不运行时扫描程序集。
 - 跨插件边界只允许 Host 注册的共享 contract。
 
-## 26. 文档拆分
+### 26. 文档拆分
 
 - [Event Contracts](contracts.md)
 - [Subscriptions](subscriptions.md)

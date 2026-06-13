@@ -1,10 +1,66 @@
-# AtomUI.City.Core Hosting 设计
+# AtomUI.City.Core Hosting 合同
 
-版本：v0.1
-状态：正式初版
+## 适用范围
+
+本专题属于 `AtomUI.City.Core` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `Hosting` 相关实现决策，不重新定义模块边界。
+
+## 设计决策
+
+- 本专题必须绑定 Feature ID。
+- 必须说明 public contract、失败行为和测试。
+- 不得只描述概念。
+
+## Public Contract
+
+- 只允许通过 `AtomUI.City.Core` 的 public API、attribute、options、manifest、generated output 或 DI extension 暴露本专题能力。
+- 新增 contract 必须进入 [api-contracts.md](api-contracts.md)。
+- 新增功能必须分配 Feature ID，并进入 [features.md](features.md)。
+- 修改失败行为、默认值、诊断码或生命周期状态必须进入 [compatibility.md](compatibility.md)。
+
+## 运行时边界
+
+- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
+- Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
+- 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
+
+## 失败行为
+
+- 输入无效：使用标准参数异常或模块 Result。
+- 生命周期状态非法：返回失败 Result、模块异常或稳定诊断。
+- 依赖缺失：阻止当前功能启用，不影响无关功能。
+- 插件卸载中：拒绝创建新贡献，并撤销已有贡献。
+- 释放失败：记录诊断并继续释放其他资源。
+
+## 测试要求
+
+| Feature ID | 相关能力 | 测试文件 |
+| --- | --- | --- |
+| AUC-CORE-001 | Application Host Builder | ApplicationHostBuilderTests; ApplicationHostRuntimeTests |
+| AUC-CORE-002 | Lifecycle Pipeline | LifecycleMiddlewarePipelineTests; ApplicationHostLifecycleIntegrationTests |
+| AUC-CORE-003 | Lifecycle Scope Tree | LifecycleScopeTreeTests |
+| AUC-CORE-004 | Module Contract | ModuleAttributeTests; ModuleBaseTests; ModuleDescriptorTests |
+| AUC-CORE-005 | DI Registration Markers | ServiceRegistrationAttributeTests |
+| AUC-CORE-006 | Host Diagnostics | HostDiagnosticsTests |
+
+本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
+
+## 完成标准
+
+- 设计决策能回答对象由谁创建、谁持有、谁释放。
+- API contract、失败行为、诊断和测试矩阵一致。
+- 不出现业务领域假设。
+- 不引入 `AtomUI.City.Presentation` 等禁止依赖。
+
+## 既有细化设计内容
+
+以下内容保留上一轮设计中的专题细节。后续修改必须与本页上方合同、Feature ID、API 行为、诊断和测试矩阵保持一致。
+
+## AtomUI.City.Core Hosting 设计
+
 适用范围：`AtomUI.City.Core` 中 Host、Application 构建、GenericHost 集成、启动/停止流程、Host 扩展方法 DSL
 
-## 1. 目标
+### 1. 目标
 
 Hosting 是 AtomUI.City 应用运行时的入口。
 
@@ -22,7 +78,7 @@ Hosting 的目标：
 - 保持 Core 不依赖 AtomUI/Avalonia。
 - 保持 AOT/trimming/source generator 友好。
 
-## 2. 非目标
+### 2. 非目标
 
 Hosting 不负责：
 
@@ -38,7 +94,7 @@ Hosting 不负责：
 
 这些能力由对应模块负责。Hosting 只负责启动边界、生命周期调度和基础设施编排。
 
-## 3. Host 与 GenericHost 的关系
+### 3. Host 与 GenericHost 的关系
 
 AtomUI.City 复用 .NET GenericHost 的成熟基础设施：
 
@@ -75,7 +131,7 @@ GenericHost 负责成熟的 .NET 基础设施；AtomUI.City Host 负责自己的
 
 允许提供 GenericHost 桥接入口，但不能绕开 AtomUI.City 的模块和生命周期约束。
 
-## 4. 命名规范
+### 4. 命名规范
 
 类型名不加 `City` 前缀。命名空间已经是 `AtomUI.City.*`。
 
@@ -107,9 +163,9 @@ PluginModuleScope
 
 也避免直接命名为 `IHost`、`HostOptions`、`IHostLifetime`，防止和 `Microsoft.Extensions.Hosting` 冲突。
 
-## 5. 核心抽象
+### 5. 核心抽象
 
-### ApplicationHost
+#### ApplicationHost
 
 推荐入口：
 
@@ -124,7 +180,7 @@ var builder = ApplicationHost.CreateBuilder(args);
 - 注入 AtomUI.City Core 基础服务。
 - 提供 `Build()` / `RunAsync()` 默认路径。
 
-### ApplicationHostBuilder
+#### ApplicationHostBuilder
 
 构建期对象。
 
@@ -138,7 +194,7 @@ var builder = ApplicationHost.CreateBuilder(args);
 - 收集 framework feature descriptor。
 - 输出 `IApplicationHost`。
 
-### IApplicationHost
+#### IApplicationHost
 
 运行期对象。
 
@@ -154,7 +210,7 @@ ILifecycleScope HostScope { get; }
 ILifecycleScope ApplicationScope { get; }
 ```
 
-### ApplicationContext
+#### ApplicationContext
 
 建议包含：
 
@@ -168,7 +224,7 @@ ILifecycleScope ApplicationScope { get; }
 - Host state。
 - Diagnostics context。
 
-### IApplicationLifetime
+#### IApplicationLifetime
 
 Core 定义抽象，Presentation 适配 Avalonia。
 
@@ -181,7 +237,7 @@ Core 定义抽象，Presentation 适配 Avalonia。
 
 Core 不引用 Avalonia lifetime 类型。
 
-## 6. 扩展方法 DSL
+### 6. 扩展方法 DSL
 
 AtomUI.City Application 构建使用 .NET 扩展方法风格。
 
@@ -222,7 +278,7 @@ await builder.Build().RunAsync();
 - `Configure*` 使用 Options 模式。
 - 所有扩展方法返回原 builder 或更具体的 feature builder。
 
-## 7. Application / Module / Plugin 组成模型
+### 7. Application / Module / Plugin 组成模型
 
 Host 管理 Application 的组成：
 
@@ -256,7 +312,7 @@ Module 可以贡献：
 
 Plugin 可以携带自己的 Modules，这些插件模块也通过 Contribution 向 Host 贡献能力。
 
-## 8. Contribution 与 ContributionLease
+### 8. Contribution 与 ContributionLease
 
 所有可撤销能力都通过 Contribution 进入 Host。
 
@@ -286,7 +342,7 @@ ContributionLease 需要支持：
 - 按反向顺序撤销。
 - 撤销失败汇总。
 
-## 9. Lifecycle Scope 模型
+### 9. Lifecycle Scope 模型
 
 Scope 只表示运行实例的生命周期边界。
 
@@ -336,7 +392,7 @@ SalesPlugin stopping
 -> unload plugin assemblies
 ```
 
-## 10. Host 构建流程
+### 10. Host 构建流程
 
 Build 前完成服务注册和静态模块图准备。
 
@@ -365,7 +421,7 @@ ApplicationHost.CreateBuilder(args)
 - Plugin 服务必须进入自己的 ServiceScope。
 - Runtime 动态能力必须走 ContributionRegistry，而不是改 Root DI。
 
-## 11. Host 启动流程
+### 11. Host 启动流程
 
 Build 后进入运行阶段。
 
@@ -393,7 +449,7 @@ Runtime initialization phase: Build 后
 
 这点必须硬性规定，否则模块系统、DI 和插件系统都会混乱。
 
-## 12. Host 停止流程
+### 12. Host 停止流程
 
 停止必须以尽可能释放为原则。
 
@@ -424,7 +480,7 @@ Stop requested
 - 不能因为一个插件卸载失败阻断整个 Host 关闭。
 - 插件卸载失败进入 `UnloadPending`。
 
-## 13. ModuleSystem 集成
+### 13. ModuleSystem 集成
 
 Hosting 驱动模块系统，但不解释模块贡献内容。
 
@@ -450,7 +506,7 @@ Hosting 不负责解释：
 
 这些贡献应由模块系统转换成 ContributionLease，并进入对应 registry。
 
-## 14. Configuration 集成
+### 14. Configuration 集成
 
 Hosting 负责建立配置根对象。
 
@@ -475,7 +531,7 @@ builder.ConfigureConfiguration(configuration => { });
 builder.ConfigureOptions<ApplicationHostOptions>(options => { });
 ```
 
-## 15. DI 集成
+### 15. DI 集成
 
 Hosting 负责：
 
@@ -493,7 +549,7 @@ Hosting 必须明确：
 - 插件不写 Root ServiceProvider。
 - Scope Tree 和 DI scope 需要明确绑定。
 
-## 16. Presentation 集成边界
+### 16. Presentation 集成边界
 
 Core Hosting 不依赖 AtomUI/Avalonia。
 
@@ -516,7 +572,7 @@ Presentation 扩展负责：
 
 Hosting 只等待 `IApplicationLifetime` 信号，不直接操作 Avalonia 类型。
 
-## 17. PluginSystem 集成边界
+### 17. PluginSystem 集成边界
 
 Host 是插件运行的协调者，但插件加载细节属于 PluginSystem。
 
@@ -546,7 +602,7 @@ Plugin 不能：
 - 绕过 Security/Data pipeline。
 - 保存 Host、Scope、ServiceProvider、ViewModel 到静态字段。
 
-## 18. AOT / Source Generator 策略
+### 18. AOT / Source Generator 策略
 
 Hosting 必须 AOT-first。
 
@@ -593,7 +649,7 @@ builder.EnableDynamicDiscovery();
 - AOT/trimming 诊断。
 - Strict mode 下可报错。
 
-## 19. 错误策略
+### 19. 错误策略
 
 默认策略：
 
@@ -610,7 +666,7 @@ builder.EnableDynamicDiscovery();
 | Plugin 卸载失败 | 标记 `UnloadPending`。 |
 | Stop / Dispose 失败 | 汇总错误，继续释放。 |
 
-## 20. 诊断要求
+### 20. 诊断要求
 
 Hosting 必须记录：
 
@@ -628,7 +684,7 @@ Hosting 必须记录：
 - Startup / Stop 各阶段耗时。
 - Fatal / non-fatal 错误。
 
-## 21. 测试要求
+### 21. 测试要求
 
 Testing 包后续要支持：
 
@@ -645,7 +701,7 @@ Testing 包后续要支持：
 - 断言 Stop 幂等。
 - 断言 Dispose 错误汇总。
 
-## 22. 开发者约束
+### 22. 开发者约束
 
 应用开发者应遵守：
 

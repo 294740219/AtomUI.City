@@ -1,0 +1,34 @@
+# AtomUI.City.EventBus Testing
+
+## 测试原则
+
+- 每个 Feature ID 至少有 Unit 或 Contract 测试。
+- 集成测试不能替代单元测试。
+- 生命周期、线程、插件、订阅、连接、dispatcher、source generator、build 和 template 行为必须有专项测试。
+- 诊断码必须断言 code 和关键 context。
+- 释放、取消、unload、Dispose 后行为必须有断言。
+
+## 产品级测试门禁
+
+| 必须证明的行为 | 最低测试要求 |
+| --- | --- |
+| Publish 不隐式切 UI 线程。 | 至少一个明确测试断言，不能只断言流程成功。 |
+| handler 外部代码不能在总线内部锁内执行。 | 至少一个明确测试断言，不能只断言流程成功。 |
+| 订阅必须返回可释放句柄并绑定 owner。 | 至少一个明确测试断言，不能只断言流程成功。 |
+| 跨插件事件类型必须来自 Host 共享 contract 程序集。 | 至少一个明确测试断言，不能只断言流程成功。 |
+| 默认派发顺序稳定。 | 至少一个明确测试断言，不能只断言流程成功。 |
+
+## 测试矩阵
+
+| Feature ID | Test Type | Test File | Required Assertions | Failure Paths | Status |
+| --- | --- | --- | --- | --- | --- |
+| AUC-EVENTBUS-001 | Unit | EventPublicationTests | 断言 delivery result、error policy、diagnostics。 | contract 未登记、handler 失败、取消。 | Required |
+| AUC-EVENTBUS-002 | RuntimeLifecycle | EventSubscriptionTests | 断言 dispose 后不再收到事件。 | 重复释放、owner dispose、插件 unload。 | Required |
+| AUC-EVENTBUS-003 | Unit | EventContractRegistryTests | 断言 shared contract、private plugin type 拒绝。 | 跨插件私有类型拒绝。 | Required |
+| AUC-EVENTBUS-004 | Unit | EventDispatchingTests | 断言顺序、异常聚合、停止策略。 | handler 异常、取消、继续或停止。 | Required |
+| AUC-EVENTBUS-005 | Unit | EventDiagnosticsTests | 断言 EventBus.Event* 现有代码。 | diagnostics collector 缺失不影响 publish。 | Required |
+| AUC-EVENTBUS-006 | Unit | EventBusRegistrationTests | 断言默认服务和可替换 diagnostics。 | 重复注册和 override 行为。 | Required |
+
+## 缺口处理
+
+如果现有测试只覆盖 smoke 或 happy path，`implementation-plan.md` 必须把缺口标为 `Required`。无法单元测试的功能必须提供 Contract、RuntimeLifecycle、PluginLifecycle、Generator、Build、PlatformIntegration、TemplateSmoke 或 Dogfood 测试替代。

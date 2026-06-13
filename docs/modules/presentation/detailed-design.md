@@ -1,10 +1,66 @@
-# AtomUI.City.Presentation Detailed Design
+# AtomUI.City.Presentation Detailed Design 合同
 
-版本：v0.1
-状态：正式初版
+## 适用范围
+
+本专题属于 `AtomUI.City.Presentation` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `Detailed Design` 相关实现决策，不重新定义模块边界。
+
+## 设计决策
+
+- Presentation 负责 ViewModel -> View -> Outlet -> VisualTree。
+- VisualTree 变化必须通过生命周期事件或绑定反馈回 ViewModel/State。
+- View 创建和提交必须在 UI dispatcher 上执行。
+
+## Public Contract
+
+- 只允许通过 `AtomUI.City.Presentation` 的 public API、attribute、options、manifest、generated output 或 DI extension 暴露本专题能力。
+- 新增 contract 必须进入 [api-contracts.md](api-contracts.md)。
+- 新增功能必须分配 Feature ID，并进入 [features.md](features.md)。
+- 修改失败行为、默认值、诊断码或生命周期状态必须进入 [compatibility.md](compatibility.md)。
+
+## 运行时边界
+
+- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
+- Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
+- 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
+
+## 失败行为
+
+- 输入无效：使用标准参数异常或模块 Result。
+- 生命周期状态非法：返回失败 Result、模块异常或稳定诊断。
+- 依赖缺失：阻止当前功能启用，不影响无关功能。
+- 插件卸载中：拒绝创建新贡献，并撤销已有贡献。
+- 释放失败：记录诊断并继续释放其他资源。
+
+## 测试要求
+
+| Feature ID | 相关能力 | 测试文件 |
+| --- | --- | --- |
+| AUC-PRESENTATION-001 | UI Dispatcher | AvaloniaUiDispatcherTests |
+| AUC-PRESENTATION-002 | View Locator | ViewLocatorTests |
+| AUC-PRESENTATION-003 | View Binding | ViewBindingTests |
+| AUC-PRESENTATION-004 | Route Outlet | RouteOutletTests |
+| AUC-PRESENTATION-005 | Presentation Runtime | PresentationRuntimeTests |
+| AUC-PRESENTATION-006 | Localization Bridge | PresentationLocalizationBridgeTests |
+
+本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
+
+## 完成标准
+
+- 设计决策能回答对象由谁创建、谁持有、谁释放。
+- API contract、失败行为、诊断和测试矩阵一致。
+- 不出现业务领域假设。
+- 不引入 `AtomUI.City.PluginSystem 运行时直接依赖插件实现类型` 等禁止依赖。
+
+## 既有细化设计内容
+
+以下内容保留上一轮设计中的专题细节。后续修改必须与本页上方合同、Feature ID、API 行为、诊断和测试矩阵保持一致。
+
+## AtomUI.City.Presentation Detailed Design
+
 适用范围：AtomUI/Avalonia 集成、UI Runtime、ViewLocator、View/ViewModel 绑定、Route Outlet、UI Dispatcher、Activation 接入、Interaction Handler、State/Localization/UI 更新、插件资源、AOT/source generator 和测试策略。
 
-## 1. 定位
+### 1. 定位
 
 `AtomUI.City.Presentation` 是 AtomUI.City 框架运行时与 AtomUI/Avalonia UI 运行时之间的隔离层。
 
@@ -19,7 +75,7 @@ Routing
 -> AtomUI / Avalonia visual tree
 ```
 
-## 1.1 拆分文档
+### 1.1 拆分文档
 
 Presentation 的详细设计按职责拆分维护：
 
@@ -43,7 +99,7 @@ Presentation 的详细设计按职责拆分维护：
 - Presentation 负责 `ViewModel -> View`、UI Dispatcher、Outlet 提交和 UI 运行时桥接。
 - AtomUI/Avalonia 负责控件、样式、主题和底层 UI 行为。
 
-### 1.1 模块数据流
+#### 1.1 模块数据流
 
 Presentation 处在页面进入链路的 UI 提交段。完整数据流必须闭合到 VisualTree 反馈和 UI 元素状态反馈：
 
@@ -83,7 +139,7 @@ User / Command / Startup
 - Mvvm 是 ViewModel 生命周期和交互契约层，不知道具体 View。
 - Routing 是页面进入决策层，不创建或持有 UI 控件。
 
-### 1.2 导航提交阶段
+#### 1.2 导航提交阶段
 
 导航进入 UI 前分为 prepare、commit、activate 三段。
 
@@ -123,7 +179,7 @@ Presentation commit failed
 
 这保证旧 VisualTree 在新路由准备失败时仍保持可用。
 
-### 1.3 VisualTree 反馈
+#### 1.3 VisualTree 反馈
 
 VisualTree 变化必须通过 Presentation 归一化后反馈。Routing、Mvvm、Core 不直接订阅 AtomUI/Avalonia 原始 visual tree 事件。
 
@@ -155,7 +211,7 @@ Window Closing / View close gesture
 -> Presentation detaches VisualTree
 ```
 
-### 1.4 UI 元素状态反馈
+#### 1.4 UI 元素状态反馈
 
 UI 元素状态变化通知 ViewModel，必须走 MVVM Binding / Command / Interaction 通道，而不是 VisualTree feedback。
 
@@ -190,7 +246,7 @@ AtomUI/Avalonia control state
 
 这些状态属于 View/Presentation，除非应用显式把它们建模成有业务语义的 ViewModel 属性或命令参数。
 
-### 1.5 运行时闭环
+#### 1.5 运行时闭环
 
 常见闭环如下：
 
@@ -230,7 +286,7 @@ Plugin stopping
 
 一句话边界：VisualTree 反馈生命周期和提交结果；UI 元素状态反馈业务语义。原始 UI 事件默认不跨越 Presentation 边界。
 
-## 2. 非目标
+### 2. 非目标
 
 Presentation 不负责：
 
@@ -247,7 +303,7 @@ Presentation 不负责：
 
 这些由 Routing、Mvvm、Data、Security、State、EventBus、AtomUI/Avalonia 或业务应用负责。
 
-## 3. 设计原则
+### 3. 设计原则
 
 Presentation 必须遵守：
 
@@ -260,7 +316,7 @@ Presentation 必须遵守：
 - Business-agnostic：不内置业务页面形态。
 - Testable：支持无真实 UI 的 Presentation 测试替身。
 
-## 4. 核心抽象
+### 4. 核心抽象
 
 | 类型 | 职责 |
 |---|---|
@@ -278,7 +334,7 @@ Presentation 必须遵守：
 
 命名不加 `City` 前缀。
 
-## 5. UI Runtime
+### 5. UI Runtime
 
 Presentation 负责启动和连接 AtomUI/Avalonia UI runtime。
 
@@ -307,7 +363,7 @@ ApplicationHost
 
 Core 不依赖 Avalonia。Presentation 是 Core 和 Avalonia 之间的适配层。
 
-## 6. UI Dispatcher
+### 6. UI Dispatcher
 
 Presentation 提供 `IUiDispatcher` 的 Avalonia 实现。
 
@@ -323,7 +379,7 @@ Presentation 提供 `IUiDispatcher` 的 Avalonia 实现。
 
 调度策略见：[Core Threading 设计](../core/threading.md)。
 
-## 7. ViewLocator
+### 7. ViewLocator
 
 ViewLocator 负责 `ViewModel -> ViewDescriptor`。
 
@@ -357,7 +413,7 @@ ViewModelType
 - 插件 View 必须记录 PluginId 和 ContributionId。
 - 插件卸载时必须撤销对应 View descriptor。
 
-## 8. ViewFactory
+### 8. ViewFactory
 
 ViewFactory 负责创建 View。
 
@@ -371,7 +427,7 @@ ViewFactory 负责创建 View。
 
 Strict AOT 模式下，ViewFactory 应由 Source Generator 生成强类型工厂，避免反射构造。
 
-## 9. View/ViewModel 绑定
+### 9. View/ViewModel 绑定
 
 Binding 过程：
 
@@ -401,7 +457,7 @@ Presentation 应提供诊断：
 - Binding 失败。
 - 插件 View descriptor 已撤销。
 
-## 10. Route Outlet
+### 10. Route Outlet
 
 Route Outlet 是 Routing 和 Presentation 的提交边界。
 
@@ -435,7 +491,7 @@ Commit plan
 - Commit 失败时必须尽量恢复旧 content。
 - Presentation 不决定导航成功，只返回 commit result。
 
-## 11. Routing 集成
+### 11. Routing 集成
 
 Routing 与 Presentation 通过明确 contract 交互。
 
@@ -459,7 +515,7 @@ Presentation 返回：
 
 Routing 根据结果更新 NavigationSnapshot、Journal 或执行回滚。
 
-## 12. Activation 集成
+### 12. Activation 集成
 
 Mvvm Activation 是 ViewModel 生命周期。Presentation 负责把 visual lifecycle 接入 Activation。
 
@@ -473,7 +529,7 @@ Mvvm Activation 是 ViewModel 生命周期。Presentation 负责把 visual lifec
 
 Presentation 不应该在 View 构造阶段激活 ViewModel。
 
-## 13. Interaction Handler
+### 13. Interaction Handler
 
 Presentation 负责把 MVVM Interaction Request 映射到 UI。
 
@@ -496,7 +552,7 @@ Presentation 负责把 MVVM Interaction Request 映射到 UI。
 
 Presentation 不把具体 Dialog 业务模型强加给应用。
 
-## 14. Validation 集成
+### 14. Validation 集成
 
 Mvvm 定义验证状态，Presentation 负责展示。
 
@@ -509,7 +565,7 @@ Presentation 需要支持：
 
 Validation failed 不是异常，不进入 fatal error。
 
-## 15. Command Binding
+### 15. Command Binding
 
 Presentation 可以增强 Command Binding。
 
@@ -523,7 +579,7 @@ Presentation 可以增强 Command Binding。
 
 长耗时命令仍由 Mvvm / Core Operation 管理，Presentation 不执行后台任务调度。
 
-## 16. State 和 UI 更新
+### 16. State 和 UI 更新
 
 State Core 不直接依赖 UI。Presentation 负责 UI 线程安全更新。
 
@@ -537,7 +593,7 @@ State Core 不直接依赖 UI。Presentation 负责 UI 线程安全更新。
 
 Presentation 不保存应用状态；状态仍归 State 模块管理。
 
-## 17. Localization 集成
+### 17. Localization 集成
 
 Presentation 负责把 Localization 的文化变化反映到 UI。
 
@@ -550,7 +606,7 @@ Presentation 负责把 Localization 的文化变化反映到 UI。
 
 Localization 负责资源查找和文化状态，Presentation 负责 UI 展示刷新。
 
-## 18. Resource 和 Theme 集成
+### 18. Resource 和 Theme 集成
 
 Presentation 接入 AtomUI/Avalonia 资源系统。
 
@@ -576,7 +632,7 @@ Stop new view creation from plugin
 -> Dispose plugin resource scope
 ```
 
-## 19. WindowScope 集成
+### 19. WindowScope 集成
 
 Presentation 创建和管理 WindowScope。
 
@@ -590,7 +646,7 @@ Presentation 创建和管理 WindowScope。
 
 Presentation 不定义业务窗口模型，但提供窗口生命周期桥接。
 
-## 20. 插件边界
+### 20. 插件边界
 
 插件可以贡献：
 
@@ -613,7 +669,7 @@ Presentation 不定义业务窗口模型，但提供窗口生命周期桥接。
 
 插件 View/ViewModel 绑定中跨边界传递的公共类型必须位于 Host 共享 contract 程序集。
 
-## 21. AOT 和 Source Generator
+### 21. AOT 和 Source Generator
 
 Presentation generator 负责：
 
@@ -634,7 +690,7 @@ Presentation generator 负责：
 - 反射构造 View 作为默认路径。
 - 动态代理绑定 UI 生命周期。
 
-## 22. 错误策略
+### 22. 错误策略
 
 | 场景 | 默认处理 |
 |---|---|
@@ -650,7 +706,7 @@ Presentation generator 负责：
 
 Presentation 错误不能静默吞掉。必须返回给 Routing、Mvvm 或 Lifecycle 的错误策略。
 
-## 23. 诊断
+### 23. 诊断
 
 必须记录：
 
@@ -667,7 +723,7 @@ Presentation 错误不能静默吞掉。必须返回给 Routing、Mvvm 或 Lifec
 
 诊断信息必须包含 ScopeId、WindowId、NavigationScopeId、RouteId、ViewModel type、View type、PluginId 和 ContributionId。
 
-## 24. 测试策略
+### 24. 测试策略
 
 Testing 包应提供：
 
@@ -695,7 +751,7 @@ Testing 包应提供：
 
 Presentation 测试应能在无真实 AtomUI/Avalonia UI 的环境中运行。真实 UI 集成测试单独放到平台集成测试中。
 
-## 25. 第一版取舍
+### 25. 第一版取舍
 
 第一版不做：
 

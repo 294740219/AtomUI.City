@@ -1,10 +1,69 @@
-# PluginSystem 安全设计
+# AtomUI.City.PluginSystem Security 合同
 
-版本：v0.1
-状态：正式初版
+## 适用范围
+
+本专题属于 `AtomUI.City.PluginSystem` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `Security` 相关实现决策，不重新定义模块边界。
+
+## 设计决策
+
+- 插件来源对象必须绑定 plugin owner。
+- 卸载必须撤销 contribution、subscription、view lease、state 和 connection。
+- 跨插件 contract 必须位于 Host 共享程序集。
+- 授权失败返回明确 result，不能直接操作 UI。
+- 权限声明必须来自 registry 或 plugin capability。
+- 认证状态变更必须通知 command、route 和 data 集成点。
+
+## Public Contract
+
+- 只允许通过 `AtomUI.City.PluginSystem` 的 public API、attribute、options、manifest、generated output 或 DI extension 暴露本专题能力。
+- 新增 contract 必须进入 [api-contracts.md](api-contracts.md)。
+- 新增功能必须分配 Feature ID，并进入 [features.md](features.md)。
+- 修改失败行为、默认值、诊断码或生命周期状态必须进入 [compatibility.md](compatibility.md)。
+
+## 运行时边界
+
+- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
+- Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
+- 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
+
+## 失败行为
+
+- 输入无效：使用标准参数异常或模块 Result。
+- 生命周期状态非法：返回失败 Result、模块异常或稳定诊断。
+- 依赖缺失：阻止当前功能启用，不影响无关功能。
+- 插件卸载中：拒绝创建新贡献，并撤销已有贡献。
+- 释放失败：记录诊断并继续释放其他资源。
+
+## 测试要求
+
+| Feature ID | 相关能力 | 测试文件 |
+| --- | --- | --- |
+| AUC-PLUGIN-001 | Plugin Metadata | PluginDeclarationAttributeTests; PluginManifestTests |
+| AUC-PLUGIN-002 | Dependency Validation | PluginDependencyTests |
+| AUC-PLUGIN-003 | Package Installation | PluginPackageTests |
+| AUC-PLUGIN-004 | Discovery | PluginLoadingTests |
+| AUC-PLUGIN-005 | Loading | PluginLoadingTests |
+| AUC-PLUGIN-006 | MSBuild Contract | PluginMsBuildContractTests |
+
+本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
+
+## 完成标准
+
+- 设计决策能回答对象由谁创建、谁持有、谁释放。
+- API contract、失败行为、诊断和测试矩阵一致。
+- 不出现业务领域假设。
+- 不引入 `AtomUI.City.Presentation` 等禁止依赖。
+
+## 既有细化设计内容
+
+以下内容保留上一轮设计中的专题细节。后续修改必须与本页上方合同、Feature ID、API 行为、诊断和测试矩阵保持一致。
+
+## PluginSystem 安全设计
+
 适用范围：插件来源、签名、hash、能力授权、加载边界和不可信代码约束
 
-## 1. 目标
+### 1. 目标
 
 插件系统必须把安全边界说清楚。插件是运行在应用进程内的扩展代码，不能把进程内加载机制当作安全沙箱。
 
@@ -20,7 +79,7 @@
 包签名、来源、hash 和信任等级的细化规则见：[签名和信任设计](signing-and-trust.md)。
 能力授权的细化规则见：[能力授权设计](capabilities.md)。
 
-## 2. 信任模型
+### 2. 信任模型
 
 插件信任由 Host policy 决定。
 
@@ -43,7 +102,7 @@
 - 发布者信息不能单独作为信任依据。
 - 信任结果必须写入安装记录和锁定文件。
 
-## 3. AssemblyLoadContext 不是安全边界
+### 3. AssemblyLoadContext 不是安全边界
 
 可卸载加载上下文只解决依赖隔离和卸载问题。
 
@@ -59,7 +118,7 @@
 
 需要运行不可信代码时，应使用进程隔离、受限 IPC、操作系统权限或专门沙箱机制，这不属于第一版 PluginSystem 的默认能力。
 
-## 4. 能力授权
+### 4. 能力授权
 
 插件声明 requested capabilities，Host policy 产生 granted capabilities。
 
@@ -96,7 +155,7 @@ Read manifest requested capabilities
 | `localization` | 影响展示文本。 |
 | `settings` | 增加配置入口。 |
 
-## 5. Contract 边界
+### 5. Contract 边界
 
 插件只能通过 Host contract 接触框架能力。
 
@@ -110,7 +169,7 @@ Read manifest requested capabilities
 
 Host 共享 contract 程序集必须由默认加载上下文加载，插件只引用该 contract，不携带私有副本。
 
-## 6. 文件和目录安全
+### 6. 文件和目录安全
 
 插件安装目录必须和包缓存目录分离。
 
@@ -123,7 +182,7 @@ Host 共享 contract 程序集必须由默认加载上下文加载，插件只�
 - 插件用户配置和状态应写入专门的 plugin data 目录，不写安装目录。
 - 清理目录必须确认插件未加载且没有 `UnloadPending`。
 
-## 7. Native 资产
+### 7. Native 资产
 
 插件携带 native/RID 资产时必须显式声明。
 
@@ -135,7 +194,7 @@ Host 共享 contract 程序集必须由默认加载上下文加载，插件只�
 - native 资产不能从未验证目录加载。
 - AOT 场景下动态 native 插件加载需要应用显式支持。
 
-## 8. 运行时隔离
+### 8. 运行时隔离
 
 运行时隔离依赖以下机制共同完成：
 
@@ -150,7 +209,7 @@ Host 共享 contract 程序集必须由默认加载上下文加载，插件只�
 
 这些机制用于工程隔离和可靠卸载，不用于承诺安全沙箱。
 
-## 9. 安全失败策略
+### 9. 安全失败策略
 
 | 失败 | 策略 |
 |---|---|
@@ -163,7 +222,7 @@ Host 共享 contract 程序集必须由默认加载上下文加载，插件只�
 
 安全失败不能静默忽略。
 
-## 10. 诊断和测试
+### 10. 诊断和测试
 
 必须覆盖：
 

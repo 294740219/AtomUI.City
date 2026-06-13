@@ -1,99 +1,41 @@
-# CLI 诊断设计
+# AtomUI.City.Cli Diagnostics
 
-版本：v0.1
-状态：正式初版
-适用范围：CLI 错误码、诊断 envelope、human output、JSON output、doctor、explain 和跨模块诊断透传
+## 诊断原则
 
-## 1. 目标
+- 诊断码稳定，不能复用。
+- 文档必须区分“当前源码已有诊断码”和“产品级目标诊断”。
+- message 可以优化，但 code 含义不能漂移。
+- 重要失败路径必须有诊断、Result 或声明异常。
+- 测试必须断言 code 和至少一个定位字段。
 
-CLI 诊断必须稳定、可解释、可被机器解析。错误不能只是一段人类可读文本。
+## 当前源码诊断码
 
-## 2. 诊断 Envelope
+| Current Code | Name | Source |
+| --- | --- | --- |
+| `AUCCLI0001` | CommandPrefixInvalid | `src/AtomUI.City.Cli/CliApplication.cs` |
+| `AUCCLI0002` | UnknownCommand | `src/AtomUI.City.Cli/CliApplication.cs` |
+| `AUCCLI0101` | AppNameRequired | `src/AtomUI.City.Cli/CliApplication.cs` |
+| `AUCCLI0102` | RootNamespaceReserved | `src/AtomUI.City.Cli/CliApplication.cs` |
+| `AUCCLI0103` | AotDynamicPluginConflict | `src/AtomUI.City.Cli/CliApplication.cs` |
+| `AUCCLI0201` | DotnetCommandFailed | `src/AtomUI.City.Cli/CliApplication.cs` |
+| `AUCCLI0301` | PluginPackagePathRequired | `src/AtomUI.City.Cli/CliApplication.cs` |
 
-```json
-{
-  "code": "AUCCLI0001",
-  "severity": "Error",
-  "message": "Invalid command argument.",
-  "details": {},
-  "suggestedActions": [],
-  "documentationLinks": []
-}
-```
+## 产品级必须诊断的失败
 
-## 3. 诊断前缀
+- 输入非法：拒绝执行并输出诊断。
+- 执行失败：返回失败 result 或 gate failure。
+- 输出不符合 contract：测试失败。
 
-| 前缀 | 来源 |
-|---|---|
-| `AUCCLI` | CLI 自身错误。 |
-| `AUCBLD` | Build 透传错误。 |
-| `AUCTPL` | Templates 透传错误。 |
-| `AUCPLG` | PluginSystem 透传错误。 |
-| `AUCGEN` | Source Generator 透传错误。 |
-| `AUCANL` | Analyzer 透传错误。 |
+## 上下文字段
 
-## 4. CLI 错误码建议
+推荐字段：`operationId`、`scopeId`、`module`、`pluginId`、`routeId`、`stateKey`、`eventType`、`handlerType`、`assembly`、`path`、`featureId`、`threadId`、`attempt`、`transportKind`。
 
-| Code | 含义 |
-|---|---|
-| `AUCCLI0001` | 参数无效。 |
-| `AUCCLI0002` | 工作区无法识别。 |
-| `AUCCLI0003` | 非交互模式缺少必填参数。 |
-| `AUCCLI0101` | 模板调用失败。 |
-| `AUCCLI0102` | Build 调用失败。 |
-| `AUCCLI0201` | 功能点测试矩阵缺失。 |
-| `AUCCLI0202` | 功能点单元测试缺失。 |
-| `AUCCLI0301` | Plan schema 无效。 |
-| `AUCCLI0302` | Apply 时文件状态不匹配。 |
-| `AUCCLI0401` | 插件操作被 PluginSystem 拒绝。 |
+## 诊断缺口处理
 
-## 5. Doctor
+- 如果当前源码没有对应诊断码，implementation plan 必须记录为 product gap。
+- 新增诊断码必须同时更新源码、本文档、测试矩阵和 compatibility。
+- 已存在诊断码不能因为重构改变语义。
 
-```bash
-atomui city doctor --json
-```
+## 测试门禁
 
-检查：
-
-- workspace。
-- package versions。
-- Build 配置。
-- Templates 可用性。
-- Plugin profile。
-- output 目录。
-- manifest 状态。
-- docs/tests gate。
-
-## 6. Explain
-
-```bash
-atomui city explain AUCCLI0201 --json
-```
-
-输出：
-
-- code。
-- severity。
-- 触发条件。
-- 修复建议。
-- 相关文档。
-- 相关命令。
-
-## 7. Human Output
-
-人类输出可以使用颜色和表格，但必须由同一诊断模型渲染。
-
-`--no-color` 禁用颜色。
-
-`--json` 禁止输出非 JSON 文本。
-
-## 8. 测试矩阵
-
-| 功能点 | 测试类型 | 必测场景 |
-|---|---|---|
-| diagnostic envelope | Unit | code、severity、details。 |
-| JSON output | Unit | 成功和失败。 |
-| human output | Golden output | no-color、verbosity。 |
-| doctor | Unit/CLI | workspace、manifest、gates。 |
-| explain | Unit | 已知和未知 code。 |
-| passthrough | Unit | Build/Templates/Plugin code 不丢失。 |
+`tests/AtomUI.City.Cli.Tests` 必须断言当前源码诊断码；产品级目标诊断补齐后必须增加对应测试。

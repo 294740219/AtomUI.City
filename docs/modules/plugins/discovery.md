@@ -1,10 +1,66 @@
-# PluginSystem 发现设计
+# AtomUI.City.PluginSystem Discovery 合同
 
-版本：v0.1
-状态：正式初版
+## 适用范围
+
+本专题属于 `AtomUI.City.PluginSystem` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `Discovery` 相关实现决策，不重新定义模块边界。
+
+## 设计决策
+
+- 插件来源对象必须绑定 plugin owner。
+- 卸载必须撤销 contribution、subscription、view lease、state 和 connection。
+- 跨插件 contract 必须位于 Host 共享程序集。
+
+## Public Contract
+
+- 只允许通过 `AtomUI.City.PluginSystem` 的 public API、attribute、options、manifest、generated output 或 DI extension 暴露本专题能力。
+- 新增 contract 必须进入 [api-contracts.md](api-contracts.md)。
+- 新增功能必须分配 Feature ID，并进入 [features.md](features.md)。
+- 修改失败行为、默认值、诊断码或生命周期状态必须进入 [compatibility.md](compatibility.md)。
+
+## 运行时边界
+
+- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
+- Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
+- 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
+
+## 失败行为
+
+- 输入无效：使用标准参数异常或模块 Result。
+- 生命周期状态非法：返回失败 Result、模块异常或稳定诊断。
+- 依赖缺失：阻止当前功能启用，不影响无关功能。
+- 插件卸载中：拒绝创建新贡献，并撤销已有贡献。
+- 释放失败：记录诊断并继续释放其他资源。
+
+## 测试要求
+
+| Feature ID | 相关能力 | 测试文件 |
+| --- | --- | --- |
+| AUC-PLUGIN-001 | Plugin Metadata | PluginDeclarationAttributeTests; PluginManifestTests |
+| AUC-PLUGIN-002 | Dependency Validation | PluginDependencyTests |
+| AUC-PLUGIN-003 | Package Installation | PluginPackageTests |
+| AUC-PLUGIN-004 | Discovery | PluginLoadingTests |
+| AUC-PLUGIN-005 | Loading | PluginLoadingTests |
+| AUC-PLUGIN-006 | MSBuild Contract | PluginMsBuildContractTests |
+
+本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
+
+## 完成标准
+
+- 设计决策能回答对象由谁创建、谁持有、谁释放。
+- API contract、失败行为、诊断和测试矩阵一致。
+- 不出现业务领域假设。
+- 不引入 `AtomUI.City.Presentation` 等禁止依赖。
+
+## 既有细化设计内容
+
+以下内容保留上一轮设计中的专题细节。后续修改必须与本页上方合同、Feature ID、API 行为、诊断和测试矩阵保持一致。
+
+## PluginSystem 发现设计
+
 适用范围：插件目录、插件包扫描、来源优先级、禁用策略和发现诊断
 
-## 1. 目标
+### 1. 目标
 
 插件发现负责回答两个问题：
 
@@ -13,7 +69,7 @@
 
 发现阶段不能执行插件代码，不能加载插件程序集，不能创建插件服务。
 
-## 2. 插件位置类型
+### 2. 插件位置类型
 
 Host 可以扫描四类插件位置：
 
@@ -31,7 +87,7 @@ Host 可以扫描四类插件位置：
 - Dev plugins 只允许在 Development 或显式开启的诊断模式中使用。
 - Machine plugins 需要受系统权限和 Host policy 管理。
 
-## 3. 默认目录
+### 3. 默认目录
 
 插件安装目录使用用户级应用数据目录。
 
@@ -51,7 +107,7 @@ Host 可以扫描四类插件位置：
 
 目录中的 `<PluginProfile>` 由 Host 插件 API 兼容版本和渠道组成，例如 `1.0-stable`。
 
-## 4. 目录结构
+### 4. 目录结构
 
 User plugins 推荐结构：
 
@@ -91,7 +147,7 @@ plugin-cache/
 - `atomui-city.plugins.lock.json` 是当前启用状态的恢复依据。
 - `plugin-cache` 只保存下载包，不作为运行时加载目录。
 
-## 5. 发现流程
+### 5. 发现流程
 
 发现流程：
 
@@ -115,7 +171,7 @@ Resolve plugin locations
 - 发现结果必须保留插件来源位置。
 - 同一个 `PluginId` 的多版本候选由锁定文件和 Host policy 决定 active 版本。
 
-## 6. 来源优先级
+### 6. 来源优先级
 
 默认优先级建议：
 
@@ -137,7 +193,7 @@ Dev plugins
 
 如果启用来源覆盖，诊断中必须记录被覆盖插件版本和覆盖原因。
 
-## 7. 禁用策略
+### 7. 禁用策略
 
 禁用状态应记录在锁定文件或用户配置中，不通过删除目录表达。
 
@@ -158,7 +214,7 @@ Dev plugins
 - 用户禁用不应删除插件配置和状态。
 - 安全禁用必须要求重新验证后才能启用。
 
-## 8. 配置覆盖
+### 8. 配置覆盖
 
 Host 应允许应用显式配置插件根目录。
 
@@ -186,7 +242,7 @@ Host 应允许应用显式配置插件根目录。
 - 路径变更不应在运行时自动迁移插件。
 - 自定义路径必须进入诊断输出。
 
-## 9. 发现错误策略
+### 9. 发现错误策略
 
 发现错误默认不阻止应用启动。
 
@@ -200,7 +256,7 @@ Host 应允许应用显式配置插件根目录。
 | 锁定文件损坏 | 使用恢复策略并记录严重诊断。 |
 | 同一插件多版本冲突 | 按锁定文件选择，无法选择则禁用。 |
 
-## 10. 诊断和测试
+### 10. 诊断和测试
 
 必须覆盖：
 

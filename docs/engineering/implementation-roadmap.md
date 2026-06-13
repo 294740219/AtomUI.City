@@ -37,6 +37,7 @@ Documented
 - 阶段范围内的公开功能点都有测试矩阵条目。
 - 阶段范围内的公开功能点都有单元测试。
 - 涉及生命周期、线程、插件、订阅、连接或资源释放的功能点必须有释放断言。
+- 涉及 public API 的功能点必须通过 [公共 API Review 门禁](public-api-review.md)。
 - 阶段内实现不得引入未确认的公共 API。
 - 阶段内实现不得改变已确认的包依赖方向。
 - 阶段内实现和文档一致。
@@ -706,6 +707,7 @@ DoD：
 - docs link check。
 - analyzer tests。
 - generator tests。
+- SalesDesk vertical slice tests。
 
 DoD：
 
@@ -713,6 +715,7 @@ DoD：
 - 所有测试通过。
 - 所有 package 可 pack。
 - 示例能运行。
+- 产品级 vertical slice 通过。
 - 没有未确认的公共 API 偏离文档。
 - Release notes 可生成。
 
@@ -757,3 +760,14 @@ Phase 0 + Phase 1
 ```
 
 也就是仓库工程基线和 Core Kernel 最小闭环。
+
+## 19. 首批 API 冻结规则
+
+第一批实现只冻结 Phase 0 到 Phase 3 所需 API：
+
+- Core Host、Lifecycle、Modularity、DI marker、Diagnostics 和 UI dispatcher abstraction。
+- Testing TestHost、FakeUiDispatcher、DeterministicScheduler、ModuleTestHost、PluginTestHost、RoutingTestHost、SourceGenerationTestCase、AOT check 和 TestLayer。
+
+这些 API 必须先满足 [公共 API Review 门禁](public-api-review.md)，再进入实现。
+
+Phase 4 之后的 State、EventBus、MVVM、Routing、Presentation、Data、Security、Localization、PluginSystem、Build、Generators、CLI 和 Templates 可以继续设计细化，但不能因为存在 `features.md` 和 `testing.md` 就标记产品级完成。

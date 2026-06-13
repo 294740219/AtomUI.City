@@ -1,10 +1,69 @@
-# AtomUI.City.Routing ViewModel Target 设计
+# AtomUI.City.Routing Viewmodel Target 合同
 
-版本：v0.1
-状态：正式初版
+## 适用范围
+
+本专题属于 `AtomUI.City.Routing` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `Viewmodel Target` 相关实现决策，不重新定义模块边界。
+
+## 设计决策
+
+- Routing 只负责 Route -> ViewModel Target。
+- 参数绑定失败必须返回导航失败结果。
+- 插件路由撤销后 route graph 必须重新发布。
+- Presentation 负责 ViewModel -> View -> Outlet -> VisualTree。
+- VisualTree 变化必须通过生命周期事件或绑定反馈回 ViewModel/State。
+- View 创建和提交必须在 UI dispatcher 上执行。
+
+## Public Contract
+
+- 只允许通过 `AtomUI.City.Routing` 的 public API、attribute、options、manifest、generated output 或 DI extension 暴露本专题能力。
+- 新增 contract 必须进入 [api-contracts.md](api-contracts.md)。
+- 新增功能必须分配 Feature ID，并进入 [features.md](features.md)。
+- 修改失败行为、默认值、诊断码或生命周期状态必须进入 [compatibility.md](compatibility.md)。
+
+## 运行时边界
+
+- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
+- Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
+- 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
+
+## 失败行为
+
+- 输入无效：使用标准参数异常或模块 Result。
+- 生命周期状态非法：返回失败 Result、模块异常或稳定诊断。
+- 依赖缺失：阻止当前功能启用，不影响无关功能。
+- 插件卸载中：拒绝创建新贡献，并撤销已有贡献。
+- 释放失败：记录诊断并继续释放其他资源。
+
+## 测试要求
+
+| Feature ID | 相关能力 | 测试文件 |
+| --- | --- | --- |
+| AUC-ROUTING-001 | Route Template Syntax | RouteTemplateTests; RoutingParameterBoundaryTests |
+| AUC-ROUTING-002 | Route Definition Attributes | RouteDefinitionAttributeTests |
+| AUC-ROUTING-003 | Route Graph | RouteGraphAndMatcherTests |
+| AUC-ROUTING-004 | Route Matcher | RouteGraphAndMatcherTests |
+| AUC-ROUTING-005 | Navigation Scope | NavigationScopeTests |
+| AUC-ROUTING-006 | Guards | RouteGuardTests |
+
+本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
+
+## 完成标准
+
+- 设计决策能回答对象由谁创建、谁持有、谁释放。
+- API contract、失败行为、诊断和测试矩阵一致。
+- 不出现业务领域假设。
+- 不引入 `AtomUI.City.Presentation` 等禁止依赖。
+
+## 既有细化设计内容
+
+以下内容保留上一轮设计中的专题细节。后续修改必须与本页上方合同、Feature ID、API 行为、诊断和测试矩阵保持一致。
+
+## AtomUI.City.Routing ViewModel Target 设计
+
 适用范围：Route 到 ViewModel Target 的映射、ViewModel 创建、参数和解析数据注入、Mvvm Activation、Presentation 边界。
 
-## 1. 定位
+### 1. 定位
 
 Routing 负责把 Route 解析为 ViewModel Target。
 
@@ -18,7 +77,7 @@ Mvvm: ViewModel activation/deactivation
 Presentation: ViewModel -> View
 ```
 
-## 2. ViewModelTargetDescriptor
+### 2. ViewModelTargetDescriptor
 
 `ViewModelTargetDescriptor` 是 Source Generator 输出的运行时描述。
 
@@ -36,7 +95,7 @@ Presentation: ViewModel -> View
 
 运行时不通过命名约定推断 ViewModel。
 
-## 3. 创建规则
+### 3. 创建规则
 
 ViewModel 创建发生在导航准备阶段。
 
@@ -51,7 +110,7 @@ Resolve data
 
 创建失败时，候选 RouteScope 释放，当前页面保持不变。
 
-## 4. 服务来源
+### 4. 服务来源
 
 ViewModel 从 RouteDescriptor 对应的 ServiceContext 创建。
 
@@ -64,7 +123,7 @@ ViewModel 从 RouteDescriptor 对应的 ServiceContext 创建。
 
 插件 ViewModel 不能从 Host Root ServiceProvider 任意解析未暴露服务。
 
-## 5. 参数注入
+### 5. 参数注入
 
 路由参数通过强类型参数对象进入 ViewModel。
 
@@ -80,7 +139,7 @@ ViewModel 从 RouteDescriptor 对应的 ServiceContext 创建。
 - 从 Dictionary 取 object。
 - 在 ViewModel 构造函数中访问全局 Router 解析参数。
 
-## 6. Resolved Data 注入
+### 6. Resolved Data 注入
 
 Resolver 结果可以作为 ViewModel 初始化输入。
 
@@ -91,7 +150,7 @@ Resolver 结果可以作为 ViewModel 初始化输入。
 - 多个 Resolver 数据通过稳定 key 绑定。
 - Source Generator 校验 key 和类型。
 
-## 7. Activation 集成
+### 7. Activation 集成
 
 Mvvm 负责 ViewModel Activation。Routing 负责把 Activation 放进导航事务中，确保 UI commit 成功后才把候选 ViewModel 标记为 active。
 
@@ -126,7 +185,7 @@ Run Leave Guards
 
 ViewModel 构造函数只接收依赖和轻量数据，不启动长期任务。
 
-## 8. Presentation 集成
+### 8. Presentation 集成
 
 Presentation 根据 ViewModel Target 或 ViewModel 实例定位 View。
 
@@ -146,7 +205,7 @@ Presentation 返回：
 
 Routing 不知道具体控件类型。
 
-## 9. Reuse
+### 9. Reuse
 
 复用发生在两个层面：
 
@@ -160,7 +219,7 @@ Routing 不知道具体控件类型。
 - ActivationScope 是否重建由策略决定。
 - 插件停用时必须强制释放。
 
-## 10. 插件 ViewModel
+### 10. 插件 ViewModel
 
 插件 ViewModel 规则：
 
@@ -172,7 +231,7 @@ Routing 不知道具体控件类型。
 
 跨插件边界传递给 Host 的类型必须位于共享 contract 程序集。
 
-## 11. AOT 和 Source Generator
+### 11. AOT 和 Source Generator
 
 Source Generator 必须生成：
 
@@ -185,7 +244,7 @@ Source Generator 必须生成：
 
 Strict AOT 模式下应生成强类型 factory，避免运行时反射构造。
 
-## 12. 错误策略
+### 12. 错误策略
 
 | 场景 | 默认处理 |
 |---|---|
@@ -195,7 +254,7 @@ Strict AOT 模式下应生成强类型 factory，避免运行时反射构造。
 | Activation 失败 | 回滚或释放候选分支。 |
 | Deactivation 失败 | 聚合诊断，继续释放。 |
 
-## 13. 测试要求
+### 13. 测试要求
 
 测试必须覆盖：
 

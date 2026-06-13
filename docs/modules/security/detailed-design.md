@@ -1,10 +1,66 @@
-# AtomUI.City.Security Detailed Design
+# AtomUI.City.Security Detailed Design 合同
 
-版本：v0.1
-状态：正式初版
+## 适用范围
+
+本专题属于 `AtomUI.City.Security` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `Detailed Design` 相关实现决策，不重新定义模块边界。
+
+## 设计决策
+
+- 授权失败返回明确 result，不能直接操作 UI。
+- 权限声明必须来自 registry 或 plugin capability。
+- 认证状态变更必须通知 command、route 和 data 集成点。
+
+## Public Contract
+
+- 只允许通过 `AtomUI.City.Security` 的 public API、attribute、options、manifest、generated output 或 DI extension 暴露本专题能力。
+- 新增 contract 必须进入 [api-contracts.md](api-contracts.md)。
+- 新增功能必须分配 Feature ID，并进入 [features.md](features.md)。
+- 修改失败行为、默认值、诊断码或生命周期状态必须进入 [compatibility.md](compatibility.md)。
+
+## 运行时边界
+
+- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
+- Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
+- 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
+
+## 失败行为
+
+- 输入无效：使用标准参数异常或模块 Result。
+- 生命周期状态非法：返回失败 Result、模块异常或稳定诊断。
+- 依赖缺失：阻止当前功能启用，不影响无关功能。
+- 插件卸载中：拒绝创建新贡献，并撤销已有贡献。
+- 释放失败：记录诊断并继续释放其他资源。
+
+## 测试要求
+
+| Feature ID | 相关能力 | 测试文件 |
+| --- | --- | --- |
+| AUC-SECURITY-001 | Authentication State | AuthenticationStateTests |
+| AUC-SECURITY-002 | Permission Registry | PermissionRegistryTests |
+| AUC-SECURITY-003 | Permission Checker | PermissionCheckerTests |
+| AUC-SECURITY-004 | Authorization Policy | AuthorizationPolicyTests; AuthorizationEvaluatorTests |
+| AUC-SECURITY-005 | Route Guard | RouteAuthorizationGuardTests |
+| AUC-SECURITY-006 | Command Authorization | CommandAuthorizationSourceTests |
+
+本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
+
+## 完成标准
+
+- 设计决策能回答对象由谁创建、谁持有、谁释放。
+- API contract、失败行为、诊断和测试矩阵一致。
+- 不出现业务领域假设。
+- 不引入 `AtomUI.City.Presentation` 等禁止依赖。
+
+## 既有细化设计内容
+
+以下内容保留上一轮设计中的专题细节。后续修改必须与本页上方合同、Feature ID、API 行为、诊断和测试矩阵保持一致。
+
+## AtomUI.City.Security Detailed Design
+
 适用范围：认证状态、当前主体、权限声明、授权策略、Route Guard、Command 权限联动、Data 认证集成、Plugin capability、AOT/source generator 和测试策略。
 
-## 1. 定位
+### 1. 定位
 
 `AtomUI.City.Security` 是框架级认证状态与授权决策模块。
 
@@ -29,7 +85,7 @@ Authentication state
 - PluginSystem 负责插件发现、加载和卸载，通过 Security 约束插件权限和 capability。
 - Presentation 负责登录、拒绝访问、命令禁用和权限提示等 UI 表达，不做授权决策。
 
-## 2. 设计原则
+### 2. 设计原则
 
 - .NET-first：优先使用 `ClaimsPrincipal`、`Claim`、Options、DI、Hosted service、CancellationToken。
 - Security makes decisions：认证和授权判断只能由 Security 统一执行。
@@ -40,7 +96,7 @@ Authentication state
 - Desktop-aware：支持本地会话、Token 缓存引用、离线状态、锁定/解锁、用户切换和应用恢复。
 - Diagnostics-first：授权失败必须能解释是未登录、权限不足、Policy 异常、插件撤销还是认证过期。
 
-## 3. 非目标
+### 3. 非目标
 
 Security 不负责：
 
@@ -56,7 +112,7 @@ Security 不负责：
 
 这些由应用、Data、PluginSystem、Presentation 或平台层实现。
 
-## 4. 核心抽象
+### 4. 核心抽象
 
 | 类型 | 职责 |
 |---|---|
@@ -73,7 +129,7 @@ Security 不负责：
 
 命名不加 `City` 前缀。
 
-## 5. 认证状态
+### 5. 认证状态
 
 认证状态建议统一建模为：
 
@@ -102,7 +158,7 @@ Security 是认证状态源。State 模块可以同步认证状态，用于 View
 
 详细规则见：[authentication.md](authentication.md)。
 
-## 6. 权限、Policy 和 Capability
+### 6. 权限、Policy 和 Capability
 
 第一版区分三层：
 
@@ -120,7 +176,7 @@ Permission 是可声明、可本地化、可诊断的稳定标识。Policy 是�
 - [authorization.md](authorization.md)
 - [plugin-integration.md](plugin-integration.md)
 
-## 7. Routing 集成
+### 7. Routing 集成
 
 Routing 不解释权限，只执行 Security 提供或 Security 驱动的 Guard。
 
@@ -144,7 +200,7 @@ Route matched
 
 详细规则见：[route-integration.md](route-integration.md)。
 
-## 8. Command 集成
+### 8. Command 集成
 
 Command 的 `CanExecute` 可以接入 Security，但 Mvvm 不实现权限逻辑。
 
@@ -159,7 +215,7 @@ Command auth metadata
 
 详细规则见：[command-integration.md](command-integration.md)。
 
-## 9. Data 集成
+### 9. Data 集成
 
 Data 管线通过 Security 获取认证信息：
 
@@ -176,7 +232,7 @@ Data request
 
 详细规则见：[data-integration.md](data-integration.md)。
 
-## 10. PluginSystem 集成
+### 10. PluginSystem 集成
 
 插件可以贡献：
 
@@ -198,7 +254,7 @@ Data request
 
 详细规则见：[plugin-integration.md](plugin-integration.md)。
 
-## 11. Presentation 集成
+### 11. Presentation 集成
 
 Presentation 只消费 Security 结果：
 
@@ -211,7 +267,7 @@ Presentation 只消费 Security 结果：
 
 Presentation 不直接读取权限存储，不解释 Policy。
 
-## 12. AOT 和 Source Generator
+### 12. AOT 和 Source Generator
 
 Security generator 负责生成：
 
@@ -226,7 +282,7 @@ Security generator 负责生成：
 
 运行时默认不扫描程序集找权限声明。
 
-## 13. 错误策略
+### 13. 错误策略
 
 | 场景 | 默认处理 |
 |---|---|
@@ -240,7 +296,7 @@ Security generator 负责生成：
 
 Security 错误不能静默吞掉，必须进入授权结果或诊断。
 
-## 14. 测试策略
+### 14. 测试策略
 
 Testing 包应提供：
 

@@ -1,10 +1,65 @@
-# AtomUI.City.Templates 详细设计
+# AtomUI.City.Templates Detailed Design 合同
 
-版本：v0.1
-状态：正式初版
+## 适用范围
+
+本专题属于 `AtomUI.City.Templates` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `Detailed Design` 相关实现决策，不重新定义模块边界。
+
+## 设计决策
+
+- 本专题必须绑定 Feature ID。
+- 必须说明 public contract、失败行为和测试。
+- 不得只描述概念。
+
+## Public Contract
+
+- 只允许通过 `AtomUI.City.Templates` 的 public API、attribute、options、manifest、generated output 或 DI extension 暴露本专题能力。
+- 新增 contract 必须进入 [api-contracts.md](api-contracts.md)。
+- 新增功能必须分配 Feature ID，并进入 [features.md](features.md)。
+- 修改失败行为、默认值、诊断码或生命周期状态必须进入 [compatibility.md](compatibility.md)。
+
+## 运行时边界
+
+- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
+- Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
+- 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
+
+## 失败行为
+
+- 输入无效：使用标准参数异常或模块 Result。
+- 生命周期状态非法：返回失败 Result、模块异常或稳定诊断。
+- 依赖缺失：阻止当前功能启用，不影响无关功能。
+- 插件卸载中：拒绝创建新贡献，并撤销已有贡献。
+- 释放失败：记录诊断并继续释放其他资源。
+
+## 测试要求
+
+| Feature ID | 相关能力 | 测试文件 |
+| --- | --- | --- |
+| AUC-TEMPLATES-001 | Application Template | ApplicationTemplateBuildSmokeTests |
+| AUC-TEMPLATES-002 | Package Layout | TemplatePackageLayoutTests |
+| AUC-TEMPLATES-003 | Template Variables | ApplicationTemplateBuildSmokeTests |
+| AUC-TEMPLATES-004 | Plugin Template | TemplatePackageLayoutTests |
+| AUC-TEMPLATES-005 | Test Template | ApplicationTemplateBuildSmokeTests |
+
+本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
+
+## 完成标准
+
+- 设计决策能回答对象由谁创建、谁持有、谁释放。
+- API contract、失败行为、诊断和测试矩阵一致。
+- 不出现业务领域假设。
+- 不引入 `运行时 Host 不依赖 Templates` 等禁止依赖。
+
+## 既有细化设计内容
+
+以下内容保留上一轮设计中的专题细节。后续修改必须与本页上方合同、Feature ID、API 行为、诊断和测试矩阵保持一致。
+
+## AtomUI.City.Templates 详细设计
+
 适用范围：应用模板、模块模板、页面模板、插件模板、测试模板、本地化模板、配置模板、模板变量、生成输出和模板验证
 
-## 1. 定位
+### 1. 定位
 
 `AtomUI.City.Templates` 负责把 AtomUI.City 的默认编程范式固化成可生成的项目结构。
 
@@ -12,7 +67,7 @@ Templates 不是简单创建空项目。它生成的工程必须符合 Core、Li
 
 CLI 负责调用模板和传递参数。Build 负责构建、manifest、打包和输出目录。Templates 负责生成默认结构、默认代码形态和默认测试入口。
 
-## 2. 设计原则
+### 2. 设计原则
 
 | 原则 | 说明 |
 |---|---|
@@ -24,7 +79,7 @@ CLI 负责调用模板和传递参数。Build 负责构建、manifest、打包�
 | Plugin-ready | 应用模板具备插件系统接入点，但不默认强制启用动态插件。 |
 | Minimal but runnable | 生成的应用必须可运行，但只包含最小 App root。 |
 
-## 3. 职责
+### 3. 职责
 
 Templates 负责：
 
@@ -49,7 +104,7 @@ Templates 不负责：
 - 业务样例功能。
 - UI 自动化测试框架。
 
-## 4. 模板类型
+### 4. 模板类型
 
 | 模板 | 用途 |
 |---|---|
@@ -61,7 +116,7 @@ Templates 不负责：
 | Localization template | 创建语言资源和懒加载语言包结构。 |
 | Configuration template | 创建 Options、配置 section、验证和测试结构。 |
 
-## 5. 生成结果边界
+### 5. 生成结果边界
 
 生成的用户项目命名空间使用用户自己的 `RootNamespace`。
 
@@ -74,7 +129,7 @@ Templates 不负责：
 - 模板生成的测试项目必须引用 `AtomUI.City.Testing`。
 - 默认不生成业务页面和业务服务。
 
-## 6. 应用结构
+### 6. 应用结构
 
 应用模板默认结构：
 
@@ -96,7 +151,7 @@ tests/<AppName>.Tests/
 
 详细规则见：[应用模板设计](application-template.md)。
 
-## 7. 页面链路
+### 7. 页面链路
 
 页面模板必须体现：
 
@@ -118,7 +173,7 @@ Route
 
 详细规则见：[页面模板设计](page-template.md)。
 
-## 8. 插件结构
+### 8. 插件结构
 
 插件模板默认结构：
 
@@ -145,7 +200,7 @@ tests/<PluginName>.Tests/
 
 详细规则见：[插件模板设计](plugin-template.md)。
 
-## 9. 测试门禁
+### 9. 测试门禁
 
 Templates 必须落实全局测试门禁：
 
@@ -158,7 +213,7 @@ Templates 必须落实全局测试门禁：
 
 详细规则见：[测试模板设计](test-template.md)。
 
-## 10. 模板变量
+### 10. 模板变量
 
 模板变量包括：
 
@@ -177,7 +232,7 @@ Templates 必须落实全局测试门禁：
 
 详细规则见：[模板变量设计](template-variables.md)。
 
-## 11. 测试矩阵
+### 11. 测试矩阵
 
 | 功能点 | 测试类型 | 测试工具 | 必测场景 |
 |---|---|---|---|
@@ -191,7 +246,7 @@ Templates 必须落实全局测试门禁：
 
 完整测试规则见：[诊断和测试设计](diagnostics-and-testing.md)。
 
-## 12. 完成标准
+### 12. 完成标准
 
 Templates 任一功能点完成必须满足：
 

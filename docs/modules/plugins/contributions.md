@@ -1,10 +1,66 @@
-# PluginSystem 贡献模型设计
+# AtomUI.City.PluginSystem Contributions 合同
 
-版本：v0.1
-状态：正式初版
+## 适用范围
+
+本专题属于 `AtomUI.City.PluginSystem` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `Contributions` 相关实现决策，不重新定义模块边界。
+
+## 设计决策
+
+- 插件来源对象必须绑定 plugin owner。
+- 卸载必须撤销 contribution、subscription、view lease、state 和 connection。
+- 跨插件 contract 必须位于 Host 共享程序集。
+
+## Public Contract
+
+- 只允许通过 `AtomUI.City.PluginSystem` 的 public API、attribute、options、manifest、generated output 或 DI extension 暴露本专题能力。
+- 新增 contract 必须进入 [api-contracts.md](api-contracts.md)。
+- 新增功能必须分配 Feature ID，并进入 [features.md](features.md)。
+- 修改失败行为、默认值、诊断码或生命周期状态必须进入 [compatibility.md](compatibility.md)。
+
+## 运行时边界
+
+- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
+- Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
+- 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
+
+## 失败行为
+
+- 输入无效：使用标准参数异常或模块 Result。
+- 生命周期状态非法：返回失败 Result、模块异常或稳定诊断。
+- 依赖缺失：阻止当前功能启用，不影响无关功能。
+- 插件卸载中：拒绝创建新贡献，并撤销已有贡献。
+- 释放失败：记录诊断并继续释放其他资源。
+
+## 测试要求
+
+| Feature ID | 相关能力 | 测试文件 |
+| --- | --- | --- |
+| AUC-PLUGIN-001 | Plugin Metadata | PluginDeclarationAttributeTests; PluginManifestTests |
+| AUC-PLUGIN-002 | Dependency Validation | PluginDependencyTests |
+| AUC-PLUGIN-003 | Package Installation | PluginPackageTests |
+| AUC-PLUGIN-004 | Discovery | PluginLoadingTests |
+| AUC-PLUGIN-005 | Loading | PluginLoadingTests |
+| AUC-PLUGIN-006 | MSBuild Contract | PluginMsBuildContractTests |
+
+本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
+
+## 完成标准
+
+- 设计决策能回答对象由谁创建、谁持有、谁释放。
+- API contract、失败行为、诊断和测试矩阵一致。
+- 不出现业务领域假设。
+- 不引入 `AtomUI.City.Presentation` 等禁止依赖。
+
+## 既有细化设计内容
+
+以下内容保留上一轮设计中的专题细节。后续修改必须与本页上方合同、Feature ID、API 行为、诊断和测试矩阵保持一致。
+
+## PluginSystem 贡献模型设计
+
 适用范围：插件可贡献能力、贡献申请、Contribution Lease、撤销规则和推荐规范
 
-## 1. 目标
+### 1. 目标
 
 插件贡献模型决定插件能给应用增加什么能力，以及这些能力如何被安全撤销。
 
@@ -19,7 +75,7 @@
 
 架构级范围见：[插件系统架构规范](../../architecture/plugin-system.md)。
 
-## 2. 可贡献能力
+### 2. 可贡献能力
 
 第一版推荐允许插件贡献：
 
@@ -51,7 +107,7 @@
 | 绕过 Data 管线的数据访问 | 不推荐 | 会绕过认证、错误处理、resilience 和诊断。 |
 | 进程内不可信代码沙箱 | 禁止承诺 | 加载上下文不是安全边界。 |
 
-## 3. Contribution Request
+### 3. Contribution Request
 
 插件不直接写 registry，而是提交 Contribution Request。
 
@@ -79,7 +135,7 @@ Contribution Request 应包含：
 
 Host 可以拒绝 request，例如能力被禁用、权限不足、版本不兼容、目标 registry 不支持动态注册或贡献标识冲突。
 
-## 4. Contribution Lease
+### 4. Contribution Lease
 
 Contribution Lease 是插件贡献进入 Host 后的可撤销句柄。
 
@@ -114,7 +170,7 @@ RevokeFailed
 
 Lease 撤销必须幂等。重复撤销不能导致二次释放异常。
 
-## 5. Registry 要求
+### 5. Registry 要求
 
 任何接收插件贡献的 registry 都必须支持：
 
@@ -128,7 +184,7 @@ Lease 撤销必须幂等。重复撤销不能导致二次释放异常。
 
 如果某个 registry 无法撤销，它只能接收启动期静态模块贡献，不能接收运行时插件贡献。
 
-## 6. 撤销顺序
+### 6. 撤销顺序
 
 插件停用或卸载时，贡献撤销必须在停止新入口和取消操作之后执行。
 
@@ -145,7 +201,7 @@ Stop accepting new plugin entry
 
 按反向顺序撤销可以降低依赖倒挂风险。例如菜单入口依赖命令，命令依赖服务，服务依赖插件 ServiceScope；撤销时应先撤销菜单入口，再撤销命令，再释放服务。
 
-## 7. 贡献冲突
+### 7. 贡献冲突
 
 Host 必须处理插件贡献冲突。
 
@@ -165,7 +221,7 @@ Host 必须处理插件贡献冲突。
 - Host 可以提供显式 override 策略，但必须记录诊断。
 - 冲突不能通过注册顺序静默覆盖。
 
-## 8. 能力声明
+### 8. 能力声明
 
 插件应在元数据中声明需要的能力。
 
@@ -183,7 +239,7 @@ Host 必须处理插件贡献冲突。
 
 Host 在加载前可以根据能力声明决定是否允许插件加载。能力声明不等同于安全沙箱，但可以作为兼容性、策略和诊断依据。
 
-## 9. 推荐规范
+### 9. 推荐规范
 
 插件开发推荐：
 
@@ -195,7 +251,7 @@ Host 在加载前可以根据能力声明决定是否允许插件加载。能力
 - 不保存 Host、Scope、ServiceProvider、ViewModel 或插件类型实例到静态字段。
 - 不把插件内部类型泄漏为 Host 长期持有的对象。
 
-## 10. 测试要求
+### 10. 测试要求
 
 Testing 包后续应支持：
 

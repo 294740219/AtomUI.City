@@ -1,10 +1,66 @@
-# AtomUI.City.Core Modularity 设计
+# AtomUI.City.Core Modularity 合同
 
-版本：v0.1
-状态：正式初版
+## 适用范围
+
+本专题属于 `AtomUI.City.Core` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `Modularity` 相关实现决策，不重新定义模块边界。
+
+## 设计决策
+
+- 本专题必须绑定 Feature ID。
+- 必须说明 public contract、失败行为和测试。
+- 不得只描述概念。
+
+## Public Contract
+
+- 只允许通过 `AtomUI.City.Core` 的 public API、attribute、options、manifest、generated output 或 DI extension 暴露本专题能力。
+- 新增 contract 必须进入 [api-contracts.md](api-contracts.md)。
+- 新增功能必须分配 Feature ID，并进入 [features.md](features.md)。
+- 修改失败行为、默认值、诊断码或生命周期状态必须进入 [compatibility.md](compatibility.md)。
+
+## 运行时边界
+
+- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
+- Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
+- 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
+
+## 失败行为
+
+- 输入无效：使用标准参数异常或模块 Result。
+- 生命周期状态非法：返回失败 Result、模块异常或稳定诊断。
+- 依赖缺失：阻止当前功能启用，不影响无关功能。
+- 插件卸载中：拒绝创建新贡献，并撤销已有贡献。
+- 释放失败：记录诊断并继续释放其他资源。
+
+## 测试要求
+
+| Feature ID | 相关能力 | 测试文件 |
+| --- | --- | --- |
+| AUC-CORE-001 | Application Host Builder | ApplicationHostBuilderTests; ApplicationHostRuntimeTests |
+| AUC-CORE-002 | Lifecycle Pipeline | LifecycleMiddlewarePipelineTests; ApplicationHostLifecycleIntegrationTests |
+| AUC-CORE-003 | Lifecycle Scope Tree | LifecycleScopeTreeTests |
+| AUC-CORE-004 | Module Contract | ModuleAttributeTests; ModuleBaseTests; ModuleDescriptorTests |
+| AUC-CORE-005 | DI Registration Markers | ServiceRegistrationAttributeTests |
+| AUC-CORE-006 | Host Diagnostics | HostDiagnosticsTests |
+
+本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
+
+## 完成标准
+
+- 设计决策能回答对象由谁创建、谁持有、谁释放。
+- API contract、失败行为、诊断和测试矩阵一致。
+- 不出现业务领域假设。
+- 不引入 `AtomUI.City.Presentation` 等禁止依赖。
+
+## 既有细化设计内容
+
+以下内容保留上一轮设计中的专题细节。后续修改必须与本页上方合同、Feature ID、API 行为、诊断和测试矩阵保持一致。
+
+## AtomUI.City.Core Modularity 设计
+
 适用范围：`AtomUI.City.Core` 中模块定义、依赖声明、模块图、模块生命周期、模块贡献、插件模块接入、AOT/source generator 约束。
 
-## 1. 定位
+### 1. 定位
 
 Module 是 AtomUI.City 应用能力组织的基本单位。
 
@@ -20,7 +76,7 @@ Application
       Modules
 ```
 
-## 2. 设计目标
+### 2. 设计目标
 
 - 提供统一模块编程模型。
 - 支持模块依赖声明和确定性启动顺序。
@@ -31,7 +87,7 @@ Application
 - 保持 AOT/trimming/source generator 友好。
 - 保持 Core 不依赖 UI、MVVM、Routing、PluginSystem 的具体实现。
 
-## 3. 非目标
+### 3. 非目标
 
 Modularity 不负责：
 
@@ -46,7 +102,7 @@ Modularity 不负责：
 
 这些由对应模块实现。Modularity 只提供模块契约、模块图和生命周期调度。
 
-## 4. 核心概念
+### 4. 核心概念
 
 | 概念 | 职责 |
 |---|---|
@@ -60,7 +116,7 @@ Modularity 不负责：
 | `ModuleRegistry` | 当前 Host 已加载模块状态和诊断信息。 |
 | `ModuleLifecycleContext` | 模块生命周期执行上下文。 |
 
-## 5. Module 基类
+### 5. Module 基类
 
 模块统一继承 `Module`。插件模块也继承同一个 `Module`，不设计单独的 `PluginModule` 公共基类。
 
@@ -151,7 +207,7 @@ public abstract class Module
 
 运行时只调用 async 方法。同步方法只是开发便利入口。
 
-## 6. 模块标识
+### 6. 模块标识
 
 模块 id 默认使用模块类型全名。
 
@@ -180,7 +236,7 @@ public sealed partial class RoutingModule : Module
 
 显式 id 只在需要稳定公开 id、跨版本兼容、插件发布或清单对外暴露时使用。
 
-## 7. 模块依赖
+### 7. 模块依赖
 
 模块依赖通过 Attribute 声明。
 
@@ -203,7 +259,7 @@ public sealed partial class PresentationModule : Module
 
 依赖声明使用 `typeof(TModule)`，不使用字符串。字符串 id 只用于模块标识，不作为依赖引用的主路径。
 
-## 8. Source Generator 模块图
+### 8. Source Generator 模块图
 
 模块依赖图由 source generator 在编译期建立输入。
 
@@ -232,7 +288,7 @@ ApplicationHost
 
 默认不允许运行时扫描程序集寻找模块。动态发现只能作为 opt-in fallback，并必须输出 AOT/trimming 诊断。
 
-## 9. 模块类型
+### 9. 模块类型
 
 第一版区分两种来源：
 
@@ -250,7 +306,7 @@ ModuleDescriptor.Plugin = PluginDescriptor
 
 插件模块的生命周期、依赖、贡献方式与普通模块一致，但 Host 会套用插件隔离、ContributionLease 和卸载规则。
 
-## 10. 生命周期阶段
+### 10. 生命周期阶段
 
 模块启动阶段：
 
@@ -278,7 +334,7 @@ OnApplicationShutdown
 
 启动顺序按拓扑排序执行：依赖先启动，被依赖方后启动。关闭顺序反向执行。
 
-## 11. 阶段语义
+### 11. 阶段语义
 
 | 阶段 | 职责 |
 |---|---|
@@ -294,7 +350,7 @@ OnApplicationShutdown
 `PreConfigureServices`、`ConfigureServices`、`PostConfigureServices` 发生在 ServiceProvider 构建前。
 `ConfigureContributions` 发生在 ServiceProvider 可用后，由 Host 统一校验并返回 ContributionLease。
 
-## 12. DI 规则
+### 12. DI 规则
 
 启动期模块可以注册 Root `IServiceCollection`，但只能发生在 ServiceProvider 构建前。
 
@@ -308,7 +364,7 @@ OnApplicationShutdown
 - 服务覆盖必须可诊断。
 - 插件服务不能泄漏为 Host 长期持有实例。
 
-## 13. Contribution 规则
+### 13. Contribution 规则
 
 Module 不直接修改全局 registry。Module 通过 Contribution Request 声明能力，由 Host 校验后进入目标 registry，并返回 ContributionLease。
 
@@ -334,7 +390,7 @@ Module
 
 插件模块的所有运行时贡献必须可撤销。插件停用时 Host 按反向顺序撤销 ContributionLease。
 
-## 14. 错误策略
+### 14. 错误策略
 
 启动期 required 模块失败：Host 启动失败，并输出模块 id、类型、阶段、依赖图和诊断上下文。
 
@@ -344,7 +400,7 @@ optional 模块失败：默认禁用该模块并记录 warning，是否继续由
 
 关闭失败：进入错误处理管线，继续尝试关闭后续模块并聚合诊断。
 
-## 15. AOT 约束
+### 15. AOT 约束
 
 Modularity 默认 AOT-first。
 
@@ -363,7 +419,7 @@ Modularity 默认 AOT-first。
 - 动态代理生成模块实例。
 - Generator 执行用户代码。
 
-## 16. 测试策略
+### 16. 测试策略
 
 Testing 包应支持：
 

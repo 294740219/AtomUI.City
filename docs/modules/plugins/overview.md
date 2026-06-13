@@ -1,76 +1,76 @@
 # AtomUI.City.PluginSystem
 
-版本：v0.1
-状态：正式初版
+文档等级：Level 3
+成熟度：Partially Implemented
+执行边界：Host runtime plugin boundary
+程序集：`AtomUI.City.PluginSystem`
+源码：`src/AtomUI.City.PluginSystem`
+测试：`tests/AtomUI.City.PluginSystem.Tests`
 
-## 职责
+## 模块定位
 
-`AtomUI.City.PluginSystem` 负责插件发现、插件元数据、插件加载、插件模块注册和插件生命周期。
+运行时插件发现、安装记录、manifest、依赖校验、加载、启停和可卸载贡献管理。
 
-PluginSystem 的目标是让应用在可控边界内扩展模块、路由、资源、服务和 UI 集成。
+## 产品级硬性约束
 
-架构级规范见：[插件系统架构规范](../../architecture/plugin-system.md)。
+以下约束是本模块实现和 review 的硬门禁，违反任一条都不能标记 Feature 完成。
 
-## 边界
+- 插件包安装必须先进入 staging，校验成功后原子切换到 installed。
+- 插件运行时入口默认一个主 assembly。
+- 插件贡献必须有 lease，卸载先 revoke contribution 再释放插件对象。
+- 跨插件边界类型必须位于 Host 共享 contract 程序集。
+- 插件卸载失败不能破坏 Host，必须进入 UnloadPending 或失败结果。
+- 安装路径必须防止路径穿越。
 
-PluginSystem 负责：
+## 模块目标
 
-- 插件元数据。
-- 插件发现。
-- 插件加载。
-- 插件模块注册。
-- 插件生命周期。
-- 插件版本约束。
-- 插件安全边界。
-- 插件贡献申请。
-- 插件 Contribution Lease。
-- 插件停用和卸载诊断。
+- 让插件以独立 NuGet 包发布，默认一个主 assembly。
+- 让 Host 可以在运行时发现、安装、加载、启用、停用和卸载插件。
+- 让插件贡献可索引、可撤销、可诊断、可兼容性检查。
+- 用 MSBuild 属性和 manifest 生成简化插件开发和打包。
 
-PluginSystem 支持插件贡献：
+## 明确非目标
 
-- 模块。
-- 服务。
-- 路由。
-- View 和 ViewModel。
-- Presentation 资源。
-- 命令或动作。
-- 权限。
-- 本地化资源。
-- EventBus handler。
-- Data client。
-- 设置页面。
-- 诊断 provider。
+- 不让插件修改 Host root provider 的不可撤销单例。
+- 不在插件系统内实现路由、视图、状态、权限等具体业务能力。
+- 不绕过 Host 生命周期执行插件代码。
 
-PluginSystem 不负责：
+## 使用者画像
 
-- 业务插件内容。
-- 插件市场服务端。
-- 任意不受控代码执行策略。
-- Host Root ServiceProvider 直接修改。
-- 不可信插件的进程内安全沙箱。
+- 框架开发者：根据模块合同实现 public API、状态机、失败路径、诊断和测试。
+- 应用开发者：通过 DI、扩展方法、attribute、manifest、CLI 或模板使用模块能力。
+- 插件开发者：通过 Host 共享 contract、manifest 和可撤销贡献接入模块。
+- 测试开发者：根据测试矩阵验证成功路径、失败路径、线程、释放和兼容性。
 
-## 详细设计
+## 与 Host 的关系
 
-| 文档 | 内容 |
-|---|---|
-| [host-integration.md](host-integration.md) | PluginSystem 与 Host、ModuleSystem、Lifecycle、DI 和 Registry 的交互方式。 |
-| [contributions.md](contributions.md) | 插件可以贡献的能力、贡献申请、Contribution Lease 和撤销规则。 |
-| [lifecycle.md](lifecycle.md) | 插件发现、加载、启用、停用、卸载和 UnloadPending 状态设计。 |
-| [metadata.md](metadata.md) | 插件身份、清单、版本、兼容性、能力声明、安装记录和锁定信息。 |
-| [manifest-schema.md](manifest-schema.md) | `atomui-city/plugin.json` 的字段、版本、校验规则和生成规则。 |
-| [package-layout.md](package-layout.md) | 插件 NuGet 包内容、安装后目录、主程序集约束和资源布局。 |
-| [msbuild-integration.md](msbuild-integration.md) | 插件项目属性、Item、Target、清单生成、包验证和本地开发安装。 |
-| [discovery.md](discovery.md) | 插件目录、插件包扫描、来源优先级、禁用策略和发现诊断。 |
-| [compatibility.md](compatibility.md) | Host 版本、插件 API 版本、contract 版本、目标框架、RID、AOT 和功能兼容。 |
-| [capabilities.md](capabilities.md) | 插件能力声明、授权、能力范围、Contribution 校验和诊断。 |
-| [contribution-index.md](contribution-index.md) | 插件贡献清单索引、贡献清单文件、必填策略和构建期生成。 |
-| [dependency-resolution.md](dependency-resolution.md) | 插件依赖、程序集依赖、共享 contract、私有依赖、native/RID 资产和加载上下文解析。 |
-| [loading.md](loading.md) | 插件验证后加载、加载上下文创建、模块图、服务 Scope 和启用前准备。 |
-| [unloading.md](unloading.md) | 插件停用后卸载、引用释放、卸载重试、UnloadPending 和文件删除约束。 |
-| [package-installation.md](package-installation.md) | 插件包下载、缓存、校验、staging、安装目录布局和安装失败恢复。 |
-| [update-and-rollback.md](update-and-rollback.md) | 插件版本切换、运行时更新、Pending 操作、回滚和文件更新约束。 |
-| [settings-and-state-migration.md](settings-and-state-migration.md) | 插件配置、用户状态、版本升级、回滚、迁移声明和降级策略。 |
-| [aot-and-static-plugins.md](aot-and-static-plugins.md) | Native AOT、trimming、source generator、静态插件、资源包和运行时动态插件限制。 |
-| [security.md](security.md) | 插件来源、签名、hash、能力授权、加载边界和不可信代码约束。 |
-| [signing-and-trust.md](signing-and-trust.md) | 插件包来源、签名、hash、发布者、信任策略和审计记录。 |
-| [diagnostics-and-testing.md](diagnostics-and-testing.md) | 插件诊断事件、错误码、测试工具、状态机测试和卸载验证。 |
+AtomUI.City.PluginSystem 作为 Host 服务或模块贡献接入 Core 生命周期，必须在 Host start/stop/dispose 中遵守本模块状态机。
+
+## 与 PluginSystem 的关系
+
+PluginSystem 是插件边界所有者，插件通过 manifest、Module 和 Contribution 暴露能力。
+
+## 与 Testing 的关系
+
+`tests/AtomUI.City.PluginSystem.Tests` 必须覆盖 [features.md](features.md) 中每个 Feature ID。产品级完成不能只看现有测试文件存在，必须补齐 [testing.md](testing.md) 中列出的必断言行为。
+
+## 文档索引
+
+| 文档 | 用途 |
+| --- | --- |
+| [architecture.md](architecture.md) | 核心不变量、对象模型、状态机、流程、失败矩阵、性能边界。 |
+| [features.md](features.md) | Feature ID、实现合同、public contract、失败行为和验收标准。 |
+| [api-contracts.md](api-contracts.md) | API family、关键方法、参数/返回/异常/取消/并发/Dispose 后行为。 |
+| [lifecycle.md](lifecycle.md) | 模块特有生命周期、Host shutdown、插件动态变更和失败处理。 |
+| [threading.md](threading.md) | 线程边界、UI dispatcher、后台任务、并发冲突和死锁规避。 |
+| [diagnostics.md](diagnostics.md) | 现有诊断码、产品级目标诊断、上下文字段和测试断言。 |
+| [testing.md](testing.md) | 具体测试矩阵、必须断言的行为、测试类型和缺口处理。 |
+| [compatibility.md](compatibility.md) | public API、配置、manifest、snapshot、generated output、CLI envelope 和包布局兼容。 |
+| [integration.md](integration.md) | 跨模块依赖方向、生命周期、线程和失败行为。 |
+| [implementation-plan.md](implementation-plan.md) | Feature 到现有基线、缺口、必补测试和实现工作的追踪。 |
+
+## 当前成熟度状态
+
+Partially Implemented
+
+该状态表示模块已有实现基线，但还需要按产品级合同补齐实现和测试。单个功能点状态以 [implementation-plan.md](implementation-plan.md) 为准。

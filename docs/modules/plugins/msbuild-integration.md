@@ -1,10 +1,66 @@
-# PluginSystem MSBuild 集成设计
+# AtomUI.City.PluginSystem MSBuild Integration 合同
 
-版本：v0.1
-状态：正式初版
+## 适用范围
+
+本专题属于 `AtomUI.City.PluginSystem` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `MSBuild Integration` 相关实现决策，不重新定义模块边界。
+
+## 设计决策
+
+- 插件来源对象必须绑定 plugin owner。
+- 卸载必须撤销 contribution、subscription、view lease、state 和 connection。
+- 跨插件 contract 必须位于 Host 共享程序集。
+
+## Public Contract
+
+- 只允许通过 `AtomUI.City.PluginSystem` 的 public API、attribute、options、manifest、generated output 或 DI extension 暴露本专题能力。
+- 新增 contract 必须进入 [api-contracts.md](api-contracts.md)。
+- 新增功能必须分配 Feature ID，并进入 [features.md](features.md)。
+- 修改失败行为、默认值、诊断码或生命周期状态必须进入 [compatibility.md](compatibility.md)。
+
+## 运行时边界
+
+- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
+- Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
+- 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
+
+## 失败行为
+
+- 输入无效：使用标准参数异常或模块 Result。
+- 生命周期状态非法：返回失败 Result、模块异常或稳定诊断。
+- 依赖缺失：阻止当前功能启用，不影响无关功能。
+- 插件卸载中：拒绝创建新贡献，并撤销已有贡献。
+- 释放失败：记录诊断并继续释放其他资源。
+
+## 测试要求
+
+| Feature ID | 相关能力 | 测试文件 |
+| --- | --- | --- |
+| AUC-PLUGIN-001 | Plugin Metadata | PluginDeclarationAttributeTests; PluginManifestTests |
+| AUC-PLUGIN-002 | Dependency Validation | PluginDependencyTests |
+| AUC-PLUGIN-003 | Package Installation | PluginPackageTests |
+| AUC-PLUGIN-004 | Discovery | PluginLoadingTests |
+| AUC-PLUGIN-005 | Loading | PluginLoadingTests |
+| AUC-PLUGIN-006 | MSBuild Contract | PluginMsBuildContractTests |
+
+本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
+
+## 完成标准
+
+- 设计决策能回答对象由谁创建、谁持有、谁释放。
+- API contract、失败行为、诊断和测试矩阵一致。
+- 不出现业务领域假设。
+- 不引入 `AtomUI.City.Presentation` 等禁止依赖。
+
+## 既有细化设计内容
+
+以下内容保留上一轮设计中的专题细节。后续修改必须与本页上方合同、Feature ID、API 行为、诊断和测试矩阵保持一致。
+
+## PluginSystem MSBuild 集成设计
+
 适用范围：插件项目属性、Item、Target、清单生成、包验证和本地开发安装
 
-## 1. 目标
+### 1. 目标
 
 插件开发不能要求开发者手写大量清单和包结构。框架应通过 MSBuild targets、tasks 和 source generator 生成稳定产物。
 
@@ -16,7 +72,7 @@
 - 打包结果与运行时安装规则一致。
 - 支持本地开发安装到插件目录。
 
-## 2. 插件项目属性
+### 2. 插件项目属性
 
 推荐插件项目：
 
@@ -37,7 +93,7 @@
 
 属性名使用 `AtomUICity` 前缀是为了避免和普通 NuGet/MSBuild 属性冲突，不代表公共 API 类型必须带 `City` 后缀或前缀。
 
-## 3. 推荐属性
+### 3. 推荐属性
 
 | 属性 | 说明 |
 |---|---|
@@ -58,7 +114,7 @@
 | `AtomUICityPackageAsPlugin` | 是否按插件包布局打包。 |
 | `AtomUICityPluginDevelopmentMode` | 是否启用开发期本地安装辅助。 |
 
-## 4. 推荐 Item
+### 4. 推荐 Item
 
 | Item | 说明 |
 |---|---|
@@ -86,7 +142,7 @@
 </ItemGroup>
 ```
 
-## 5. 推荐 Target
+### 5. 推荐 Target
 
 | Target | 说明 |
 |---|---|
@@ -100,7 +156,7 @@
 
 Target 应可被普通 `dotnet build`、`dotnet pack` 和 CI 调用。
 
-## 6. Source Generator 分工
+### 6. Source Generator 分工
 
 Source generator 负责生成编译期可知的索引：
 
@@ -121,7 +177,7 @@ Source generators
 -> atomui-city/manifests/*.json
 ```
 
-## 7. 诊断代码
+### 7. 诊断代码
 
 建议诊断：
 
@@ -135,7 +191,7 @@ Source generators
 | `AUCPLG1301` | AOT 兼容声明与使用能力冲突。 |
 | `AUCPLG1401` | required contribution manifest 未生成。 |
 
-## 8. 开发体验
+### 8. 开发体验
 
 开发期本地安装流程：
 
@@ -153,7 +209,7 @@ dotnet pack
 - 开发期插件可以来自项目输出目录，但必须显式开启。
 - 开发期路径必须进入诊断。
 
-## 9. 测试要求
+### 9. 测试要求
 
 必须覆盖：
 

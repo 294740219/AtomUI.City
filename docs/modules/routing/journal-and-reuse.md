@@ -1,16 +1,72 @@
-# AtomUI.City.Routing Journal and Reuse 设计
+# AtomUI.City.Routing Journal And Reuse 合同
 
-版本：v0.1
-状态：正式初版
+## 适用范围
+
+本专题属于 `AtomUI.City.Routing` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `Journal And Reuse` 相关实现决策，不重新定义模块边界。
+
+## 设计决策
+
+- Routing 只负责 Route -> ViewModel Target。
+- 参数绑定失败必须返回导航失败结果。
+- 插件路由撤销后 route graph 必须重新发布。
+
+## Public Contract
+
+- 只允许通过 `AtomUI.City.Routing` 的 public API、attribute、options、manifest、generated output 或 DI extension 暴露本专题能力。
+- 新增 contract 必须进入 [api-contracts.md](api-contracts.md)。
+- 新增功能必须分配 Feature ID，并进入 [features.md](features.md)。
+- 修改失败行为、默认值、诊断码或生命周期状态必须进入 [compatibility.md](compatibility.md)。
+
+## 运行时边界
+
+- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
+- Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
+- 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
+
+## 失败行为
+
+- 输入无效：使用标准参数异常或模块 Result。
+- 生命周期状态非法：返回失败 Result、模块异常或稳定诊断。
+- 依赖缺失：阻止当前功能启用，不影响无关功能。
+- 插件卸载中：拒绝创建新贡献，并撤销已有贡献。
+- 释放失败：记录诊断并继续释放其他资源。
+
+## 测试要求
+
+| Feature ID | 相关能力 | 测试文件 |
+| --- | --- | --- |
+| AUC-ROUTING-001 | Route Template Syntax | RouteTemplateTests; RoutingParameterBoundaryTests |
+| AUC-ROUTING-002 | Route Definition Attributes | RouteDefinitionAttributeTests |
+| AUC-ROUTING-003 | Route Graph | RouteGraphAndMatcherTests |
+| AUC-ROUTING-004 | Route Matcher | RouteGraphAndMatcherTests |
+| AUC-ROUTING-005 | Navigation Scope | NavigationScopeTests |
+| AUC-ROUTING-006 | Guards | RouteGuardTests |
+
+本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
+
+## 完成标准
+
+- 设计决策能回答对象由谁创建、谁持有、谁释放。
+- API contract、失败行为、诊断和测试矩阵一致。
+- 不出现业务领域假设。
+- 不引入 `AtomUI.City.Presentation` 等禁止依赖。
+
+## 既有细化设计内容
+
+以下内容保留上一轮设计中的专题细节。后续修改必须与本页上方合同、Feature ID、API 行为、诊断和测试矩阵保持一致。
+
+## AtomUI.City.Routing Journal and Reuse 设计
+
 适用范围：NavigationJournal、Back/Forward、Replace/Reset、路由状态恢复、RouteReusePolicy、KeepAlive 和插件路由清理。
 
-## 1. 定位
+### 1. 定位
 
 Journal 记录 NavigationScope 内的导航历史。Reuse 控制路由分支是否保留或缓存。
 
 两者都必须服务桌面长期运行模型，避免无边界缓存和插件卸载失败。
 
-## 2. NavigationJournal
+### 2. NavigationJournal
 
 每个 NavigationScope 拥有独立 Journal。
 
@@ -22,7 +78,7 @@ Journal 记录：
 
 不跨 NavigationScope 共享。
 
-## 3. JournalEntry
+### 3. JournalEntry
 
 JournalEntry 只保存可恢复导航状态。
 
@@ -48,7 +104,7 @@ JournalEntry 禁止保存：
 - Stream。
 - 插件私有类型实例。
 
-## 4. 导航模式
+### 4. 导航模式
 
 支持：
 
@@ -61,7 +117,7 @@ JournalEntry 禁止保存：
 
 默认普通导航使用 Push。
 
-## 5. Back / Forward
+### 5. Back / Forward
 
 Back 流程：
 
@@ -81,7 +137,7 @@ Forward 类似。
 - 记录诊断。
 - 继续寻找下一个可用 entry。
 
-## 6. 状态恢复
+### 6. 状态恢复
 
 Journal 不直接保存 ViewModel 状态。
 
@@ -93,7 +149,7 @@ Journal 不直接保存 ViewModel 状态。
 
 不可序列化状态不进入 Journal。
 
-## 7. Route Reuse
+### 7. Route Reuse
 
 复用策略分两类：
 
@@ -104,7 +160,7 @@ Journal 不直接保存 ViewModel 状态。
 
 已离开分支缓存默认关闭，必须显式启用。
 
-## 8. RouteReusePolicy
+### 8. RouteReusePolicy
 
 建议策略：
 
@@ -117,7 +173,7 @@ Journal 不直接保存 ViewModel 状态。
 
 缓存必须有容量限制和诊断。
 
-## 9. KeepAlive
+### 9. KeepAlive
 
 KeepAlive 分支必须保留：
 
@@ -136,7 +192,7 @@ KeepAlive 分支不能保留：
 
 Presentation 可以拒绝某些 View 保留，Routing 必须按结果降级为释放。
 
-## 10. 参数变化
+### 10. 参数变化
 
 同一 RouteId 参数变化时，策略决定：
 
@@ -150,7 +206,7 @@ Presentation 可以拒绝某些 View 保留，Routing 必须按结果降级为�
 - RouteId 相同但 path 参数变化：重新解析数据。
 - RouteId 不同：按路由树 diff 处理。
 
-## 11. 插件清理
+### 11. 插件清理
 
 插件停用时必须：
 
@@ -164,7 +220,7 @@ Find Journal entries by ContributionId
 
 不允许 Journal 或 Reuse cache 保留插件类型实例，否则插件 AssemblyLoadContext 无法卸载。
 
-## 12. 诊断
+### 12. 诊断
 
 必须记录：
 
@@ -176,7 +232,7 @@ Find Journal entries by ContributionId
 - KeepAlive 容量。
 - 插件 entry 清理数量。
 
-## 13. 测试要求
+### 13. 测试要求
 
 测试必须覆盖：
 

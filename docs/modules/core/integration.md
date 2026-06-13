@@ -1,0 +1,26 @@
+# AtomUI.City.Core Integration
+
+## 集成原则
+
+- 必须说明依赖方向，不能只写“集成某模块”。
+- 跨模块 contract 必须是 public API、manifest、generated output、options、diagnostics、MSBuild property、CLI envelope 或 template variable。
+- 跨插件边界 contract 必须来自 Host 共享程序集。
+- 集成失败必须有可测试的 Result、异常或诊断。
+
+## 集成点
+
+| Provider Module | Consumer Module | Contract | Direction | Lifecycle | Threading | Failure Behavior | Tests |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Core / Hosting | AtomUI.City.Core | Core 定义 Host 本体，所有运行时模块都通过 IApplicationHostBuilder、LifecyclePipeline 和 ModuleBase 接入。 | Core -> Module 或执行边界 -> Module | 见 lifecycle.md | 见 threading.md | 启动/执行失败必须有 Result、异常或诊断。 | tests/AtomUI.City.Core.Tests |
+| PluginSystem | AtomUI.City.Core | Core 不加载插件，但提供插件模块复用的 Module、Lifecycle 和 Diagnostics 基础合同。 | Plugin owner/manifest -> Module | load/enable/disable/unload 或 package/template/generator 边界 | 插件后台任务必须可取消 | 贡献撤销失败必须隔离。 | tests/AtomUI.City.Core.Tests |
+| Testing | AtomUI.City.Core | Feature ID 和产品合同测试。 | Testing -> Module | 构造 -> 执行 -> 断言 -> 释放 | fake dispatcher / deterministic scheduler / snapshot | 测试失败阻止完成状态。 | tests/AtomUI.City.Core.Tests |
+
+## 集成硬约束
+
+- Core 不允许引用 Avalonia、AtomUI、Roslyn、CLI、Templates 或 Testing 生产程序集。
+- ApplicationHostBuilder Build 后必须冻结服务注册入口。
+- IUiDispatcher 只定义抽象，Core 不提交真实 UI work。
+
+## 集成变更规则
+
+新增跨模块集成时，必须同时更新 features、api-contracts、testing、compatibility 和 implementation-plan。

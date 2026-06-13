@@ -1,0 +1,93 @@
+# AtomUI.City.Routing API Contracts
+
+本文件是实现 public API 的行为合同。它不是源码目录索引；每个关键 API 必须说明用途、生命周期、失败行为、取消、并发和兼容性。
+
+## API Family 合同
+
+| API Family | 关键类型 | 职责 | 硬性行为 |
+| --- | --- | --- | --- |
+| Route Definition | RouteTemplate, RouteDefinitionAttribute, RouteMapAttribute | 声明和解析路由模板。 | 模板解析结果不可变，非法模板必须稳定失败。 |
+| Route Graph | RouteDescriptor, RouteGraphSnapshot, RouteGraphError | 合成不可变路由图。 | 发布是原子操作，失败不替换旧 graph。 |
+| Navigation | IRouter, NavigationScope, NavigationResult | 执行导航事务。 | 失败、取消或 guard 拒绝不能提交半导航。 |
+| Target Resolution | NavigationTarget, ViewModelTargetDescriptor | 输出 ViewModel target。 | 不创建 View、不操作 VisualTree。 |
+
+## 关键方法合同
+
+| Method | Purpose | Parameters | Return | Failure Behavior | Cancellation | Concurrency / Idempotency |
+| --- | --- | --- | --- | --- | --- | --- |
+| RouteTemplate.Parse | 解析 route pattern。 | pattern 不得为空；constraint 必须可识别。 | RouteTemplate 或声明异常。 | 非法 segment、重复参数名、catch-all 位置错误。 | 纯 CPU，无 token。 | 无共享状态，可并发。 |
+| RouteGraphSnapshot.Create | 从 descriptors 发布 graph。 | descriptors 稳定排序且 owner 明确。 | RouteGraphSnapshot。 | 冲突、重复 id、缺失 parent 返回 RouteGraphError。 | 批量 build 应观察 token。 | 发布后不可变；旧 snapshot 继续可读。 |
+| IRouter.NavigateAsync | 执行导航事务。 | target route、parameters、NavigationOptions。 | NavigationResult。 | match/guard/resolver/commit 任一失败都不改变 current snapshot。 | 取消后返回 Cancelled 或 OperationCanceledException，不能提交。 | 按 NavigationConcurrencyPolicy 串行、替换或拒绝。 |
+| IRouteEnterGuard.CanEnterAsync | 进入 route 前授权或重定向。 | RouteGuardContext 必须包含 route、parameters、services。 | RouteGuardResult。 | 异常映射为 navigation failed；redirect loop 必须检测。 | 必须观察 token。 | guard 实例并发策略由 DI lifetime 决定，结果无共享可变状态。 |
+| NavigationScope.DisposeAsync | 结束导航作用域并释放临时资源。 | 允许重复调用。 | ValueTask。 | 释放失败记录诊断并继续清理。 | 不启动新 work。 | Dispose 幂等。 |
+
+## Public 类型覆盖
+
+| Type | 分类 | Review 规则 |
+| --- | --- | --- |
+| `IRouteEnterGuard` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `IRouteLeaveGuard` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `IRouteMatchPolicy` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `IRouter` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `IndexRouteAttribute` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `LayoutRouteAttribute` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `NavigationConcurrencyPolicy` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `NavigationError` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `NavigationHistoryBehavior` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `NavigationMode` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `NavigationOptions` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `NavigationResult` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `NavigationResultStatus` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `NavigationScope` | 关键 contract | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `NavigationSnapshot` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `NavigationTarget` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `NavigationTargetKind` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `RedirectRouteAttribute` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `RouteAttribute` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `RouteDefinitionAttribute` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `RouteDefinitionKind` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `RouteDescriptor` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `RouteExtensionPoint` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `RouteExtensionPointAttribute` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `RouteGraphError` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `RouteGraphException` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `RouteGraphSnapshot` | 关键 contract | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `RouteGroupAttribute` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `RouteGuardContext` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `RouteGuardResult` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `RouteGuardResultStatus` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `RouteMapAttribute` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `RouteMatch` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `RouteMatchPolicyContext` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `RouteMatchStatus` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `RouteMatcher` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `RouteMetadataDescriptor` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `RouteReference` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `RouteReference<TParameters>` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `RouteTemplate` | 关键 contract | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `RouteTemplateSegment` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `RouteTemplateSegmentKind` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `ViewModelTargetDescriptor` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+
+## Nullability 和参数规则
+
+- 参数为 `null` 且合同不接受 `null` 时，抛出 `ArgumentNullException`。
+- 字符串 id、path、key、route、permission、culture、package id 必须在边界校验空值、空白和非法字符。
+- 文件路径必须规范化并限制在声明 root 下。
+- 枚举未知值必须拒绝或映射为明确失败结果。
+
+## Cancellation 合同
+
+- 接收 `CancellationToken` 的 API 必须在 IO、子进程、网络、dispatcher work、插件代码、handler 调用前后观察取消。
+- 取消后不得提交状态、缓存、事件、UI 或 manifest 输出。
+- 取消结果必须稳定：返回 Cancelled Result 或抛 `OperationCanceledException`，不能混用成功结果。
+
+## Dispose 后行为
+
+- mutating API 在 Dispose 后必须失败。
+- 查询 immutable descriptor、manifest、snapshot、result 的 API 可以继续读取。
+- 重复 Dispose、Stop、Unload、Unsubscribe、Revoke 必须幂等。
+
+## Public API Review 门禁
+
+以下改动必须先更新文档并 review：新增 public 类型或成员；修改异常、Result status、诊断码、默认 options、manifest/schema、generated output、MSBuild property、CLI JSON envelope 或模板变量。

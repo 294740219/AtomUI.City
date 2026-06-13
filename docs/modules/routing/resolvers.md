@@ -1,10 +1,66 @@
-# AtomUI.City.Routing Resolvers 设计
+# AtomUI.City.Routing Resolvers 合同
 
-版本：v0.1
-状态：正式初版
+## 适用范围
+
+本专题属于 `AtomUI.City.Routing` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `Resolvers` 相关实现决策，不重新定义模块边界。
+
+## 设计决策
+
+- Routing 只负责 Route -> ViewModel Target。
+- 参数绑定失败必须返回导航失败结果。
+- 插件路由撤销后 route graph 必须重新发布。
+
+## Public Contract
+
+- 只允许通过 `AtomUI.City.Routing` 的 public API、attribute、options、manifest、generated output 或 DI extension 暴露本专题能力。
+- 新增 contract 必须进入 [api-contracts.md](api-contracts.md)。
+- 新增功能必须分配 Feature ID，并进入 [features.md](features.md)。
+- 修改失败行为、默认值、诊断码或生命周期状态必须进入 [compatibility.md](compatibility.md)。
+
+## 运行时边界
+
+- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
+- Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
+- 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
+
+## 失败行为
+
+- 输入无效：使用标准参数异常或模块 Result。
+- 生命周期状态非法：返回失败 Result、模块异常或稳定诊断。
+- 依赖缺失：阻止当前功能启用，不影响无关功能。
+- 插件卸载中：拒绝创建新贡献，并撤销已有贡献。
+- 释放失败：记录诊断并继续释放其他资源。
+
+## 测试要求
+
+| Feature ID | 相关能力 | 测试文件 |
+| --- | --- | --- |
+| AUC-ROUTING-001 | Route Template Syntax | RouteTemplateTests; RoutingParameterBoundaryTests |
+| AUC-ROUTING-002 | Route Definition Attributes | RouteDefinitionAttributeTests |
+| AUC-ROUTING-003 | Route Graph | RouteGraphAndMatcherTests |
+| AUC-ROUTING-004 | Route Matcher | RouteGraphAndMatcherTests |
+| AUC-ROUTING-005 | Navigation Scope | NavigationScopeTests |
+| AUC-ROUTING-006 | Guards | RouteGuardTests |
+
+本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
+
+## 完成标准
+
+- 设计决策能回答对象由谁创建、谁持有、谁释放。
+- API contract、失败行为、诊断和测试矩阵一致。
+- 不出现业务领域假设。
+- 不引入 `AtomUI.City.Presentation` 等禁止依赖。
+
+## 既有细化设计内容
+
+以下内容保留上一轮设计中的专题细节。后续修改必须与本页上方合同、Feature ID、API 行为、诊断和测试矩阵保持一致。
+
+## AtomUI.City.Routing Resolvers 设计
+
 适用范围：路由数据解析、Resolver 生命周期、取消、错误、缓存、与 Data/State/Mvvm 的集成。
 
-## 1. 定位
+### 1. 定位
 
 Resolver 在路由激活前准备页面进入所必需的数据。
 
@@ -12,7 +68,7 @@ Resolver 的目标是把页面进入前的必要数据准备放到 Routing 生�
 
 Resolver 不负责长期状态维护，不替代 Data 模块，不负责 UI loading 控件。
 
-## 2. 解析数据边界
+### 2. 解析数据边界
 
 适合 Resolver 的数据：
 
@@ -32,7 +88,7 @@ Resolver 不负责长期状态维护，不替代 Data 模块，不负责 UI load
 
 这些应进入 Data、State、ViewModel Activation 或业务服务。
 
-## 3. Resolver Contract
+### 3. Resolver Contract
 
 建议语义：
 
@@ -54,7 +110,7 @@ ResolveAsync(RouteResolveContext context, CancellationToken cancellationToken)
 
 Resolver 返回 `ResolveResult<TData>`，不返回裸数据。
 
-## 4. 结果模型
+### 4. 结果模型
 
 Resolver 结果：
 
@@ -68,7 +124,7 @@ Resolver 结果：
 
 NotFound 可以由路由错误策略转换为错误路由或导航失败。
 
-## 5. 执行顺序
+### 5. 执行顺序
 
 默认顺序：
 
@@ -86,7 +142,7 @@ Parent resolvers
 - 失败位置清楚。
 - 避免不必要的并发复杂度。
 
-## 6. 与 RouteScope
+### 6. 与 RouteScope
 
 Resolver 运行在 provisional RouteScope 内。
 
@@ -98,7 +154,7 @@ Resolver 运行在 provisional RouteScope 内。
 - Resolver 不能把插件私有对象交给 Host 长期保存。
 - Resolver 不能直接访问 View。
 
-## 7. 与 Data 集成
+### 7. 与 Data 集成
 
 Data 模块负责请求管线、认证注入、重试、缓存和错误标准化。
 
@@ -116,7 +172,7 @@ Resolver
 
 Data 请求必须接收 Resolver 的 CancellationToken。
 
-## 8. 与 State 集成
+### 8. 与 State 集成
 
 Resolver 结果可以：
 
@@ -126,7 +182,7 @@ Resolver 结果可以：
 
 Resolver 不应隐式修改全局状态。需要写全局状态时，必须通过明确服务和诊断记录。
 
-## 9. 注入到 ViewModel
+### 9. 注入到 ViewModel
 
 ViewModel Target 可以声明需要的 resolved data。
 
@@ -137,7 +193,7 @@ ViewModel Target 可以声明需要的 resolved data。
 - 缺失必需 resolved data 时导航失败。
 - 可选 resolved data 可以为 null 或默认值。
 
-## 10. Loading 状态
+### 10. Loading 状态
 
 Routing 可以暴露 `NavigationStatus` 表示正在 resolving。
 
@@ -145,7 +201,7 @@ Presentation 可据此展示导航级 loading。具体 loading UI 由 Presentati
 
 Resolver 不直接控制 UI loading。
 
-## 11. 缓存策略
+### 11. 缓存策略
 
 第一版默认不缓存 Resolver 结果。
 
@@ -157,7 +213,7 @@ Resolver 不直接控制 UI loading。
 
 Resolver 缓存必须绑定 RouteScope、NavigationScope 或 Data cache，不能使用无边界静态缓存。
 
-## 12. 插件 Resolver
+### 12. 插件 Resolver
 
 插件 Resolver 运行在插件服务上下文中。
 
@@ -170,7 +226,7 @@ Resolver 缓存必须绑定 RouteScope、NavigationScope 或 Data cache，不能
 
 Resolver 返回的数据如果跨插件边界传递，类型必须位于 Host 共享 contract 程序集。
 
-## 13. 错误策略
+### 13. 错误策略
 
 | 场景 | 默认处理 |
 |---|---|
@@ -182,7 +238,7 @@ Resolver 返回的数据如果跨插件边界传递，类型必须位于 Host �
 
 错误策略必须释放已创建的 provisional scope。
 
-## 14. 诊断
+### 14. 诊断
 
 必须记录：
 
@@ -196,7 +252,7 @@ Resolver 返回的数据如果跨插件边界传递，类型必须位于 Host �
 - 取消来源。
 - 错误信息。
 
-## 15. 测试要求
+### 15. 测试要求
 
 测试必须覆盖：
 

@@ -1,10 +1,66 @@
-# AtomUI.City.Core Configuration 设计
+# AtomUI.City.Core Configuration 合同
 
-版本：v0.1
-状态：正式初版
+## 适用范围
+
+本专题属于 `AtomUI.City.Core` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `Configuration` 相关实现决策，不重新定义模块边界。
+
+## 设计决策
+
+- 本专题必须绑定 Feature ID。
+- 必须说明 public contract、失败行为和测试。
+- 不得只描述概念。
+
+## Public Contract
+
+- 只允许通过 `AtomUI.City.Core` 的 public API、attribute、options、manifest、generated output 或 DI extension 暴露本专题能力。
+- 新增 contract 必须进入 [api-contracts.md](api-contracts.md)。
+- 新增功能必须分配 Feature ID，并进入 [features.md](features.md)。
+- 修改失败行为、默认值、诊断码或生命周期状态必须进入 [compatibility.md](compatibility.md)。
+
+## 运行时边界
+
+- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
+- Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
+- 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
+
+## 失败行为
+
+- 输入无效：使用标准参数异常或模块 Result。
+- 生命周期状态非法：返回失败 Result、模块异常或稳定诊断。
+- 依赖缺失：阻止当前功能启用，不影响无关功能。
+- 插件卸载中：拒绝创建新贡献，并撤销已有贡献。
+- 释放失败：记录诊断并继续释放其他资源。
+
+## 测试要求
+
+| Feature ID | 相关能力 | 测试文件 |
+| --- | --- | --- |
+| AUC-CORE-001 | Application Host Builder | ApplicationHostBuilderTests; ApplicationHostRuntimeTests |
+| AUC-CORE-002 | Lifecycle Pipeline | LifecycleMiddlewarePipelineTests; ApplicationHostLifecycleIntegrationTests |
+| AUC-CORE-003 | Lifecycle Scope Tree | LifecycleScopeTreeTests |
+| AUC-CORE-004 | Module Contract | ModuleAttributeTests; ModuleBaseTests; ModuleDescriptorTests |
+| AUC-CORE-005 | DI Registration Markers | ServiceRegistrationAttributeTests |
+| AUC-CORE-006 | Host Diagnostics | HostDiagnosticsTests |
+
+本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
+
+## 完成标准
+
+- 设计决策能回答对象由谁创建、谁持有、谁释放。
+- API contract、失败行为、诊断和测试矩阵一致。
+- 不出现业务领域假设。
+- 不引入 `AtomUI.City.Presentation` 等禁止依赖。
+
+## 既有细化设计内容
+
+以下内容保留上一轮设计中的专题细节。后续修改必须与本页上方合同、Feature ID、API 行为、诊断和测试矩阵保持一致。
+
+## AtomUI.City.Core Configuration 设计
+
 适用范围：`AtomUI.City.Core` 中配置源、Options、PreConfigure、配置验证、热更新、插件配置隔离、AOT/source generator 约束。
 
-## 1. 定位
+### 1. 定位
 
 Configuration 是 Host、Module、DI、PluginSystem 和运行时能力的基础输入。
 
@@ -15,7 +71,7 @@ AtomUI.City 默认复用：
 
 AtomUI.City 在其上补充桌面应用需要的配置分层、模块配置阶段、插件配置隔离、AOT 友好的 options binding 和配置诊断。
 
-## 2. 非目标
+### 2. 非目标
 
 Configuration 不负责：
 
@@ -28,7 +84,7 @@ Configuration 不负责：
 
 这些可以由上层模块扩展，但不是 Core Configuration 的第一职责。
 
-## 3. 配置来源
+### 3. 配置来源
 
 建议默认配置分层：
 
@@ -58,7 +114,7 @@ Framework defaults
 
 插件配置必须独立分区，不允许默认写入 Host 全局配置根。
 
-## 4. 模块配置阶段
+### 4. 模块配置阶段
 
 模块配置阶段分为：
 
@@ -78,7 +134,7 @@ PreConfigureServices
 - `PostConfigureServices`：做最终修正和兼容性处理。
 - `Application Initialization`：只读取最终配置，不再修改服务注册。
 
-## 5. PreConfigure Options
+### 5. PreConfigure Options
 
 AtomUI.City 需要提供 `PreConfigure<TOptions>`。
 
@@ -116,7 +172,7 @@ services.ExecutePreConfigure<RoutingOptions>();
 - 插件拥有独立 PreConfigure store。
 - 插件不能修改 Host 全局 PreConfigure store。
 
-## 6. Options 模型
+### 6. Options 模型
 
 第一版支持：
 
@@ -139,7 +195,7 @@ public sealed partial class RoutingOptions
 }
 ```
 
-## 7. 插件配置隔离
+### 7. 插件配置隔离
 
 插件配置结构建议：
 
@@ -173,7 +229,7 @@ Read plugin metadata
 - 释放插件 configuration context。
 - 不删除用户配置，除非用户明确卸载并清理。
 
-## 8. 热更新边界
+### 8. 热更新边界
 
 默认只有明确声明为 reloadable 的 options 支持热更新。
 
@@ -194,7 +250,7 @@ public sealed partial class RoutingOptions
 
 热更新不能自动重建 DI 容器，不能修改模块图，不能修改已经加载的插件服务注册。
 
-## 9. AOT / Source Generator
+### 9. AOT / Source Generator
 
 Configuration 默认 AOT-first。
 
@@ -215,7 +271,7 @@ Generator 负责：
 - 动态生成 options proxy。
 - 配置 action 中执行用户代码发现类型。
 
-## 10. 错误策略
+### 10. 错误策略
 
 启动期 required options 验证失败：Host 启动失败。
 
@@ -232,7 +288,7 @@ reloadable options 更新失败：保留上一份有效配置，记录 diagnosti
 - 配置来源。
 - 错误阶段。
 
-## 11. 公共抽象建议
+### 11. 公共抽象建议
 
 | 类型 | 职责 |
 |---|---|
@@ -244,7 +300,7 @@ reloadable options 更新失败：保留上一份有效配置，记录 diagnosti
 | `ConfigurationReloadPolicy` | 热更新策略。 |
 | `ConfigurationValidationResult` | 配置验证结果。 |
 
-## 12. 测试策略
+### 12. 测试策略
 
 Testing 包应支持：
 

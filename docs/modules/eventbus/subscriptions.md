@@ -1,10 +1,66 @@
-# AtomUI.City.EventBus Subscriptions 设计
+# AtomUI.City.EventBus Subscriptions 合同
 
-版本：v0.1
-状态：正式初版
+## 适用范围
+
+本专题属于 `AtomUI.City.EventBus` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `Subscriptions` 相关实现决策，不重新定义模块边界。
+
+## 设计决策
+
+- 本专题必须绑定 Feature ID。
+- 必须说明 public contract、失败行为和测试。
+- 不得只描述概念。
+
+## Public Contract
+
+- 只允许通过 `AtomUI.City.EventBus` 的 public API、attribute、options、manifest、generated output 或 DI extension 暴露本专题能力。
+- 新增 contract 必须进入 [api-contracts.md](api-contracts.md)。
+- 新增功能必须分配 Feature ID，并进入 [features.md](features.md)。
+- 修改失败行为、默认值、诊断码或生命周期状态必须进入 [compatibility.md](compatibility.md)。
+
+## 运行时边界
+
+- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
+- Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
+- 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
+
+## 失败行为
+
+- 输入无效：使用标准参数异常或模块 Result。
+- 生命周期状态非法：返回失败 Result、模块异常或稳定诊断。
+- 依赖缺失：阻止当前功能启用，不影响无关功能。
+- 插件卸载中：拒绝创建新贡献，并撤销已有贡献。
+- 释放失败：记录诊断并继续释放其他资源。
+
+## 测试要求
+
+| Feature ID | 相关能力 | 测试文件 |
+| --- | --- | --- |
+| AUC-EVENTBUS-001 | Typed Publish | EventPublicationTests |
+| AUC-EVENTBUS-002 | Subscription Lifecycle | EventSubscriptionTests |
+| AUC-EVENTBUS-003 | Contract Registry | EventContractRegistryTests |
+| AUC-EVENTBUS-004 | Dispatch Policy | EventDispatchingTests |
+| AUC-EVENTBUS-005 | Diagnostics | EventDiagnosticsTests |
+| AUC-EVENTBUS-006 | DI Registration | EventBusRegistrationTests |
+
+本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
+
+## 完成标准
+
+- 设计决策能回答对象由谁创建、谁持有、谁释放。
+- API contract、失败行为、诊断和测试矩阵一致。
+- 不出现业务领域假设。
+- 不引入 `AtomUI.City.Presentation` 等禁止依赖。
+
+## 既有细化设计内容
+
+以下内容保留上一轮设计中的专题细节。后续修改必须与本页上方合同、Feature ID、API 行为、诊断和测试矩阵保持一致。
+
+## AtomUI.City.EventBus Subscriptions 设计
+
 适用范围：事件处理器、静态和动态订阅、订阅所有权、生命周期状态、DI 创建、并发与重入、撤销和插件贡献设计。
 
-## 1. 定位
+### 1. 定位
 
 Subscription 表示一个事件 contract、handler、调度策略和生命周期 owner 之间的受管关系。
 
@@ -20,7 +76,7 @@ EventBus 必须能明确回答：
 
 订阅不是一个无法追踪的 delegate。
 
-## 2. 核心抽象
+### 2. 核心抽象
 
 建议抽象：
 
@@ -60,11 +116,11 @@ public interface IEventSubscription :
 
 `Dispose` 用于无异步等待的快速撤销入口；需要 drain handler 时必须使用 `StopAsync` 或 `DisposeAsync`。
 
-## 3. 订阅类型
+### 3. 订阅类型
 
 EventBus 支持两类订阅。
 
-### 静态订阅
+#### 静态订阅
 
 静态订阅由应用或静态模块在构建期声明：
 
@@ -83,7 +139,7 @@ Module declaration
 - 不依赖运行时程序集扫描。
 - 随 Host 停止释放。
 
-### 动态订阅
+#### 动态订阅
 
 动态订阅在运行时创建：
 
@@ -95,7 +151,7 @@ Module declaration
 
 动态订阅必须提供明确 owner，并返回 `IEventSubscription`。
 
-## 4. Subscription Descriptor
+### 4. Subscription Descriptor
 
 订阅 descriptor 至少包含：
 
@@ -117,7 +173,7 @@ Module declaration
 
 Descriptor 不保存不必要的运行时对象。静态 descriptor 可以长时间缓存；插件 descriptor 必须由插件运行时上下文持有。
 
-## 5. Owner
+### 5. Owner
 
 每个订阅必须绑定以下 owner 之一：
 
@@ -136,7 +192,7 @@ Descriptor 不保存不必要的运行时对象。静态 descriptor 可以长时
 - 把 subscription 保存到静态字段。
 - 让子 Scope 订阅比父 Scope 活得更久。
 
-## 6. 强引用策略
+### 6. 强引用策略
 
 第一版只提供强引用订阅。
 
@@ -151,7 +207,7 @@ Descriptor 不保存不必要的运行时对象。静态 descriptor 可以长时
 
 需要“对象释放后自动退订”的场景，应通过 ActivationScope、RouteScope 或其他 Lifecycle Scope 表达。
 
-## 7. Subscription 状态机
+### 7. Subscription 状态机
 
 建议状态：
 
@@ -179,7 +235,7 @@ StopTimedOut
 - `Disposed`：队列、handler、service scope 和引用已释放。
 - `StopTimedOut`：停止超过 timeout，进入错误策略。
 
-## 8. 注册流程
+### 8. 注册流程
 
 ```text
 Validate owner
@@ -199,7 +255,7 @@ Validate owner
 - 插件 Contribution 不得创建 Active lease。
 - 错误进入 Diagnostics。
 
-## 9. 撤销流程
+### 9. 撤销流程
 
 ```text
 Mark Quiescing
@@ -220,7 +276,7 @@ Mark Quiescing
 - 正在执行的 handler 通过 cancellation token 协作停止。
 - EventBus 不能强制终止线程。
 
-## 10. 发布与撤销竞争
+### 10. 发布与撤销竞争
 
 多线程环境下，发布和撤销可能同时发生。
 
@@ -252,7 +308,7 @@ Stop subscription
 - 停止后不会开始新的 handler。
 - 已经开始的 handler 可以被等待和取消。
 
-## 11. Handler 创建
+### 11. Handler 创建
 
 Handler 可以是：
 
@@ -280,7 +336,7 @@ DI handler 创建规则：
 
 第一版不允许 singleton handler 隐式持有 route、ViewModel 或插件服务。
 
-## 12. Handler 调用
+### 12. Handler 调用
 
 Handler 调用必须通过预构建 invoker：
 
@@ -298,7 +354,7 @@ Event delivery
 
 运行时禁止使用 `MethodInfo.Invoke` 调用 handler。
 
-## 13. 并发和重入
+### 13. 并发和重入
 
 建议订阅并发策略：
 
@@ -319,7 +375,7 @@ Event delivery
 - Handler 不共享非线程安全状态。
 - 插件停用能够等待全部并发调用结束。
 
-## 14. Filter 设计
+### 14. Filter 设计
 
 第一版不把任意订阅 predicate 作为核心 API。
 
@@ -337,7 +393,7 @@ Event delivery
 - 错误进入订阅错误策略。
 - 插件 filter 必须随订阅释放。
 
-## 15. Handler 顺序
+### 15. Handler 顺序
 
 不同 handler 之间不提供业务顺序保证。
 
@@ -359,7 +415,7 @@ Order = 20
 - 发布后续事实事件。
 - 使用明确的流程协调器。
 
-## 16. 生命周期取消
+### 16. 生命周期取消
 
 每次 delivery 的 cancellation token 至少关联：
 
@@ -379,7 +435,7 @@ Handler 应把 cancellation token 传递给：
 
 取消不计入 handler failure。
 
-## 17. ContributionLease
+### 17. ContributionLease
 
 插件和运行时模块注册 handler 时，订阅必须作为 Contribution 进入 EventBus。
 
@@ -405,7 +461,7 @@ Lease 记录：
 
 撤销 Lease 必须触发 subscription quiesce 和 drain。
 
-## 18. 闭包和引用安全
+### 18. 闭包和引用安全
 
 动态 delegate handler 可能通过 closure 持有：
 
@@ -423,7 +479,7 @@ Lease 记录：
 - 诊断应显示 handler target type 和 owner Scope。
 - Analyzer 可以提示静态 subscription 捕获局部对象。
 
-## 19. 错误处理
+### 19. 错误处理
 
 订阅级错误包括：
 
@@ -447,7 +503,7 @@ Lease 记录：
 - 保留诊断记录。
 - 插件订阅失败可以降低插件能力或触发插件停用策略。
 
-## 20. AOT 与 Source Generator
+### 20. AOT 与 Source Generator
 
 Source Generator 负责生成：
 
@@ -467,7 +523,7 @@ Analyzer 应检查：
 - Concurrent handler 未显式声明线程安全意图。
 - Dynamic handler 被静态字段持有。
 
-## 21. 测试要求
+### 21. 测试要求
 
 必须测试：
 
@@ -485,7 +541,7 @@ Analyzer 应检查：
 - Handler 异步释放。
 - ContributionLease 撤销订阅。
 
-## 22. 第一版明确决策
+### 22. 第一版明确决策
 
 - 默认强引用订阅。
 - 不提供弱引用订阅。

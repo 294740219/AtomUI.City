@@ -1,14 +1,70 @@
-# AtomUI.City.Routing Navigation 设计
+# AtomUI.City.Routing Navigation 合同
 
-版本：v0.1
-状态：正式初版
+## 适用范围
+
+本专题属于 `AtomUI.City.Routing` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `Navigation` 相关实现决策，不重新定义模块边界。
+
+## 设计决策
+
+- Routing 只负责 Route -> ViewModel Target。
+- 参数绑定失败必须返回导航失败结果。
+- 插件路由撤销后 route graph 必须重新发布。
+
+## Public Contract
+
+- 只允许通过 `AtomUI.City.Routing` 的 public API、attribute、options、manifest、generated output 或 DI extension 暴露本专题能力。
+- 新增 contract 必须进入 [api-contracts.md](api-contracts.md)。
+- 新增功能必须分配 Feature ID，并进入 [features.md](features.md)。
+- 修改失败行为、默认值、诊断码或生命周期状态必须进入 [compatibility.md](compatibility.md)。
+
+## 运行时边界
+
+- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
+- Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
+- 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
+
+## 失败行为
+
+- 输入无效：使用标准参数异常或模块 Result。
+- 生命周期状态非法：返回失败 Result、模块异常或稳定诊断。
+- 依赖缺失：阻止当前功能启用，不影响无关功能。
+- 插件卸载中：拒绝创建新贡献，并撤销已有贡献。
+- 释放失败：记录诊断并继续释放其他资源。
+
+## 测试要求
+
+| Feature ID | 相关能力 | 测试文件 |
+| --- | --- | --- |
+| AUC-ROUTING-001 | Route Template Syntax | RouteTemplateTests; RoutingParameterBoundaryTests |
+| AUC-ROUTING-002 | Route Definition Attributes | RouteDefinitionAttributeTests |
+| AUC-ROUTING-003 | Route Graph | RouteGraphAndMatcherTests |
+| AUC-ROUTING-004 | Route Matcher | RouteGraphAndMatcherTests |
+| AUC-ROUTING-005 | Navigation Scope | NavigationScopeTests |
+| AUC-ROUTING-006 | Guards | RouteGuardTests |
+
+本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
+
+## 完成标准
+
+- 设计决策能回答对象由谁创建、谁持有、谁释放。
+- API contract、失败行为、诊断和测试矩阵一致。
+- 不出现业务领域假设。
+- 不引入 `AtomUI.City.Presentation` 等禁止依赖。
+
+## 既有细化设计内容
+
+以下内容保留上一轮设计中的专题细节。后续修改必须与本页上方合同、Feature ID、API 行为、诊断和测试矩阵保持一致。
+
+## AtomUI.City.Routing Navigation 设计
+
 适用范围：IRouter、NavigationScope、NavigationTarget、NavigationTransaction、NavigationResult、并发策略、提交和回滚。
 
-## 1. 定位
+### 1. 定位
 
 Navigation 是 Routing 的运行时核心。它把开发者的导航请求转换为事务式路由切换，并保证当前页面在候选页面准备好之前不被破坏。
 
-## 2. IRouter
+### 2. IRouter
 
 `IRouter` 是某个 NavigationScope 内的导航入口。
 
@@ -43,7 +99,7 @@ public interface IRouter
 
 `NavigateByPathAsync` 只作为 Deep Link、命令行入口、外部 URI、测试和兼容入口，不作为日常代码主路径。
 
-## 3. NavigationTarget
+### 3. NavigationTarget
 
 所有请求先规范化为 `NavigationTarget`。
 
@@ -66,7 +122,7 @@ public interface IRouter
 - NavigationOptions。
 - 来源诊断信息。
 
-## 4. NavigationOptions
+### 4. NavigationOptions
 
 建议选项：
 
@@ -82,7 +138,7 @@ public interface IRouter
 
 默认模式为 Push，默认并发策略为同 Scope 内 Commit 前取消旧导航，Commit 中排队。
 
-## 5. NavigationScope
+### 5. NavigationScope
 
 NavigationScope 生命周期通常挂在 WindowScope 下。
 
@@ -106,7 +162,7 @@ Reject new navigation
 -> Mark stopped
 ```
 
-## 6. NavigationTransaction
+### 6. NavigationTransaction
 
 一次导航创建一个 transaction。
 
@@ -136,7 +192,7 @@ RolledBack
 
 Transaction 必须记录阶段耗时和阶段结果。
 
-## 7. 导航计划
+### 7. 导航计划
 
 NavigationPlan 由当前路由树和目标路由树 diff 得出。
 
@@ -152,7 +208,7 @@ NavigationPlan 由当前路由树和目标路由树 diff 得出。
 
 共同父路由默认保留，减少不必要的 ViewModel 重建。
 
-## 8. Provisional RouteScope
+### 8. Provisional RouteScope
 
 新增路由分支先创建 provisional RouteScope。
 
@@ -168,7 +224,7 @@ NavigationPlan 由当前路由树和目标路由树 diff 得出。
 
 这样可以保证当前页面在候选页面准备完成前仍保持活动。
 
-## 9. Commit
+### 9. Commit
 
 Commit 必须在 UI Thread 上执行。
 
@@ -194,7 +250,7 @@ Stop accepting current route operations that will leave
 
 Commit 开始后不允许被新导航打断。
 
-## 10. 回滚
+### 10. 回滚
 
 准备阶段回滚：
 
@@ -216,7 +272,7 @@ Try restore old outlet content
 
 回滚失败必须进入 ErrorPolicy，并保留最大诊断信息。
 
-## 11. 并发策略
+### 11. 并发策略
 
 同一个 NavigationScope 内默认串行。
 
@@ -232,7 +288,7 @@ Commit 中始终排队或拒绝，不取消。
 
 不同 NavigationScope 可以并行导航，但如果共享插件卸载、全局配置切换等外部操作，需要通过对应模块的生命周期锁协调。
 
-## 12. Redirect
+### 12. Redirect
 
 Guard 或 Resolver 可以返回 redirect。
 
@@ -244,7 +300,7 @@ Guard 或 Resolver 可以返回 redirect。
 - 静态 redirect 循环由 Source Generator 诊断。
 - 动态 redirect 循环由运行时检测。
 
-## 13. NavigationResult
+### 13. NavigationResult
 
 建议结果：
 
@@ -261,7 +317,7 @@ Guard 或 Resolver 可以返回 redirect。
 
 结果必须包含 NavigationId、目标、失败阶段和诊断信息。
 
-## 14. 状态暴露
+### 14. 状态暴露
 
 NavigationScope 应暴露当前状态：
 
@@ -272,7 +328,7 @@ IStateValue<NavigationStatus>
 
 外部观察当前路由状态使用 State。EventBus 只发布导航完成、失败、取消等事实事件，不作为控制流。
 
-## 15. 测试要求
+### 15. 测试要求
 
 测试必须覆盖：
 

@@ -1,66 +1,73 @@
 # AtomUI.City.Data
 
-版本：v0.1
-状态：正式初版
+文档等级：Level 3
+成熟度：Partially Implemented
+执行边界：Host runtime data pipeline
+程序集：`AtomUI.City.Data`
+源码：`src/AtomUI.City.Data`
+测试：`tests/AtomUI.City.Data.Tests`
 
-## 职责
+## 模块定位
 
-`AtomUI.City.Data` 负责数据请求、客户端代理、请求管线、缓存、错误模型、取消、重试和认证集成。
+桌面客户端统一数据访问层，第一批支持 HttpClient、gRPC 和 SignalR。
 
-Data 的目标是让应用数据访问具备统一入口、统一错误处理、统一生命周期和统一诊断。
+## 产品级硬性约束
 
-Data 第一版必须支持多种访问方式：
+以下约束是本模块实现和 review 的硬门禁，违反任一条都不能标记 Feature 完成。
 
-- HTTP / REST / Web API。
-- gRPC unary / streaming。
-- SignalR realtime connection。
+- 每个长连接必须声明 DataConnectionOwner。
+- 请求取消后不得写入 State、缓存或 UI。
+- 认证在 transport 执行前完成。
+- HTTP、gRPC、SignalR 统一映射到 DataResult 和 DataErrorKind。
+- 缓存 key 必须包含 request identity、transport、endpoint、method、payload identity 和安全上下文相关部分。
 
-## 边界
+## 模块目标
 
-Data 可以依赖：
+- 统一 DataRequestPipeline 包装多传输。
+- 显式管理连接生命周期、认证、取消、缓存、重试和错误映射。
 
-- Microsoft.Extensions.Http
-- Polly
-- Security 抽象
-- State 抽象
+## 明确非目标
 
-Data 不负责：
+- 不实现 ORM。
+- 不绑定具体后端业务协议。
+- 不在数据层直接操作 UI。
 
-- 领域模型设计。
-- 仓储模式。
-- 应用服务分层。
-- UI 状态展示。
-- 认证状态管理。
-- 权限策略解释。
+## 使用者画像
 
-## 详细设计
+- 框架开发者：根据模块合同实现 public API、状态机、失败路径、诊断和测试。
+- 应用开发者：通过 DI、扩展方法、attribute、manifest、CLI 或模板使用模块能力。
+- 插件开发者：通过 Host 共享 contract、manifest 和可撤销贡献接入模块。
+- 测试开发者：根据测试矩阵验证成功路径、失败路径、线程、释放和兼容性。
 
-| 文档 | 内容 |
-|---|---|
-| [detailed-design.md](detailed-design.md) | Data 总体架构、多传输访问、请求管线、生命周期、认证、缓存、错误和测试策略。 |
-| [request-pipeline.md](request-pipeline.md) | 请求上下文、管线阶段、handler、OperationScope、响应映射和诊断。 |
-| [transport.md](transport.md) | Transport 抽象、request/response、streaming、realtime connection 和生命周期差异。 |
-| [http-client.md](http-client.md) | HTTP / REST / Web API、HttpClientFactory、delegating handler、上传下载和 HTTP 错误映射。 |
-| [grpc-client.md](grpc-client.md) | gRPC unary、server/client/bidi streaming、deadline、metadata、channel 和 status 映射。 |
-| [signalr-client.md](signalr-client.md) | SignalR connection、hub invoke、server push、subscription、reconnect 和 token refresh。 |
-| [client-proxy.md](client-proxy.md) | Typed client、generated client、adapter client、Refit 可选适配和 descriptor。 |
-| [security-integration.md](security-integration.md) | Security credential、401/403、single-flight refresh、用户切换和插件凭据边界。 |
-| [async-and-threading.md](async-and-threading.md) | 异步、线程、late result suppression、回调调度和 sync-over-async 禁止规则。 |
-| [concurrency.md](concurrency.md) | AllowConcurrent、Queue、CancelPrevious、LatestWins、KeyedSerial 等并发策略。 |
-| [connection-lifecycle.md](connection-lifecycle.md) | HTTP、gRPC channel、gRPC streaming、SignalR 长连接和显式连接生命周期。 |
-| [streaming-and-realtime.md](streaming-and-realtime.md) | gRPC streaming、SignalR server push、subscription、backpressure 和状态投影。 |
-| [resilience.md](resilience.md) | Timeout、retry、circuit breaker、fallback、rate limit 和 mutation 重试约束。 |
-| [caching.md](caching.md) | Request cache、response cache、snapshot cache、principal 隔离和插件缓存撤销。 |
-| [consistency-and-cache-invalidation.md](consistency-and-cache-invalidation.md) | Query/mutation/subscription、一致性、idempotency、optimistic update 和失效策略。 |
-| [large-payload-and-progress.md](large-payload-and-progress.md) | 上传、下载、进度、range、临时文件、节流和大载荷内存约束。 |
-| [error-model.md](error-model.md) | DataResult、DataError、HTTP/gRPC/SignalR 错误映射和取消语义。 |
-| [state-integration.md](state-integration.md) | Data 与 State 的显式更新、状态投影、OperationScope 和 UI 线程边界。 |
-| [routing-integration.md](routing-integration.md) | Resolver 调用 Data、导航取消、ResolveResult 映射和预取诊断。 |
-| [plugin-integration.md](plugin-integration.md) | 插件 Data client、capability、请求取消、连接停止、缓存撤销和 contract 隔离。 |
-| [diagnostics-and-testing.md](diagnostics-and-testing.md) | Data 诊断字段、测试替身、竞态测试、无 UI 测试和插件卸载测试。 |
+## 与 Host 的关系
 
-## 可选增强文档
+AtomUI.City.Data 作为 Host 服务或模块贡献接入 Core 生命周期，必须在 Host start/stop/dispose 中遵守本模块状态机。
 
-- `offline-sync.md`
-- `refit-integration.md`
-- `otel-integration.md`
+## 与 PluginSystem 的关系
+
+插件可以通过 manifest 或 Host 共享 contract 贡献本模块能力；所有插件来源对象必须绑定 plugin owner 并可撤销。
+
+## 与 Testing 的关系
+
+`tests/AtomUI.City.Data.Tests` 必须覆盖 [features.md](features.md) 中每个 Feature ID。产品级完成不能只看现有测试文件存在，必须补齐 [testing.md](testing.md) 中列出的必断言行为。
+
+## 文档索引
+
+| 文档 | 用途 |
+| --- | --- |
+| [architecture.md](architecture.md) | 核心不变量、对象模型、状态机、流程、失败矩阵、性能边界。 |
+| [features.md](features.md) | Feature ID、实现合同、public contract、失败行为和验收标准。 |
+| [api-contracts.md](api-contracts.md) | API family、关键方法、参数/返回/异常/取消/并发/Dispose 后行为。 |
+| [lifecycle.md](lifecycle.md) | 模块特有生命周期、Host shutdown、插件动态变更和失败处理。 |
+| [threading.md](threading.md) | 线程边界、UI dispatcher、后台任务、并发冲突和死锁规避。 |
+| [diagnostics.md](diagnostics.md) | 现有诊断码、产品级目标诊断、上下文字段和测试断言。 |
+| [testing.md](testing.md) | 具体测试矩阵、必须断言的行为、测试类型和缺口处理。 |
+| [compatibility.md](compatibility.md) | public API、配置、manifest、snapshot、generated output、CLI envelope 和包布局兼容。 |
+| [integration.md](integration.md) | 跨模块依赖方向、生命周期、线程和失败行为。 |
+| [implementation-plan.md](implementation-plan.md) | Feature 到现有基线、缺口、必补测试和实现工作的追踪。 |
+
+## 当前成熟度状态
+
+Partially Implemented
+
+该状态表示模块已有实现基线，但还需要按产品级合同补齐实现和测试。单个功能点状态以 [implementation-plan.md](implementation-plan.md) 为准。

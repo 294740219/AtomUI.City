@@ -1,16 +1,72 @@
-# AtomUI.City.Routing Route Graph 设计
+# AtomUI.City.Routing Route Graph 合同
 
-版本：v0.1
-状态：正式初版
+## 适用范围
+
+本专题属于 `AtomUI.City.Routing` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `Route Graph` 相关实现决策，不重新定义模块边界。
+
+## 设计决策
+
+- Routing 只负责 Route -> ViewModel Target。
+- 参数绑定失败必须返回导航失败结果。
+- 插件路由撤销后 route graph 必须重新发布。
+
+## Public Contract
+
+- 只允许通过 `AtomUI.City.Routing` 的 public API、attribute、options、manifest、generated output 或 DI extension 暴露本专题能力。
+- 新增 contract 必须进入 [api-contracts.md](api-contracts.md)。
+- 新增功能必须分配 Feature ID，并进入 [features.md](features.md)。
+- 修改失败行为、默认值、诊断码或生命周期状态必须进入 [compatibility.md](compatibility.md)。
+
+## 运行时边界
+
+- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
+- Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
+- 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
+
+## 失败行为
+
+- 输入无效：使用标准参数异常或模块 Result。
+- 生命周期状态非法：返回失败 Result、模块异常或稳定诊断。
+- 依赖缺失：阻止当前功能启用，不影响无关功能。
+- 插件卸载中：拒绝创建新贡献，并撤销已有贡献。
+- 释放失败：记录诊断并继续释放其他资源。
+
+## 测试要求
+
+| Feature ID | 相关能力 | 测试文件 |
+| --- | --- | --- |
+| AUC-ROUTING-001 | Route Template Syntax | RouteTemplateTests; RoutingParameterBoundaryTests |
+| AUC-ROUTING-002 | Route Definition Attributes | RouteDefinitionAttributeTests |
+| AUC-ROUTING-003 | Route Graph | RouteGraphAndMatcherTests |
+| AUC-ROUTING-004 | Route Matcher | RouteGraphAndMatcherTests |
+| AUC-ROUTING-005 | Navigation Scope | NavigationScopeTests |
+| AUC-ROUTING-006 | Guards | RouteGuardTests |
+
+本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
+
+## 完成标准
+
+- 设计决策能回答对象由谁创建、谁持有、谁释放。
+- API contract、失败行为、诊断和测试矩阵一致。
+- 不出现业务领域假设。
+- 不引入 `AtomUI.City.Presentation` 等禁止依赖。
+
+## 既有细化设计内容
+
+以下内容保留上一轮设计中的专题细节。后续修改必须与本页上方合同、Feature ID、API 行为、诊断和测试矩阵保持一致。
+
+## AtomUI.City.Routing Route Graph 设计
+
 适用范围：RouteDescriptor、RouteRegistry、RouteGraphSnapshot、路由贡献、优先级、冲突检测和插件动态变更。
 
-## 1. 定位
+### 1. 定位
 
 Route Graph 表示应用当前可导航结构。
 
 它不是简单列表，而是一棵由 Host、模块和插件共同贡献的不可变快照。导航匹配、Deep Link 解析、扩展点挂载、插件撤销和诊断都依赖 Route Graph。
 
-## 2. 输入来源
+### 2. 输入来源
 
 Route Graph 输入来自：
 
@@ -22,7 +78,7 @@ Route Graph 输入来自：
 
 所有输入都必须转换为 `RouteContribution`，再进入 `RouteRegistry`。
 
-## 3. RouteDescriptor
+### 3. RouteDescriptor
 
 `RouteDescriptor` 是运行时消费的路由描述。
 
@@ -46,7 +102,7 @@ Route Graph 输入来自：
 
 RouteDescriptor 必须不可变。
 
-## 4. RouteRegistry
+### 4. RouteRegistry
 
 `RouteRegistry` 负责接收贡献并发布快照。
 
@@ -69,7 +125,7 @@ Accept RouteContribution
 - 快照发布必须原子化。
 - 快照版本单调递增。
 
-## 5. RouteGraphSnapshot
+### 5. RouteGraphSnapshot
 
 `RouteGraphSnapshot` 是不可变结构。
 
@@ -88,7 +144,7 @@ Accept RouteContribution
 
 导航开始时捕获一个 snapshot。本次导航不得访问全局 mutable graph。
 
-## 6. 层级规则
+### 6. 层级规则
 
 父子关系必须显式。
 
@@ -103,7 +159,7 @@ Accept RouteContribution
 - ExtensionPoint 不能直接被导航进入。
 - 插件路由只能挂到 ExtensionPoint 或 Host 显式允许的父节点。
 
-## 7. Path 匹配
+### 7. Path 匹配
 
 Path Template 兼容 ASP.NET Core 10 Route Template 的主要语义。
 
@@ -119,7 +175,7 @@ Path Template 兼容 ASP.NET Core 10 Route Template 的主要语义。
 
 运行时不做模糊选择。
 
-## 8. ExtensionPoint
+### 8. ExtensionPoint
 
 扩展点是 Host 或模块开放给后续模块和插件的挂载位置。
 
@@ -135,7 +191,7 @@ ExtensionPoint 应声明：
 
 插件贡献到扩展点时，RouteRegistry 必须校验这些规则。
 
-## 9. Route Metadata
+### 9. Route Metadata
 
 Route Metadata 只表达框架级导航信息，不表达业务流程。
 
@@ -153,7 +209,7 @@ Route Metadata 只表达框架级导航信息，不表达业务流程。
 
 权限检查由 Security 和 Guard 承接，Routing 只保存需要交给 Guard 的 metadata。
 
-## 10. Contribution 归属
+### 10. Contribution 归属
 
 每个 descriptor 必须记录来源。
 
@@ -174,7 +230,7 @@ RouteDescriptor
 - Journal 清理插件路由。
 - 缓存驱逐插件 ViewModel。
 
-## 11. 冲突检测
+### 11. 冲突检测
 
 必须检测：
 
@@ -191,7 +247,7 @@ RouteDescriptor
 
 冲突默认阻止贡献生效。插件贡献冲突不应影响 Host 已运行路由图。
 
-## 12. 快照更新策略
+### 12. 快照更新策略
 
 静态模块启动期贡献失败，默认视为应用启动失败。
 
@@ -209,7 +265,7 @@ Build candidate graph
 
 旧 snapshot 可能被正在执行的导航持有。Registry 不能提前释放旧 snapshot 引用的必要 descriptor。
 
-## 13. 测试要求
+### 13. 测试要求
 
 测试必须覆盖：
 

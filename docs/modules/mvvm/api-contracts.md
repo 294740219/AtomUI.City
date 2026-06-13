@@ -1,0 +1,76 @@
+# AtomUI.City.Mvvm API Contracts
+
+本文件是实现 public API 的行为合同。它不是源码目录索引；每个关键 API 必须说明用途、生命周期、失败行为、取消、并发和兼容性。
+
+## API Family 合同
+
+| API Family | 关键类型 | 职责 | 硬性行为 |
+| --- | --- | --- | --- |
+| ViewModel Base | ViewModelBase | 属性通知和释放入口。 | 不引用具体 View 或 Avalonia visual。 |
+| Activation | IActivatable, ICanDeactivate, ActivationScope | ViewModel 激活和停用。 | 状态机必须可测试，拒绝停用不抛业务异常。 |
+| Command | CommandFactory, OperationScope, OperationResult | 命令执行和操作结果。 | 异常、取消、并发拒绝必须有稳定结果。 |
+| Interaction | Interaction<TRequest, TResult> | ViewModel 到 UI 的请求 contract。 | 无 handler 返回 Failed，不直接依赖 Presentation 类型。 |
+| Validation | ValidationScope, ValidationMessage | 验证状态和消息聚合。 | 消息变化可被 Presentation 绑定。 |
+
+## 关键方法合同
+
+| Method | Purpose | Parameters | Return | Failure Behavior | Cancellation | Concurrency / Idempotency |
+| --- | --- | --- | --- | --- | --- | --- |
+| ViewModelBase.SetProperty | 更新属性并触发通知。 | propertyName 必须稳定，比较器可选。 | bool 表示是否变化。 | Dispose 后按合同拒绝或忽略。 | 同步 API 无 token。 | 调用线程发布通知；UI marshal 由 Presentation 负责。 |
+| ActivationScope.ActivateAsync | 激活 ViewModel。 | ActivationContext 不得为 null。 | ActivationState 或 OperationResult。 | 激活异常进入 Failed，不进入 Active。 | 必须观察 token。 | 重复 Activate 在 Active 状态下幂等或返回已激活。 |
+| ICanDeactivate.CanDeactivateAsync | 离开前确认。 | context 包含原因和目标。 | DeactivationResult。 | 拒绝返回 Denied，不抛业务异常。 | 必须观察 token。 | 同一 scope 内并发 deactivation 串行。 |
+| CommandFactory.CreateAsyncCommand | 创建异步命令。 | execute 不得为 null；canExecute 可选。 | ICommand 或框架 command wrapper。 | execute 异常映射 OperationResult Failed。 | 命令 token 必须传递到 execute。 | 并发执行按 policy 拒绝或串行。 |
+| Interaction.HandleAsync | 请求 UI interaction。 | request 不得为 null。 | InteractionResult<TResult>。 | 无 handler 或 handler 异常返回 Failed。 | 取消后不提交 handler result。 | 每次调用独立 context。 |
+| ValidationScope.SetMessages | 替换字段验证消息。 | field 可为空表示 global；messages 不得含 null。 | ValidationStatus。 | Dispose 后更新失败。 | 同步 API 无 token。 | 状态更新顺序必须稳定。 |
+
+## Public 类型覆盖
+
+| Type | 分类 | Review 规则 |
+| --- | --- | --- |
+| `ActivationContext` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `ActivationScope` | 关键 contract | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `ActivationScopeAccessor` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `ActivationState` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `CommandExecutionState` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `CommandFactory` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `CommandGroup` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `DeactivationResult` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `DeactivationStatus` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `IActivatable` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `IActivationScope` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `ICanDeactivate` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `IConfirmDeactivate` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `Interaction<TRequest, TResult>` | 关键 contract | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `InteractionContext<TRequest>` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `InteractionResult<TResult>` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `InteractionResultStatus` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `OperationResult` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `OperationScope` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `OperationStatus` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `ValidationMessage` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `ValidationScope` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `ValidationStatus` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `ViewModelBase` | 关键 contract | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+
+## Nullability 和参数规则
+
+- 参数为 `null` 且合同不接受 `null` 时，抛出 `ArgumentNullException`。
+- 字符串 id、path、key、route、permission、culture、package id 必须在边界校验空值、空白和非法字符。
+- 文件路径必须规范化并限制在声明 root 下。
+- 枚举未知值必须拒绝或映射为明确失败结果。
+
+## Cancellation 合同
+
+- 接收 `CancellationToken` 的 API 必须在 IO、子进程、网络、dispatcher work、插件代码、handler 调用前后观察取消。
+- 取消后不得提交状态、缓存、事件、UI 或 manifest 输出。
+- 取消结果必须稳定：返回 Cancelled Result 或抛 `OperationCanceledException`，不能混用成功结果。
+
+## Dispose 后行为
+
+- mutating API 在 Dispose 后必须失败。
+- 查询 immutable descriptor、manifest、snapshot、result 的 API 可以继续读取。
+- 重复 Dispose、Stop、Unload、Unsubscribe、Revoke 必须幂等。
+
+## Public API Review 门禁
+
+以下改动必须先更新文档并 review：新增 public 类型或成员；修改异常、Result status、诊断码、默认 options、manifest/schema、generated output、MSBuild property、CLI JSON envelope 或模板变量。

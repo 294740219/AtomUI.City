@@ -1,10 +1,69 @@
-# PluginSystem 包安装设计
+# AtomUI.City.PluginSystem Package Installation 合同
 
-版本：v0.1
-状态：正式初版
+## 适用范围
+
+本专题属于 `AtomUI.City.PluginSystem` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `Package Installation` 相关实现决策，不重新定义模块边界。
+
+## 设计决策
+
+- 包布局必须可由测试断言。
+- 路径必须使用跨平台分隔符处理。
+- 安装目录不得允许路径穿越。
+- 插件来源对象必须绑定 plugin owner。
+- 卸载必须撤销 contribution、subscription、view lease、state 和 connection。
+- 跨插件 contract 必须位于 Host 共享程序集。
+
+## Public Contract
+
+- 只允许通过 `AtomUI.City.PluginSystem` 的 public API、attribute、options、manifest、generated output 或 DI extension 暴露本专题能力。
+- 新增 contract 必须进入 [api-contracts.md](api-contracts.md)。
+- 新增功能必须分配 Feature ID，并进入 [features.md](features.md)。
+- 修改失败行为、默认值、诊断码或生命周期状态必须进入 [compatibility.md](compatibility.md)。
+
+## 运行时边界
+
+- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
+- Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
+- 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
+
+## 失败行为
+
+- 输入无效：使用标准参数异常或模块 Result。
+- 生命周期状态非法：返回失败 Result、模块异常或稳定诊断。
+- 依赖缺失：阻止当前功能启用，不影响无关功能。
+- 插件卸载中：拒绝创建新贡献，并撤销已有贡献。
+- 释放失败：记录诊断并继续释放其他资源。
+
+## 测试要求
+
+| Feature ID | 相关能力 | 测试文件 |
+| --- | --- | --- |
+| AUC-PLUGIN-001 | Plugin Metadata | PluginDeclarationAttributeTests; PluginManifestTests |
+| AUC-PLUGIN-002 | Dependency Validation | PluginDependencyTests |
+| AUC-PLUGIN-003 | Package Installation | PluginPackageTests |
+| AUC-PLUGIN-004 | Discovery | PluginLoadingTests |
+| AUC-PLUGIN-005 | Loading | PluginLoadingTests |
+| AUC-PLUGIN-006 | MSBuild Contract | PluginMsBuildContractTests |
+
+本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
+
+## 完成标准
+
+- 设计决策能回答对象由谁创建、谁持有、谁释放。
+- API contract、失败行为、诊断和测试矩阵一致。
+- 不出现业务领域假设。
+- 不引入 `AtomUI.City.Presentation` 等禁止依赖。
+
+## 既有细化设计内容
+
+以下内容保留上一轮设计中的专题细节。后续修改必须与本页上方合同、Feature ID、API 行为、诊断和测试矩阵保持一致。
+
+## PluginSystem 包安装设计
+
 适用范围：插件包下载、缓存、校验、staging、安装目录布局和安装失败恢复
 
-## 1. 目标
+### 1. 目标
 
 插件安装负责把一个外部插件包变成 Host 可以发现和加载的本地插件版本。
 
@@ -19,7 +78,7 @@
 包内容和安装后目录结构见：[包布局设计](package-layout.md)。
 更新、回滚和 pending 操作见：[更新和回滚设计](update-and-rollback.md)。
 
-## 2. 包模型
+### 2. 包模型
 
 第一版插件推荐发布为一个独立 NuGet 包。
 
@@ -48,7 +107,7 @@ SalesPlugin.nupkg
   atomui-city/assets/icon.png
 ```
 
-## 3. 安装目录
+### 3. 安装目录
 
 安装目标目录：
 
@@ -70,7 +129,7 @@ plugins/
 - 删除只能发生在插件未加载且没有 pending 操作时。
 - 安装目录不能依赖 NuGet 全局包缓存存在。
 
-## 4. 包缓存
+### 4. 包缓存
 
 下载包进入包缓存：
 
@@ -89,7 +148,7 @@ plugin-cache/
 - 包缓存损坏可以删除后重新下载。
 - 包 hash 必须来自受信任源或安装流程重新计算。
 
-## 5. 安装流程
+### 5. 安装流程
 
 安装流程：
 
@@ -117,7 +176,7 @@ Resolve package source
 - 锁定文件更新必须在文件落盘后执行。
 - 安装成功不等于启用成功。
 
-## 6. Staging
+### 6. Staging
 
 所有安装和更新必须先进入 staging：
 
@@ -137,7 +196,7 @@ plugins/
 - staging 清理不能影响已安装插件。
 - staging 验证结果进入诊断。
 
-## 7. 本地文件安装
+### 7. 本地文件安装
 
 从本地文件安装时，流程与下载包一致，只是 package source 不同：
 
@@ -156,7 +215,7 @@ Read local package
 - 本地文件安装可以被 Host policy 禁止。
 - 本地文件安装来源必须进入诊断。
 
-## 8. 安装失败恢复
+### 8. 安装失败恢复
 
 安装失败处理：
 
@@ -171,7 +230,7 @@ Read local package
 
 安装失败不能影响已启用的旧版本插件。
 
-## 9. 卸载和清理
+### 9. 卸载和清理
 
 卸载分为禁用、卸载和清理：
 
@@ -188,7 +247,7 @@ Read local package
 - 用户配置和状态默认不随 uninstall 删除，除非用户显式选择清理数据。
 - 清理缓存不能影响已安装插件。
 
-## 10. 诊断和测试
+### 10. 诊断和测试
 
 必须覆盖：
 

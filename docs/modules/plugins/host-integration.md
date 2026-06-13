@@ -1,10 +1,66 @@
-# PluginSystem Host 集成设计
+# AtomUI.City.PluginSystem Host Integration 合同
 
-版本：v0.1
-状态：正式初版
+## 适用范围
+
+本专题属于 `AtomUI.City.PluginSystem` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `Host Integration` 相关实现决策，不重新定义模块边界。
+
+## 设计决策
+
+- 插件来源对象必须绑定 plugin owner。
+- 卸载必须撤销 contribution、subscription、view lease、state 和 connection。
+- 跨插件 contract 必须位于 Host 共享程序集。
+
+## Public Contract
+
+- 只允许通过 `AtomUI.City.PluginSystem` 的 public API、attribute、options、manifest、generated output 或 DI extension 暴露本专题能力。
+- 新增 contract 必须进入 [api-contracts.md](api-contracts.md)。
+- 新增功能必须分配 Feature ID，并进入 [features.md](features.md)。
+- 修改失败行为、默认值、诊断码或生命周期状态必须进入 [compatibility.md](compatibility.md)。
+
+## 运行时边界
+
+- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
+- Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
+- 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
+
+## 失败行为
+
+- 输入无效：使用标准参数异常或模块 Result。
+- 生命周期状态非法：返回失败 Result、模块异常或稳定诊断。
+- 依赖缺失：阻止当前功能启用，不影响无关功能。
+- 插件卸载中：拒绝创建新贡献，并撤销已有贡献。
+- 释放失败：记录诊断并继续释放其他资源。
+
+## 测试要求
+
+| Feature ID | 相关能力 | 测试文件 |
+| --- | --- | --- |
+| AUC-PLUGIN-001 | Plugin Metadata | PluginDeclarationAttributeTests; PluginManifestTests |
+| AUC-PLUGIN-002 | Dependency Validation | PluginDependencyTests |
+| AUC-PLUGIN-003 | Package Installation | PluginPackageTests |
+| AUC-PLUGIN-004 | Discovery | PluginLoadingTests |
+| AUC-PLUGIN-005 | Loading | PluginLoadingTests |
+| AUC-PLUGIN-006 | MSBuild Contract | PluginMsBuildContractTests |
+
+本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
+
+## 完成标准
+
+- 设计决策能回答对象由谁创建、谁持有、谁释放。
+- API contract、失败行为、诊断和测试矩阵一致。
+- 不出现业务领域假设。
+- 不引入 `AtomUI.City.Presentation` 等禁止依赖。
+
+## 既有细化设计内容
+
+以下内容保留上一轮设计中的专题细节。后续修改必须与本页上方合同、Feature ID、API 行为、诊断和测试矩阵保持一致。
+
+## PluginSystem Host 集成设计
+
 适用范围：`AtomUI.City.PluginSystem` 与 Host、ModuleSystem、Lifecycle、DI、Registry 的交互方式
 
-## 1. 目标
+### 1. 目标
 
 PluginSystem 不能绕过 Host 直接修改应用运行时。Host 是插件运行的唯一协调者，PluginSystem 是 Host 管理运行时扩展的专门子系统。
 
@@ -19,7 +75,7 @@ Host 集成设计需要保证：
 
 全局架构规则见：[插件系统架构规范](../../architecture/plugin-system.md)。
 
-## 2. Host 职责
+### 2. Host 职责
 
 Host 负责协调插件系统和其他框架模块。
 
@@ -37,7 +93,7 @@ Host 必须提供：
 
 Host 不应该把 Root ServiceProvider 暴露给插件做任意修改。插件如果需要服务，只能使用插件 ServiceScope 内的 ServiceProvider 或 Host 暴露的稳定 contract。
 
-## 3. PluginSystem 职责
+### 3. PluginSystem 职责
 
 PluginSystem 负责插件运行时细节：
 
@@ -54,7 +110,7 @@ PluginSystem 负责插件运行时细节：
 
 PluginSystem 不负责解释具体业务含义。插件贡献的路由、权限、数据客户端、UI 资源和命令应交给对应模块的 registry 或 contract 处理。
 
-## 4. 交互边界
+### 4. 交互边界
 
 Host 与 PluginSystem 的关系：
 
@@ -79,7 +135,7 @@ Host
 - 对应 Host Registry 创建 ContributionLease。
 - Host 持有 Lease，并在插件停用或卸载时按反向顺序撤销。
 
-## 5. Host Contract
+### 5. Host Contract
 
 Host contract 是插件能接触 Host 的唯一稳定边界。
 
@@ -96,7 +152,7 @@ Host contract 是插件能接触 Host 的唯一稳定边界。
 
 Host contract 应保持窄接口。不要把 Host 内部对象、全局容器、可变注册表或具体 UI runtime 直接暴露给插件。
 
-## 6. Registry 集成
+### 6. Registry 集成
 
 插件贡献最终进入各模块 registry：
 
@@ -116,7 +172,7 @@ Host contract 应保持窄接口。不要把 Host 内部对象、全局容器、
 
 所有 registry 必须支持可撤销注册。不能撤销的 registry 不能接收运行时插件贡献。
 
-## 7. DI 集成
+### 7. DI 集成
 
 插件 DI 必须独立于 Host Root ServiceProvider。
 
@@ -140,7 +196,7 @@ Host Root Services
 
 如果某个插件能力必须被 Host 或其他模块调用，应通过稳定 contract、代理或 lease 暴露，而不是直接共享插件内部实现类型。
 
-## 8. ModuleSystem 集成
+### 8. ModuleSystem 集成
 
 插件可以携带一个或多个插件模块。
 
@@ -154,7 +210,7 @@ Host Root Services
 
 静态应用模块和插件模块可以依赖同一套 module contract，但运行时边界不同。静态模块随应用启动，插件模块随插件加载和卸载动态变化。
 
-## 9. Lifecycle 集成
+### 9. Lifecycle 集成
 
 PluginSystem 必须接入 Core 生命周期系统。
 
@@ -179,7 +235,7 @@ PluginSystem 必须接入 Core 生命周期系统。
 
 Core 生命周期详细设计见：[Core 生命周期详细设计](../core/lifecycle.md)。
 
-## 10. 错误处理
+### 10. 错误处理
 
 默认策略：
 
@@ -195,7 +251,7 @@ Core 生命周期详细设计见：[Core 生命周期详细设计](../core/lifec
 
 插件错误不能默认穿透为 Host Fatal。只有 Host 自身 contract、Core 生命周期或主应用必需插件失败时，才可以升级为 Fatal。
 
-## 11. 诊断要求
+### 11. 诊断要求
 
 Host 与 PluginSystem 交互必须记录：
 

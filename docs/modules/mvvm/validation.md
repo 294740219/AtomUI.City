@@ -1,16 +1,72 @@
-# AtomUI.City.Mvvm Validation 设计
+# AtomUI.City.Mvvm Validation 合同
 
-版本：v0.1
-状态：正式初版
+## 适用范围
+
+本专题属于 `AtomUI.City.Mvvm` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `Validation` 相关实现决策，不重新定义模块边界。
+
+## 设计决策
+
+- 本专题必须绑定 Feature ID。
+- 必须说明 public contract、失败行为和测试。
+- 不得只描述概念。
+
+## Public Contract
+
+- 只允许通过 `AtomUI.City.Mvvm` 的 public API、attribute、options、manifest、generated output 或 DI extension 暴露本专题能力。
+- 新增 contract 必须进入 [api-contracts.md](api-contracts.md)。
+- 新增功能必须分配 Feature ID，并进入 [features.md](features.md)。
+- 修改失败行为、默认值、诊断码或生命周期状态必须进入 [compatibility.md](compatibility.md)。
+
+## 运行时边界
+
+- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
+- Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
+- 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
+
+## 失败行为
+
+- 输入无效：使用标准参数异常或模块 Result。
+- 生命周期状态非法：返回失败 Result、模块异常或稳定诊断。
+- 依赖缺失：阻止当前功能启用，不影响无关功能。
+- 插件卸载中：拒绝创建新贡献，并撤销已有贡献。
+- 释放失败：记录诊断并继续释放其他资源。
+
+## 测试要求
+
+| Feature ID | 相关能力 | 测试文件 |
+| --- | --- | --- |
+| AUC-MVVM-001 | ViewModel Base | ViewModelBaseTests |
+| AUC-MVVM-002 | Activation | ActivationScopeTests |
+| AUC-MVVM-003 | Commands | CommandTests |
+| AUC-MVVM-004 | Deactivation | DeactivationTests |
+| AUC-MVVM-005 | Interactions | InteractionTests |
+| AUC-MVVM-006 | Validation | ValidationScopeTests |
+
+本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
+
+## 完成标准
+
+- 设计决策能回答对象由谁创建、谁持有、谁释放。
+- API contract、失败行为、诊断和测试矩阵一致。
+- 不出现业务领域假设。
+- 不引入 `AtomUI.City.Presentation` 等禁止依赖。
+
+## 既有细化设计内容
+
+以下内容保留上一轮设计中的专题细节。后续修改必须与本页上方合同、Feature ID、API 行为、诊断和测试矩阵保持一致。
+
+## AtomUI.City.Mvvm Validation 设计
+
 适用范围：ViewModel 验证、验证状态、Command 联动、Presentation 集成、错误策略和测试支持。
 
-## 1. 定位
+### 1. 定位
 
 Validation 负责 ViewModel 层的输入验证和状态暴露。
 
 验证失败不是异常。验证失败应作为状态暴露给 UI、Command、Diagnostics 和 Testing。
 
-## 2. 底层依赖
+### 2. 底层依赖
 
 第一版默认复用 `CommunityToolkit.Mvvm`：
 
@@ -26,7 +82,7 @@ Mvvm 在其上补充：
 - Presentation 可观察验证结果。
 - Diagnostics 记录验证失败来源。
 
-## 3. ValidationScope
+### 3. ValidationScope
 
 ValidationScope 表示一组验证状态的生命周期边界。
 
@@ -39,7 +95,7 @@ ValidationScope 可以绑定：
 
 ViewModel 停用时，临时验证状态应随 ActivationScope 释放。
 
-## 4. 验证结果模型
+### 4. 验证结果模型
 
 验证结果应区分：
 
@@ -53,7 +109,7 @@ ViewModel 停用时，临时验证状态应随 ActivationScope 释放。
 
 验证逻辑异常和验证失败必须区分。
 
-## 5. Command 联动
+### 5. Command 联动
 
 Command 可执行状态可以依赖 Validation 状态。
 
@@ -64,7 +120,7 @@ Command 可执行状态可以依赖 Validation 状态。
 - Validation Failed 进入 ErrorPolicy，但不杀死 ViewModel。
 - Command 执行前可以触发一次验证。
 
-## 6. Presentation 集成
+### 6. Presentation 集成
 
 Presentation 负责把验证状态展示为 UI。
 
@@ -77,7 +133,7 @@ Mvvm 只提供：
 
 UI 展示形式由 Presentation 和应用决定。
 
-## 7. 插件边界
+### 7. 插件边界
 
 插件 ViewModel 的验证状态绑定插件 ActivationScope。
 
@@ -89,7 +145,7 @@ UI 展示形式由 Presentation 和应用决定。
 
 插件验证失败不能影响 Host 全局验证状态。
 
-## 8. AOT / Source Generator
+### 8. AOT / Source Generator
 
 Generator/Analyzer 可负责：
 
@@ -98,7 +154,7 @@ Generator/Analyzer 可负责：
 - 生成属性验证 manifest。
 - 诊断异步验证未接入 cancellation token。
 
-## 9. 错误策略
+### 9. 错误策略
 
 | 场景 | 默认处理 |
 |---|---|
@@ -107,7 +163,7 @@ Generator/Analyzer 可负责：
 | 验证逻辑异常 | 暴露 Failed，记录诊断。 |
 | ViewModel 停用 | 取消 pending validation。 |
 
-## 10. 测试策略
+### 10. 测试策略
 
 Testing 包应支持：
 

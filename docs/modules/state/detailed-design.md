@@ -1,10 +1,66 @@
-# AtomUI.City.State Detailed Design
+# AtomUI.City.State Detailed Design 合同
 
-版本：v0.1
-状态：正式初版
+## 适用范围
+
+本专题属于 `AtomUI.City.State` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `Detailed Design` 相关实现决策，不重新定义模块边界。
+
+## 设计决策
+
+- 本专题必须绑定 Feature ID。
+- 必须说明 public contract、失败行为和测试。
+- 不得只描述概念。
+
+## Public Contract
+
+- 只允许通过 `AtomUI.City.State` 的 public API、attribute、options、manifest、generated output 或 DI extension 暴露本专题能力。
+- 新增 contract 必须进入 [api-contracts.md](api-contracts.md)。
+- 新增功能必须分配 Feature ID，并进入 [features.md](features.md)。
+- 修改失败行为、默认值、诊断码或生命周期状态必须进入 [compatibility.md](compatibility.md)。
+
+## 运行时边界
+
+- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
+- Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
+- 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
+
+## 失败行为
+
+- 输入无效：使用标准参数异常或模块 Result。
+- 生命周期状态非法：返回失败 Result、模块异常或稳定诊断。
+- 依赖缺失：阻止当前功能启用，不影响无关功能。
+- 插件卸载中：拒绝创建新贡献，并撤销已有贡献。
+- 释放失败：记录诊断并继续释放其他资源。
+
+## 测试要求
+
+| Feature ID | 相关能力 | 测试文件 |
+| --- | --- | --- |
+| AUC-STATE-001 | Writable State | WritableStateTests |
+| AUC-STATE-002 | Application State | ApplicationStateTests |
+| AUC-STATE-003 | Computed State | ComputedStateTests |
+| AUC-STATE-004 | State Subscription | StateScopeTests; StateThreadingTests |
+| AUC-STATE-005 | State Snapshot | StateSnapshotTests |
+| AUC-STATE-006 | Collection State | StateCollectionTests |
+
+本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
+
+## 完成标准
+
+- 设计决策能回答对象由谁创建、谁持有、谁释放。
+- API contract、失败行为、诊断和测试矩阵一致。
+- 不出现业务领域假设。
+- 不引入 `AtomUI.City.Presentation` 等禁止依赖。
+
+## 既有细化设计内容
+
+以下内容保留上一轮设计中的专题细节。后续修改必须与本页上方合同、Feature ID、API 行为、诊断和测试矩阵保持一致。
+
+## AtomUI.City.State Detailed Design
+
 适用范围：状态值、可写状态、计算状态、状态订阅、应用级共享状态、StateScope、Snapshot、集合状态、调度、插件隔离、AOT/source generator 约束。
 
-## 1. 定位
+### 1. 定位
 
 `AtomUI.City.State` 是 AtomUI.City 的状态管理基础设施。
 
@@ -21,7 +77,7 @@ State 模块要解决：
 - 状态副作用如何绑定生命周期。
 - 状态快照如何持久化、恢复和测试断言。
 
-## 1.1 拆分文档
+### 1.1 拆分文档
 
 State 的细节按职责拆分维护：
 
@@ -37,7 +93,7 @@ State 的细节按职责拆分维护：
 | [plugin-integration.md](plugin-integration.md) | 插件状态隔离、授权、撤销和卸载。 |
 | [diagnostics-and-testing.md](diagnostics-and-testing.md) | 诊断、测试工具和测试矩阵。 |
 
-## 2. 非目标
+### 2. 非目标
 
 State 不负责：
 
@@ -52,7 +108,7 @@ State 不负责：
 
 Rx / ReactiveUI 可以作为适配层，但不是 State 核心依赖。
 
-## 3. 命名原则
+### 3. 命名原则
 
 State API 必须坚持 .NET 风格。
 
@@ -76,7 +132,7 @@ IStateCollection<TKey, TItem>
 - 不把 Store 作为核心抽象。
 - 不默认暴露 Rx 类型。
 
-## 4. 核心抽象
+### 4. 核心抽象
 
 | 类型 | 职责 |
 |---|---|
@@ -94,7 +150,7 @@ IStateCollection<TKey, TItem>
 | `StateSnapshot` | 状态快照。 |
 | `IStateCollection<TKey,TItem>` | keyed collection state。 |
 
-## 5. IReadOnlyState<T>
+### 5. IReadOnlyState<T>
 
 建议语义：
 
@@ -118,7 +174,7 @@ public interface IReadOnlyState<T>
 - 订阅必须可释放。
 - 默认不暴露 Rx 类型。
 
-## 6. IWritableState<T>
+### 6. IWritableState<T>
 
 建议语义：
 
@@ -142,7 +198,7 @@ public interface IWritableState<T> : IReadOnlyState<T>
 
 异步操作不直接放进 state。异步请求属于 Data/Command/OperationScope，完成后再提交状态更新。
 
-## 7. 应用级共享状态
+### 7. 应用级共享状态
 
 桌面软件需要方便读取、监听和设置应用级共享状态，例如主题、语言、当前用户、当前工作区、网络状态、窗口布局策略、全局忙碌状态和授权状态。
 
@@ -178,7 +234,7 @@ IStateScopeAccessor
 
 使用方通过构造函数注入状态服务，而不是访问静态对象。
 
-## 8. StateKey<T> 与 StateDefinition<T>
+### 8. StateKey<T> 与 StateDefinition<T>
 
 应用级共享状态使用强类型 key。
 
@@ -218,7 +274,7 @@ context.States.Add(
 - 快照策略。
 - 诊断元数据。
 
-## 9. 应用级状态访问
+### 9. 应用级状态访问
 
 建议 API：
 
@@ -250,7 +306,7 @@ activationScope.OnStateChanged(ThemeStates.CurrentTheme, args => { });
 
 这样监听会随 ViewModel 停用自动释放。
 
-## 10. 应用级状态访问策略
+### 10. 应用级状态访问策略
 
 全局状态必须有写入规则。
 
@@ -264,7 +320,7 @@ activationScope.OnStateChanged(ThemeStates.CurrentTheme, args => { });
 
 `IApplicationState` 和 `IApplicationStateWriter` 分离，方便 Host 给插件只暴露只读接口。
 
-## 11. IComputedState<T>
+### 11. IComputedState<T>
 
 `IComputedState<T>` 是只读派生状态。
 
@@ -288,7 +344,7 @@ Dependencies
 
 第一版不建议依赖表达式树自动解析属性路径，因为这对 AOT/trimming 不友好。更推荐显式依赖或 generator 可识别声明。
 
-## 12. StateScope
+### 12. StateScope
 
 StateScope 是状态生命周期边界。
 
@@ -310,7 +366,7 @@ Plugin service context
 - Plugin 相关 state 随插件停用或卸载释放。
 - Application 级 state 随应用关闭释放。
 
-## 13. StateSubscription
+### 13. StateSubscription
 
 状态副作用不叫 `Effect`，建议称为 `StateSubscription` 或 State Reaction。公共 API 优先使用 subscription 语义。
 
@@ -328,7 +384,7 @@ state.OnChange(...)
 - subscription 释放必须幂等。
 - 插件 subscription 必须可被插件卸载流程找到并释放。
 
-## 14. StateCollection
+### 14. StateCollection
 
 集合状态建议用 .NET 风格命名：
 
@@ -348,7 +404,7 @@ IStateCollection<TKey, TItem>
 
 不建议直接暴露可变 `List<T>` / `Dictionary<TKey,T>`。集合变更必须通过状态 API，以便触发通知、诊断和快照。
 
-## 15. StateSnapshot
+### 15. StateSnapshot
 
 StateSnapshot 用于：
 
@@ -381,7 +437,7 @@ Snapshot 必须包含：
 | Network status | 不持久化。 |
 | Window layout policy | 可持久化。 |
 
-## 16. 调度策略
+### 16. 调度策略
 
 State Core 不直接依赖 Avalonia Dispatcher。
 
@@ -417,7 +473,7 @@ State 必须满足：
 - 插件状态绑定插件生命周期或插件贡献 lease。
 - 推荐状态值使用 immutable 或 replace-only 风格。
 
-## 17. 与 MVVM 集成
+### 17. 与 MVVM 集成
 
 ViewModel 可以通过 DI 接收 `IApplicationState`、`IApplicationStateWriter` 或具体 state 服务。
 
@@ -438,7 +494,7 @@ IStateCollection<TKey,TItem>
 - ViewModel 停用时释放 subscription。
 - State 错误不应杀死 ViewModel。
 
-## 18. 与 Data / EventBus 集成
+### 18. 与 Data / EventBus 集成
 
 Data 模块负责异步请求和缓存策略。State 只接收最终状态更新。
 
@@ -451,7 +507,7 @@ Command/Data request
 
 EventBus 不应该自动监听所有 state 变化。状态变化发布事件必须显式声明，避免隐式循环。
 
-## 19. 插件状态
+### 19. 插件状态
 
 插件状态必须隔离。
 
@@ -466,7 +522,7 @@ EventBus 不应该自动监听所有 state 变化。状态变化发布事件必�
 - 插件 state snapshot 必须带 PluginId。
 - 插件 state restore 必须经过插件版本兼容检查。
 
-## 20. AOT / Source Generator
+### 20. AOT / Source Generator
 
 State 默认 AOT-first。
 
@@ -489,7 +545,7 @@ Generator/Analyzer 负责：
 - 动态代理 state。
 - expression-tree 依赖分析作为默认路径。
 
-## 21. 错误策略
+### 21. 错误策略
 
 | 场景 | 默认处理 |
 |---|---|
@@ -504,7 +560,7 @@ Generator/Analyzer 负责：
 
 取消不是错误。OperationScope 取消后不应继续提交状态更新。
 
-## 22. 测试策略
+### 22. 测试策略
 
 Testing 包应支持：
 

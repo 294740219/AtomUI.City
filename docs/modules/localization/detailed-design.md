@@ -1,10 +1,66 @@
-# AtomUI.City.Localization Detailed Design
+# AtomUI.City.Localization Detailed Design 合同
 
-版本：v0.1
-状态：正式初版
+## 适用范围
+
+本专题属于 `AtomUI.City.Localization` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `Detailed Design` 相关实现决策，不重新定义模块边界。
+
+## 设计决策
+
+- 语言包按当前 culture 懒加载。
+- assembly 语言包必须支持运行时加载和撤销。
+- 缺失 key 必须输出诊断并走 fallback。
+
+## Public Contract
+
+- 只允许通过 `AtomUI.City.Localization` 的 public API、attribute、options、manifest、generated output 或 DI extension 暴露本专题能力。
+- 新增 contract 必须进入 [api-contracts.md](api-contracts.md)。
+- 新增功能必须分配 Feature ID，并进入 [features.md](features.md)。
+- 修改失败行为、默认值、诊断码或生命周期状态必须进入 [compatibility.md](compatibility.md)。
+
+## 运行时边界
+
+- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
+- Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
+- 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
+
+## 失败行为
+
+- 输入无效：使用标准参数异常或模块 Result。
+- 生命周期状态非法：返回失败 Result、模块异常或稳定诊断。
+- 依赖缺失：阻止当前功能启用，不影响无关功能。
+- 插件卸载中：拒绝创建新贡献，并撤销已有贡献。
+- 释放失败：记录诊断并继续释放其他资源。
+
+## 测试要求
+
+| Feature ID | 相关能力 | 测试文件 |
+| --- | --- | --- |
+| AUC-LOCALIZATION-001 | Culture State | CultureStateTests |
+| AUC-LOCALIZATION-002 | Language Package Providers | LanguagePackageProviderTests |
+| AUC-LOCALIZATION-003 | Resource Declarations | LocalizationDeclarationAttributeTests |
+| AUC-LOCALIZATION-004 | Lookup and Fallback | LocalizationServiceTests |
+| AUC-LOCALIZATION-005 | Lazy Loading | LocalizationServiceTests |
+| AUC-LOCALIZATION-006 | Presentation Bridge | LocalizationServiceTests |
+
+本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
+
+## 完成标准
+
+- 设计决策能回答对象由谁创建、谁持有、谁释放。
+- API contract、失败行为、诊断和测试矩阵一致。
+- 不出现业务领域假设。
+- 不引入 `AtomUI.City.Presentation concrete UI types` 等禁止依赖。
+
+## 既有细化设计内容
+
+以下内容保留上一轮设计中的专题细节。后续修改必须与本页上方合同、Feature ID、API 行为、诊断和测试矩阵保持一致。
+
+## AtomUI.City.Localization Detailed Design
+
 适用范围：多语言资源、文化切换、语言包懒加载、独立语言包 assembly、AtomUI/Avalonia 集成、UI 热刷新、插件资源、AOT/source generator 和测试策略。
 
-## 1. 定位
+### 1. 定位
 
 `AtomUI.City.Localization` 是应用级多语言资源运行时。
 
@@ -23,7 +79,7 @@ Localization manifest
 -> AtomUI/Avalonia resources and bindings
 ```
 
-## 2. 设计原则
+### 2. 设计原则
 
 - Culture-first lazy loading：懒加载以当前 culture 的语言包为单位，不按单个 key 零散加载。
 - Manifest-only startup：启动只加载 manifest，不加载所有语言包。
@@ -36,7 +92,7 @@ Localization manifest
 - Source-generator-first：资源 manifest、强类型 key 和 descriptor 由 source generator 生成。
 - Testable：支持无真实 UI 的文化切换、查找、fallback、插件撤销和 UI refresh 测试。
 
-## 3. 非目标
+### 3. 非目标
 
 Localization 不负责：
 
@@ -48,7 +104,7 @@ Localization 不负责：
 - 业务错误模型。
 - 具体资源编辑器。
 
-## 4. 核心抽象
+### 4. 核心抽象
 
 | 类型 | 职责 |
 |---|---|
@@ -66,7 +122,7 @@ Localization 不负责：
 
 命名不加 `City` 前缀。
 
-## 5. 资源分层
+### 5. 资源分层
 
 资源来源：
 
@@ -92,7 +148,7 @@ Current feature / plugin
 
 详细规则见：[resource-model.md](resource-model.md) 和 [lookup-and-fallback.md](lookup-and-fallback.md)。
 
-## 6. 语言包懒加载
+### 6. 语言包懒加载
 
 Localization 懒加载以 language package 为单位。
 
@@ -119,7 +175,7 @@ Current culture = zh-CN
 
 详细规则见：[lazy-loading.md](lazy-loading.md)。
 
-## 7. 语言包 Assembly
+### 7. 语言包 Assembly
 
 普通 .NET 运行时支持语言包放在独立 assembly 中运行时动态加载。
 
@@ -137,7 +193,7 @@ FileLanguagePackageProvider
 
 详细规则见：[language-package-assemblies.md](language-package-assemblies.md)。
 
-## 8. 文化切换
+### 8. 文化切换
 
 文化切换必须事务式。
 
@@ -164,7 +220,7 @@ Load failed
 
 详细规则见：[culture-management.md](culture-management.md)。
 
-## 9. AtomUI/Avalonia 集成
+### 9. AtomUI/Avalonia 集成
 
 Localization 不直接操作控件。文化变化通过 Presentation bridge 接入 AtomUI/Avalonia。
 
@@ -185,7 +241,7 @@ AtomUI/Avalonia 资源更新必须在 UI Thread。
 - [atomui-integration.md](atomui-integration.md)
 - [ui-refresh.md](ui-refresh.md)
 
-## 10. 开发者体验
+### 10. 开发者体验
 
 字符串 key 模式：
 
@@ -223,7 +279,7 @@ XAML 目标语法：
 
 详细规则见：[mvvm-integration.md](mvvm-integration.md)。
 
-## 11. 插件资源
+### 11. 插件资源
 
 插件本地化资源必须绑定 Contribution。
 
@@ -245,7 +301,7 @@ Plugin enable
 
 详细规则见：[plugin-integration.md](plugin-integration.md)。
 
-## 12. AOT 和 Source Generator
+### 12. AOT 和 Source Generator
 
 Localization generator 负责：
 
@@ -264,7 +320,7 @@ Localization generator 负责：
 
 详细规则见：[source-generation.md](source-generation.md)。
 
-## 13. 错误策略
+### 13. 错误策略
 
 | 场景 | 默认处理 |
 |---|---|
@@ -276,7 +332,7 @@ Localization generator 负责：
 | 插件资源已撤销 | fallback 或清理对应 UI。 |
 | AtomUI resource apply 失败 | rollback UI resource swap 并记录错误。 |
 
-## 14. 测试策略
+### 14. 测试策略
 
 Testing 包应提供：
 

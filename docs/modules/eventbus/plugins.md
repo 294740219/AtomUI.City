@@ -1,10 +1,66 @@
-# AtomUI.City.EventBus Plugin Integration 设计
+# AtomUI.City.EventBus Plugins 合同
 
-版本：v0.1
-状态：正式初版
+## 适用范围
+
+本专题属于 `AtomUI.City.EventBus` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `Plugins` 相关实现决策，不重新定义模块边界。
+
+## 设计决策
+
+- 插件来源对象必须绑定 plugin owner。
+- 卸载必须撤销 contribution、subscription、view lease、state 和 connection。
+- 跨插件 contract 必须位于 Host 共享程序集。
+
+## Public Contract
+
+- 只允许通过 `AtomUI.City.EventBus` 的 public API、attribute、options、manifest、generated output 或 DI extension 暴露本专题能力。
+- 新增 contract 必须进入 [api-contracts.md](api-contracts.md)。
+- 新增功能必须分配 Feature ID，并进入 [features.md](features.md)。
+- 修改失败行为、默认值、诊断码或生命周期状态必须进入 [compatibility.md](compatibility.md)。
+
+## 运行时边界
+
+- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
+- Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
+- 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
+
+## 失败行为
+
+- 输入无效：使用标准参数异常或模块 Result。
+- 生命周期状态非法：返回失败 Result、模块异常或稳定诊断。
+- 依赖缺失：阻止当前功能启用，不影响无关功能。
+- 插件卸载中：拒绝创建新贡献，并撤销已有贡献。
+- 释放失败：记录诊断并继续释放其他资源。
+
+## 测试要求
+
+| Feature ID | 相关能力 | 测试文件 |
+| --- | --- | --- |
+| AUC-EVENTBUS-001 | Typed Publish | EventPublicationTests |
+| AUC-EVENTBUS-002 | Subscription Lifecycle | EventSubscriptionTests |
+| AUC-EVENTBUS-003 | Contract Registry | EventContractRegistryTests |
+| AUC-EVENTBUS-004 | Dispatch Policy | EventDispatchingTests |
+| AUC-EVENTBUS-005 | Diagnostics | EventDiagnosticsTests |
+| AUC-EVENTBUS-006 | DI Registration | EventBusRegistrationTests |
+
+本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
+
+## 完成标准
+
+- 设计决策能回答对象由谁创建、谁持有、谁释放。
+- API contract、失败行为、诊断和测试矩阵一致。
+- 不出现业务领域假设。
+- 不引入 `AtomUI.City.Presentation` 等禁止依赖。
+
+## 既有细化设计内容
+
+以下内容保留上一轮设计中的专题细节。后续修改必须与本页上方合同、Feature ID、API 行为、诊断和测试矩阵保持一致。
+
+## AtomUI.City.EventBus Plugin Integration 设计
+
 适用范围：插件事件平面、事件 Contract 校验、Capability、Handler Contribution、插件启用停用、事件 drain、AssemblyLoadContext 卸载和错误隔离设计。
 
-## 1. 定位
+### 1. 定位
 
 EventBus 是插件与 Host、静态模块和其他插件解耦通信的重要基础设施，但它也是最容易阻止插件卸载的系统之一。
 
@@ -20,11 +76,11 @@ EventBus 可能长期持有：
 
 因此插件 EventBus 集成必须建立在 ContributionLease、Lifecycle、Threading 和 Host Contract Registry 之上。
 
-## 2. 两个事件平面
+### 2. 两个事件平面
 
 插件 EventBus 分为两个逻辑平面。
 
-### Shared Contract Plane
+#### Shared Contract Plane
 
 用于：
 
@@ -40,7 +96,7 @@ EventBus 可能长期持有：
 - Channel 由 Host 管理。
 - 订阅进入 Host EventBus registry。
 
-### Plugin Private Plane
+#### Plugin Private Plane
 
 用于：
 
@@ -56,7 +112,7 @@ EventBus 可能长期持有：
 - 随插件停用或卸载整体释放。
 - 不得把私有事件桥接进 Shared Plane。
 
-## 3. Shared Plane Contract
+### 3. Shared Plane Contract
 
 共享事件的事件类型及完整对象图必须来自 Host 注册的共享 Contract Assembly，并由 Default AssemblyLoadContext 唯一加载。
 
@@ -74,7 +130,7 @@ PluginSystem 在插件验证阶段检查：
 
 任何不匹配都应在插件执行代码前失败。
 
-## 4. Plugin Manifest
+### 4. Plugin Manifest
 
 插件 manifest 应声明：
 
@@ -91,7 +147,7 @@ Requested capabilities
 
 Source Generator 生成 event manifest。PluginSystem 不通过运行时扫描插件程序集发现 handler。
 
-## 5. Capability 模型
+### 5. Capability 模型
 
 推荐 capability：
 
@@ -113,7 +169,7 @@ Capability 应进一步绑定：
 
 不能只授予一个无限制的全局 EventBus capability。
 
-## 6. 插件获得的接口
+### 6. 插件获得的接口
 
 Host 根据 capability 给插件暴露受限 contract：
 
@@ -129,7 +185,7 @@ Host 根据 capability 给插件暴露受限 contract：
 - 任意 channel 创建权限。
 - EventBus worker 和 queue 内部对象。
 
-## 7. Handler Contribution
+### 7. Handler Contribution
 
 插件 handler 通过 Contribution 注册：
 
@@ -158,7 +214,7 @@ Request 至少包含：
 
 EventBus 可以降低插件请求的 capacity 或 concurrency，但不能静默扩大权限。
 
-## 8. 插件 Handler 创建
+### 8. 插件 Handler 创建
 
 插件 handler 必须从插件 ServiceProvider 创建。
 
@@ -171,7 +227,7 @@ EventBus 可以降低插件请求的 capacity 或 concurrency，但不能静默�
 - Scoped handler 随插件或更小 Scope 释放。
 - Plugin ServiceProvider 停止后不能创建新 handler。
 
-## 9. 插件激活
+### 9. 插件激活
 
 插件 EventBus 激活流程：
 
@@ -192,7 +248,7 @@ Verify event manifest
 - Host 才能向插件 handler 投递事件。
 - 插件私有 EventBus 才能接受事件。
 
-## 10. 激活失败回滚
+### 10. 激活失败回滚
 
 激活中任一步失败：
 
@@ -208,7 +264,7 @@ Reject plugin publications
 
 不能留下半激活插件订阅。
 
-## 11. 插件停用屏障
+### 11. 插件停用屏障
 
 插件停用必须先建立 EventBus quiescing barrier：
 
@@ -231,7 +287,7 @@ Mark plugin event capability Quiescing
 - 插件不能创建新订阅。
 - 已捕获旧快照的 delivery 在执行前必须检查插件状态。
 
-## 12. Queue 处理策略
+### 12. Queue 处理策略
 
 插件停用时，队列策略分为：
 
@@ -245,7 +301,7 @@ Mark plugin event capability Quiescing
 
 一旦共享事件已经被 Shared Plane 接受，事件 payload 必须完全由 Shared Contract 组成，因此它可以在插件停用后继续由 Host 或其他插件处理。
 
-## 13. In-flight Handler
+### 13. In-flight Handler
 
 正在执行的插件 handler：
 
@@ -263,7 +319,7 @@ EventBus 维护：
 
 无法 drain 时，插件停用结果必须明确失败或降级。
 
-## 14. 卸载流程
+### 14. 卸载流程
 
 插件卸载前 EventBus 必须满足：
 
@@ -289,7 +345,7 @@ Dispose plugin event runtime
 -> Allow PluginSystem to unload ALC
 ```
 
-## 15. UnloadPending
+### 15. UnloadPending
 
 EventBus 可能导致插件进入 `UnloadPending`：
 
@@ -304,7 +360,7 @@ EventBus 可能导致插件进入 `UnloadPending`：
 
 EventBus 必须输出具体残留项，不能只报告“插件无法卸载”。
 
-## 16. 诊断对象安全
+### 16. 诊断对象安全
 
 插件异常和事件 payload 不能被 Host 诊断系统永久强引用。
 
@@ -316,7 +372,7 @@ EventBus 必须输出具体残留项，不能只报告“插件无法卸载”�
 - 默认不保存完整插件事件 payload。
 - 需要 payload snapshot 时转换为 Host-owned stable representation。
 
-## 17. 插件更新
+### 17. 插件更新
 
 插件更新流程：
 
@@ -335,7 +391,7 @@ Deactivate old plugin
 - 插件不能在更新时替换 Host Shared Contract。
 - Contract 不兼容时拒绝新插件版本。
 
-## 18. Plugin-to-Plugin 通信
+### 18. Plugin-to-Plugin 通信
 
 插件之间只通过 Shared Contract Plane 通信。
 
@@ -348,7 +404,7 @@ Deactivate old plugin
 
 插件不需要感知对方是否安装。没有订阅者时，发布结果可以成功但 handler count 为零，是否视为业务问题由发布方决定。
 
-## 19. 插件错误隔离
+### 19. 插件错误隔离
 
 插件 handler 失败默认：
 
@@ -365,7 +421,7 @@ Deactivate old plugin
 
 具体升级策略由 Host 配置。
 
-## 20. 性能和配额
+### 20. 性能和配额
 
 插件不能消耗无限 EventBus 资源。
 
@@ -386,7 +442,7 @@ Host 应限制：
 - 触发 throttling。
 - 记录插件资源诊断。
 
-## 21. AOT 和 Dynamic Plugin Mode
+### 21. AOT 和 Dynamic Plugin Mode
 
 Static Plugin Mode：
 
@@ -401,7 +457,7 @@ Dynamic Plugin Mode：
 - 不扫描任意类型发现 handler。
 - 不承诺完整 NativeAOT 动态加载。
 
-## 22. 测试要求
+### 22. 测试要求
 
 必须测试：
 
@@ -419,7 +475,7 @@ Dynamic Plugin Mode：
 - EventBus 不阻止 AssemblyLoadContext 回收。
 - UnloadPending 诊断包含具体残留。
 
-## 23. 第一版明确决策
+### 23. 第一版明确决策
 
 - Shared Plane 由 Host 管理。
 - Private Plane 随插件释放。

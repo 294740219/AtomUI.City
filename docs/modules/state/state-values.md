@@ -1,10 +1,66 @@
-# AtomUI.City.State 状态值设计
+# AtomUI.City.State State Values 合同
 
-版本：v0.1
-状态：正式初版
+## 适用范围
+
+本专题属于 `AtomUI.City.State` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `State Values` 相关实现决策，不重新定义模块边界。
+
+## 设计决策
+
+- 本专题必须绑定 Feature ID。
+- 必须说明 public contract、失败行为和测试。
+- 不得只描述概念。
+
+## Public Contract
+
+- 只允许通过 `AtomUI.City.State` 的 public API、attribute、options、manifest、generated output 或 DI extension 暴露本专题能力。
+- 新增 contract 必须进入 [api-contracts.md](api-contracts.md)。
+- 新增功能必须分配 Feature ID，并进入 [features.md](features.md)。
+- 修改失败行为、默认值、诊断码或生命周期状态必须进入 [compatibility.md](compatibility.md)。
+
+## 运行时边界
+
+- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
+- Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
+- 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
+
+## 失败行为
+
+- 输入无效：使用标准参数异常或模块 Result。
+- 生命周期状态非法：返回失败 Result、模块异常或稳定诊断。
+- 依赖缺失：阻止当前功能启用，不影响无关功能。
+- 插件卸载中：拒绝创建新贡献，并撤销已有贡献。
+- 释放失败：记录诊断并继续释放其他资源。
+
+## 测试要求
+
+| Feature ID | 相关能力 | 测试文件 |
+| --- | --- | --- |
+| AUC-STATE-001 | Writable State | WritableStateTests |
+| AUC-STATE-002 | Application State | ApplicationStateTests |
+| AUC-STATE-003 | Computed State | ComputedStateTests |
+| AUC-STATE-004 | State Subscription | StateScopeTests; StateThreadingTests |
+| AUC-STATE-005 | State Snapshot | StateSnapshotTests |
+| AUC-STATE-006 | Collection State | StateCollectionTests |
+
+本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
+
+## 完成标准
+
+- 设计决策能回答对象由谁创建、谁持有、谁释放。
+- API contract、失败行为、诊断和测试矩阵一致。
+- 不出现业务领域假设。
+- 不引入 `AtomUI.City.Presentation` 等禁止依赖。
+
+## 既有细化设计内容
+
+以下内容保留上一轮设计中的专题细节。后续修改必须与本页上方合同、Feature ID、API 行为、诊断和测试矩阵保持一致。
+
+## AtomUI.City.State 状态值设计
+
 适用范围：`IReadOnlyState<T>`、`IWritableState<T>`、状态版本、相等比较、原子更新和状态定义
 
-## 1. 定位
+### 1. 定位
 
 状态值是 State 模块的最小运行单元。
 
@@ -17,7 +73,7 @@ StateKey<T>
 StateDefinition<T>
 ```
 
-## 2. IReadOnlyState<T>
+### 2. IReadOnlyState<T>
 
 建议语义：
 
@@ -41,7 +97,7 @@ public interface IReadOnlyState<T>
 - 订阅必须可释放。
 - 默认不暴露 Rx 类型。
 
-## 3. IWritableState<T>
+### 3. IWritableState<T>
 
 建议语义：
 
@@ -65,7 +121,7 @@ public interface IWritableState<T> : IReadOnlyState<T>
 
 异步请求不直接进入 state。异步请求属于 Data、Command 或 OperationScope，完成后再提交状态更新。
 
-## 4. StateKey<T>
+### 4. StateKey<T>
 
 应用级和模块级共享状态必须使用强类型 key。
 
@@ -90,7 +146,7 @@ public static class ThemeStates
 - 插件 key 必须带插件或 package 前缀。
 - 不允许不同类型复用同一个 key 名称。
 
-## 5. StateDefinition<T>
+### 5. StateDefinition<T>
 
 状态注册必须显式声明定义。
 
@@ -115,7 +171,7 @@ context.States.Add(
 - 相等比较策略。
 - 诊断元数据。
 
-## 6. 相等比较
+### 6. 相等比较
 
 相等值不触发通知。
 
@@ -128,7 +184,7 @@ context.States.Add(
 
 不允许通过原地修改可变对象绕过状态提交。推荐状态值使用 immutable 或 replace-only 风格。
 
-## 7. 原子更新
+### 7. 原子更新
 
 `SetValue` 和 `Update` 必须满足：
 
@@ -138,7 +194,7 @@ context.States.Add(
 - 更新失败不改变当前值。
 - 取消后的 OperationScope 不应继续提交状态更新。
 
-## 8. AOT 和 Source Generator
+### 8. AOT 和 Source Generator
 
 Source Generator 负责生成：
 
@@ -150,7 +206,7 @@ Source Generator 负责生成：
 
 默认禁止运行时扫描程序集找状态定义。
 
-## 9. 测试矩阵
+### 9. 测试矩阵
 
 | 功能点 | 测试类型 | 断言 |
 |---|---|---|

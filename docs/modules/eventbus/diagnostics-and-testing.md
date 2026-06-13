@@ -1,10 +1,66 @@
-# AtomUI.City.EventBus Diagnostics and Testing 设计
+# AtomUI.City.EventBus Diagnostics And Testing 合同
 
-版本：v0.1
-状态：正式初版
+## 适用范围
+
+本专题属于 `AtomUI.City.EventBus` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `Diagnostics And Testing` 相关实现决策，不重新定义模块边界。
+
+## 设计决策
+
+- 每个 Feature ID 至少有 Unit 或 Contract 测试。
+- 集成测试不能替代单元测试。
+- 释放、取消和诊断必须断言。
+
+## Public Contract
+
+- 只允许通过 `AtomUI.City.EventBus` 的 public API、attribute、options、manifest、generated output 或 DI extension 暴露本专题能力。
+- 新增 contract 必须进入 [api-contracts.md](api-contracts.md)。
+- 新增功能必须分配 Feature ID，并进入 [features.md](features.md)。
+- 修改失败行为、默认值、诊断码或生命周期状态必须进入 [compatibility.md](compatibility.md)。
+
+## 运行时边界
+
+- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
+- Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
+- 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
+
+## 失败行为
+
+- 输入无效：使用标准参数异常或模块 Result。
+- 生命周期状态非法：返回失败 Result、模块异常或稳定诊断。
+- 依赖缺失：阻止当前功能启用，不影响无关功能。
+- 插件卸载中：拒绝创建新贡献，并撤销已有贡献。
+- 释放失败：记录诊断并继续释放其他资源。
+
+## 测试要求
+
+| Feature ID | 相关能力 | 测试文件 |
+| --- | --- | --- |
+| AUC-EVENTBUS-001 | Typed Publish | EventPublicationTests |
+| AUC-EVENTBUS-002 | Subscription Lifecycle | EventSubscriptionTests |
+| AUC-EVENTBUS-003 | Contract Registry | EventContractRegistryTests |
+| AUC-EVENTBUS-004 | Dispatch Policy | EventDispatchingTests |
+| AUC-EVENTBUS-005 | Diagnostics | EventDiagnosticsTests |
+| AUC-EVENTBUS-006 | DI Registration | EventBusRegistrationTests |
+
+本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
+
+## 完成标准
+
+- 设计决策能回答对象由谁创建、谁持有、谁释放。
+- API contract、失败行为、诊断和测试矩阵一致。
+- 不出现业务领域假设。
+- 不引入 `AtomUI.City.Presentation` 等禁止依赖。
+
+## 既有细化设计内容
+
+以下内容保留上一轮设计中的专题细节。后续修改必须与本页上方合同、Feature ID、API 行为、诊断和测试矩阵保持一致。
+
+## AtomUI.City.EventBus Diagnostics and Testing 设计
+
 适用范围：事件诊断上下文、结构化记录、错误策略、指标、事件链、测试工具、确定性调度、插件卸载断言和性能验证。
 
-## 1. 定位
+### 1. 定位
 
 EventBus 是高度解耦的系统。发布方通常不知道订阅方，订阅方也可能位于另一个模块、线程或插件中。如果缺少结构化诊断，事件丢失、顺序异常、handler 阻塞和插件卸载失败会很难定位。
 
@@ -18,7 +74,7 @@ EventBus 诊断必须回答：
 - 哪个插件或 Scope 持有订阅。
 - 当前为什么无法停止或卸载。
 
-## 2. DiagnosticContext 集成
+### 2. DiagnosticContext 集成
 
 EventBus 复用 Core `DiagnosticContext`，并增加事件维度：
 
@@ -43,7 +99,7 @@ EventBus 复用 Core `DiagnosticContext`，并增加事件维度：
 
 不应默认记录敏感 partition key 原文。
 
-## 3. EventId、CorrelationId 与 CausationId
+### 3. EventId、CorrelationId 与 CausationId
 
 每次发布生成唯一 `EventId`。
 
@@ -67,7 +123,7 @@ Command operation
 
 诊断系统可以通过 CorrelationId 重建事件因果链。
 
-## 4. Diagnostic Record
+### 4. Diagnostic Record
 
 建议事件总线产生结构化 record：
 
@@ -87,7 +143,7 @@ Command operation
 | `EventChannelBackpressure` | Queue 达到阈值。 |
 | `EventPluginDrainTimedOut` | 插件 handler 无法在时限内结束。 |
 
-## 5. Payload 记录
+### 5. Payload 记录
 
 默认不记录完整事件 payload。
 
@@ -109,7 +165,7 @@ Command operation
 
 Payload diagnostics 必须 opt-in，并通过 contract 提供的稳定 formatter 生成 Host-owned snapshot。
 
-## 6. Exception 记录
+### 6. Exception 记录
 
 静态模块异常可以进入 Core diagnostic sink。
 
@@ -130,7 +186,7 @@ Payload diagnostics 必须 opt-in，并通过 contract 提供的稳定 formatter
 - EventId。
 - SubscriptionId。
 
-## 7. 错误策略
+### 7. 错误策略
 
 EventBus 错误策略：
 
@@ -151,7 +207,7 @@ EventBus 错误策略：
 
 更具体策略可以收紧错误处理，但插件不能自行把 Host 系统错误降级为忽略。
 
-## 8. 连续失败
+### 8. 连续失败
 
 EventBus 可以维护订阅健康状态：
 
@@ -168,7 +224,7 @@ EventBus 可以维护订阅健康状态：
 
 失败计数必须有恢复窗口，避免一次历史错误永久污染订阅状态。
 
-## 9. 指标
+### 9. 指标
 
 建议指标：
 
@@ -188,7 +244,7 @@ EventBus 可以维护订阅健康状态：
 
 指标标签必须受控，不能把 EventId、用户 id 或任意 partition key 作为高基数标签。
 
-## 10. 日志级别
+### 10. 日志级别
 
 建议：
 
@@ -206,7 +262,7 @@ EventBus 可以维护订阅健康状态：
 
 高频事件不能默认逐条输出 Information 日志。
 
-## 11. 诊断缓冲
+### 11. 诊断缓冲
 
 桌面应用现场排查可以使用有界内存诊断缓冲。
 
@@ -218,7 +274,7 @@ EventBus 可以维护订阅健康状态：
 - 支持按 PluginId、EventContractId、SubscriptionId 查询。
 - 插件卸载前不需要清空共享稳定摘要，但必须清除插件对象引用。
 
-## 12. Testing 包能力
+### 12. Testing 包能力
 
 `AtomUI.City.Testing` 应提供：
 
@@ -232,7 +288,7 @@ EventBus 可以维护订阅健康状态：
 | `EventBusAssertions` | 顺序、线程目标、错误和生命周期断言。 |
 | `PluginEventBusProbe` | 检查插件残留订阅、queue 和 handler。 |
 
-## 13. EventRecorder
+### 13. EventRecorder
 
 EventRecorder 记录稳定事件事实：
 
@@ -247,7 +303,7 @@ EventRecorder 记录稳定事件事实：
 
 默认不记录完整 payload。测试可以显式提供安全 projector。
 
-## 14. 确定性调度
+### 14. 确定性调度
 
 测试不能依赖真实线程和 `Task.Delay` 猜测时序。
 
@@ -265,7 +321,7 @@ Deterministic dispatcher 应支持：
 
 这样可以稳定断言多线程顺序。
 
-## 15. 顺序测试
+### 15. 顺序测试
 
 必须覆盖：
 
@@ -280,7 +336,7 @@ Deterministic dispatcher 应支持：
 
 测试应断言框架承诺的顺序，不应断言文档明确不保证的跨订阅完成顺序。
 
-## 16. 背压测试
+### 16. 背压测试
 
 每种策略都需要：
 
@@ -298,7 +354,7 @@ Deterministic dispatcher 应支持：
 - DropNewest 拒绝当前事件。
 - CoalesceLatest 只保留指定 key 的最新事件。
 
-## 17. 错误测试
+### 17. 错误测试
 
 需要覆盖：
 
@@ -314,7 +370,7 @@ Deterministic dispatcher 应支持：
 - FailPublisher。
 - DisableSubscription。
 
-## 18. Lifecycle 测试
+### 18. Lifecycle 测试
 
 需要覆盖：
 
@@ -334,7 +390,7 @@ Deterministic dispatcher 应支持：
 - Handler 已释放。
 - Snapshot 不再包含订阅。
 
-## 19. Plugin 测试
+### 19. Plugin 测试
 
 需要覆盖：
 
@@ -351,7 +407,7 @@ Deterministic dispatcher 应支持：
 - AssemblyLoadContext 可以被 GC 回收。
 - UnloadPending 输出具体 EventBus 残留。
 
-## 20. Contract 测试
+### 20. Contract 测试
 
 需要覆盖：
 
@@ -365,7 +421,7 @@ Deterministic dispatcher 应支持：
 
 Generator golden tests 应验证 manifest 和 generated invoker 的确定性。
 
-## 21. 性能测试
+### 21. 性能测试
 
 Benchmark 与 correctness test 分开。
 
@@ -387,7 +443,7 @@ Benchmark 场景：
 - Drain time。
 - Cancellation responsiveness。
 
-## 22. 测试完成标准
+### 22. 测试完成标准
 
 EventBus 开始实现前，测试设计必须能覆盖：
 

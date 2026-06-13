@@ -1,16 +1,72 @@
-# AtomUI.City.Testing 详细设计
+# AtomUI.City.Testing Detailed Design 合同
 
-版本：v0.1
-状态：正式初版
+## 适用范围
+
+本专题属于 `AtomUI.City.Testing` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `Detailed Design` 相关实现决策，不重新定义模块边界。
+
+## 设计决策
+
+- 每个 Feature ID 至少有 Unit 或 Contract 测试。
+- 集成测试不能替代单元测试。
+- 释放、取消和诊断必须断言。
+
+## Public Contract
+
+- 只允许通过 `AtomUI.City.Testing` 的 public API、attribute、options、manifest、generated output 或 DI extension 暴露本专题能力。
+- 新增 contract 必须进入 [api-contracts.md](api-contracts.md)。
+- 新增功能必须分配 Feature ID，并进入 [features.md](features.md)。
+- 修改失败行为、默认值、诊断码或生命周期状态必须进入 [compatibility.md](compatibility.md)。
+
+## 运行时边界
+
+- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
+- Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
+- 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
+
+## 失败行为
+
+- 输入无效：使用标准参数异常或模块 Result。
+- 生命周期状态非法：返回失败 Result、模块异常或稳定诊断。
+- 依赖缺失：阻止当前功能启用，不影响无关功能。
+- 插件卸载中：拒绝创建新贡献，并撤销已有贡献。
+- 释放失败：记录诊断并继续释放其他资源。
+
+## 测试要求
+
+| Feature ID | 相关能力 | 测试文件 |
+| --- | --- | --- |
+| AUC-TESTING-001 | Test Host | TestHostTests |
+| AUC-TESTING-002 | Fake Dispatcher | FakeUiDispatcherTests |
+| AUC-TESTING-003 | Deterministic Scheduler | SharedTestUtilitiesTests |
+| AUC-TESTING-004 | Module Test Host | ModuleTestHostTests |
+| AUC-TESTING-005 | Plugin Test Host | PluginTestHostTests |
+| AUC-TESTING-006 | Routing Test Host | RoutingTestHostTests |
+
+本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
+
+## 完成标准
+
+- 设计决策能回答对象由谁创建、谁持有、谁释放。
+- API contract、失败行为、诊断和测试矩阵一致。
+- 不出现业务领域假设。
+- 不引入 `生产运行时反向依赖 AtomUI.City.Testing` 等禁止依赖。
+
+## 既有细化设计内容
+
+以下内容保留上一轮设计中的专题细节。后续修改必须与本页上方合同、Feature ID、API 行为、诊断和测试矩阵保持一致。
+
+## AtomUI.City.Testing 详细设计
+
 适用范围：测试治理、TestHost、确定性调度、生命周期测试、模块协作测试、插件测试、集成测试和测试断言工具
 
-## 1. 定位
+### 1. 定位
 
 `AtomUI.City.Testing` 是 AtomUI.City 的框架级测试基础设施。它负责让框架编程模型、生命周期、模块协作、插件运行时、线程调度、状态通知和诊断行为可被稳定验证。
 
 Testing 的目标不是替代测试框架，也不是封装应用业务测试。应用和框架测试可以继续使用 xUnit、NUnit、MSTest 等 runner。Testing 提供的是测试 Host、fake runtime、deterministic scheduler、driver、assertion 和测试矩阵规范。
 
-## 2. 硬约束
+### 2. 硬约束
 
 AtomUI.City 采用功能点测试门禁。
 
@@ -28,7 +84,7 @@ AtomUI.City 采用功能点测试门禁。
 
 详细规则见：[功能点测试门禁](feature-test-gate.md)。
 
-## 3. 设计原则
+### 3. 设计原则
 
 | 原则 | 说明 |
 |---|---|
@@ -40,7 +96,7 @@ AtomUI.City 采用功能点测试门禁。
 | AOT-aware | 测试工具不能依赖运行时反射扫描作为核心机制。 |
 | Documentation-traceable | 模块设计文档中的功能点必须映射到测试矩阵。 |
 
-## 4. 边界
+### 4. 边界
 
 Testing 负责：
 
@@ -74,7 +130,7 @@ Testing 不负责：
 
 生产代码不得依赖 `AtomUI.City.Testing`。测试项目可以依赖它。
 
-## 5. 核心组件
+### 5. 核心组件
 
 | 组件 | 职责 |
 |---|---|
@@ -96,7 +152,7 @@ Testing 不负责：
 | `PluginTestHost` | 构造 fake plugin package/source，驱动 install、load、activate、unload。 |
 | `DiagnosticsAssertions` | 断言诊断事件、错误码、阶段和上下文。 |
 
-## 6. TestHost 模型
+### 6. TestHost 模型
 
 ```text
 TestHost
@@ -131,7 +187,7 @@ UseLocalizationTesting
 UsePluginTesting
 ```
 
-## 7. 线程和调度
+### 7. 线程和调度
 
 测试必须避免依赖真实时钟和真实线程时序。
 
@@ -155,7 +211,7 @@ Arrange
 
 详细规则见：[Fake Dispatcher 和确定性调度](fake-dispatcher-and-scheduler.md)。
 
-## 8. 测试分层
+### 8. 测试分层
 
 | 层级 | 说明 |
 |---|---|
@@ -169,7 +225,7 @@ Arrange
 
 集成测试策略见：[集成测试策略](integration-testing.md)。
 
-## 9. 每个模块的测试矩阵
+### 9. 每个模块的测试矩阵
 
 每个模块详细设计必须包含测试矩阵。
 
@@ -182,7 +238,7 @@ Arrange
 
 测试矩阵用于实现前检查和完成前验收。
 
-## 10. 集成测试设计
+### 10. 集成测试设计
 
 集成测试分两类：
 
@@ -203,7 +259,7 @@ Arrange
 
 平台集成测试覆盖 fake runtime 无法证明的 UI 行为，例如 UI Dispatcher、真实 ViewLocator、binding、Outlet commit、ResourceDictionary 和 visual lifecycle。
 
-## 11. 插件测试
+### 11. 插件测试
 
 PluginSystem 测试必须支持：
 
@@ -222,7 +278,7 @@ PluginSystem 测试必须支持：
 
 详细规则见：[插件测试](plugin-testing.md)。
 
-## 12. AOT 和 Source Generator 测试
+### 12. AOT 和 Source Generator 测试
 
 Testing 必须支持：
 
@@ -234,7 +290,7 @@ Testing 必须支持：
 
 运行时反射扫描不能作为测试工具发现功能点的默认方式。
 
-## 13. 完成标准
+### 13. 完成标准
 
 一个功能点完成必须同时满足：
 
