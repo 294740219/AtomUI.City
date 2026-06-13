@@ -6,7 +6,14 @@ public sealed class StateSnapshot
     {
         ArgumentNullException.ThrowIfNull(entries);
 
-        Entries = Array.AsReadOnly(entries.ToArray());
+        var snapshotEntries = entries.ToArray();
+
+        if (snapshotEntries.Any(entry => entry is null))
+        {
+            throw new ArgumentException("State snapshot entries must not contain null.", nameof(entries));
+        }
+
+        Entries = Array.AsReadOnly(snapshotEntries);
     }
 
     public IReadOnlyList<StateSnapshotEntry> Entries { get; }

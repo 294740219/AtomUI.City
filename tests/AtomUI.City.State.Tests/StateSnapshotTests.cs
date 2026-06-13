@@ -78,6 +78,40 @@ public sealed class StateSnapshotTests
     }
 
     [Fact]
+    public void SnapshotEntryRejectsNegativeVersion()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new StateSnapshotEntry(
+            "AtomUI.City.Tests.Theme",
+            typeof(string),
+            "light",
+            version: -1,
+            schemaVersion: 1,
+            ownerModule: null,
+            pluginId: null));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void SnapshotEntryRejectsInvalidSchemaVersion(int schemaVersion)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new StateSnapshotEntry(
+            "AtomUI.City.Tests.Theme",
+            typeof(string),
+            "light",
+            version: 0,
+            schemaVersion: schemaVersion,
+            ownerModule: null,
+            pluginId: null));
+    }
+
+    [Fact]
+    public void SnapshotRejectsNullEntries()
+    {
+        Assert.Throws<ArgumentException>(() => new StateSnapshot([null!]));
+    }
+
+    [Fact]
     public void SnapshotRestoreAppliesCompatibleRegisteredValues()
     {
         var key = new StateKey<string>("AtomUI.City.Tests.Theme");
