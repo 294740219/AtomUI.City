@@ -763,6 +763,74 @@
 | Diagnostics | 自动 revoke contribution 时写 `AUCTEST401`；内部 Host dispose 写 `AUCTEST001`。 |
 | Tests | `PluginTestHostTests`。 |
 
+### `RoutingTestHostBuilder.MapRoute`
+
+| Field | Contract |
+| --- | --- |
+| Feature | AUC-TESTING-006 |
+| Purpose | 声明测试 route name、pattern 和 view model target。 |
+| Parameters | `name`、`pattern` 不能为空或空白；`viewModelType` 不能为 null。 |
+| Return | 当前 `RoutingTestHostBuilder`。 |
+| Nullability | 参数不接受 null。 |
+| Cancellation | 无。 |
+| Exceptions or Result | 参数非法抛声明异常；Build 后调用抛 `InvalidOperationException`。 |
+| Idempotency | 每次调用追加一个 route；duplicate route name 或 normalized pattern 在 Build 时失败。 |
+| Concurrency | 配置阶段不保证线程安全。 |
+| Side Effects | 只修改 builder 内部 route registration。 |
+| Diagnostics | Build 前不写诊断。 |
+| Tests | `RoutingTestHostTests`。 |
+
+### `RoutingTestHostBuilder.Build`
+
+| Field | Contract |
+| --- | --- |
+| Feature | AUC-TESTING-006 |
+| Purpose | 冻结 builder，验证 route conflict，并创建 immutable route graph snapshot。 |
+| Parameters | 无。 |
+| Return | 新的 `RoutingTestHost`。 |
+| Nullability | 返回值不能为空。 |
+| Cancellation | 同步构建，不接收 token。 |
+| Exceptions or Result | 重复 Build、duplicate route name 或 duplicate pattern 抛 `InvalidOperationException`。 |
+| Idempotency | 每个 builder 只允许成功 Build 一次。 |
+| Concurrency | Build 必须外部串行。 |
+| Side Effects | 创建 route snapshot 和 test diagnostics。 |
+| Diagnostics | match/navigation failure 写入返回 Host 的 diagnostics。 |
+| Tests | `RoutingTestHostTests`。 |
+
+### `RoutingTestHost.Match`
+
+| Field | Contract |
+| --- | --- |
+| Feature | AUC-TESTING-006 |
+| Purpose | 匹配 path 到 route target，并抽取 route parameters。 |
+| Parameters | `path` 不能为空或空白。 |
+| Return | `RouteTestMatch`。 |
+| Nullability | `path` 不接受 null；返回值不能为空。 |
+| Cancellation | 无。 |
+| Exceptions or Result | 未匹配时返回 not-found result，不抛异常。 |
+| Idempotency | 只读；重复匹配同一路径返回等价 result。 |
+| Concurrency | route snapshot 可并发读取。 |
+| Side Effects | not found 时写 diagnostics。 |
+| Diagnostics | not found 写 `AUCTEST501`，消息包含 path。 |
+| Tests | `RoutingTestHostTests`。 |
+
+### `RoutingTestHost.NavigateAsync`
+
+| Field | Contract |
+| --- | --- |
+| Feature | AUC-TESTING-006 |
+| Purpose | 提供可取消 navigation helper，复用 `Match` 的 route graph 结果。 |
+| Parameters | `path` 不能为空或空白；`cancellationToken` 在 match 前观察。 |
+| Return | 匹配完成后的 `RouteTestMatch`。 |
+| Nullability | `path` 不接受 null；返回 task 不为空。 |
+| Cancellation | token 取消时抛 `OperationCanceledException`，不写 not-found diagnostic。 |
+| Exceptions or Result | 未匹配时返回 not-found result。 |
+| Idempotency | helper 不提交真实 navigation 状态。 |
+| Concurrency | 测试默认串行调用。 |
+| Side Effects | 未取消时与 `Match` 一致。 |
+| Diagnostics | not found 写 `AUCTEST501`。 |
+| Tests | `RoutingTestHostTests`。 |
+
 ## Public 类型覆盖
 
 | Type | 分类 | Review 规则 |
