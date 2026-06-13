@@ -542,6 +542,108 @@
 | Diagnostics | callback 异常写 `AUCTEST201`，消息包含 work id 和 due time。 |
 | Tests | `SharedTestUtilitiesTests`。 |
 
+### `ModuleTestHostBuilder.UseModule`
+
+| Field | Contract |
+| --- | --- |
+| Feature | AUC-TESTING-004 |
+| Purpose | 注册测试模块实例，并记录测试可读 module name。 |
+| Parameters | `name` 不能为空或空白；`module` 不能为 null。 |
+| Return | 当前 `ModuleTestHostBuilder`。 |
+| Nullability | `name` 和 `module` 不接受 null。 |
+| Cancellation | 无。 |
+| Exceptions or Result | 参数非法抛 `ArgumentException` 或 `ArgumentNullException`；Build 后调用抛 `InvalidOperationException`。 |
+| Idempotency | 每次调用追加一个模块；duplicate module name 或 module type 在 Build 时失败。 |
+| Concurrency | 配置阶段不保证线程安全。 |
+| Side Effects | 只修改 builder 内部 module registration。 |
+| Diagnostics | Build 前不写诊断；生命周期失败由 `ModuleTestHost` 写 diagnostics。 |
+| Tests | `ModuleTestHostTests`。 |
+
+### `ModuleTestHostBuilder.UseHostProperty`
+
+| Field | Contract |
+| --- | --- |
+| Feature | AUC-TESTING-004 |
+| Purpose | 透传测试 Host property 到内部 `TestHostBuilder`。 |
+| Parameters | `key` 不能为空或空白；`value` 可以为 null。 |
+| Return | 当前 `ModuleTestHostBuilder`。 |
+| Nullability | `key` 不接受 null；`value` 接受 null。 |
+| Cancellation | 无。 |
+| Exceptions or Result | 参数非法由内部 `TestHostBuilder` 抛出；Build 后调用抛 `InvalidOperationException`。 |
+| Idempotency | 同一 key 重复设置时，最后一次 Build 前设置生效。 |
+| Concurrency | 配置阶段不保证线程安全。 |
+| Side Effects | 修改内部 host builder pending properties。 |
+| Diagnostics | Build 前不写诊断。 |
+| Tests | `ModuleTestHostTests`。 |
+
+### `ModuleTestHostBuilder.Build`
+
+| Field | Contract |
+| --- | --- |
+| Feature | AUC-TESTING-004 |
+| Purpose | 冻结 builder，验证模块依赖图，按依赖序创建 `ModuleTestHost`。 |
+| Parameters | 无。 |
+| Return | 新的 `ModuleTestHost`。 |
+| Nullability | 返回值不能为空。 |
+| Cancellation | 同步构建，不接收 token。 |
+| Exceptions or Result | 重复 Build、duplicate module、required dependency missing 或 dependency cycle 抛 `InvalidOperationException`。 |
+| Idempotency | 每个 builder 只允许成功 Build 一次。 |
+| Concurrency | Build 必须外部串行。 |
+| Side Effects | 创建内部 `TestHost` 和临时目录。 |
+| Diagnostics | graph failure 通过异常消息暴露；module lifecycle failure 写入 Host diagnostics。 |
+| Tests | `ModuleTestHostTests`。 |
+
+### `ModuleTestHost.InitializeAsync`
+
+| Field | Contract |
+| --- | --- |
+| Feature | AUC-TESTING-004 |
+| Purpose | 按依赖序执行 module service、contribution 和 application initialization 阶段。 |
+| Parameters | `cancellationToken` 在每个 module stage 前后传递和观察。 |
+| Return | 初始化完成后的 `ValueTask`。 |
+| Nullability | 返回 task 不为空。 |
+| Cancellation | token 取消时抛 `OperationCanceledException`，不得把 Host 标记为 initialized。 |
+| Exceptions or Result | lifecycle stage 抛出的异常写诊断后重新抛出；重复初始化幂等。 |
+| Idempotency | 成功初始化后重复调用不重复执行 module stage。 |
+| Concurrency | 生命周期由测试串行驱动。 |
+| Side Effects | 构建 service provider，执行 module contribution 和 initialization hook。 |
+| Diagnostics | stage 失败写 `AUCTEST301`，消息包含 module name、module type 和 stage。 |
+| Tests | `ModuleTestHostTests`。 |
+
+### `ModuleTestHost.ShutdownAsync`
+
+| Field | Contract |
+| --- | --- |
+| Feature | AUC-TESTING-004 |
+| Purpose | 按反向依赖序执行 module shutdown，并停止内部 `TestHost`。 |
+| Parameters | `cancellationToken` 传递给每个 shutdown hook。 |
+| Return | shutdown 完成后的 `ValueTask`。 |
+| Nullability | 返回 task 不为空。 |
+| Cancellation | token 取消时抛 `OperationCanceledException`；已经开始的最小清理不能跳过。 |
+| Exceptions or Result | shutdown stage 异常写 `AUCTEST302` 后重新抛出；重复 shutdown 幂等。 |
+| Idempotency | 成功 shutdown 后重复调用不重复执行 module stage。 |
+| Concurrency | 生命周期由测试串行驱动。 |
+| Side Effects | 停止内部 Host 并释放 service provider。 |
+| Diagnostics | shutdown 失败写 `AUCTEST302`，消息包含 module name、module type 和 stage。 |
+| Tests | `ModuleTestHostTests`。 |
+
+### `ModuleTestHost.Dispose` 和 `ModuleTestHost.DisposeAsync`
+
+| Field | Contract |
+| --- | --- |
+| Feature | AUC-TESTING-004 |
+| Purpose | 自动 shutdown 未停止的模块并释放内部 `TestHost`。 |
+| Parameters | 无。 |
+| Return | `Dispose` 无返回；`DisposeAsync` 返回释放完成的 `ValueTask`。 |
+| Nullability | 无。 |
+| Cancellation | Dispose 不接收 token。 |
+| Exceptions or Result | 重复 Dispose 幂等；shutdown 失败按原异常抛出并写诊断。 |
+| Idempotency | 幂等。 |
+| Concurrency | 单测试线程串行释放。 |
+| Side Effects | 释放 service provider、fake runtime 和临时目录。 |
+| Diagnostics | shutdown 失败写 `AUCTEST302`；内部 Host dispose 写 `AUCTEST001`。 |
+| Tests | `ModuleTestHostTests`。 |
+
 ## Public 类型覆盖
 
 | Type | 分类 | Review 规则 |
