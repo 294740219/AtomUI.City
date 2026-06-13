@@ -4,16 +4,16 @@
 
 ## Feature 索引
 
-| Feature ID | 名称 | 状态 | Public Contract | 主测试 |
+| Feature ID | 名称 | 状态 | 公开合同 | 主测试 |
 | --- | --- | --- | --- | --- |
-| AUC-STATE-001 | Writable State | Ready to Start Product Implementation | IWritableState<T>, WritableState<T> | WritableStateTests |
-| AUC-STATE-002 | Application State | Ready to Start Product Implementation | IApplicationState, ApplicationStateRegistry | ApplicationStateTests |
-| AUC-STATE-003 | Computed State | Ready to Start Product Implementation | IComputedState<T>, ComputedState<T> | ComputedStateTests |
-| AUC-STATE-004 | State Subscription | Ready to Start Product Implementation | IStateSubscription, IStateReaction | StateScopeTests; StateThreadingTests |
-| AUC-STATE-005 | State Snapshot | Ready to Start Product Implementation | StateSnapshot, StateSnapshotEntry | StateSnapshotTests |
-| AUC-STATE-006 | Collection State | Ready to Start Product Implementation | StateCollection<TKey,TItem> | StateCollectionTests |
-| AUC-STATE-007 | Diagnostics | Ready to Start Product Implementation | StateDiagnosticIds | StateDiagnosticsTests |
-| AUC-STATE-008 | Threading | Ready to Start Product Implementation | StateDispatchPolicy | StateThreadingTests |
+| AUC-STATE-001 | Writable State | 准备开始产品实现 | IWritableState<T>, WritableState<T> | WritableStateTests |
+| AUC-STATE-002 | Application State | 产品化进行中 | IApplicationState, ApplicationStateRegistry, StateDefinition<T> | ApplicationStateTests; StateDefinitionTests |
+| AUC-STATE-003 | Computed State | 准备开始产品实现 | IComputedState<T>, ComputedState<T> | ComputedStateTests |
+| AUC-STATE-004 | State Subscription | 准备开始产品实现 | IStateSubscription, IStateReaction | StateScopeTests; StateThreadingTests |
+| AUC-STATE-005 | State Snapshot | 产品化进行中 | StateSnapshot, StateSnapshotEntry | StateSnapshotTests |
+| AUC-STATE-006 | Collection State | 准备开始产品实现 | StateCollection<TKey,TItem> | StateCollectionTests |
+| AUC-STATE-007 | Diagnostics | 准备开始产品实现 | StateDiagnosticIds | StateDiagnosticsTests |
+| AUC-STATE-008 | Threading | 准备开始产品实现 | StateDispatchPolicy | StateThreadingTests |
 
 ## Feature 硬门禁
 
@@ -36,7 +36,7 @@
 ## AUC-STATE-001 Writable State
 
 Feature ID: `AUC-STATE-001`
-Status: Ready to Start Product Implementation
+Status: 准备开始产品实现
 Goal: 线程安全读写、变更通知和 access policy。
 Public Contract: IWritableState<T>, WritableState<T>
 Runtime / Build Behavior: 线程安全读写、变更通知和 access policy。
@@ -49,7 +49,7 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-STATE-002 Application State
 
 Feature ID: `AUC-STATE-002`
-Status: Ready to Start Product Implementation
+Status: 产品化进行中
 Goal: 通过 DI 访问应用级共享状态。
 Public Contract: IApplicationState, ApplicationStateRegistry
 Runtime / Build Behavior: 通过 DI 访问应用级共享状态。
@@ -57,12 +57,12 @@ Failure Behavior: 未注册、重复注册、写入拒绝。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 implementation plan 中追踪。
 Tests: `ApplicationStateTests`。
-Required Assertions: 断言注册、读取、writer、not registered。
+Required Assertions: 断言注册、读取、writer、not registered、StateDefinition enum 和 schema version 边界。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 ## AUC-STATE-003 Computed State
 
 Feature ID: `AUC-STATE-003`
-Status: Ready to Start Product Implementation
+Status: 准备开始产品实现
 Goal: 依赖状态变更后重新计算。
 Public Contract: IComputedState<T>, ComputedState<T>
 Runtime / Build Behavior: 依赖状态变更后重新计算。
@@ -75,7 +75,7 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-STATE-004 State Subscription
 
 Feature ID: `AUC-STATE-004`
-Status: Ready to Start Product Implementation
+Status: 准备开始产品实现
 Goal: 生命周期绑定订阅和释放。
 Public Contract: IStateSubscription, IStateReaction
 Runtime / Build Behavior: 生命周期绑定订阅和释放。
@@ -88,7 +88,7 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-STATE-005 State Snapshot
 
 Feature ID: `AUC-STATE-005`
-Status: Ready to Start Product Implementation
+Status: 产品化进行中
 Goal: 捕获和恢复状态条目。
 Public Contract: StateSnapshot, StateSnapshotEntry
 Runtime / Build Behavior: 捕获和恢复状态条目。
@@ -96,12 +96,12 @@ Failure Behavior: 版本不兼容、policy 拒绝、restore 失败。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 implementation plan 中追踪。
 Tests: `StateSnapshotTests`。
-Required Assertions: 断言不可变、过滤、restore diagnostics。
+Required Assertions: 断言不可变、过滤、restore diagnostics、entry version/schema 边界、entries 不含 null。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 ## AUC-STATE-006 Collection State
 
 Feature ID: `AUC-STATE-006`
-Status: Ready to Start Product Implementation
+Status: 准备开始产品实现
 Goal: 集合变更、快照和事件。
 Public Contract: StateCollection<TKey,TItem>
 Runtime / Build Behavior: 集合变更、快照和事件。
@@ -114,7 +114,7 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-STATE-007 Diagnostics
 
 Feature ID: `AUC-STATE-007`
-Status: Ready to Start Product Implementation
+Status: 准备开始产品实现
 Goal: 未注册、访问拒绝、订阅失败诊断。
 Public Contract: StateDiagnosticIds
 Runtime / Build Behavior: 未注册、访问拒绝、订阅失败诊断。
@@ -127,7 +127,7 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-STATE-008 Threading
 
 Feature ID: `AUC-STATE-008`
-Status: Ready to Start Product Implementation
+Status: 准备开始产品实现
 Goal: 多线程更新和派发策略。
 Public Contract: StateDispatchPolicy
 Runtime / Build Behavior: 多线程更新和派发策略。

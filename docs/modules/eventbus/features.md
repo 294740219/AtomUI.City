@@ -4,14 +4,14 @@
 
 ## Feature 索引
 
-| Feature ID | 名称 | 状态 | Public Contract | 主测试 |
+| Feature ID | 名称 | 状态 | 公开合同 | 主测试 |
 | --- | --- | --- | --- | --- |
-| AUC-EVENTBUS-001 | Typed Publish | Ready to Start Product Implementation | IEventBus.PublishAsync, EventPublishResult | EventPublicationTests |
-| AUC-EVENTBUS-002 | Subscription Lifecycle | Ready to Start Product Implementation | IEventSubscription, EventSubscriptionOptions | EventSubscriptionTests |
-| AUC-EVENTBUS-003 | Contract Registry | Ready to Start Product Implementation | IEventContractRegistry, EventContractDescriptor | EventContractRegistryTests |
-| AUC-EVENTBUS-004 | Dispatch Policy | Ready to Start Product Implementation | EventDispatchPolicy, EventErrorPolicy | EventDispatchingTests |
-| AUC-EVENTBUS-005 | Diagnostics | Ready to Start Product Implementation | EventDiagnosticIds | EventDiagnosticsTests |
-| AUC-EVENTBUS-006 | DI Registration | Ready to Start Product Implementation | EventBusServiceCollectionExtensions | EventBusRegistrationTests |
+| AUC-EVENTBUS-001 | Typed Publish | 产品化进行中 | IEventBus.PublishAsync, IEventBus.PostAsync, EventPublishResult | EventPublicationTests |
+| AUC-EVENTBUS-002 | Subscription Lifecycle | 准备开始产品实现 | IEventSubscription, EventSubscriptionOptions | EventSubscriptionTests |
+| AUC-EVENTBUS-003 | Contract Registry | 准备开始产品实现 | IEventContractRegistry, EventContractDescriptor | EventContractRegistryTests |
+| AUC-EVENTBUS-004 | Dispatch Policy | 产品化进行中 | EventDispatchPolicy, EventErrorPolicy, EventSubscriptionOptions | EventDispatchingTests |
+| AUC-EVENTBUS-005 | Diagnostics | 准备开始产品实现 | EventDiagnosticIds | EventDiagnosticsTests |
+| AUC-EVENTBUS-006 | DI Registration | 准备开始产品实现 | EventBusServiceCollectionExtensions | EventBusRegistrationTests |
 
 ## Feature 硬门禁
 
@@ -34,20 +34,20 @@
 ## AUC-EVENTBUS-001 Typed Publish
 
 Feature ID: `AUC-EVENTBUS-001`
-Status: Ready to Start Product Implementation
+Status: 产品化进行中
 Goal: 按事件类型发布并返回 handler 结果。
 Public Contract: IEventBus.PublishAsync, EventPublishResult
 Runtime / Build Behavior: 按事件类型发布并返回 handler 结果。
-Failure Behavior: contract 未登记、handler 失败、取消。
+Failure Behavior: event 为 null、contract 未登记、handler 失败、取消。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 implementation plan 中追踪。
 Tests: `EventPublicationTests`。
-Required Assertions: 断言 delivery result、error policy、diagnostics。
+Required Assertions: 断言 delivery result、null event、预取消 token、error policy、diagnostics。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 ## AUC-EVENTBUS-002 Subscription Lifecycle
 
 Feature ID: `AUC-EVENTBUS-002`
-Status: Ready to Start Product Implementation
+Status: 准备开始产品实现
 Goal: 订阅 Active/Disposed 和 owner 释放。
 Public Contract: IEventSubscription, EventSubscriptionOptions
 Runtime / Build Behavior: 订阅 Active/Disposed 和 owner 释放。
@@ -60,7 +60,7 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-EVENTBUS-003 Contract Registry
 
 Feature ID: `AUC-EVENTBUS-003`
-Status: Ready to Start Product Implementation
+Status: 准备开始产品实现
 Goal: 登记事件 contract 和 plane。
 Public Contract: IEventContractRegistry, EventContractDescriptor
 Runtime / Build Behavior: 登记事件 contract 和 plane。
@@ -73,20 +73,20 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-EVENTBUS-004 Dispatch Policy
 
 Feature ID: `AUC-EVENTBUS-004`
-Status: Ready to Start Product Implementation
+Status: 产品化进行中
 Goal: 顺序派发和错误策略。
 Public Contract: EventDispatchPolicy, EventErrorPolicy
 Runtime / Build Behavior: 顺序派发和错误策略。
-Failure Behavior: handler 异常、取消、继续或停止。
+Failure Behavior: handler 异常、取消、继续或停止、未知 error policy。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 implementation plan 中追踪。
 Tests: `EventDispatchingTests`。
-Required Assertions: 断言顺序、异常聚合、停止策略。
+Required Assertions: 断言顺序、异常聚合、停止策略、未知 error policy 拒绝。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 ## AUC-EVENTBUS-005 Diagnostics
 
 Feature ID: `AUC-EVENTBUS-005`
-Status: Ready to Start Product Implementation
+Status: 准备开始产品实现
 Goal: 发布、拒绝、delivery 失败和订阅诊断。
 Public Contract: EventDiagnosticIds
 Runtime / Build Behavior: 发布、拒绝、delivery 失败和订阅诊断。
@@ -99,7 +99,7 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-EVENTBUS-006 DI Registration
 
 Feature ID: `AUC-EVENTBUS-006`
-Status: Ready to Start Product Implementation
+Status: 准备开始产品实现
 Goal: 注册总线和 registry。
 Public Contract: EventBusServiceCollectionExtensions
 Runtime / Build Behavior: 注册总线和 registry。

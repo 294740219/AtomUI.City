@@ -12,13 +12,13 @@
 
 ## 任务
 
-- [ ] 写 State 失败测试：`StateDefinition.Create` 拒绝未知 `StateLifetime`、`StateAccessPolicy`、`StateSnapshotPolicy` 和小于 1 的 schema version。
-- [ ] 实现 StateDefinition 边界校验。
-- [ ] 写 State snapshot 失败测试：`StateSnapshotEntry` 拒绝负 version 和小于 1 的 schema version；`StateSnapshot` 拒绝 entries 中的 null 项。
-- [ ] 实现 StateSnapshot/StateSnapshotEntry 边界校验。
-- [ ] 写 EventBus 失败测试：`PublishAsync` / `PostAsync` 拒绝 null event；`PublishAsync` 在无订阅者但 token 已取消时抛 `OperationCanceledException`。
-- [ ] 实现 EventBus 发布入口校验和取消观察。
-- [ ] 写 EventBus options 失败测试：`EventSubscriptionOptions.WithErrorPolicy` 拒绝未知 enum。
-- [ ] 实现 EventSubscriptionOptions error policy 校验。
-- [ ] 同步 `docs/modules/state/api-contracts.md`、`docs/modules/state/features.md`、`docs/modules/state/implementation-plan.md`、`docs/modules/eventbus/api-contracts.md`、`docs/modules/eventbus/features.md`、`docs/modules/eventbus/implementation-plan.md`，保持中文描述。
+- [x] 写 State 失败测试：`StateDefinition.Create` 拒绝未知 `StateLifetime`、`StateAccessPolicy`、`StateSnapshotPolicy` 和小于 1 的 schema version。
+- [x] 实现 StateDefinition 边界校验。
+- [x] 写 State snapshot 失败测试：`StateSnapshotEntry` 拒绝负 version 和小于 1 的 schema version；`StateSnapshot` 拒绝 entries 中的 null 项。
+- [x] 实现 StateSnapshot/StateSnapshotEntry 边界校验。
+- [x] 写 EventBus 失败测试：`PublishAsync` / `PostAsync` 拒绝 null event；`PublishAsync` 在无订阅者但 token 已取消时抛 `OperationCanceledException`。
+- [x] 实现 EventBus 发布入口校验和取消观察。
+- [x] 写 EventBus options 失败测试：`EventSubscriptionOptions.WithErrorPolicy` 拒绝未知 enum。
+- [x] 实现 EventSubscriptionOptions error policy 校验。
+- [x] 同步 `docs/modules/state/api-contracts.md`、`docs/modules/state/features.md`、`docs/modules/state/implementation-plan.md`、`docs/modules/eventbus/api-contracts.md`、`docs/modules/eventbus/features.md`、`docs/modules/eventbus/implementation-plan.md`，保持中文描述。
 - [ ] 运行完整门禁：`dotnet test tests/AtomUI.City.State.Tests/AtomUI.City.State.Tests.csproj`、`dotnet test tests/AtomUI.City.EventBus.Tests/AtomUI.City.EventBus.Tests.csproj`、`dotnet build AtomUICity.slnx`、`dotnet test AtomUICity.slnx --no-build`、`bash engineering/check-docs.sh`、`bash engineering/check-public-api.sh`、`git diff --check`。

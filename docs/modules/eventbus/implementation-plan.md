@@ -2,18 +2,18 @@
 
 本文件跟踪模块 Feature ID 到现有实现基线、产品级测试缺口和后续实现工作的关系。
 
-| Feature ID | Documented | API Contract | Existing Test File | Implementation Baseline | Product Contract Tests | Required Assertions | Implementation Gap | Status |
+| Feature ID | 已文档化 | API 合同 | 现有测试文件 | 实现基线 | 产品合同测试 | 必要断言 | 实现缺口 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| AUC-EVENTBUS-001 | Yes | Yes | EventPublicationTests | Baseline Exists | Required | 断言 delivery result、error policy、diagnostics。 | Required | Ready to Start Product Implementation |
-| AUC-EVENTBUS-002 | Yes | Yes | EventSubscriptionTests | Baseline Exists | Required | 断言 dispose 后不再收到事件。 | Required | Ready to Start Product Implementation |
-| AUC-EVENTBUS-003 | Yes | Yes | EventContractRegistryTests | Baseline Exists | Required | 断言 shared contract、private plugin type 拒绝。 | Required | Ready to Start Product Implementation |
-| AUC-EVENTBUS-004 | Yes | Yes | EventDispatchingTests | Baseline Exists | Required | 断言顺序、异常聚合、停止策略。 | Required | Ready to Start Product Implementation |
-| AUC-EVENTBUS-005 | Yes | Yes | EventDiagnosticsTests | Baseline Exists | Required | 断言 EventBus.Event* 现有代码。 | Required | Ready to Start Product Implementation |
-| AUC-EVENTBUS-006 | Yes | Yes | EventBusRegistrationTests | Baseline Exists | Required | 断言默认服务和可替换 diagnostics。 | Required | Ready to Start Product Implementation |
+| AUC-EVENTBUS-001 | 是 | 是 | EventPublicationTests | 已有基线 | 部分通过 | 断言 delivery result、null event、预取消 token、error policy、diagnostics。 | 仍需完整产品合同测试 | 产品化进行中 |
+| AUC-EVENTBUS-002 | 是 | 是 | EventSubscriptionTests | 已有基线 | 必需 | 断言 dispose 后不再收到事件。 | 必需 | 准备开始产品实现 |
+| AUC-EVENTBUS-003 | 是 | 是 | EventContractRegistryTests | 已有基线 | 必需 | 断言 shared contract、private plugin type 拒绝。 | 必需 | 准备开始产品实现 |
+| AUC-EVENTBUS-004 | 是 | 是 | EventDispatchingTests | 已有基线 | 部分通过 | 断言顺序、异常聚合、停止策略、未知 error policy 拒绝。 | 仍需完整产品合同测试 | 产品化进行中 |
+| AUC-EVENTBUS-005 | 是 | 是 | EventDiagnosticsTests | 已有基线 | 必需 | 断言 EventBus.Event* 现有代码。 | 必需 | 准备开始产品实现 |
+| AUC-EVENTBUS-006 | 是 | 是 | EventBusRegistrationTests | 已有基线 | 必需 | 断言默认服务和可替换 diagnostics。 | 必需 | 准备开始产品实现 |
 
 ## 更新规则
 
-- `Baseline Exists` 只表示当前仓库已有实现或测试入口，不表示产品级完成。
-- `Product Contract Tests` 为 `Required` 时，不能把 Feature 标记为 Implemented。
+- `已有基线` 只表示当前仓库已有实现或测试入口，不表示产品级完成。
+- `产品合同测试` 为 `必需` 时，不能把 Feature 标记为已实现。
 - 新增 public API、manifest、diagnostic、MSBuild property、CLI command 或 template variable 时，必须先更新标准文档页。
 - 文档与代码不一致时，先修正文档并确认，再调整实现。
