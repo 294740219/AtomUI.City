@@ -154,6 +154,35 @@ public sealed class ApplicationHostModuleLifecycleTests
             ModuleRecorder.Calls);
     }
 
+    [Fact]
+    public void PreConfigureActionsRunInDependencyOrderBeforeConfigureServices()
+    {
+        ModuleRecorder.Reset();
+        var builder = ApplicationHost.CreateBuilder();
+
+        builder
+            .UseModule<ApplicationOptionsModule>()
+            .UseModule<FeatureOptionsModule>()
+            .UseModule<FoundationOptionsModule>();
+
+        using var host = builder.Build();
+
+        Assert.Equal(["foundation", "feature", "application"], ModuleRecorder.Calls);
+    }
+
+    [Fact]
+    public void ServiceConfigurationContextPreConfigureRejectsNullArguments()
+    {
+        var context = new ServiceConfigurationContext(
+            new ApplicationContext(),
+            new ServiceCollection());
+
+        Assert.Throws<ArgumentNullException>(() =>
+            context.PreConfigure<RecordedOptions>(null!));
+        Assert.Throws<ArgumentNullException>(() =>
+            context.ExecutePreConfigure<RecordedOptions>(null!));
+    }
+
     private interface ICoreService;
 
     private sealed class CoreService : ICoreService;
@@ -246,6 +275,49 @@ public sealed class ApplicationHostModuleLifecycleTests
         public override void OnApplicationShutdown(ApplicationShutdownContext context)
         {
             ModuleRecorder.Record("feature:shutdown");
+        }
+    }
+
+    private sealed class RecordedOptions
+    {
+        public List<string> Calls { get; } = [];
+    }
+
+    private sealed class FoundationOptionsModule : ModuleBase
+    {
+        public override void PreConfigureServices(ServiceConfigurationContext context)
+        {
+            context.PreConfigure<RecordedOptions>(options => options.Calls.Add("foundation"));
+        }
+    }
+
+    [DependsOn(typeof(FoundationOptionsModule))]
+    private sealed class FeatureOptionsModule : ModuleBase
+    {
+        public override void PreConfigureServices(ServiceConfigurationContext context)
+        {
+            context.PreConfigure<RecordedOptions>(options => options.Calls.Add("feature"));
+        }
+    }
+
+    [DependsOn(typeof(FeatureOptionsModule))]
+    private sealed class ApplicationOptionsModule : ModuleBase
+    {
+        public override void PreConfigureServices(ServiceConfigurationContext context)
+        {
+            context.PreConfigure<RecordedOptions>(options => options.Calls.Add("application"));
+        }
+
+        public override void ConfigureServices(ServiceConfigurationContext context)
+        {
+            var options = new RecordedOptions();
+
+            context.ExecutePreConfigure(options);
+
+            foreach (var call in options.Calls)
+            {
+                ModuleRecorder.Record(call);
+            }
         }
     }
 
