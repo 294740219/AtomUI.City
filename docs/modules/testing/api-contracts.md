@@ -302,6 +302,246 @@
 | SourceGenerationTestCase.Run | 运行 generator 测试。 | source files、additional files、references。 | GeneratedSourceSnapshot 和 diagnostics。 | 编译失败保留 diagnostics。 | 测试 token 传递给 runner。 | 输出按 hint name 稳定排序。 |
 | AotCompatibilityCheck.Run | 检查 AOT 禁止模式。 | assembly/project metadata。 | diagnostic list。 | 发现反射扫描兜底等模式返回 diagnostic。 | 纯 CPU/文件读取可观察 token。 | 结果不可变。 |
 
+## 关键方法详细合同
+
+### `TestHostBuilder.UseProperty`
+
+| Field | Contract |
+| --- | --- |
+| Feature | AUC-TESTING-001 |
+| Purpose | 在 `Build` 前写入测试 Host 的 application property。 |
+| Parameters | `key` 不能为空或空白；`value` 可以为 null。 |
+| Return | 当前 `TestHostBuilder`。 |
+| Nullability | `key` 不接受 null；`value` 接受 null。 |
+| Cancellation | 无。 |
+| Exceptions or Result | `key` 非法抛 `ArgumentException`；`Build` 后调用抛 `InvalidOperationException`。 |
+| Idempotency | 同一 key 重复设置时，最后一次 Build 前设置生效。 |
+| Concurrency | 配置阶段不保证线程安全。 |
+| Side Effects | 只修改 builder 内部 pending properties。 |
+| Diagnostics | Build 前不写诊断；非法状态通过异常暴露。 |
+| Tests | `TestHostTests`。 |
+
+### `TestHostBuilder.UseDirectoryName`
+
+| Field | Contract |
+| --- | --- |
+| Feature | AUC-TESTING-001 |
+| Purpose | 设置测试临时目录名称前缀，便于失败时定位。 |
+| Parameters | `name` 不能为空或空白。 |
+| Return | 当前 `TestHostBuilder`。 |
+| Nullability | `name` 不接受 null。 |
+| Cancellation | 无。 |
+| Exceptions or Result | `name` 非法抛 `ArgumentException`；`Build` 后调用抛 `InvalidOperationException`。 |
+| Idempotency | 多次调用时最后一次 Build 前设置生效。 |
+| Concurrency | 配置阶段不保证线程安全。 |
+| Side Effects | 只修改 builder 内部 directory name。 |
+| Diagnostics | Build 前不写诊断。 |
+| Tests | `TestHostTests`。 |
+
+### `TestHostBuilder.KeepDirectoryOnDispose`
+
+| Field | Contract |
+| --- | --- |
+| Feature | AUC-TESTING-001 |
+| Purpose | 配置测试 Host dispose 时保留临时目录。 |
+| Parameters | 无。 |
+| Return | 当前 `TestHostBuilder`。 |
+| Nullability | 无。 |
+| Cancellation | 无。 |
+| Exceptions or Result | `Build` 后调用抛 `InvalidOperationException`。 |
+| Idempotency | 重复调用在 Build 前幂等。 |
+| Concurrency | 配置阶段不保证线程安全。 |
+| Side Effects | 只修改 builder 内部 keep flag。 |
+| Diagnostics | Build 前不写诊断。 |
+| Tests | `TestHostTests`。 |
+
+### `TestHostBuilder.Build`
+
+| Field | Contract |
+| --- | --- |
+| Feature | AUC-TESTING-001 |
+| Purpose | 冻结 builder，创建 `ApplicationContext`、临时目录、共享 diagnostics、fake dispatcher 和 deterministic scheduler。 |
+| Parameters | 无。 |
+| Return | 新的 `TestHost`。 |
+| Nullability | 返回值不能为空。 |
+| Cancellation | 同步构建，不接收 token。 |
+| Exceptions or Result | 重复 Build 抛 `InvalidOperationException`；目录创建失败按 IO 异常抛出。 |
+| Idempotency | 每个 builder 只允许成功 Build 一次。 |
+| Concurrency | Build 必须外部串行。 |
+| Side Effects | 创建临时目录；成功后冻结所有 builder mutation entrypoint。 |
+| Diagnostics | Host 生命周期 diagnostics 在返回的 `TestHost.Diagnostics` 中记录。 |
+| Tests | `TestHostTests`。 |
+
+### `TestHost.StopAsync`
+
+| Field | Contract |
+| --- | --- |
+| Feature | AUC-TESTING-001 |
+| Purpose | 将测试 Host 标记为 stopped，并作为 Dispose 前的统一停止入口。 |
+| Parameters | 无。 |
+| Return | Host 停止后完成的 `ValueTask`。 |
+| Nullability | 返回 task 不为空。 |
+| Cancellation | 当前版本无 token；停止必须快速且确定。 |
+| Exceptions or Result | Dispose 后重复 Stop 不抛出，保持 stopped。 |
+| Idempotency | 幂等；重复调用不重复释放资源。 |
+| Concurrency | 单测试线程串行调用；并发调用必须保持 stopped 状态稳定。 |
+| Side Effects | 设置 `IsStopped`。 |
+| Diagnostics | Stop 本身不写成功诊断；Dispose 写 `AUCTEST001`。 |
+| Tests | `TestHostTests`。 |
+
+### `TestHost.Dispose` 和 `TestHost.DisposeAsync`
+
+| Field | Contract |
+| --- | --- |
+| Feature | AUC-TESTING-001 |
+| Purpose | 停止 Host，释放 dispatcher、scheduler 和临时目录，并阻止后续 mutable API 使用。 |
+| Parameters | 无。 |
+| Return | `Dispose` 无返回；`DisposeAsync` 返回释放完成的 `ValueTask`。 |
+| Nullability | 无。 |
+| Cancellation | Dispose 不接受 token；已经开始的最小清理不能跳过。 |
+| Exceptions or Result | 重复 Dispose 幂等；释放后 dispatcher/scheduler mutation 抛 `ObjectDisposedException`。 |
+| Idempotency | 幂等；`AUCTEST001` 只记录一次。 |
+| Concurrency | 单测试线程串行释放；并发释放不得重复删除目录。 |
+| Side Effects | 删除或保留临时目录，取决于 `KeepDirectoryOnDispose`。 |
+| Diagnostics | 成功释放写 `AUCTEST001`，消息包含 Host directory。 |
+| Tests | `TestHostTests`。 |
+
+### `FakeUiDispatcher.CheckAccess`
+
+| Field | Contract |
+| --- | --- |
+| Feature | AUC-TESTING-002 |
+| Purpose | 判断当前执行是否处于 fake UI work 上下文。 |
+| Parameters | 无。 |
+| Return | fake UI marker 激活时返回 true，否则返回 false。 |
+| Nullability | 无。 |
+| Cancellation | 无。 |
+| Exceptions or Result | Dispose 后可继续读取 marker，返回 false。 |
+| Idempotency | 只读。 |
+| Concurrency | marker 只代表当前测试执行流；不模拟真实 UI thread affinity。 |
+| Side Effects | 无。 |
+| Diagnostics | 不写诊断。 |
+| Tests | `FakeUiDispatcherTests`。 |
+
+### `FakeUiDispatcher.Post`
+
+| Field | Contract |
+| --- | --- |
+| Feature | AUC-TESTING-002 |
+| Purpose | 将同步 UI work 排入 fake dispatcher 队列，等待 `Drain` 手动执行。 |
+| Parameters | `callback` 不能为 null。 |
+| Return | `FakeUiWorkItem`，用于断言 id、取消、完成和失败状态。 |
+| Nullability | `callback` 不接受 null；返回值不能为空。 |
+| Cancellation | 调用方可通过返回的 work item 在执行前取消。 |
+| Exceptions or Result | Dispose 后调用抛 `ObjectDisposedException`；callback 执行异常由 `Drain` 捕获并写诊断。 |
+| Idempotency | 每次调用创建独立 work item。 |
+| Concurrency | enqueue 使用内部锁保护；drain 由测试串行调用。 |
+| Side Effects | 增加 `PendingCount`。 |
+| Diagnostics | work 执行异常写 `AUCTEST101`，消息包含 work item id。 |
+| Tests | `FakeUiDispatcherTests`。 |
+
+### `FakeUiDispatcher.Drain`
+
+| Field | Contract |
+| --- | --- |
+| Feature | AUC-TESTING-002 |
+| Purpose | 按 FIFO 顺序执行 pending UI work。 |
+| Parameters | 无。 |
+| Return | 无。 |
+| Nullability | 无。 |
+| Cancellation | 已取消 work item 不执行。 |
+| Exceptions or Result | work exception 不向外抛出，记录诊断后继续执行后续 work。 |
+| Idempotency | 队列为空时调用幂等。 |
+| Concurrency | 不支持并发 drain；测试必须串行推进。 |
+| Side Effects | 减少 `PendingCount`，执行回调时激活 fake UI marker。 |
+| Diagnostics | work exception 写 `AUCTEST101`；取消 work 不写错误诊断。 |
+| Tests | `FakeUiDispatcherTests`。 |
+
+### `FakeUiDispatcher.InvokeAsync`
+
+| Field | Contract |
+| --- | --- |
+| Feature | AUC-TESTING-002 |
+| Purpose | 立即在 fake UI marker 下执行同步回调，用于模拟 UI thread direct invoke。 |
+| Parameters | `callback` 不能为 null；`cancellationToken` 在执行前观察。 |
+| Return | 回调完成后的 `ValueTask` 或 `ValueTask<T>`。 |
+| Nullability | callback 不接受 null。 |
+| Cancellation | token 已取消时抛 `OperationCanceledException`，且不执行 callback。 |
+| Exceptions or Result | Dispose 后调用抛 `ObjectDisposedException`；callback 异常按调用栈传播。 |
+| Idempotency | 每次调用只执行一次 callback。 |
+| Concurrency | 不模拟真实 dispatcher 重入队列；直接执行。 |
+| Side Effects | 执行期间 `CheckAccess()` 返回 true。 |
+| Diagnostics | 直接 invoke 的 callback 异常由调用方断言，不写 dispatcher work 诊断。 |
+| Tests | `FakeUiDispatcherTests`。 |
+
+### `FakeUiDispatcher.PostAsync`
+
+| Field | Contract |
+| --- | --- |
+| Feature | AUC-TESTING-002 |
+| Purpose | 实现 Core `IUiDispatcher.PostAsync`，把异步 UI work 排入 fake dispatcher。 |
+| Parameters | `callback` 不能为 null；`cancellationToken` 在入队前和执行前观察。 |
+| Return | work 成功入队后的 `ValueTask`。 |
+| Nullability | callback 不接受 null。 |
+| Cancellation | token 已取消时抛 `OperationCanceledException`；执行前取消则 work 标记为 canceled。 |
+| Exceptions or Result | Dispose 后调用抛 `ObjectDisposedException`；执行异常由 `Drain` 写诊断。 |
+| Idempotency | 每次调用创建独立 queued work。 |
+| Concurrency | enqueue 使用内部锁保护；drain 串行。 |
+| Side Effects | 增加 `PendingCount`。 |
+| Diagnostics | work 执行异常写 `AUCTEST101`。 |
+| Tests | `FakeUiDispatcherTests`。 |
+
+### `DeterministicScheduler.Schedule`
+
+| Field | Contract |
+| --- | --- |
+| Feature | AUC-TESTING-003 |
+| Purpose | 在虚拟时间线上安排 callback，替代真实 `Task.Delay`。 |
+| Parameters | `delay` 必须大于等于 0；`callback` 不能为 null。 |
+| Return | `DeterministicScheduledWorkItem`，用于取消和断言状态。 |
+| Nullability | callback 不接受 null；返回值不能为空。 |
+| Cancellation | 调用方可在执行前通过返回句柄取消 work。 |
+| Exceptions or Result | 负 delay 抛 `ArgumentOutOfRangeException`；Dispose 后调用抛 `ObjectDisposedException`。 |
+| Idempotency | 每次调用创建独立 work item。 |
+| Concurrency | 单线程推进；内部 priority 包含 due time 和 enqueue id，保证同一 due time 稳定排序。 |
+| Side Effects | 增加 `ScheduledCount`。 |
+| Diagnostics | callback 执行异常由 `RunDueWork` 写 `AUCTEST201`。 |
+| Tests | `SharedTestUtilitiesTests`。 |
+
+### `DeterministicScheduler.AdvanceBy`
+
+| Field | Contract |
+| --- | --- |
+| Feature | AUC-TESTING-003 |
+| Purpose | 推进虚拟时间并执行所有 due work。 |
+| Parameters | `duration` 必须大于等于 0。 |
+| Return | 无。 |
+| Nullability | 无。 |
+| Cancellation | 已取消 work item 不执行。 |
+| Exceptions or Result | 负 duration 抛 `ArgumentOutOfRangeException`；Dispose 后调用抛 `ObjectDisposedException`。 |
+| Idempotency | duration 为 0 时只执行当前 due work。 |
+| Concurrency | 单线程推进。 |
+| Side Effects | 更新 `Now`，减少 `ScheduledCount`，执行 due callbacks。 |
+| Diagnostics | callback 异常写 `AUCTEST201` 并继续后续 due work。 |
+| Tests | `SharedTestUtilitiesTests`。 |
+
+### `DeterministicScheduler.RunDueWork`
+
+| Field | Contract |
+| --- | --- |
+| Feature | AUC-TESTING-003 |
+| Purpose | 在不改变 `Now` 的情况下执行当前 due work。 |
+| Parameters | 无。 |
+| Return | 无。 |
+| Nullability | 无。 |
+| Cancellation | 已取消 work item 被跳过并标记完成。 |
+| Exceptions or Result | Dispose 后调用抛 `ObjectDisposedException`；callback exception 不向外抛出。 |
+| Idempotency | 没有 due work 时幂等。 |
+| Concurrency | 单线程推进。 |
+| Side Effects | 执行 callback，移除 due work。 |
+| Diagnostics | callback 异常写 `AUCTEST201`，消息包含 work id 和 due time。 |
+| Tests | `SharedTestUtilitiesTests`。 |
+
 ## Public 类型覆盖
 
 | Type | 分类 | Review 规则 |
@@ -309,6 +549,7 @@
 | `AotCompatibilityCheck` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `AotCompatibilityDiagnostic` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `DeterministicScheduler` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `DeterministicScheduledWorkItem` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `DisposableTracker` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `ExpectedDiagnostic` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `FakeUiDispatcher` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
