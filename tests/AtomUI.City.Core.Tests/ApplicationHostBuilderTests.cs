@@ -1,4 +1,5 @@
 using AtomUI.City.Hosting;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace AtomUI.City.Core.Tests;
@@ -42,6 +43,38 @@ public sealed class ApplicationHostBuilderTests
 
         Assert.Throws<NotSupportedException>(() => arguments[0] = "--mode=changed");
         Assert.Equal("--mode=test", host.Context.StartupArguments[0]);
+    }
+
+    [Fact]
+    public async Task BuildFreezesPublicBuilderMutationEntrypoints()
+    {
+        var builder = ApplicationHost.CreateBuilder();
+
+        await using var host = builder.Build();
+
+        Assert.Throws<InvalidOperationException>(() =>
+            builder.ConfigureServices(services => services.AddSingleton<TestService>()));
+        Assert.Throws<InvalidOperationException>(() =>
+            builder.ConfigureHost(options => options.ApplicationName = "changed"));
+        Assert.Throws<InvalidOperationException>(() =>
+            builder.Services.AddSingleton<TestService>());
+        Assert.Throws<InvalidOperationException>(() =>
+            builder.Properties["changed"] = true);
+        Assert.Throws<InvalidOperationException>(() =>
+            builder.Configuration.AddInMemoryCollection(
+                new Dictionary<string, string?> { ["changed"] = "true" }));
+    }
+
+    [Fact]
+    public async Task BuildCanOnlyRunOnce()
+    {
+        var builder = ApplicationHost.CreateBuilder();
+
+        await using var host = builder.Build();
+
+        var exception = Assert.Throws<InvalidOperationException>(() => builder.Build());
+
+        Assert.Contains("only build once", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     private sealed class TestService;
