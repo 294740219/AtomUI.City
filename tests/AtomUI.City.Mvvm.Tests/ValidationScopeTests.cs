@@ -38,6 +38,81 @@ public sealed class ValidationScopeTests
     }
 
     [Fact]
+    public void SetMessagesReplacesAndClearsFieldMessages()
+    {
+        var scope = new ValidationScope();
+        var first = new ValidationMessage("Name", "Name is required.");
+        var second = new ValidationMessage("Name", "Name is too long.");
+
+        scope.SetMessages("Name", [first]);
+        scope.SetMessages("Name", [second]);
+
+        Assert.Equal(ValidationStatus.Invalid, scope.Status);
+        Assert.Single(scope.Messages["Name"]);
+        Assert.Equal("Name is too long.", scope.Errors["Name"][0]);
+
+        scope.SetMessages("Name", []);
+
+        Assert.Equal(ValidationStatus.Valid, scope.Status);
+        Assert.False(scope.Errors.ContainsKey("Name"));
+        Assert.False(scope.Messages.ContainsKey("Name"));
+    }
+
+    [Fact]
+    public void SetMessagesDeduplicatesRepeatedMessages()
+    {
+        var scope = new ValidationScope();
+        var message = new ValidationMessage("Name", "Name is required.", "Validation.Name.Required", ["Name"]);
+
+        scope.SetMessages("Name", [message, message]);
+
+        Assert.Single(scope.Messages["Name"]);
+        Assert.Single(scope.Errors["Name"]);
+    }
+
+    [Fact]
+    public void SetMessagesRejectsNullMessages()
+    {
+        var scope = new ValidationScope();
+        ValidationMessage?[] messages = [null];
+
+        Assert.Throws<ArgumentException>(() => scope.SetMessages("Name", messages));
+    }
+
+    [Fact]
+    public void ValidationChangedEventCarriesPresentationBindingInputs()
+    {
+        using var activationScope = new ActivationScope();
+        var scope = new ValidationScope();
+        ValidationChangedEventArgs? changed = null;
+
+        scope.BindTo(activationScope);
+        scope.ValidationChanged += (_, args) => changed = args;
+
+        scope.SetMessages("Name", [new ValidationMessage("Name", "Name is required.")]);
+
+        Assert.NotNull(changed);
+        Assert.Equal("Name", changed.Key);
+        Assert.Equal(ValidationStatus.Invalid, changed.Status);
+        Assert.Equal("Name is required.", changed.Errors[0]);
+        Assert.Equal("Name is required.", changed.Messages[0].Message);
+        Assert.Equal(activationScope.Id, changed.OwnerScopeId);
+    }
+
+    [Fact]
+    public void DisposeIsIdempotentAndRejectsMutation()
+    {
+        var scope = new ValidationScope();
+
+        scope.Dispose();
+        scope.Dispose();
+
+        Assert.True(scope.IsDisposed);
+        Assert.Throws<ObjectDisposedException>(() =>
+            scope.SetMessages("Name", [new ValidationMessage("Name", "Name is required.")]));
+    }
+
+    [Fact]
     public void ValidationMessageArgumentsRejectExternalMutation()
     {
         var arguments = new List<object?> { "Name" };

@@ -10,7 +10,7 @@
 | AUC-MVVM-002 | Activation and Deactivation | Completed | IActivatable, ICanDeactivate, ActivationScope | ActivationScopeTests; DeactivationTests |
 | AUC-MVVM-003 | Command Execution | Completed | CommandFactory, OperationScope, OperationResult | CommandTests |
 | AUC-MVVM-004 | Interaction Requests | Completed | Interaction<TRequest, TResult>, InteractionContext<TRequest> | InteractionTests |
-| AUC-MVVM-005 | Validation Model | Ready to Start Product Implementation | ValidationScope, ValidationMessage, ValidationStatus | ValidationScopeTests |
+| AUC-MVVM-005 | Validation Model | Completed | ValidationScope, ValidationMessage, ValidationStatus | ValidationScopeTests |
 | AUC-MVVM-006 | Operation and Cancellation Scope | Ready to Start Product Implementation | OperationScope, CommandExecutionState | CommandTests |
 
 ## Feature 硬门禁
@@ -89,13 +89,13 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-MVVM-005 Validation Model
 
 Feature ID: `AUC-MVVM-005`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 定义输入验证消息、状态聚合和 Presentation 可绑定合同。
 Public Contract: ValidationScope, ValidationMessage, ValidationStatus
-Runtime / Build Behavior: ValidationScope 聚合 field/global message；状态变化可由 Presentation 绑定为视觉状态。
-Failure Behavior: 未知 field、重复 message、Dispose 后更新必须有稳定行为。
+Runtime / Build Behavior: ValidationScope 聚合 field/global message；ValidationChanged 事件为 Presentation 提供绑定输入。
+Failure Behavior: 空消息清理 field；重复 message 去重；Dispose 后更新抛 `ObjectDisposedException`。
 Threading / Cancellation: 验证可以在后台线程计算，最终状态提交必须遵守调用方调度策略。
-Diagnostics: validation diagnostics 必须包含 field、severity 和 owner scope。
+Diagnostics: ValidationChangedEventArgs 包含 field key、状态、消息、错误和 owner scope id。
 Tests: `ValidationScopeTests`
 Required Assertions: 断言消息增删、状态聚合、重复处理、释放和 Presentation binding 输入。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。

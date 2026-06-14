@@ -10,7 +10,7 @@
 | Activation | IActivatable, ICanDeactivate, IConfirmDeactivate, ActivationScope, DeactivationGuard | ViewModel 激活和停用。 | 状态机必须可测试，拒绝停用不抛业务异常。 |
 | Command | CommandFactory, OperationScope, OperationResult | 命令执行和操作结果。 | 异常、取消、并发拒绝必须有稳定结果。 |
 | Interaction | Interaction<TRequest, TResult> | ViewModel 到 UI 的请求 contract。 | 无 handler 返回 NotHandled，不直接依赖 Presentation 类型。 |
-| Validation | ValidationScope, ValidationMessage | 验证状态和消息聚合。 | 消息变化可被 Presentation 绑定。 |
+| Validation | ValidationScope, ValidationMessage, ValidationChangedEventArgs | 验证状态和消息聚合。 | 消息变化可被 Presentation 绑定。 |
 
 ## 关键方法合同
 
@@ -24,7 +24,7 @@
 | CommandFactory.Create | 创建同步命令。 | execute 不得为 null；canExecute 和 state 可选。 | IRelayCommand。 | execute 异常映射 OperationResult Failed，不外抛到 UI。 | 同步 API 无 token。 | 写入 CommandExecutionState；CanExecuteChanged 可通知 Presentation。 |
 | CommandFactory.CreateAsync | 创建异步命令。 | execute 不得为 null；state 和 activationScope 可选。 | IAsyncRelayCommand。 | execute 异常映射 OperationResult Failed；并发执行映射 Rejected。 | 命令 token 必须传递到 execute，并链接 ActivationScope token。 | 单一 command state 同时只允许一个 running operation。 |
 | Interaction.RequestAsync | 请求 UI interaction。 | request 为 TRequest；handler 通过 ActivationScope 可选绑定。 | InteractionResult<TResult>。 | 无 handler 返回 NotHandled；handler 异常返回 Failed。 | 取消后不提交 handler result。 | 每次调用独立 InteractionContext，包含 request id、request type、handler type 和 scope id。 |
-| ValidationScope.SetMessages | 替换字段验证消息。 | field 可为空表示 global；messages 不得含 null。 | ValidationStatus。 | Dispose 后更新失败。 | 同步 API 无 token。 | 状态更新顺序必须稳定。 |
+| ValidationScope.SetMessages | 替换字段验证消息。 | field key 可为空表示 global；messages 不得含 null。 | void；状态通过 Status 读取。 | Dispose 后抛 `ObjectDisposedException`；空 messages 清理 field；重复 message 去重。 | 同步 API 无 token。 | 提交后触发 ValidationChanged，事件包含 field key、Status、Errors、Messages 和 owner scope id。 |
 
 ## Public 类型覆盖
 
@@ -53,6 +53,7 @@
 | `OperationStatus` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `ValidationMessage` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `ValidationScope` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `ValidationChangedEventArgs` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `ValidationStatus` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `ViewModelBase` | 关键 contract | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 

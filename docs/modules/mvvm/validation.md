@@ -37,11 +37,11 @@
 | Feature ID | 相关能力 | 测试文件 |
 | --- | --- | --- |
 | AUC-MVVM-001 | ViewModel Base | ViewModelBaseTests |
-| AUC-MVVM-002 | Activation | ActivationScopeTests |
+| AUC-MVVM-002 | Activation and Deactivation | ActivationScopeTests; DeactivationTests; ViewModelBaseTests |
 | AUC-MVVM-003 | Commands | CommandTests |
-| AUC-MVVM-004 | Deactivation | DeactivationTests |
-| AUC-MVVM-005 | Interactions | InteractionTests |
-| AUC-MVVM-006 | Validation | ValidationScopeTests |
+| AUC-MVVM-004 | Interactions | InteractionTests |
+| AUC-MVVM-005 | Validation | ValidationScopeTests |
+| AUC-MVVM-006 | Operation Scope | CommandTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -130,6 +130,7 @@ Mvvm 只提供：
 - 对象级错误。
 - 验证状态变化通知。
 - 验证诊断。
+- Presentation 绑定输入：field key、Status、Errors、Messages 和 owner scope id。
 
 UI 展示形式由 Presentation 和应用决定。
 
