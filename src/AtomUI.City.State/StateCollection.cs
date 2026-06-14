@@ -3,7 +3,7 @@ using AtomUI.City.Diagnostics;
 
 namespace AtomUI.City.State;
 
-public sealed class StateCollection<TKey, TItem> : IStateCollection<TKey, TItem>
+public sealed class StateCollection<TKey, TItem> : IStateCollection<TKey, TItem>, IDisposable
     where TKey : notnull
 {
     private readonly IHostDiagnostics? _diagnostics;
@@ -11,6 +11,7 @@ public sealed class StateCollection<TKey, TItem> : IStateCollection<TKey, TItem>
     private readonly IEqualityComparer<TItem> _itemComparer;
     private readonly List<StateSubscription> _subscriptions = [];
     private readonly object _syncRoot = new();
+    private bool _disposed;
 
     public StateCollection(
         IEqualityComparer<TKey>? keyComparer = null,
@@ -357,6 +358,19 @@ public sealed class StateCollection<TKey, TItem> : IStateCollection<TKey, TItem>
         Notify(args, subscriptions);
 
         return true;
+    }
+
+    public void Dispose()
+    {
+        lock (_syncRoot)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+        }
     }
 
     public IStateSubscription OnChange(Action<StateCollectionChangedEventArgs<TKey, TItem>> handler)

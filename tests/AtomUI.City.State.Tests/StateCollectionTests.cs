@@ -142,6 +142,22 @@ public sealed class StateCollectionTests
     }
 
     [Fact]
+    public void DisposeCanBeCalledMoreThanOnce()
+    {
+        var collection = new StateCollection<string, int>();
+        collection.AddOrUpdate("settings", 1);
+
+        collection.Dispose();
+        collection.Dispose();
+
+        Assert.Equal(1, collection.Version);
+        Assert.Equal(1, collection.Items["settings"]);
+        Assert.True(collection.TryGetItemVersion("settings", out var itemVersion));
+        Assert.Equal(1, itemVersion);
+        Assert.Equal(1, collection.CreateSnapshot().ItemCount);
+    }
+
+    [Fact]
     public void AddOrUpdateRangeMergesChangesIntoSingleNotificationInInputOrder()
     {
         var collection = new StateCollection<string, int>();
