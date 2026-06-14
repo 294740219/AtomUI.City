@@ -132,6 +132,8 @@ public sealed class StateDefinition<T> : StateDefinition
         string? pluginId = null,
         IEqualityComparer<T>? comparer = null)
     {
+        StateKey<T>.ThrowIfDefault(key, nameof(key));
+
         return new StateDefinition<T>(
             key,
             defaultValue,

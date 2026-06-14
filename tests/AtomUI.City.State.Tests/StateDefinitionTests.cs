@@ -5,6 +5,15 @@ namespace AtomUI.City.State.Tests;
 public sealed class StateDefinitionTests
 {
     [Fact]
+    public void StateDefinitionRejectsDefaultKey()
+    {
+        var exception = Assert.Throws<ArgumentException>(() =>
+            StateDefinition.Create(default(StateKey<string>), "value"));
+
+        Assert.Equal("key", exception.ParamName);
+    }
+
+    [Fact]
     public void StateDefinitionRejectsUnknownLifetime()
     {
         var key = new StateKey<string>("AtomUI.City.Tests.InvalidLifetime");
