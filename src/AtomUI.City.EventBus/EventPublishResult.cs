@@ -62,7 +62,13 @@ public sealed record EventDeliveryResult(
         init => _dispatchPolicy = ValidateDispatchPolicy(value);
     }
 
-    public bool Succeeded { get; init; } = ValidateSucceeded(Succeeded, Canceled, ErrorMessage);
+    private bool _succeeded = ValidateSucceeded(Succeeded, Canceled, ErrorMessage);
+
+    public bool Succeeded
+    {
+        get => _succeeded;
+        init => _succeeded = ValidateSucceeded(value, Canceled, ErrorMessage);
+    }
 
     private string? _errorMessage = ValidateErrorMessage(Succeeded, ErrorMessage);
 
