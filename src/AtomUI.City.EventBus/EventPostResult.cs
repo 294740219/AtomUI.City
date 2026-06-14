@@ -57,6 +57,11 @@ public sealed record EventPostResult(
 
     private static bool ValidateAccepted(bool accepted, string? rejectionReason)
     {
+        if (accepted && !string.IsNullOrWhiteSpace(rejectionReason))
+        {
+            throw new ArgumentException("Accepted event post result cannot include a rejection reason.", nameof(Accepted));
+        }
+
         if (!accepted && string.IsNullOrWhiteSpace(rejectionReason))
         {
             throw new ArgumentException("Rejected event post result must include a rejection reason.", nameof(Accepted));

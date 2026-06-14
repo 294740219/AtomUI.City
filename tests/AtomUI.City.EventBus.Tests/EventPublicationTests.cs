@@ -549,6 +549,21 @@ public sealed class EventPublicationTests
     }
 
     [Fact]
+    public void PostResultRejectsAcceptedReasonStateInitMutation()
+    {
+        var result = new EventPostResult(
+            Guid.NewGuid(),
+            new EventContractId("atomui.city.tests.post.v1"),
+            Accepted: false,
+            RejectionReason: "not accepted");
+
+        Assert.Throws<ArgumentException>(() => result with
+        {
+            Accepted = true,
+        });
+    }
+
+    [Fact]
     public async Task PostAsyncRejectsNegativePublishDepthBeforeAcceptance()
     {
         var diagnostics = new InMemoryHostDiagnostics();

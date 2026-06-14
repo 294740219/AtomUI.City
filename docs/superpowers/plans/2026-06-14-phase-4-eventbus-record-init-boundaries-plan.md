@@ -538,7 +538,7 @@ Commit message: `fix(EventBus): validate post accepted init`
 - Test: `tests/AtomUI.City.EventBus.Tests/EventPublicationTests.cs`
 - Modify: this plan file
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```csharp
 [Fact]
@@ -557,12 +557,12 @@ public void PostResultRejectsAcceptedReasonStateInitMutation()
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `dotnet test tests/AtomUI.City.EventBus.Tests/AtomUI.City.EventBus.Tests.csproj --filter "FullyQualifiedName~PostResultRejectsAcceptedReasonStateInitMutation"`
 Expected: FAIL because `Accepted` init mutations only reject missing rejection reasons after Task 9.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Extend `ValidateAccepted` so it also rejects accepted results that still carry a rejection reason:
 
@@ -575,12 +575,12 @@ if (accepted && !string.IsNullOrWhiteSpace(rejectionReason))
 
 Update `api-contracts.md` so `EventPostResult` documents constructor and init mutation consistency. Add a 2026-06-14 note to `implementation-plan.md` that `EventDeliveryResult` and `EventPostResult` init mutation boundaries are hardened.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `dotnet test tests/AtomUI.City.EventBus.Tests/AtomUI.City.EventBus.Tests.csproj --filter "FullyQualifiedName~PostResultRejectsAcceptedReasonStateInitMutation"`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit message: `fix(EventBus): validate post accepted reason init`
 
@@ -588,9 +588,9 @@ Commit message: `fix(EventBus): validate post accepted reason init`
 
 ## Final Verification
 
-- [ ] Run `dotnet test tests/AtomUI.City.EventBus.Tests/AtomUI.City.EventBus.Tests.csproj`.
-- [ ] Run `dotnet build AtomUICity.slnx`.
-- [ ] Run `dotnet test AtomUICity.slnx --no-build`.
-- [ ] Run `bash engineering/check-docs.sh`.
-- [ ] Run `bash engineering/check-public-api.sh`.
-- [ ] Run `git diff --check`.
+- [x] Run `dotnet test tests/AtomUI.City.EventBus.Tests/AtomUI.City.EventBus.Tests.csproj`.
+- [x] Run `dotnet build AtomUICity.slnx`.
+- [x] Run `dotnet test AtomUICity.slnx --no-build`.
+- [x] Run `bash engineering/check-docs.sh`.
+- [x] Run `bash engineering/check-public-api.sh`.
+- [x] Run `git diff --check`.

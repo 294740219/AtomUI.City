@@ -21,3 +21,4 @@
 ## 2026-06-14 进展
 
 - 加固 `EventPublishOptions` 与 `EventContext<TEvent>` 边界：publish depth、correlation id、causation id、event id、contract id、subscription id 与 dispatch policy 的非法输入均由构造或 init 边界拒绝。
+- 加固 `EventDeliveryResult` 与 `EventPostResult` record init mutation 边界，确保 `with { ... }` 不能绕过 subscription id、dispatch policy、event id、contract id 或 accepted/rejection 状态一致性校验。
