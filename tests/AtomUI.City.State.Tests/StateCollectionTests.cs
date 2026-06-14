@@ -216,6 +216,12 @@ public sealed class StateCollectionTests
     }
 
     [Fact]
+    public void CollectionInterfaceExposesDisposeContract()
+    {
+        Assert.True(typeof(IDisposable).IsAssignableFrom(typeof(IStateCollection<string, int>)));
+    }
+
+    [Fact]
     public void AddOrUpdateRangeMergesChangesIntoSingleNotificationInInputOrder()
     {
         var collection = new StateCollection<string, int>();

@@ -1,6 +1,6 @@
 namespace AtomUI.City.State;
 
-public interface IStateCollection<TKey, TItem>
+public interface IStateCollection<TKey, TItem> : IDisposable
     where TKey : notnull
 {
     long Version { get; }
