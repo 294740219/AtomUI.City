@@ -5,8 +5,8 @@
 ## 当前结论
 
 - 1.0 发布状态：不可发布。
-- 全局进度：73/118。
-- 模块 Feature 合同：73/109。
+- 全局进度：74/118。
+- 模块 Feature 合同：74/109。
 - 最终发布门禁：0/9。
 - 最近校准日期：2026-06-15。
 
@@ -42,7 +42,7 @@
 | MVVM | 6 | 0 | 6 | 已完成 |
 | State | 8 | 0 | 8 | 已完成 |
 | EventBus | 6 | 0 | 6 | 已完成 |
-| PluginSystem | 6 | 2 | 8 | 产品化进行中 |
+| PluginSystem | 7 | 1 | 8 | 产品化进行中 |
 | Data | 0 | 9 | 9 | 未完成 |
 | Localization | 0 | 7 | 7 | 未完成 |
 | Security | 0 | 7 | 7 | 未完成 |
@@ -152,7 +152,7 @@
 - [x] AUC-PLUGIN-004 Discovery。验收重点：invalid install record diagnostics 且继续扫描其他插件。
 - [x] AUC-PLUGIN-005 Loading。验收重点：Loaded/Faulted 状态和 diagnostics。
 - [x] AUC-PLUGIN-006 MSBuild Contract。验收重点：MSBuild property、output path、package content roots。
-- [ ] AUC-PLUGIN-007 Diagnostics。验收重点：AUCPLG0000-0022 关键路径。
+- [x] AUC-PLUGIN-007 Diagnostics。验收重点：AUCPLG0000-0022 catalog 唯一、连续、不可变。
 - [ ] AUC-PLUGIN-008 Unload Contract。验收重点：Disable -> Unloading -> Unloaded/UnloadPending。
 
 ## Data

@@ -25,4 +25,31 @@ public static class PluginDiagnosticIds
     public const string PluginPackageIdMismatch = "AUCPLG0020";
     public const string MissingInstallRecord = "AUCPLG0021";
     public const string InvalidPluginDirectory = "AUCPLG0022";
+
+    public static IReadOnlyList<string> All { get; } = Array.AsReadOnly(
+    [
+        ManifestNotFound,
+        MissingPluginId,
+        MainAssemblyNotFound,
+        PluginIdMismatch,
+        UnsupportedManifestSchema,
+        RequiredContributionManifestNotFound,
+        InvalidMainAssembly,
+        PluginAlreadyInstalled,
+        PluginDependencyMissing,
+        PluginDependencyCycle,
+        InvalidPluginId,
+        InvalidPluginVersion,
+        InvalidContributionPath,
+        InvalidTargetFramework,
+        PackageExtractionFailed,
+        PluginIdConflict,
+        PluginDependencyVersionMismatch,
+        InvalidInstallRecord,
+        PluginVersionMismatch,
+        InvalidManifest,
+        PluginPackageIdMismatch,
+        MissingInstallRecord,
+        InvalidPluginDirectory,
+    ]);
 }

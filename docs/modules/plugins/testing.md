@@ -29,7 +29,7 @@
 | AUC-PLUGIN-004 | PluginLifecycle | PluginLoadingTests | 断言 invalid install record 和 invalid directory diagnostics 且继续扫描其他插件。 | 缺少 install record、非法 record、目录无效。 | Completed |
 | AUC-PLUGIN-005 | PluginLifecycle | PluginLoadingTests | 断言 Loaded/Faulted 状态、runtime presence 和 diagnostics。 | 主程序集缺失、manifest invalid、id mismatch。 | Completed |
 | AUC-PLUGIN-006 | PluginLifecycle | PluginMsBuildContractTests | 断言 MSBuild property、output path、package content roots。 | 属性缺失、layout 不合法、manifest 未生成。 | Completed |
-| AUC-PLUGIN-007 | PluginLifecycle | PluginResultTests | 断言 AUCPLG0000-0022 关键路径。 | 诊断码不能复用，context 必须有 pluginId/path。 | Required |
+| AUC-PLUGIN-007 | PluginLifecycle | PluginResultTests | 断言 AUCPLG0000-0022 catalog 唯一、连续、不可变，且 diagnostic code/message 非空。 | 诊断码不能复用，context 必须有 pluginId/path。 | Completed |
 | AUC-PLUGIN-008 | PluginLifecycle | PluginLoadingTests | 断言 Disable -> Unloading -> Unloaded/UnloadPending。 | active contribution、未释放 view/subscription/connection。 | Required |
 
 ## 缺口处理

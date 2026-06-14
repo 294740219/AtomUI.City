@@ -7,6 +7,8 @@
 - message 可以优化，但 code 含义不能漂移。
 - 重要失败路径必须有诊断、Result 或声明异常。
 - 测试必须断言 code 和至少一个定位字段。
+- `PluginDiagnosticIds.All` 必须按 code 顺序列出当前稳定诊断码，且不可由调用方修改。
+- `PluginDiagnostic` 必须拒绝空 code 和空 message。
 
 ## 当前源码诊断码
 

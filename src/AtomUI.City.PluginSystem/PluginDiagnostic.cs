@@ -5,7 +5,16 @@ public sealed record PluginDiagnostic(
     string Message,
     string? PluginId = null,
     string? Field = null,
-    string? Path = null);
+    string? Path = null)
+{
+    public string Code { get; init; } = !string.IsNullOrWhiteSpace(Code)
+        ? Code
+        : throw new ArgumentException("Plugin diagnostic code cannot be empty.", nameof(Code));
+
+    public string Message { get; init; } = !string.IsNullOrWhiteSpace(Message)
+        ? Message
+        : throw new ArgumentException("Plugin diagnostic message cannot be empty.", nameof(Message));
+}
 
 public sealed class PluginValidationResult
 {

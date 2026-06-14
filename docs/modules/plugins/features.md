@@ -12,7 +12,7 @@
 | AUC-PLUGIN-004 | Discovery | Completed | PluginDiscoveryScanner | PluginLoadingTests |
 | AUC-PLUGIN-005 | Loading | Completed | PluginLoader, PluginLoadResult | PluginLoadingTests |
 | AUC-PLUGIN-006 | MSBuild Contract | Completed | PluginMsBuildContract | PluginMsBuildContractTests |
-| AUC-PLUGIN-007 | Diagnostics | Ready to Start Product Implementation | PluginDiagnosticIds, PluginDiagnostic | PluginResultTests |
+| AUC-PLUGIN-007 | Diagnostics | Completed | PluginDiagnosticIds, PluginDiagnostic | PluginResultTests |
 | AUC-PLUGIN-008 | Unload Contract | Ready to Start Product Implementation | PluginRuntime, Contribution lease | PluginLoadingTests |
 
 ## Feature 硬门禁
@@ -115,15 +115,15 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-PLUGIN-007 Diagnostics
 
 Feature ID: `AUC-PLUGIN-007`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 插件安装、发现、加载和依赖诊断。
 Public Contract: PluginDiagnosticIds, PluginDiagnostic
-Runtime / Build Behavior: 插件安装、发现、加载和依赖诊断。
-Failure Behavior: 诊断码不能复用，context 必须有 pluginId/path。
+Runtime / Build Behavior: 插件安装、发现、加载和依赖诊断；诊断码 catalog 必须稳定且不可变。
+Failure Behavior: 诊断码不能复用，context 必须有 pluginId/path，diagnostic code/message 必须非空。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `PluginResultTests`。
-Required Assertions: 断言 AUCPLG0000-0022 关键路径。
+Required Assertions: 断言 AUCPLG0000-0022 catalog 唯一、连续、不可变，且 diagnostic code/message 非空。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 ## AUC-PLUGIN-008 Unload Contract
 
