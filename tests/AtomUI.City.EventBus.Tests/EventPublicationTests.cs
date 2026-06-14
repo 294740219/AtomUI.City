@@ -84,6 +84,19 @@ public sealed class EventPublicationTests
         });
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData(" cause ")]
+    [InlineData("cause\nid")]
+    public void PublishOptionsRejectInvalidCausationIds(string causationId)
+    {
+        Assert.Throws<ArgumentException>(() => new EventPublishOptions
+        {
+            CausationId = causationId,
+        });
+    }
+
     [Fact]
     public async Task PostAsyncRejectsNullEvent()
     {

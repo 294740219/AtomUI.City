@@ -3,6 +3,7 @@ namespace AtomUI.City.EventBus;
 public sealed class EventPublishOptions
 {
     private string? _correlationId;
+    private string? _causationId;
     private int _publishDepth;
 
     public static EventPublishOptions Default { get; } = new();
@@ -13,7 +14,11 @@ public sealed class EventPublishOptions
         init => _correlationId = EventCorrelationIds.ValidateOptional(value, nameof(CorrelationId));
     }
 
-    public string? CausationId { get; init; }
+    public string? CausationId
+    {
+        get => _causationId;
+        init => _causationId = EventCorrelationIds.ValidateOptional(value, nameof(CausationId));
+    }
 
     public int PublishDepth
     {

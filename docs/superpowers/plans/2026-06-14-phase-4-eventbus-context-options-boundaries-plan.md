@@ -97,7 +97,7 @@ Commit message: `fix(EventBus): validate publish correlation ids`
 - Modify: `src/AtomUI.City.EventBus/EventPublishOptions.cs`
 - Test: `tests/AtomUI.City.EventBus.Tests/EventPublicationTests.cs`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```csharp
 [Theory]
@@ -114,21 +114,21 @@ public void PublishOptionsRejectInvalidCausationIds(string causationId)
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `dotnet test tests/AtomUI.City.EventBus.Tests/AtomUI.City.EventBus.Tests.csproj --filter "FullyQualifiedName~PublishOptionsRejectInvalidCausationIds"`
 Expected: FAIL because causation ids currently accept blank, surrounding whitespace, and control characters.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Call `EventCorrelationIds.ValidateOptional` from `EventPublishOptions.CausationId`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `dotnet test tests/AtomUI.City.EventBus.Tests/AtomUI.City.EventBus.Tests.csproj --filter "FullyQualifiedName~PublishOptionsRejectInvalidCausationIds"`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit message: `fix(EventBus): validate publish causation ids`
 
