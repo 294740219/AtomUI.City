@@ -23,7 +23,7 @@
 | Feature ID | Test Type | Test File | Required Assertions | Failure Paths | Status |
 | --- | --- | --- | --- | --- | --- |
 | AUC-STATE-001 | Unit | WritableStateTests | 断言原子更新、version、提交后通知、相等值不通知、订阅 dispose、disposed mutation rejection、updater 异常诊断和写拒绝/access policy。 | updater 拒绝或失败、handler 失败、disposed state、ReadOnly 写拒绝。 | Completed |
-| AUC-STATE-002 | Unit | ApplicationStateTests | 断言注册、读取、writer、not registered。 | 未注册、重复注册、写入拒绝。 | Required |
+| AUC-STATE-002 | Unit | ApplicationStateTests; StateDefinitionTests | 断言注册、读取、writer、not registered、StateDefinition enum 和 schema version 边界。 | 未注册、重复注册、写入拒绝、Update null updater。 | Completed |
 | AUC-STATE-003 | Unit | ComputedStateTests | 断言依赖失效、缓存、异常诊断。 | compute 异常、循环依赖、dispose。 | Required |
 | AUC-STATE-004 | Unit | StateScopeTests; StateThreadingTests | 断言 dispose 后不通知。 | 重复释放、owner dispose、callback 失败。 | Required |
 | AUC-STATE-005 | Unit | StateSnapshotTests | 断言不可变、过滤、restore diagnostics。 | 版本不兼容、policy 拒绝、restore 失败。 | Required |

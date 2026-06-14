@@ -7,7 +7,7 @@
 | Feature ID | 名称 | 状态 | 公开合同 | 主测试 |
 | --- | --- | --- | --- | --- |
 | AUC-STATE-001 | Writable State | Completed | IWritableState<T>, WritableState<T> | WritableStateTests |
-| AUC-STATE-002 | Application State | 产品化进行中 | IApplicationState, ApplicationStateRegistry, StateDefinition<T> | ApplicationStateTests; StateDefinitionTests |
+| AUC-STATE-002 | Application State | Completed | IApplicationState, ApplicationStateRegistry, StateDefinition<T> | ApplicationStateTests; StateDefinitionTests |
 | AUC-STATE-003 | Computed State | 产品化进行中 | IComputedState<T>, ComputedState<T> | ComputedStateTests |
 | AUC-STATE-004 | State Subscription | 产品化进行中 | IStateSubscription, IStateReaction, StateSubscriptionOptions | StateScopeTests; StateThreadingTests |
 | AUC-STATE-005 | State Snapshot | 产品化进行中 | StateSnapshot, StateSnapshotEntry | StateSnapshotTests |
@@ -49,15 +49,15 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-STATE-002 Application State
 
 Feature ID: `AUC-STATE-002`
-Status: 产品化进行中
+Status: Completed
 Goal: 通过 DI 访问应用级共享状态。
 Public Contract: IApplicationState, ApplicationStateRegistry
 Runtime / Build Behavior: 通过 DI 访问应用级共享状态。
-Failure Behavior: 未注册、重复注册、写入拒绝。
+Failure Behavior: 未注册、重复注册、写入拒绝、Update null updater、StateDefinition enum 和 schema version 边界。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `ApplicationStateTests`。
-Required Assertions: 断言注册、读取、writer、not registered、StateDefinition enum 和 schema version 边界。
+Required Assertions: 断言注册、读取、writer、not registered、Update 参数边界、StateDefinition enum 和 schema version 边界。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 ## AUC-STATE-003 Computed State
 

@@ -129,6 +129,8 @@ public interface IApplicationStateWriter
 
 `IApplicationState` 和 `IApplicationStateWriter` 分离，方便 Host 给插件或普通模块只暴露只读接口。
 
+`Update` 必须在 registry lookup 前拒绝 null updater。这样缺参调用不会写入未注册 state 诊断，也不会隐式创建或访问 state。
+
 ### 5. 写入策略
 
 全局状态必须有写入规则。
@@ -173,6 +175,8 @@ public interface IApplicationStateWriter
 | 未注册状态 | Unit | 返回诊断错误，不隐式创建。 |
 | 只读入口 | Unit | `IApplicationState` 不能写入。 |
 | Writer 写入 | Unit | 授权 writer 可更新状态。 |
+| Writer 参数边界 | Unit | null updater 先于 registry lookup 被拒绝。 |
 | 写入策略拒绝 | Unit | 拒绝写入并记录诊断。 |
+| StateDefinition 边界 | Unit | 未知 enum 和非法 schema version 被拒绝。 |
 | ActivationScope 监听 | Unit | Scope 停用后自动解除订阅。 |
 | 插件只读访问 | Unit | 插件默认不能写 Host 状态。 |

@@ -66,6 +66,8 @@ public sealed class ApplicationStateRegistry :
 
     public bool Update<T>(StateKey<T> key, Func<T, T> updater)
     {
+        ArgumentNullException.ThrowIfNull(updater);
+
         return GetWritable(key).Update(updater);
     }
 

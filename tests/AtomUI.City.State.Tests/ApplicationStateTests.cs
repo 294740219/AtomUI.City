@@ -36,6 +36,20 @@ public sealed class ApplicationStateTests
     }
 
     [Fact]
+    public void WriterUpdateRejectsNullUpdaterBeforeRegistryLookup()
+    {
+        var diagnostics = new InMemoryHostDiagnostics();
+        var registry = new ApplicationStateRegistry(diagnostics);
+        var key = new StateKey<string>("AtomUI.City.Tests.Missing");
+
+        var exception = Assert.Throws<ArgumentNullException>(
+            () => registry.Update(key, null!));
+
+        Assert.Equal("updater", exception.ParamName);
+        Assert.Empty(diagnostics.Records);
+    }
+
+    [Fact]
     public void ReadOnlyStateDefinitionRejectsApplicationWriter()
     {
         var key = new StateKey<string>("AtomUI.City.Tests.ReadOnly");
