@@ -42,6 +42,7 @@ run_gate "docs" bash engineering/check-docs.sh
 run_gate "license" bash engineering/check-license.sh
 run_gate "project-inventory" bash engineering/check-project-inventory.sh
 run_gate "dependency-boundaries" bash engineering/check-dependency-boundaries.sh
+run_gate "test-naming" bash engineering/check-test-naming.sh
 run_gate "public-api" bash engineering/check-public-api.sh
 run_gate "test" bash engineering/test-ci.sh
 run_gate "release-notes" bash engineering/generate-release-notes.sh

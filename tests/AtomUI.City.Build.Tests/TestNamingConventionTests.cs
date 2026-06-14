@@ -45,6 +45,24 @@ public sealed partial class TestNamingConventionTests
         Assert.Empty(violations);
     }
 
+    [Fact]
+    public void TestNamingGateChecksProjectModuleAndFileNames()
+    {
+        var repositoryRoot = RepositoryPaths.FindRepositoryRoot();
+        var scriptPath = Path.Combine(repositoryRoot, "engineering", "check-test-naming.sh");
+
+        Assert.True(File.Exists(scriptPath), "Expected test naming gate at engineering/check-test-naming.sh.");
+
+        var script = File.ReadAllText(scriptPath);
+
+        Assert.Contains("test project folder does not match project file", script, StringComparison.Ordinal);
+        Assert.Contains("test project without source module", script, StringComparison.Ordinal);
+        Assert.Contains("test file without Tests suffix", script, StringComparison.Ordinal);
+        Assert.Contains("public test class without Tests suffix", script, StringComparison.Ordinal);
+        Assert.Contains("AtomUI.City.TemplateSmokeTests", script, StringComparison.Ordinal);
+        Assert.Contains("bash engineering/check-test-naming.sh", File.ReadAllText(Path.Combine(repositoryRoot, "engineering", "check-release.sh")), StringComparison.Ordinal);
+    }
+
     [GeneratedRegex(@"^public\s+(?:sealed\s+|partial\s+|sealed\s+partial\s+|partial\s+sealed\s+)?class\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Multiline)]
     private static partial Regex PublicTestClassRegex();
 

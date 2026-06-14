@@ -12,7 +12,7 @@
 | AUC-BUILD-004 | Dependency Boundary | 已实现并通过产品合同测试 | project reference and package reference rules | ProjectDependencyBoundaryTests |
 | AUC-BUILD-005 | Source Generator Packaging | 已实现并通过产品合同测试 | AtomUI.City.Generators package layout | SourceGeneratorProjectStructureTests |
 | AUC-BUILD-006 | Release Gates | 已实现并通过产品合同测试 | engineering/check-docs.sh, pack/test gates | EngineeringGateTests; PackagingReleaseGateTests |
-| AUC-BUILD-007 | Test Naming | Ready to Start Product Implementation | test project and test file naming convention | TestNamingConventionTests |
+| AUC-BUILD-007 | Test Naming | 已实现并通过产品合同测试 | test project and test file naming convention | TestNamingConventionTests |
 
 ## Feature 硬门禁
 
@@ -118,7 +118,7 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-BUILD-007 Test Naming
 
 Feature ID: `AUC-BUILD-007`
-Status: Ready to Start Product Implementation
+Status: 已实现并通过产品合同测试
 Goal: 保证测试文件和模块可追踪。
 Public Contract: test project and test file naming convention
 Runtime / Build Behavior: 测试项目按 AtomUI.City.<Module>.Tests 命名，测试文件对应 feature 或 contract。
