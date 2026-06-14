@@ -56,7 +56,7 @@ Commit message: `fix(State): reject default keys in definitions`
 - Modify: `docs/modules/state/api-contracts.md`
 - Test: `tests/AtomUI.City.State.Tests/ApplicationStateTests.cs`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```csharp
 [Fact]
@@ -73,21 +73,21 @@ public void MissingApplicationStateRejectsDefaultKeyBeforeDiagnostics()
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `dotnet test tests/AtomUI.City.State.Tests/AtomUI.City.State.Tests.csproj --filter "FullyQualifiedName~MissingApplicationStateRejectsDefaultKeyBeforeDiagnostics"`
 Expected: FAIL because registry lookup currently lets the default key reach dictionary lookup semantics.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Call `StateKey<T>.ThrowIfDefault(key, nameof(key))` at the start of `ApplicationStateRegistry.GetRegistration`. Update `api-contracts.md` to state application state registry key boundaries reject default keys before diagnostics.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `dotnet test tests/AtomUI.City.State.Tests/AtomUI.City.State.Tests.csproj --filter "FullyQualifiedName~MissingApplicationStateRejectsDefaultKeyBeforeDiagnostics"`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit message: `fix(State): reject default keys in registry reads`
 

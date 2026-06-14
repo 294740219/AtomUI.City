@@ -98,6 +98,19 @@ public sealed class ApplicationStateTests
     }
 
     [Fact]
+    public void MissingApplicationStateRejectsDefaultKeyBeforeDiagnostics()
+    {
+        var diagnostics = new InMemoryHostDiagnostics();
+        var registry = new ApplicationStateRegistry(diagnostics);
+
+        var exception = Assert.Throws<ArgumentException>(
+            () => registry.Get(default(StateKey<int>)));
+
+        Assert.Equal("key", exception.ParamName);
+        Assert.Empty(diagnostics.Records);
+    }
+
+    [Fact]
     public void ApplicationStateTypeMismatchRecordsDiagnostics()
     {
         var diagnostics = new InMemoryHostDiagnostics();

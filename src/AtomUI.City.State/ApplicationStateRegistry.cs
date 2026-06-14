@@ -97,6 +97,8 @@ public sealed class ApplicationStateRegistry :
 
     private StateRegistration<T> GetRegistration<T>(StateKey<T> key)
     {
+        StateKey<T>.ThrowIfDefault(key, nameof(key));
+
         if (!_registrations.TryGetValue(key.Name, out var registration))
         {
             WriteNotRegisteredDiagnostic(key.Name, typeof(T));
