@@ -473,7 +473,7 @@ Commit message: `fix(EventBus): validate post rejection init`
 - Test: `tests/AtomUI.City.EventBus.Tests/EventPublicationTests.cs`
 - Modify: this plan file
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```csharp
 [Fact]
@@ -491,12 +491,12 @@ public void PostResultRejectsRejectedMissingReasonInitMutation()
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `dotnet test tests/AtomUI.City.EventBus.Tests/AtomUI.City.EventBus.Tests.csproj --filter "FullyQualifiedName~PostResultRejectsRejectedMissingReasonInitMutation"`
 Expected: FAIL because `Accepted` init mutations do not require a rejection reason.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Add a validating `Accepted` backing field that rejects the rejected-without-reason state:
 
@@ -520,12 +520,12 @@ private static bool ValidateAccepted(bool accepted, string? rejectionReason)
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `dotnet test tests/AtomUI.City.EventBus.Tests/AtomUI.City.EventBus.Tests.csproj --filter "FullyQualifiedName~PostResultRejectsRejectedMissingReasonInitMutation"`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit message: `fix(EventBus): validate post accepted init`
 

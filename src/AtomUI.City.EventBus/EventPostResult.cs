@@ -22,6 +22,14 @@ public sealed record EventPostResult(
         init => _contractId = ValidateContractId(value);
     }
 
+    private bool _accepted = ValidateAccepted(Accepted, RejectionReason);
+
+    public bool Accepted
+    {
+        get => _accepted;
+        init => _accepted = ValidateAccepted(value, RejectionReason);
+    }
+
     private string? _rejectionReason = ValidateRejectionReason(Accepted, RejectionReason);
 
     public string? RejectionReason
@@ -45,6 +53,16 @@ public sealed record EventPostResult(
         EventContractId.ThrowIfDefault(contractId, nameof(ContractId));
 
         return contractId;
+    }
+
+    private static bool ValidateAccepted(bool accepted, string? rejectionReason)
+    {
+        if (!accepted && string.IsNullOrWhiteSpace(rejectionReason))
+        {
+            throw new ArgumentException("Rejected event post result must include a rejection reason.", nameof(Accepted));
+        }
+
+        return accepted;
     }
 
     private static string? ValidateRejectionReason(
