@@ -4,7 +4,7 @@
 
 | Feature ID | 已文档化 | API 合同 | 现有测试文件 | 实现基线 | 产品合同测试 | 必要断言 | 实现缺口 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| AUC-STATE-001 | 是 | 是 | WritableStateTests | 已有基线 | 必需 | 断言原子更新、version、通知顺序、写拒绝。 | 必需 | 准备开始产品实现 |
+| AUC-STATE-001 | 是 | 是 | WritableStateTests | 已有基线 | 部分通过 | 断言原子更新、version、提交后通知、相等值不通知、订阅 dispose、disposed mutation rejection、updater 异常诊断和写拒绝/access policy。 | 仍需完整产品合同测试 | 产品化进行中 |
 | AUC-STATE-002 | 是 | 是 | ApplicationStateTests; StateDefinitionTests | 已有基线 | 部分通过 | 断言注册、读取、writer、not registered、StateDefinition enum 和 schema version 边界。 | 仍需完整产品合同测试 | 产品化进行中 |
 | AUC-STATE-003 | 是 | 是 | ComputedStateTests | 已有基线 | 部分通过 | 断言 lazy invalidation、依赖失效、缓存、异常诊断、null dependency 拒绝。 | 仍需完整产品合同测试 | 产品化进行中 |
 | AUC-STATE-004 | 是 | 是 | StateScopeTests; StateThreadingTests | 已有基线 | 部分通过 | 断言 dispose 后不通知、Background 不阻塞状态提交、Background handler 失败诊断。 | 仍需完整产品合同测试 | 产品化进行中 |

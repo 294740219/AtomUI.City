@@ -54,6 +54,62 @@ public sealed class WritableStateTests
     }
 
     [Fact]
+    public void SetValueIncrementsVersionAndNotifiesAfterCommit()
+    {
+        var state = new WritableState<int>(1);
+        long observedVersion = -1;
+        int observedValue = -1;
+        StateChangedEventArgs<int>? observedArgs = null;
+
+        state.OnChange(args =>
+        {
+            observedVersion = state.Version;
+            observedValue = state.Value;
+            observedArgs = args;
+        });
+
+        var changed = state.SetValue(2);
+
+        Assert.True(changed);
+        Assert.Equal(1, state.Version);
+        Assert.Equal(1, observedVersion);
+        Assert.Equal(2, observedValue);
+        Assert.NotNull(observedArgs);
+        Assert.Equal(1, observedArgs.OldValue);
+        Assert.Equal(2, observedArgs.NewValue);
+        Assert.Equal(1, observedArgs.Version);
+    }
+
+    [Fact]
+    public void DisposedSubscriptionStopsReceivingNotifications()
+    {
+        var state = new WritableState<int>(0);
+        var notifications = 0;
+        var subscription = state.OnChange(_ => notifications++);
+
+        subscription.Dispose();
+        state.SetValue(1);
+
+        Assert.Equal(0, notifications);
+    }
+
+    [Fact]
+    public void DisposeRejectsMutatingApisAndKeepsReadPropertiesAvailable()
+    {
+        var state = new WritableState<int>(3);
+
+        state.Dispose();
+        state.Dispose();
+
+        Assert.Equal(3, state.Value);
+        Assert.Equal(0, state.Version);
+        Assert.Throws<ObjectDisposedException>(() => state.SetValue(4));
+        Assert.Throws<ObjectDisposedException>(() => state.Set(4));
+        Assert.Throws<ObjectDisposedException>(() => state.Update(value => value + 1));
+        Assert.Throws<ObjectDisposedException>(() => state.OnChange(_ => { }));
+    }
+
+    [Fact]
     public void UpdateKeepsCurrentValueWhenUpdaterThrows()
     {
         var state = new WritableState<int>(3);

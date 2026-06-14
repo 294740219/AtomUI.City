@@ -84,7 +84,7 @@ public interface IReadOnlyState<T>
 
     long Version { get; }
 
-    IDisposable OnChange(Action<StateChangedEventArgs<T>> handler);
+    IStateSubscription OnChange(Action<StateChangedEventArgs<T>> handler);
 }
 ```
 
@@ -95,6 +95,7 @@ public interface IReadOnlyState<T>
 - 相等值不触发变更。
 - 变化通知在状态提交后触发。
 - 订阅必须可释放。
+- 订阅释放后不再收到后续通知，重复释放幂等。
 - 默认不暴露 Rx 类型。
 
 ### 3. IWritableState<T>
@@ -107,6 +108,8 @@ public interface IWritableState<T> : IReadOnlyState<T>
     bool SetValue(T value);
 
     bool Update(Func<T, T> updater);
+
+    void Set(T value);
 }
 ```
 
@@ -118,6 +121,13 @@ public interface IWritableState<T> : IReadOnlyState<T>
 - 更新必须原子化。
 - 更新失败时保留旧值。
 - updater 中禁止执行 IO 或长耗时逻辑。
+
+`WritableState<T>` 作为当前具体实现同时实现 `IDisposable`，但不把 `IDisposable` 加到 `IWritableState<T>` 合同上。Dispose 行为：
+
+- `Dispose` 幂等，释放后清空已注册 subscriptions。
+- `Value`、`Version` 和 `ValueType` 在 Dispose 后仍可读取。
+- `Set`、`SetValue`、`Update` 和 `OnChange` 在 Dispose 后抛 `ObjectDisposedException`。
+- 内部 restore-style mutation 在 Dispose 后也必须拒绝。
 
 异步请求不直接进入 state。异步请求属于 Data、Command 或 OperationScope，完成后再提交状态更新。
 
@@ -191,6 +201,7 @@ context.States.Add(
 - 状态提交原子化。
 - 版本递增和当前值替换不可分离。
 - 不在状态锁内调用订阅者。
+- 订阅者观察到通知时，`Value` 和 `Version` 必须已经是提交后的值。
 - 更新失败不改变当前值。
 - 取消后的 OperationScope 不应继续提交状态更新。
 
@@ -214,6 +225,9 @@ Source Generator 负责生成：
 | SetValue | Unit | 值变化时返回 true，Version 递增。 |
 | 相等值提交 | Unit | 返回 false，不递增 Version，不通知。 |
 | Update 原子性 | Unit | updater 成功才替换值。 |
+| 提交后通知 | Unit | handler 中读取到已提交的 Value 和 Version。 |
+| subscription dispose | Unit | 释放后不再收到通知。 |
+| WritableState Dispose | Unit | 读属性保留，mutation 和 subscription API 抛 ObjectDisposedException，重复 Dispose 幂等。 |
 | updater 异常 | Unit | 旧值保留，诊断记录。 |
 | 重复 StateKey | Analyzer/Generator | 输出稳定诊断。 |
 | 不可序列化 snapshot 类型 | Analyzer/Generator | 输出构建期诊断。 |

@@ -17,8 +17,9 @@
 
 | Method | Purpose | Parameters | Return | Failure Behavior | Cancellation | Concurrency / Idempotency |
 | --- | --- | --- | --- | --- | --- | --- |
-| IWritableState<T>.Set | 写入状态。 | value。 | 新 version。 | 写入拒绝、callback 失败。 | 同步提交，不隐式切线程。 | 并发写串行化。 |
-| IReadOnlyState<T>.Subscribe | 订阅状态。 | handler/options。 | IStateSubscription。 | disposed state 失败；handler 失败写 diagnostics。 | 调度由 StateDispatchPolicy；Background 不得阻塞状态提交。 | dispose 后不再通知。 |
+| IWritableState<T>.Set / SetValue / Update | 写入或转换状态。 | value/updater。 | `Set` 无返回；`SetValue`/`Update` 返回是否提交变更。 | updater 为 null 抛 `ArgumentNullException`；`WritableState<T>` Dispose 后 `Set`、`SetValue`、`Update` 抛 `ObjectDisposedException`；updater 失败保留旧值并写 diagnostics；callback 失败写 diagnostics。 | 同步提交，不隐式切线程。 | 并发写串行化；相等值不递增 version、不通知。 |
+| IReadOnlyState<T>.OnChange | 订阅状态。 | handler/options。 | IStateSubscription。 | handler/options 为 null 抛 `ArgumentNullException`；`WritableState<T>` Dispose 后抛 `ObjectDisposedException`；handler 失败写 diagnostics。 | 调度由 StateDispatchPolicy；Background 不得阻塞状态提交。 | subscription dispose 后不再通知；重复 dispose 幂等。 |
+| WritableState<T>.Dispose | 结束可写状态生命周期。 | 无。 | 无。 | 重复 Dispose 不抛异常；Dispose 后读属性仍可读取，mutation、subscription 和 restore-style mutation 抛 `ObjectDisposedException`。 | 无。 | 清空现有 subscriptions；不在状态锁内调用 handler。 |
 | ComputedState<T> constructor | 创建计算状态。 | compute 不能为 null；dependencies 不得为 null 且不得包含 null 项。 | ComputedState<T>。 | compute/dependencies 为 null 抛 `ArgumentNullException`；dependency 项为 null 抛 `ArgumentException`。 | 无。 | 依赖订阅随 computed dispose 释放。 |
 | ComputedState<T>.Value | 读取计算值。 | 无。 | 当前计算值。 | compute 失败保留上一有效值并写 diagnostics。 | 同步计算，不执行 IO。 | 依赖变化后无订阅者只标记 dirty，读取时才重算；依赖变化且有订阅者时立即重算并通知。 |
 | StateDefinition.Create | 创建状态定义。 | key、lifetime、access、snapshotPolicy、schemaVersion 必须有效。 | StateDefinition<T>。 | 未知 enum 或 schemaVersion 小于 1 抛 `ArgumentOutOfRangeException`。 | 无。 | 创建结果不可变。 |
@@ -87,7 +88,8 @@
 
 ## Dispose 后行为
 
-- mutating API 在 Dispose 后必须失败。
+- `WritableState<T>` 的 `Value`、`Version`、`ValueType` 在 Dispose 后仍可读取。
+- `WritableState<T>` 的 `Set`、`SetValue`、`Update`、`OnChange` 和 restore-style mutation 在 Dispose 后必须失败并抛 `ObjectDisposedException`。
 - 查询 immutable descriptor、manifest、snapshot、result 的 API 可以继续读取。
 - 重复 Dispose、Stop、Unload、Unsubscribe、Revoke 必须幂等。
 

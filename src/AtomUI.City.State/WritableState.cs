@@ -2,13 +2,14 @@ using AtomUI.City.Diagnostics;
 
 namespace AtomUI.City.State;
 
-public sealed class WritableState<T> : IWritableState<T>
+public sealed class WritableState<T> : IWritableState<T>, IDisposable
 {
     private readonly IEqualityComparer<T> _comparer;
     private readonly IHostDiagnostics? _diagnostics;
     private readonly List<StateSubscription> _subscriptions = [];
     private readonly object _syncRoot = new();
     private T _value;
+    private bool _disposed;
 
     public WritableState(
         T initialValue,
@@ -51,6 +52,8 @@ public sealed class WritableState<T> : IWritableState<T>
 
         lock (_syncRoot)
         {
+            ThrowIfDisposed();
+
             if (_comparer.Equals(_value, value))
             {
                 return false;
@@ -77,6 +80,8 @@ public sealed class WritableState<T> : IWritableState<T>
 
         lock (_syncRoot)
         {
+            ThrowIfDisposed();
+
             T nextValue;
 
             try
@@ -125,6 +130,8 @@ public sealed class WritableState<T> : IWritableState<T>
 
         lock (_syncRoot)
         {
+            ThrowIfDisposed();
+
             _subscriptions.Add(subscription);
         }
 
@@ -147,6 +154,28 @@ public sealed class WritableState<T> : IWritableState<T>
         return OnChange(args => handler(args), options);
     }
 
+    public void Dispose()
+    {
+        StateSubscription[] subscriptions;
+
+        lock (_syncRoot)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            subscriptions = _subscriptions.ToArray();
+            _subscriptions.Clear();
+        }
+
+        foreach (var subscription in subscriptions)
+        {
+            subscription.Dispose();
+        }
+    }
+
     internal void Restore(T value, long version)
     {
         StateChangedEventArgs<T>? args;
@@ -154,6 +183,8 @@ public sealed class WritableState<T> : IWritableState<T>
 
         lock (_syncRoot)
         {
+            ThrowIfDisposed();
+
             if (_comparer.Equals(_value, value) && Version == version)
             {
                 return;
@@ -212,6 +243,14 @@ public sealed class WritableState<T> : IWritableState<T>
             StateDiagnosticIds.WritableStateUpdateFailed,
             $"Writable state failed to update value type '{typeof(T).FullName}' at version {Version}: {exception.Message}",
             HostDiagnosticSeverity.Error));
+    }
+
+    private void ThrowIfDisposed()
+    {
+        if (_disposed)
+        {
+            throw new ObjectDisposedException(GetType().FullName);
+        }
     }
 
     private void Remove(StateSubscription subscription)
