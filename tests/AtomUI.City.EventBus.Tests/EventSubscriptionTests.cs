@@ -26,6 +26,20 @@ public sealed class EventSubscriptionTests
     }
 
     [Fact]
+    public void OwnedSubscribeRejectsDisposedBus()
+    {
+        var eventBus = new InMemoryEventBus();
+        var owner = LifecycleScope.CreateRoot(LifecycleScopeKind.Application, "app");
+
+        eventBus.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(
+            () => eventBus.Subscribe<TestEvent>(
+                owner,
+                _ => ValueTask.CompletedTask));
+    }
+
+    [Fact]
     public async Task DisposedSubscriptionNoLongerReceivesEvents()
     {
         var eventBus = new InMemoryEventBus();

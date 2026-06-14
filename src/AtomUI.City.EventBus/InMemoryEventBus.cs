@@ -65,6 +65,8 @@ public sealed class InMemoryEventBus : IEventBus
         EventSubscriptionOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(owner);
+        ArgumentNullException.ThrowIfNull(handler);
+        ThrowIfDisposed();
 
         return SubscribeCore(
             owner,
