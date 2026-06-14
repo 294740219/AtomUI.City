@@ -103,7 +103,7 @@ public sealed class InteractionHandlerRegistry : IInteractionHandlerRegistry
                 },
                 linkedCancellation.Token).ConfigureAwait(false);
 
-            WriteHandledDiagnostic<TRequest, TResult>();
+            WriteHandledDiagnostic<TRequest, TResult>(registration);
 
             return InteractionResult<TResult>.Completed(value!);
         }
@@ -114,7 +114,7 @@ public sealed class InteractionHandlerRegistry : IInteractionHandlerRegistry
         }
         catch (Exception exception)
         {
-            WriteFailedDiagnostic<TRequest, TResult>(exception);
+            WriteFailedDiagnostic<TRequest, TResult>(registration, exception);
 
             return InteractionResult<TResult>.Failed(exception);
         }
@@ -188,12 +188,18 @@ public sealed class InteractionHandlerRegistry : IInteractionHandlerRegistry
         }
     }
 
-    private void WriteHandledDiagnostic<TRequest, TResult>()
+    private void WriteHandledDiagnostic<TRequest, TResult>(HandlerRegistration registration)
     {
         _diagnostics?.Write(new HostDiagnosticRecord(
             PresentationDiagnosticIds.InteractionHandled,
             $"Presentation interaction handler completed request '{typeof(TRequest).FullName}' with result '{typeof(TResult).FullName}'.",
-            HostDiagnosticSeverity.Info));
+            HostDiagnosticSeverity.Info)
+        {
+            Context = CreateDiagnosticContext<TRequest, TResult>(
+                InteractionResultStatus.Completed,
+                registration,
+                exception: null),
+        });
     }
 
     private void WriteNotHandledDiagnostic<TRequest, TResult>()
@@ -201,15 +207,29 @@ public sealed class InteractionHandlerRegistry : IInteractionHandlerRegistry
         _diagnostics?.Write(new HostDiagnosticRecord(
             PresentationDiagnosticIds.InteractionNotHandled,
             $"Presentation interaction handler was not found for request '{typeof(TRequest).FullName}' with result '{typeof(TResult).FullName}'.",
-            HostDiagnosticSeverity.Warning));
+            HostDiagnosticSeverity.Warning)
+        {
+            Context = CreateDiagnosticContext<TRequest, TResult>(
+                InteractionResultStatus.NotHandled,
+                registration: null,
+                exception: null),
+        });
     }
 
-    private void WriteFailedDiagnostic<TRequest, TResult>(Exception exception)
+    private void WriteFailedDiagnostic<TRequest, TResult>(
+        HandlerRegistration registration,
+        Exception exception)
     {
         _diagnostics?.Write(new HostDiagnosticRecord(
             PresentationDiagnosticIds.InteractionFailed,
             $"Presentation interaction handler failed for request '{typeof(TRequest).FullName}' with result '{typeof(TResult).FullName}': {exception.Message}",
-            HostDiagnosticSeverity.Error));
+            HostDiagnosticSeverity.Error)
+        {
+            Context = CreateDiagnosticContext<TRequest, TResult>(
+                InteractionResultStatus.Failed,
+                registration,
+                exception),
+        });
     }
 
     private void WriteRevokedDiagnostic(HandlerRegistration registration)
@@ -217,7 +237,46 @@ public sealed class InteractionHandlerRegistry : IInteractionHandlerRegistry
         _diagnostics?.Write(new HostDiagnosticRecord(
             PresentationDiagnosticIds.InteractionHandlerRevoked,
             $"Presentation interaction handler revoked plugin '{Normalize(registration.PluginId)}' contribution '{Normalize(registration.ContributionId)}'.",
-            HostDiagnosticSeverity.Info));
+            HostDiagnosticSeverity.Info)
+        {
+            Context = CreateDiagnosticContext(
+                registration.Key.RequestType,
+                registration.Key.ResultType,
+                status: "Revoked",
+                registration,
+                exception: null),
+        });
+    }
+
+    private static IReadOnlyDictionary<string, string?> CreateDiagnosticContext<TRequest, TResult>(
+        InteractionResultStatus status,
+        HandlerRegistration? registration,
+        Exception? exception)
+    {
+        return CreateDiagnosticContext(
+            typeof(TRequest),
+            typeof(TResult),
+            status.ToString(),
+            registration,
+            exception);
+    }
+
+    private static IReadOnlyDictionary<string, string?> CreateDiagnosticContext(
+        Type requestType,
+        Type resultType,
+        string status,
+        HandlerRegistration? registration,
+        Exception? exception)
+    {
+        return new Dictionary<string, string?>(StringComparer.Ordinal)
+        {
+            ["requestType"] = requestType.FullName,
+            ["resultType"] = resultType.FullName,
+            ["status"] = status,
+            ["pluginId"] = registration?.PluginId,
+            ["contributionId"] = registration?.ContributionId,
+            ["error"] = exception?.GetType().FullName,
+        };
     }
 
     private static string Normalize(string? value)

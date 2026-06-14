@@ -26,7 +26,7 @@
 | AUC-PRESENTATION-003 | PlatformIntegration | ViewBindingTests | 断言构造参数、DataContext、失败回滚、handle dispose 和 lifecycle event。 | 构造失败、binding 失败、取消。 | Implemented |
 | AUC-PRESENTATION-004 | PlatformIntegration | RouteOutletTests | 断言成功替换、失败回滚、取消、重复 commit、旧 view dispose 和结果状态。 | commit 失败、dispatcher 失败、old view deactivate 拒绝。 | Implemented |
 | AUC-PRESENTATION-005 | PlatformIntegration | VisualFeedbackTests | 断言 attach/detach、focus、visibility、反馈顺序和 handler 失败隔离。 | 未知 visual、重复 detach、反馈 handler 失败。 | Implemented |
-| AUC-PRESENTATION-006 | PlatformIntegration | PresentationInteractionHandlerTests; ValidationVisualStateBindingTests | 断言 handler 注册撤销、无 handler、验证消息变化、控件释放和取消。 | 无 handler、重复 handler、控件已释放。 | Required |
+| AUC-PRESENTATION-006 | PlatformIntegration | PresentationInteractionHandlerTests; ValidationVisualStateBindingTests | 断言 handler 注册撤销、无 handler、验证消息变化、控件释放和取消。 | 无 handler、重复 handler、控件已释放。 | Implemented |
 | AUC-PRESENTATION-007 | PlatformIntegration | PresentationLocalizationBridgeTests; PresentationResourceRegistryTests | 断言 culture 切换、fallback、resource revoke、插件资源卸载和局部失败隔离。 | 语言包缺失、resource dictionary 加载失败、target 已释放。 | Required |
 | AUC-PRESENTATION-008 | PlatformIntegration | ActivePluginViewRegistryTests; PresentationPluginUnloadCoordinatorTests | 断言 active view lease、卸载撤销、拒绝卸载、资源释放和重复 unload。 | active view 拒绝关闭、资源撤销失败、handler 仍被引用。 | Required |
 

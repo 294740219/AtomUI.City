@@ -25,6 +25,12 @@
 | `AUCPRS013` | OutletCommitFailed | Error | RouteOutlet commit 失败、outlet mismatch、dispatcher 失败或 rejected handle dispose 失败。 | `outletName`, `requestedOutletName`, `operation`, `currentViewType`, `newViewType`, `error` |
 | `AUCPRS014` | VisualLifecycleAdapterExecuted | Info | Visual lifecycle handler 成功处理事件。 | `viewType`, `viewModelType`, `eventKind`, `error` |
 | `AUCPRS015` | VisualLifecycleAdapterFailed | Error | Visual lifecycle handler 处理事件失败。 | `viewType`, `viewModelType`, `eventKind`, `error` |
+| `AUCPRS020` | InteractionHandled | Info | Interaction handler 成功处理 request。 | `requestType`, `resultType`, `status`, `pluginId`, `contributionId`, `error` |
+| `AUCPRS021` | InteractionNotHandled | Warning | Interaction request 没有可用 handler。 | `requestType`, `resultType`, `status`, `pluginId`, `contributionId`, `error` |
+| `AUCPRS022` | InteractionFailed | Error | Interaction handler 抛异常。 | `requestType`, `resultType`, `status`, `pluginId`, `contributionId`, `error` |
+| `AUCPRS023` | InteractionHandlerRevoked | Info | Interaction handler 被 plugin 或 contribution revoke。 | `requestType`, `resultType`, `status`, `pluginId`, `contributionId`, `error` |
+| `AUCPRS024` | ValidationVisualStateApplied | Info | ValidationScope snapshot 应用到 visual target。 | `status`, `keys`, `messageCount`, `targetType`, `error` |
+| `AUCPRS025` | ValidationVisualStateApplyFailed | Error | Validation visual target 应用失败。 | `status`, `keys`, `messageCount`, `targetType`, `error` |
 
 ## 产品级必须诊断的失败
 
@@ -35,6 +41,8 @@
 - View binding 失败：释放已创建 View 并诊断。
 - Outlet commit 失败：保留旧 content，释放被拒绝的新 handle，并记录 outlet、operation、view type 和 error。
 - Visual lifecycle handler 失败：记录失败并继续通知后续 handler。
+- Interaction handler 缺失、失败或撤销：记录 request/result type、owner 和 status。
+- Validation visual target 失败：记录 status、keys、message count、target type 和 error；用户取消不记录失败。
 - 插件卸载 active view：detach 并撤销资源。
 
 ## 上下文字段

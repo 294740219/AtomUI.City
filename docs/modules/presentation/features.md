@@ -11,7 +11,7 @@
 | AUC-PRESENTATION-003 | View Factory and Binding | 已实现并通过产品合同测试 | ViewFactory, ViewBinder, BoundViewHandle | ViewBindingTests |
 | AUC-PRESENTATION-004 | Route Outlet Commit | 已实现并通过产品合同测试 | IRouteOutlet, RouteOutlet, RouteOutletCommitResult | RouteOutletTests |
 | AUC-PRESENTATION-005 | Visual Lifecycle Feedback | 已实现并通过产品合同测试 | VisualLifecycleHub, VisualLifecycleEvent | VisualFeedbackTests |
-| AUC-PRESENTATION-006 | Interaction and Validation Bridge | Ready to Start Product Implementation | InteractionHandlerRegistry, ValidationVisualStateBinding | PresentationInteractionHandlerTests; ValidationVisualStateBindingTests |
+| AUC-PRESENTATION-006 | Interaction and Validation Bridge | 已实现并通过产品合同测试 | InteractionHandlerRegistry, ValidationVisualStateBinding | PresentationInteractionHandlerTests; ValidationVisualStateBindingTests |
 | AUC-PRESENTATION-007 | Localization and Resource Bridge | Ready to Start Product Implementation | PresentationLocalizationBridge, PresentationResourceRegistry | PresentationLocalizationBridgeTests; PresentationResourceRegistryTests |
 | AUC-PRESENTATION-008 | Plugin UI Unload Coordination | Ready to Start Product Implementation | ActivePluginViewRegistry, PresentationPluginUnloadCoordinator | ActivePluginViewRegistryTests; PresentationPluginUnloadCoordinatorTests |
 
@@ -105,13 +105,13 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-PRESENTATION-006 Interaction and Validation Bridge
 
 Feature ID: `AUC-PRESENTATION-006`
-Status: Ready to Start Product Implementation
+Status: 已实现并通过产品合同测试
 Goal: 把 MVVM Interaction/Validation 映射到 UI handler 和视觉状态。
 Public Contract: InteractionHandlerRegistry, ValidationVisualStateBinding
-Runtime / Build Behavior: Interaction handler 按 request type 和 owner 查找；validation binding 将 ValidationScope 映射到控件状态。
-Failure Behavior: 无 handler、重复 handler、控件已释放必须返回失败或撤销 binding。
-Threading / Cancellation: handler 可以异步；UI 展示必须在 dispatcher；取消后不提交结果。
-Diagnostics: interaction/validation diagnostics 必须包含 request type、control id 和 handler owner。
+Runtime / Build Behavior: Interaction handler 按 request/result type 查找最后注册且未释放的 handler；validation binding 将 ValidationScope immutable snapshot 映射到控件状态并保留消息变化。
+Failure Behavior: 无 handler 返回 NotHandled；handler 异常返回 Failed；plugin/contribution revoke 移除 handler；控件已释放时 validation apply 失败并记录诊断。
+Threading / Cancellation: interaction handler 和 validation target 都通过 dispatcher 执行；预取消不调用 handler 或 target；运行中 owner revoke/activation scope dispose 取消 pending interaction。
+Diagnostics: interaction diagnostics 包含 request type、result type、status、plugin id、contribution id 和 error；validation diagnostics 包含 status、keys、message count、target type 和 error。
 Tests: `PresentationInteractionHandlerTests; ValidationVisualStateBindingTests`
 Required Assertions: 断言 handler 注册撤销、无 handler、验证消息变化、控件释放和取消。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。

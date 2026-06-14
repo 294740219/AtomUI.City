@@ -47,7 +47,10 @@ public sealed class PresentationInteractionHandlerTests
             record =>
                 record.Code == PresentationDiagnosticIds.InteractionHandled &&
                 record.Severity == HostDiagnosticSeverity.Info &&
-                record.Message.Contains(typeof(ConfirmRequest).FullName!, StringComparison.Ordinal));
+                record.Message.Contains(typeof(ConfirmRequest).FullName!, StringComparison.Ordinal) &&
+                record.Context["requestType"] == typeof(ConfirmRequest).FullName &&
+                record.Context["resultType"] == typeof(bool).FullName &&
+                record.Context["status"] == nameof(InteractionResultStatus.Completed));
     }
 
     [Fact]
@@ -65,7 +68,10 @@ public sealed class PresentationInteractionHandlerTests
             record =>
                 record.Code == PresentationDiagnosticIds.InteractionNotHandled &&
                 record.Severity == HostDiagnosticSeverity.Warning &&
-                record.Message.Contains(typeof(ConfirmRequest).FullName!, StringComparison.Ordinal));
+                record.Message.Contains(typeof(ConfirmRequest).FullName!, StringComparison.Ordinal) &&
+                record.Context["requestType"] == typeof(ConfirmRequest).FullName &&
+                record.Context["resultType"] == typeof(bool).FullName &&
+                record.Context["status"] == nameof(InteractionResultStatus.NotHandled));
     }
 
     [Fact]
@@ -86,7 +92,33 @@ public sealed class PresentationInteractionHandlerTests
             record =>
                 record.Code == PresentationDiagnosticIds.InteractionFailed &&
                 record.Severity == HostDiagnosticSeverity.Error &&
-                record.Message.Contains("interaction failed", StringComparison.Ordinal));
+                record.Message.Contains("interaction failed", StringComparison.Ordinal) &&
+                record.Context["requestType"] == typeof(ConfirmRequest).FullName &&
+                record.Context["resultType"] == typeof(bool).FullName &&
+                record.Context["status"] == nameof(InteractionResultStatus.Failed) &&
+                record.Context["error"] == typeof(InvalidOperationException).FullName);
+    }
+
+    [Fact]
+    public async Task RegistryReturnsCanceledWithoutCallingHandlerWhenTokenIsPreCanceled()
+    {
+        var registry = new InteractionHandlerRegistry(new RecordingDispatcher());
+        var handlerCalled = false;
+        using var cancellation = new CancellationTokenSource();
+        registry.Register<ConfirmRequest, bool>(
+            (_, _) =>
+            {
+                handlerCalled = true;
+                return ValueTask.FromResult(true);
+            });
+
+        await cancellation.CancelAsync();
+        var result = await registry.HandleAsync<ConfirmRequest, bool>(
+            new ConfirmRequest("Delete?"),
+            cancellation.Token);
+
+        Assert.Equal(InteractionResultStatus.Canceled, result.Status);
+        Assert.False(handlerCalled);
     }
 
     [Fact]
@@ -155,7 +187,9 @@ public sealed class PresentationInteractionHandlerTests
                 record.Code == PresentationDiagnosticIds.InteractionHandlerRevoked &&
                 record.Severity == HostDiagnosticSeverity.Info &&
                 record.Message.Contains("com.company.sales", StringComparison.Ordinal) &&
-                record.Message.Contains("sales.confirmation", StringComparison.Ordinal));
+                record.Message.Contains("sales.confirmation", StringComparison.Ordinal) &&
+                record.Context["pluginId"] == "com.company.sales" &&
+                record.Context["contributionId"] == "sales.confirmation");
     }
 
     [Fact]

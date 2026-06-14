@@ -12,6 +12,8 @@
 - `ViewDescriptor.ConstructorParameterTypes`、ViewFactory 取消前不创建、ViewBinder binding 失败释放、BoundViewHandle dispose 幂等和 attach/detach lifecycle 属于 1.0 兼容 contract。
 - `RouteOutlet` 的同 outlet commit 串行、重复提交同一 handle 不释放当前 View、取消前不 attach、失败保留旧 content、拒绝的新 handle 释放和 `OutletCommit*` 诊断上下文字段属于 1.0 兼容 contract。
 - `VisualLifecycleEventKind` 的 Attached、Detached、Loaded、Unloaded、Focused、Unfocused、Visible、Hidden 值，以及 `VisualLifecycleHub` 的订阅顺序、失败隔离和 `VisualLifecycleAdapter*` 诊断上下文字段属于 1.0 兼容 contract。
+- `InteractionHandlerRegistry` 的最后注册 handler 选择、plugin/contribution revoke、预取消不调用 handler、owner revoke 取消 pending interaction 和 `Interaction*` 诊断上下文字段属于 1.0 兼容 contract。
+- `ValidationVisualStateBinding` 的 immutable snapshot、消息变化重新应用、预取消不调用 target、target 释放失败传播和 `ValidationVisualState*` 诊断上下文字段属于 1.0 兼容 contract。
 - 插件 View、resource dictionary、localized binding 必须绑定 plugin lease。
 - VisualTree 变化必须反馈到 ViewModel/State。
 

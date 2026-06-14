@@ -24,6 +24,8 @@
 | ViewBinder.Bind | 设置 DataContext 并建立 binding handle。 | ViewDescriptor、View、ViewModel。 | BoundViewHandle。 | binding 失败释放已创建 View；handle dispose 清理 DataContext 并发布 detach lifecycle。 | 同步 API 无 token。 | handle dispose 幂等。 |
 | IRouteOutlet.CommitAsync | 把 bound view 提交到 outlet。 | RouteOutletCommitPlan。 | RouteOutletCommitResult。 | 失败不替换旧 content；old deactivate 拒绝则中止。 | attach 前可取消；attach 后完成回滚或提交。 | 同一 outlet commit 串行。 |
 | VisualLifecycleHub.Notify | 发布 attach/detach/focus/visibility 等 visual 事件。 | view 不得为 null；VisualLifecycleEventKind 必须是声明值。 | void。 | handler 失败被隔离并诊断，不阻断后续 handler，不破坏 VisualTree。 | 同步 API 无 token；由 UI 捕获方保证 dispatcher 边界。 | 按 UI 捕获顺序和订阅顺序发布；unsubscribe 后不再接收事件。 |
+| InteractionHandlerRegistry.HandleAsync | 把 MVVM interaction request 交给当前 handler。 | request、result type 和 token。 | InteractionResult。 | 无 handler 返回 NotHandled；handler 异常返回 Failed；handler owner 撤销后不再调用。 | 预取消不调用 handler；运行中 owner revoke 或 activation scope dispose 返回 Canceled。 | 同 key 使用最后注册且未释放的 handler；plugin/contribution revoke 幂等移除。 |
+| ValidationVisualStateBinding.ApplyAsync | 把 ValidationScope snapshot 应用到 UI target。 | ValidationScope、IValidationVisualStateTarget 和 token。 | ValueTask。 | target apply 失败原样传播并记录诊断；disposed target 失败不吞掉。 | 预取消不调用 target 且不记录失败诊断。 | 每次 Apply 使用新的 immutable snapshot，target 接收消息变化。 |
 | PresentationPluginUnloadCoordinator.CoordinateAsync | 插件卸载前撤销 UI contribution。 | plugin id 和 unload request。 | PresentationPluginUnloadResult。 | active view 拒绝关闭或资源撤销失败时阻止 unload。 | 必须观察 token。 | 同一 plugin unload 串行且幂等。 |
 
 ## Public 类型覆盖

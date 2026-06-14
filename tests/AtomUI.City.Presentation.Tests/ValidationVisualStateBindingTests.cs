@@ -80,7 +80,10 @@ public sealed class ValidationVisualStateBindingTests
                 record.Code == PresentationDiagnosticIds.ValidationVisualStateApplied &&
                 record.Severity == HostDiagnosticSeverity.Info &&
                 record.Message.Contains(nameof(ValidationStatus.Invalid), StringComparison.Ordinal) &&
-                record.Message.Contains("Name", StringComparison.Ordinal));
+                record.Message.Contains("Name", StringComparison.Ordinal) &&
+                record.Context["status"] == nameof(ValidationStatus.Invalid) &&
+                record.Context["targetType"] == typeof(RecordingValidationTarget).FullName &&
+                record.Context["keys"] == "Name");
     }
 
     [Fact]
@@ -104,7 +107,75 @@ public sealed class ValidationVisualStateBindingTests
             record =>
                 record.Code == PresentationDiagnosticIds.ValidationVisualStateApplyFailed &&
                 record.Severity == HostDiagnosticSeverity.Error &&
-                record.Message.Contains("visual state failed", StringComparison.Ordinal));
+                record.Message.Contains("visual state failed", StringComparison.Ordinal) &&
+                record.Context["status"] == nameof(ValidationStatus.Invalid) &&
+                record.Context["targetType"] == typeof(RecordingValidationTarget).FullName &&
+                record.Context["error"] == typeof(InvalidOperationException).FullName);
+    }
+
+    [Fact]
+    public async Task ApplyAsyncPublishesChangedValidationMessagesToTarget()
+    {
+        var binding = new ValidationVisualStateBinding(new RecordingDispatcher());
+        var target = new RecordingValidationTarget();
+        var scope = new ValidationScope();
+
+        scope.SetInvalid("Name", "Name is required.", "Validation.Name.Required");
+        await binding.ApplyAsync(scope, target);
+
+        scope.SetInvalid("Name", "Name is too short.", "Validation.Name.Length", [3]);
+        await binding.ApplyAsync(scope, target);
+
+        Assert.Equal(2, target.Snapshots.Count);
+        Assert.Equal("Name is required.", target.Snapshots[0].Messages["Name"][0].Message);
+        Assert.Equal("Name is too short.", target.Snapshots[1].Messages["Name"][0].Message);
+        Assert.Equal("Validation.Name.Length", target.Snapshots[1].Messages["Name"][0].MessageKey);
+        Assert.Equal(3, target.Snapshots[1].Messages["Name"][0].MessageArguments?[0]);
+    }
+
+    [Fact]
+    public async Task ApplyAsyncDoesNotInvokeTargetWhenTokenIsPreCanceled()
+    {
+        var diagnostics = new InMemoryHostDiagnostics();
+        var binding = new ValidationVisualStateBinding(new RecordingDispatcher(), diagnostics);
+        var target = new RecordingValidationTarget();
+        var scope = new ValidationScope();
+        using var cancellation = new CancellationTokenSource();
+        scope.SetInvalid("Name", "Name is required.");
+
+        await cancellation.CancelAsync();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => binding.ApplyAsync(scope, target, cancellation.Token).AsTask());
+
+        Assert.Equal(0, target.ApplyCount);
+        Assert.DoesNotContain(
+            diagnostics.Records,
+            static record => record.Code == PresentationDiagnosticIds.ValidationVisualStateApplyFailed);
+    }
+
+    [Fact]
+    public async Task ApplyAsyncRecordsDisposedTargetFailureDiagnostics()
+    {
+        var diagnostics = new InMemoryHostDiagnostics();
+        var binding = new ValidationVisualStateBinding(new RecordingDispatcher(), diagnostics);
+        var target = new RecordingValidationTarget
+        {
+            IsDisposed = true,
+        };
+        var scope = new ValidationScope();
+        scope.SetInvalid("Name", "Name is required.");
+
+        var exception = await Assert.ThrowsAsync<ObjectDisposedException>(
+            () => binding.ApplyAsync(scope, target).AsTask());
+
+        Assert.Equal(typeof(RecordingValidationTarget).FullName, exception.ObjectName);
+        Assert.Contains(
+            diagnostics.Records,
+            record =>
+                record.Code == PresentationDiagnosticIds.ValidationVisualStateApplyFailed &&
+                record.Severity == HostDiagnosticSeverity.Error &&
+                record.Context["targetType"] == typeof(RecordingValidationTarget).FullName &&
+                record.Context["error"] == typeof(ObjectDisposedException).FullName);
     }
 
     private sealed class RecordingValidationTarget : IValidationVisualStateTarget
@@ -122,18 +193,31 @@ public sealed class ValidationVisualStateBindingTests
 
         public ValidationVisualStateSnapshot? Snapshot { get; private set; }
 
+        public List<ValidationVisualStateSnapshot> Snapshots { get; } = [];
+
+        public int ApplyCount { get; private set; }
+
         public bool WasOnDispatcher { get; private set; }
 
         public Exception? Failure { get; init; }
 
+        public bool IsDisposed { get; init; }
+
         public void ApplyValidationState(ValidationVisualStateSnapshot snapshot)
         {
+            ApplyCount++;
+            if (IsDisposed)
+            {
+                throw new ObjectDisposedException(typeof(RecordingValidationTarget).FullName);
+            }
+
             if (Failure is not null)
             {
                 throw Failure;
             }
 
             Snapshot = snapshot;
+            Snapshots.Add(snapshot);
             WasOnDispatcher = _dispatcher?.IsOnDispatcher ?? true;
         }
     }
