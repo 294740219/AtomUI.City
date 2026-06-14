@@ -57,6 +57,24 @@ public sealed class StateThreadingTests
     }
 
     [Fact]
+    public void DisposedDispatcherSubscriptionSkipsPendingCallback()
+    {
+        var dispatcher = new DeferredDispatcher();
+        var state = new WritableState<int>(0);
+        var observed = 0;
+
+        var subscription = state.OnChange(
+            args => observed = args.NewValue,
+            StateSubscriptionOptions.Dispatcher(dispatcher));
+
+        state.SetValue(5);
+        subscription.Dispose();
+        dispatcher.RunPending();
+
+        Assert.Equal(0, observed);
+    }
+
+    [Fact]
     public void ReadOnlyStateSubscriptionCanDeclareDispatcherPolicy()
     {
         var dispatcher = new RecordingDispatcher();
@@ -218,6 +236,43 @@ public sealed class StateThreadingTests
             CancellationToken cancellationToken = default)
         {
             return callback(cancellationToken);
+        }
+    }
+
+    private sealed class DeferredDispatcher : IUiDispatcher
+    {
+        private Action? _pending;
+
+        public bool CheckAccess() => false;
+
+        public ValueTask InvokeAsync(Action callback, CancellationToken cancellationToken = default)
+        {
+            _pending = callback;
+
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask<T> InvokeAsync<T>(Func<T> callback, CancellationToken cancellationToken = default)
+        {
+            _pending = () => _ = callback();
+
+            return ValueTask.FromResult(default(T)!);
+        }
+
+        public ValueTask PostAsync(
+            Func<CancellationToken, ValueTask> callback,
+            CancellationToken cancellationToken = default)
+        {
+            _pending = () => callback(cancellationToken).AsTask().GetAwaiter().GetResult();
+
+            return ValueTask.CompletedTask;
+        }
+
+        public void RunPending()
+        {
+            var pending = _pending;
+            _pending = null;
+            pending?.Invoke();
         }
     }
 

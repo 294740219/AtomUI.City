@@ -93,6 +93,7 @@ ViewModel 构造函数不得建立长期订阅。长期订阅必须在 Activatio
 - subscription 释放必须幂等。
 - Scope 停止时按反向顺序释放 subscription。
 - StateScope 释放时释放所有 state subscriptions。
+- Dispatcher、Queued 和 Background 等延迟回调在实际执行前必须重新检查 subscription Dispose 状态。
 - 插件 subscription 必须可被插件卸载流程找到并释放。
 - 释放失败进入错误聚合，但不能阻断其他释放。
 

@@ -9,7 +9,7 @@
 | AUC-STATE-001 | Writable State | Completed | IWritableState<T>, WritableState<T> | WritableStateTests |
 | AUC-STATE-002 | Application State | Completed | IApplicationState, ApplicationStateRegistry, StateDefinition<T> | ApplicationStateTests; StateDefinitionTests |
 | AUC-STATE-003 | Computed State | Completed | IComputedState<T>, ComputedState<T> | ComputedStateTests |
-| AUC-STATE-004 | State Subscription | 产品化进行中 | IStateSubscription, IStateReaction, StateSubscriptionOptions | StateScopeTests; StateThreadingTests |
+| AUC-STATE-004 | State Subscription | Completed | IStateSubscription, IStateReaction, StateSubscriptionOptions | StateScopeTests; StateThreadingTests |
 | AUC-STATE-005 | State Snapshot | 产品化进行中 | StateSnapshot, StateSnapshotEntry | StateSnapshotTests |
 | AUC-STATE-006 | Collection State | 产品化进行中 | StateCollection<TKey,TItem> | StateCollectionTests |
 | AUC-STATE-007 | Diagnostics | 准备开始产品实现 | StateDiagnosticIds | StateDiagnosticsTests |
@@ -75,15 +75,15 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-STATE-004 State Subscription
 
 Feature ID: `AUC-STATE-004`
-Status: 产品化进行中
+Status: Completed
 Goal: 生命周期绑定订阅和释放。
 Public Contract: IStateSubscription, IStateReaction
-Runtime / Build Behavior: 生命周期绑定订阅和释放。
-Failure Behavior: 重复释放、owner dispose、callback 失败；Background handler 失败进入 diagnostics。
+Runtime / Build Behavior: 生命周期绑定订阅和释放；延迟调度回调执行前重新检查 Dispose 状态。
+Failure Behavior: 重复释放、owner dispose、callback 失败；Background 和 Dispatcher handler 失败进入 diagnostics。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `StateScopeTests; StateThreadingTests`。
-Required Assertions: 断言 dispose 后不通知、Background 不阻塞状态提交、Background handler 失败诊断。
+Required Assertions: 断言 dispose 后不通知、Dispatcher pending callback 释放抑制、Background 不阻塞状态提交、Background handler 失败诊断。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 ## AUC-STATE-005 State Snapshot
 

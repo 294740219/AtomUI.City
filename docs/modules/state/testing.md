@@ -25,7 +25,7 @@
 | AUC-STATE-001 | Unit | WritableStateTests | 断言原子更新、version、提交后通知、相等值不通知、订阅 dispose、disposed mutation rejection、updater 异常诊断和写拒绝/access policy。 | updater 拒绝或失败、handler 失败、disposed state、ReadOnly 写拒绝。 | Completed |
 | AUC-STATE-002 | Unit | ApplicationStateTests; StateDefinitionTests | 断言注册、读取、writer、not registered、StateDefinition enum 和 schema version 边界。 | 未注册、重复注册、写入拒绝、Update null updater。 | Completed |
 | AUC-STATE-003 | Unit | ComputedStateTests | 断言 lazy invalidation、依赖失效、缓存、异常诊断、null dependency 拒绝。 | compute 异常、dispose、null dependency、依赖订阅释放。 | Completed |
-| AUC-STATE-004 | Unit | StateScopeTests; StateThreadingTests | 断言 dispose 后不通知。 | 重复释放、owner dispose、callback 失败。 | Required |
+| AUC-STATE-004 | Unit | StateScopeTests; StateThreadingTests | 断言 dispose 后不通知、Background 不阻塞状态提交、Background handler 失败诊断。 | 重复释放、owner dispose、callback 失败、Dispatcher pending callback 释放后到达。 | Completed |
 | AUC-STATE-005 | Unit | StateSnapshotTests | 断言不可变、过滤、restore diagnostics。 | 版本不兼容、policy 拒绝、restore 失败。 | Required |
 | AUC-STATE-006 | Unit | StateCollectionTests | 断言 change kind、item version、collection version、快照不可变、非法构造参数、dispose 幂等、dispose 后读 API 可用、mutation/restore/subscription API 拒绝。 | 重复 key、missing key、clear、disposed collection、null key、null 条目、未知 change kind、负 version。 | Required |
 | AUC-STATE-007 | Unit | StateDiagnosticsTests | 断言 AUCSTA001-010。 | diagnostics collector 缺失。 | Required |

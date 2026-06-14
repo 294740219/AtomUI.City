@@ -35,7 +35,7 @@ internal sealed class StateSubscription : IStateSubscription
             switch (_options.DispatchPolicy)
             {
                 case StateDispatchPolicy.Dispatcher:
-                    _options.UiDispatcher?.InvokeAsync(() => _handler(args)).AsTask().GetAwaiter().GetResult();
+                    _options.UiDispatcher?.InvokeAsync(() => NotifyDispatched(args)).AsTask().GetAwaiter().GetResult();
                     break;
                 case StateDispatchPolicy.Background:
                     _ = Task.Run(() => NotifyBackground(args));
@@ -117,6 +117,11 @@ internal sealed class StateSubscription : IStateSubscription
 
     private void NotifyQueued(StateChangedEventArgs args)
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         try
         {
             _handler(args);
@@ -131,6 +136,26 @@ internal sealed class StateSubscription : IStateSubscription
     }
 
     private void NotifyBackground(StateChangedEventArgs args)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        try
+        {
+            _handler(args);
+        }
+        catch (Exception exception)
+        {
+            _diagnostics?.Write(new HostDiagnosticRecord(
+                StateDiagnosticIds.SubscriptionHandlerFailed,
+                $"State subscription handler failed at version {args.Version}: {exception.Message}",
+            HostDiagnosticSeverity.Error));
+        }
+    }
+
+    private void NotifyDispatched(StateChangedEventArgs args)
     {
         if (_disposed)
         {
