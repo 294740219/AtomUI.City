@@ -22,6 +22,7 @@
 - `PluginDependencyValidator` 的 missing dependency、version mismatch、duplicate plugin id 和 cycle diagnostics 进入 1.0 兼容承诺；cycle 中每个 plugin id 必须可定位。
 - `PluginPackageInstaller` 的 staging cleanup、installed version root、install record 和规范化 RootPath/ManifestPath 进入 1.0 兼容承诺。
 - `PluginDiscoveryScanner` 对 invalid install record、invalid manifest 和 invalid installed directory 的诊断与继续扫描行为进入 1.0 兼容承诺。
+- `PluginLoadResult.State`、成功时 `Runtime` 非空、失败时 `Runtime` 为空和 `Faulted` state 进入 1.0 兼容承诺。
 
 ## 数据格式兼容
 

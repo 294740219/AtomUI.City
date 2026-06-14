@@ -8,7 +8,7 @@
 | --- | --- | --- | --- |
 | Manifest | PluginManifest, PluginManifestReader, PluginManifestValidator | 读取和校验 plugin.json。 | 不执行插件代码；schema、version、mainAssembly、targetFramework 和 required field 稳定。 |
 | Package | PluginPackageInstaller, PluginPackageLayoutValidator, PluginInstallationReader | 安装、布局校验和安装记录。 | staging 原子切换；非法路径拒绝；安装记录路径必须规范化。 |
-| Runtime | PluginLoader, PluginRuntime, PluginRuntimeState, PluginLoadResult | 加载、启用、停用、卸载。 | 状态机显式；失败有 diagnostics。 |
+| Runtime | PluginLoader, PluginRuntime, PluginRuntimeState, PluginLoadResult | 加载、启用、停用、卸载。 | 状态机显式；失败有 diagnostics 且 result state 为 Faulted。 |
 | Dependencies | PluginDependencyAttribute, PluginDependencyValidator, PluginSemanticVersion | 依赖和版本校验。 | 缺失、循环、版本不满足和重复 plugin id 结构化返回；循环中的每个 plugin id 必须有诊断。 |
 | Diagnostics | PluginDiagnosticIds, PluginDiagnostic | 插件错误码和诊断。 | 现有 AUCPLG0000-0022 保持稳定。 |
 
@@ -18,7 +18,7 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | PluginManifestReader.Read | 读取 manifest。 | path 必须规范化且在包根下。 | 返回 manifest 或 diagnostics。 | 缺失、schema 不兼容、JSON 无效返回诊断。 | 可取消用于 IO。 | 无共享可变状态。 |
 | PluginPackageInstaller.InstallAsync | 安装插件包。 | package path、install root、cancellation。 | 成功返回 PluginInstallation。 | 失败清理 staging。 | 必须观察取消并清理临时目录。 | 并发安装同一 plugin/version 必须串行或拒绝。 |
-| PluginLoader.LoadAsync | 加载插件运行时。 | manifest、root path、owner。 | PluginLoadResult。 | 主程序集缺失、id mismatch、依赖失败进入 diagnostics。 | 可取消。 | 不得污染 Host root provider。 |
+| PluginLoader.LoadAsync | 加载插件运行时。 | manifest、root path、owner。 | PluginLoadResult；成功时 State 为 Loaded 且 Runtime 非空，失败时 State 为 Faulted 且 Runtime 为空。 | 主程序集缺失、id mismatch、依赖失败进入 diagnostics。 | 可取消。 | 不得污染 Host root provider。 |
 | PluginRuntime.DisableAsync | 停用插件。 | 只能 Enabled 状态。 | Disabled 或失败结果。 | 贡献撤销失败仍继续其他撤销。 | 取消后仍执行最小清理。 | 并发 Disable/Unload 串行化。 |
 
 ## Public 类型覆盖

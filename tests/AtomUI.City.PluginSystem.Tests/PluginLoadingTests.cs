@@ -18,8 +18,10 @@ public sealed class PluginLoadingTests
         var result = await loader.LoadAsync(descriptor);
 
         Assert.True(result.Succeeded);
-        Assert.Equal(PluginRuntimeState.Loaded, result.Runtime.State);
-        Assert.Equal("AtomUI.City.PluginSystem", result.Runtime.MainAssembly.GetName().Name);
+        Assert.Equal(PluginRuntimeState.Loaded, result.State);
+        var runtime = Assert.IsType<PluginRuntime>(result.Runtime);
+        Assert.Equal(PluginRuntimeState.Loaded, runtime.State);
+        Assert.Equal("AtomUI.City.PluginSystem", runtime.MainAssembly.GetName().Name);
     }
 
     [Fact]
@@ -33,12 +35,13 @@ public sealed class PluginLoadingTests
             workspace.Root);
         var loader = new PluginLoader();
         var result = await loader.LoadAsync(descriptor);
+        var runtime = Assert.IsType<PluginRuntime>(result.Runtime);
 
-        result.Runtime.Activate();
-        await result.Runtime.DeactivateAsync();
-        await result.Runtime.UnloadAsync();
+        runtime.Activate();
+        await runtime.DeactivateAsync();
+        await runtime.UnloadAsync();
 
-        Assert.Equal(PluginRuntimeState.Unloaded, result.Runtime.State);
+        Assert.Equal(PluginRuntimeState.Unloaded, runtime.State);
     }
 
     [Fact]
@@ -54,6 +57,8 @@ public sealed class PluginLoadingTests
         var result = await loader.LoadAsync(descriptor);
 
         Assert.False(result.Succeeded);
+        Assert.Equal(PluginRuntimeState.Faulted, result.State);
+        Assert.Null(result.Runtime);
         Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == PluginDiagnosticIds.MainAssemblyNotFound);
     }
 

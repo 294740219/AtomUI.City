@@ -10,7 +10,7 @@
 | AUC-PLUGIN-002 | Dependency Validation | Completed | PluginDependencyValidator, PluginSemanticVersion | PluginDependencyTests |
 | AUC-PLUGIN-003 | Package Installation | Completed | PluginPackageInstaller, PluginInstallationReader, PluginPackagePaths | PluginPackageTests |
 | AUC-PLUGIN-004 | Discovery | Completed | PluginDiscoveryScanner | PluginLoadingTests |
-| AUC-PLUGIN-005 | Loading | Ready to Start Product Implementation | PluginLoader, PluginLoadResult | PluginLoadingTests |
+| AUC-PLUGIN-005 | Loading | Completed | PluginLoader, PluginLoadResult | PluginLoadingTests |
 | AUC-PLUGIN-006 | MSBuild Contract | Ready to Start Product Implementation | PluginMsBuildContract | PluginMsBuildContractTests |
 | AUC-PLUGIN-007 | Diagnostics | Ready to Start Product Implementation | PluginDiagnosticIds, PluginDiagnostic | PluginResultTests |
 | AUC-PLUGIN-008 | Unload Contract | Ready to Start Product Implementation | PluginRuntime, Contribution lease | PluginLoadingTests |
@@ -89,15 +89,15 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-PLUGIN-005 Loading
 
 Feature ID: `AUC-PLUGIN-005`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 加载插件 manifest 和主 assembly。
 Public Contract: PluginLoader, PluginLoadResult
-Runtime / Build Behavior: 加载插件 manifest 和主 assembly。
-Failure Behavior: 主程序集缺失、manifest invalid、id mismatch。
+Runtime / Build Behavior: 加载插件 manifest 和主 assembly，成功结果必须有 Loaded state 和 runtime。
+Failure Behavior: 主程序集缺失、manifest invalid、id mismatch；失败结果必须有 Faulted state、diagnostics 且 runtime 为空。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `PluginLoadingTests`。
-Required Assertions: 断言 Loaded/Failed 状态和 diagnostics。
+Required Assertions: 断言 Loaded/Faulted 状态、runtime presence 和 diagnostics。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 ## AUC-PLUGIN-006 MSBuild Contract
 

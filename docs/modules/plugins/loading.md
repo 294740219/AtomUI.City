@@ -109,6 +109,8 @@ Create plugin lifecycle context
 - 加载阶段不能把 Contribution 应用到 Host registry。
 - 加载阶段不能允许新路由、命令或事件入口进入插件。
 - 加载失败必须释放已创建的加载上下文和服务容器。
+- `PluginLoadResult.State` 必须表达加载结果；成功为 `Loaded`，失败为 `Faulted`。
+- 失败结果不得暴露可用 runtime；`Runtime` 必须为空并携带 diagnostics。
 
 ### 4. 服务注册
 
@@ -161,6 +163,7 @@ Stop loading
 ```
 
 加载失败默认不影响主应用启动，除非插件被 Host 标记为必需插件。
+当前加载失败结果使用 `Faulted` 状态并保留诊断；没有 runtime 可供启用或卸载。
 
 ### 8. 线程约束
 
