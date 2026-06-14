@@ -42,15 +42,13 @@ public sealed class InMemoryEventContractRegistry : IEventContractRegistry
                 $"Shared event contract registry cannot register plugin-private contract '{descriptor.ContractId.Value}'.");
         }
 
-        if (_byContractId.TryGetValue(descriptor.ContractId, out var existingContract)
-            && existingContract.EventType != descriptor.EventType)
+        if (_byContractId.TryGetValue(descriptor.ContractId, out var existingContract))
         {
             throw new InvalidOperationException(
                 $"Event contract id '{descriptor.ContractId.Value}' is already registered for '{existingContract.EventType.FullName}'.");
         }
 
-        if (_byEventType.TryGetValue(descriptor.EventType, out var existingType)
-            && existingType.ContractId != descriptor.ContractId)
+        if (_byEventType.TryGetValue(descriptor.EventType, out var existingType))
         {
             throw new InvalidOperationException(
                 $"Event type '{descriptor.EventType.FullName}' is already registered as '{existingType.ContractId.Value}'.");

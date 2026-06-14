@@ -56,6 +56,23 @@ public sealed class EventContractRegistryTests
     }
 
     [Fact]
+    public void ContractRegistryRejectsDuplicateDescriptorRegistration()
+    {
+        var contractId = new EventContractId("atomui.city.tests.duplicate-same.v1");
+        var descriptor = EventContractDescriptor.Shared<TestEvent>(
+            contractId,
+            typeof(TestEvent).Assembly);
+        var registry = new InMemoryEventContractRegistry();
+
+        registry.Register(descriptor);
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => registry.Register(descriptor));
+
+        Assert.Contains(contractId.Value, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void SharedContractRegistryRejectsPluginPrivateDescriptor()
     {
         var contractId = new EventContractId("atomui.city.tests.private.v1");

@@ -218,6 +218,7 @@ plugin.state-changed.v1
 
 - Id 在 Host 共享事件平面内唯一。
 - Id 使用稳定、可读、与 CLR 类型名解耦的形式。
+- Host shared registry 必须拒绝重复 contract id、重复 event type 和 plugin-private descriptor，不能通过重复注册静默覆盖已有映射。
 - Id 一旦公开不能改变语义。
 - 破坏性变更创建新 Id 或新 major version。
 - default `EventContractId` 不是已创建 id，Shared 和 PluginPrivate descriptor 都必须拒绝。

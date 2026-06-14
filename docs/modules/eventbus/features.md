@@ -8,7 +8,7 @@
 | --- | --- | --- | --- | --- |
 | AUC-EVENTBUS-001 | Typed Publish | Completed | IEventBus.PublishAsync, IEventBus.PostAsync, EventPublishResult | EventPublicationTests |
 | AUC-EVENTBUS-002 | Subscription Lifecycle | Completed | IEventSubscription, EventSubscriptionOptions | EventSubscriptionTests |
-| AUC-EVENTBUS-003 | Contract Registry | 产品化进行中 | IEventContractRegistry, EventContractDescriptor | EventContractRegistryTests |
+| AUC-EVENTBUS-003 | Contract Registry | Completed | IEventContractRegistry, EventContractDescriptor | EventContractRegistryTests |
 | AUC-EVENTBUS-004 | Dispatch Policy | 产品化进行中 | EventDispatchPolicy, EventErrorPolicy, EventSubscriptionOptions | EventDispatchingTests |
 | AUC-EVENTBUS-005 | Diagnostics | 产品化进行中 | EventDiagnosticIds | EventDiagnosticsTests |
 | AUC-EVENTBUS-006 | DI Registration | 准备开始产品实现 | EventBusServiceCollectionExtensions | EventBusRegistrationTests |
@@ -60,15 +60,15 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-EVENTBUS-003 Contract Registry
 
 Feature ID: `AUC-EVENTBUS-003`
-Status: 产品化进行中
+Status: Completed
 Goal: 登记事件 contract 和 plane。
 Public Contract: IEventContractRegistry, EventContractDescriptor
-Runtime / Build Behavior: 登记事件 contract 和 plane。
-Failure Behavior: 跨插件私有类型拒绝、default contract id 拒绝。
+Runtime / Build Behavior: 登记 shared event contract、保持 type/id 映射稳定，并为未登记内部事件创建稳定默认 shared descriptor。
+Failure Behavior: 跨插件私有类型拒绝、default contract id 拒绝、重复 contract id 和重复 event type 拒绝。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `EventContractRegistryTests`。
-Required Assertions: 断言 shared contract assembly match、重复 contract id、稳定默认映射、plugin-private descriptor default id 拒绝、shared registry 拒绝 plugin-private descriptor。
+Required Assertions: 断言 shared contract assembly match、重复 contract id、重复 descriptor、稳定默认映射、plugin-private descriptor default id 拒绝、shared registry 拒绝 plugin-private descriptor。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 ## AUC-EVENTBUS-004 Dispatch Policy
 
