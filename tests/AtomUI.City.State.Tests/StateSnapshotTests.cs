@@ -122,6 +122,21 @@ public sealed class StateSnapshotTests
         Assert.Throws<ArgumentNullException>(() => entry with { ValueType = null! });
     }
 
+    [Fact]
+    public void SnapshotEntryRejectsNegativeVersionInit()
+    {
+        var entry = new StateSnapshotEntry(
+            "AtomUI.City.Tests.Theme",
+            typeof(string),
+            "light",
+            version: 0,
+            schemaVersion: 1,
+            ownerModule: null,
+            pluginId: null);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => entry with { Version = -1 });
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(-1)]

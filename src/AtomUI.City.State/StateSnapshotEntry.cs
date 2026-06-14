@@ -4,6 +4,7 @@ public sealed record StateSnapshotEntry
 {
     private string _stateName = null!;
     private Type _valueType = null!;
+    private long _version;
 
     public StateSnapshotEntry(
         string stateName,
@@ -66,7 +67,22 @@ public sealed record StateSnapshotEntry
 
     public object? Value { get; init; }
 
-    public long Version { get; init; }
+    public long Version
+    {
+        get => _version;
+        init
+        {
+            if (value < 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(value),
+                    value,
+                    "State snapshot version must be greater than or equal to 0.");
+            }
+
+            _version = value;
+        }
+    }
 
     public int SchemaVersion { get; init; }
 
