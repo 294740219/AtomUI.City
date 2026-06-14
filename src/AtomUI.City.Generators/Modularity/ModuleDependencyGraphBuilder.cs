@@ -61,7 +61,7 @@ public static class ModuleDependencyGraphBuilder
 
         foreach (var module in modules)
         {
-            if (!Visit(module, modulesByTypeName, visitStates, orderedModules, diagnostics))
+            if (!Visit(module, modulesByTypeName, visitStates, orderedModules, diagnostics, new List<string>()))
             {
                 return new ModuleDependencyGraphResult([], diagnostics);
             }
@@ -75,7 +75,8 @@ public static class ModuleDependencyGraphBuilder
         IReadOnlyDictionary<string, ModuleMetadata> modulesByTypeName,
         IDictionary<string, ModuleVisitState> visitStates,
         ICollection<ModuleMetadata> orderedModules,
-        ICollection<GeneratorDiagnostic> diagnostics)
+        ICollection<GeneratorDiagnostic> diagnostics,
+        List<string> dependencyPath)
     {
         if (visitStates.TryGetValue(module.TypeName, out var state))
         {
@@ -84,15 +85,17 @@ public static class ModuleDependencyGraphBuilder
                 return true;
             }
 
+            var cyclePath = CreateCyclePath(dependencyPath, module.TypeName);
             diagnostics.Add(new GeneratorDiagnostic(
                 GeneratorDiagnostics.CircularModuleDependency,
-                $"Module dependency graph contains a cycle at '{module.TypeName}'.",
+                $"Module dependency graph contains a cycle: {cyclePath}.",
                 module.TypeName));
 
             return false;
         }
 
         visitStates.Add(module.TypeName, ModuleVisitState.Visiting);
+        dependencyPath.Add(module.TypeName);
 
         foreach (var dependency in module.Dependencies)
         {
@@ -101,16 +104,28 @@ public static class ModuleDependencyGraphBuilder
                 continue;
             }
 
-            if (!Visit(dependencyModule, modulesByTypeName, visitStates, orderedModules, diagnostics))
+            if (!Visit(dependencyModule, modulesByTypeName, visitStates, orderedModules, diagnostics, dependencyPath))
             {
+                dependencyPath.RemoveAt(dependencyPath.Count - 1);
                 return false;
             }
         }
 
+        dependencyPath.RemoveAt(dependencyPath.Count - 1);
         visitStates[module.TypeName] = ModuleVisitState.Visited;
         orderedModules.Add(module);
 
         return true;
+    }
+
+    private static string CreateCyclePath(IReadOnlyList<string> dependencyPath, string repeatedModuleTypeName)
+    {
+        var cycleStartIndex = dependencyPath
+            .Select((moduleTypeName, index) => new { moduleTypeName, index })
+            .FirstOrDefault(item => string.Equals(item.moduleTypeName, repeatedModuleTypeName, StringComparison.Ordinal))
+            ?.index ?? 0;
+
+        return string.Join(" -> ", dependencyPath.Skip(cycleStartIndex).Append(repeatedModuleTypeName));
     }
 
     private enum ModuleVisitState

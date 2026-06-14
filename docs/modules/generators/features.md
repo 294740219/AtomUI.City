@@ -7,7 +7,7 @@
 | Feature ID | 名称 | 状态 | Public Contract | 主测试 |
 | --- | --- | --- | --- | --- |
 | AUC-GENERATORS-001 | Incremental Infrastructure | 已实现并通过产品合同测试 | AtomUICityIncrementalGenerator, GeneratorFeature | IncrementalGeneratorInfrastructureTests |
-| AUC-GENERATORS-002 | Module Graph | Ready to Start Product Implementation | ModuleMetadataReader, ModuleDependencyGraphBuilder | ModuleDependencyGraphBuilderTests; ModuleMetadataReaderTests |
+| AUC-GENERATORS-002 | Module Graph | 已实现并通过产品合同测试 | ModuleMetadataReader, ModuleDependencyGraphBuilder | ModuleDependencyGraphBuilderTests; ModuleMetadataReaderTests |
 | AUC-GENERATORS-003 | DI Manifest | Ready to Start Product Implementation | ServiceRegistrationMetadataReader, ServiceRegistrationManifestBuilder | ServiceRegistrationManifestBuilderTests; ServiceRegistrationMetadataReaderTests |
 | AUC-GENERATORS-004 | Route Manifest | Ready to Start Product Implementation | RouteMetadataReader, RouteManifestBuilder | RouteManifestBuilderTests; RouteMetadataReaderTests |
 | AUC-GENERATORS-005 | Plugin Manifest | Ready to Start Product Implementation | PluginMetadataReader, PluginManifestBuilder | PluginManifestBuilderTests; PluginMetadataReaderTests |
@@ -49,7 +49,7 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-GENERATORS-002 Module Graph
 
 Feature ID: `AUC-GENERATORS-002`
-Status: Ready to Start Product Implementation
+Status: 已实现并通过产品合同测试
 Goal: 编译期建立模块依赖图。
 Public Contract: ModuleMetadataReader, ModuleDependencyGraphBuilder
 Runtime / Build Behavior: 读取 Module/DependsOn metadata，默认 module id 为类型全名，输出拓扑排序。

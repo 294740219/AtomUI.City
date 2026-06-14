@@ -49,6 +49,26 @@ public sealed class ModuleDependencyGraphBuilderTests
     }
 
     [Fact]
+    public void BuildReportsCircularDependencyPath()
+    {
+        var result = ModuleDependencyGraphBuilder.Build(
+            [
+                Module("Sample.App.FirstModule", [Dependency("Sample.App.SecondModule")]),
+                Module("Sample.App.SecondModule", [Dependency("Sample.App.ThirdModule")]),
+                Module("Sample.App.ThirdModule", [Dependency("Sample.App.FirstModule")]),
+            ]);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+
+        Assert.Equal(GeneratorDiagnosticIds.CircularModuleDependency, diagnostic.Id);
+        Assert.Contains(
+            "Sample.App.FirstModule -> Sample.App.SecondModule -> Sample.App.ThirdModule -> Sample.App.FirstModule",
+            diagnostic.Message,
+            StringComparison.Ordinal);
+        Assert.Equal("Sample.App.FirstModule", diagnostic.Target);
+    }
+
+    [Fact]
     public void BuildReportsMissingRequiredDependencies()
     {
         var result = ModuleDependencyGraphBuilder.Build(
