@@ -6,7 +6,13 @@ public sealed record EventPostResult(
     bool Accepted,
     string? RejectionReason = null)
 {
-    public Guid EventId { get; init; } = ValidateEventId(EventId);
+    private Guid _eventId = ValidateEventId(EventId);
+
+    public Guid EventId
+    {
+        get => _eventId;
+        init => _eventId = ValidateEventId(value);
+    }
 
     public EventContractId ContractId { get; init; } = ValidateContractId(ContractId);
 

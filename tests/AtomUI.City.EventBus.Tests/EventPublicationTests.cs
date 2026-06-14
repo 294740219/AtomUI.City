@@ -469,6 +469,20 @@ public sealed class EventPublicationTests
     }
 
     [Fact]
+    public void PostResultRejectsEmptyEventIdInitMutation()
+    {
+        var result = new EventPostResult(
+            Guid.NewGuid(),
+            new EventContractId("atomui.city.tests.post.v1"),
+            Accepted: true);
+
+        Assert.Throws<ArgumentException>(() => result with
+        {
+            EventId = Guid.Empty,
+        });
+    }
+
+    [Fact]
     public void PostResultRejectsDefaultContractId()
     {
         Assert.Throws<ArgumentException>(() => new EventPostResult(
