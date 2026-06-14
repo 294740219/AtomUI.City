@@ -451,6 +451,19 @@ public sealed class StateCollectionTests
     }
 
     [Fact]
+    public void RestoreSnapshotRejectsDisposedCollection()
+    {
+        var collection = new StateCollection<string, int>();
+        var snapshot = new StateCollectionSnapshot<string, int>(
+            collectionVersion: 1,
+            [new StateCollectionSnapshotEntry<string, int>("settings", 1, ItemVersion: 1)]);
+
+        collection.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(() => collection.RestoreSnapshot(snapshot));
+    }
+
+    [Fact]
     public void SnapshotCopiesItemsFromConstructorInput()
     {
         var items = new List<StateCollectionSnapshotEntry<string, int>>

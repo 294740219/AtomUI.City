@@ -86,6 +86,8 @@ public sealed class StateCollection<TKey, TItem> : IStateCollection<TKey, TItem>
 
         lock (_syncRoot)
         {
+            ThrowIfDisposed();
+
             var nextItems = new Dictionary<TKey, CollectionItem>(_items.Comparer);
             var snapshotKeys = new HashSet<TKey>(_items.Comparer);
             var changes = new List<StateCollectionChange<TKey, TItem>>();
