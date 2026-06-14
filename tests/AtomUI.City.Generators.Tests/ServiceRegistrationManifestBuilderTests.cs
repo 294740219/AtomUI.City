@@ -36,6 +36,36 @@ public sealed class ServiceRegistrationManifestBuilderTests
     }
 
     [Fact]
+    public void BuildReportsLifetimeConflictsForSameImplementation()
+    {
+        var result = ServiceRegistrationManifestBuilder.Build(
+            [
+                Registration("Sample.App.UserSession", ServiceRegistrationLifetime.Singleton, "Sample.App.IUserSession"),
+                Registration("Sample.App.UserSession", ServiceRegistrationLifetime.Scoped, "Sample.App.IRequestSession"),
+            ]);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+
+        Assert.Equal(GeneratorDiagnosticIds.InvalidManifestInput, diagnostic.Id);
+        Assert.Contains("conflicting lifetimes", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Equal("Sample.App.UserSession", diagnostic.Target);
+        Assert.Empty(result.Manifest.Registrations);
+    }
+
+    [Fact]
+    public void BuildAllowsDistinctKeysForSameExposedService()
+    {
+        var result = ServiceRegistrationManifestBuilder.Build(
+            [
+                KeyedRegistration("Sample.App.SystemClock", ServiceRegistrationLifetime.Singleton, "system", "Sample.App.IClock"),
+                KeyedRegistration("Sample.App.CustomClock", ServiceRegistrationLifetime.Singleton, "custom", "Sample.App.IClock"),
+            ]);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.Equal(["custom", "system"], result.Manifest.Registrations.Select(registration => registration.Key));
+    }
+
+    [Fact]
     public void BuildReturnsReadonlyServiceRegistrationCollections()
     {
         var result = ServiceRegistrationManifestBuilder.Build(
@@ -73,12 +103,21 @@ public sealed class ServiceRegistrationManifestBuilderTests
         ServiceRegistrationLifetime lifetime,
         params string[] exposedServiceTypeNames)
     {
+        return KeyedRegistration(implementationTypeName, lifetime, key: null, exposedServiceTypeNames);
+    }
+
+    private static ServiceRegistrationMetadata KeyedRegistration(
+        string implementationTypeName,
+        ServiceRegistrationLifetime lifetime,
+        string? key,
+        params string[] exposedServiceTypeNames)
+    {
         return new ServiceRegistrationMetadata(
             implementationTypeName,
             lifetime,
             exposedServiceTypeNames,
             replace: false,
             tryAdd: false,
-            key: null);
+            key);
     }
 }

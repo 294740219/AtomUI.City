@@ -60,6 +60,30 @@ public sealed class ServiceRegistrationMetadataReaderTests
     }
 
     [Fact]
+    public void TryReadReadsExplicitRegistrationOptions()
+    {
+        var registration = ReadSingleRegistration(
+            """
+            using AtomUI.City.DependencyInjection;
+            using Microsoft.Extensions.DependencyInjection;
+
+            namespace Sample.App;
+
+            [Service(ServiceLifetime.Singleton, Replace = true, TryAdd = true, Key = "system")]
+            public sealed class SystemClock
+            {
+            }
+            """,
+            "Sample.App.SystemClock");
+
+        Assert.Equal(ServiceRegistrationLifetime.Singleton, registration.Lifetime);
+        Assert.Equal(["Sample.App.SystemClock"], registration.ExposedServiceTypeNames);
+        Assert.True(registration.Replace);
+        Assert.True(registration.TryAdd);
+        Assert.Equal("system", registration.Key);
+    }
+
+    [Fact]
     public void TryReadReadsDependencyMarkerInterfaces()
     {
         var registration = ReadSingleRegistration(

@@ -8,7 +8,7 @@
 | --- | --- | --- | --- | --- |
 | AUC-GENERATORS-001 | Incremental Infrastructure | 已实现并通过产品合同测试 | AtomUICityIncrementalGenerator, GeneratorFeature | IncrementalGeneratorInfrastructureTests |
 | AUC-GENERATORS-002 | Module Graph | 已实现并通过产品合同测试 | ModuleMetadataReader, ModuleDependencyGraphBuilder | ModuleDependencyGraphBuilderTests; ModuleMetadataReaderTests |
-| AUC-GENERATORS-003 | DI Manifest | Ready to Start Product Implementation | ServiceRegistrationMetadataReader, ServiceRegistrationManifestBuilder | ServiceRegistrationManifestBuilderTests; ServiceRegistrationMetadataReaderTests |
+| AUC-GENERATORS-003 | DI Manifest | 已实现并通过产品合同测试 | ServiceRegistrationMetadataReader, ServiceRegistrationManifestBuilder | ServiceRegistrationManifestBuilderTests; ServiceRegistrationMetadataReaderTests |
 | AUC-GENERATORS-004 | Route Manifest | Ready to Start Product Implementation | RouteMetadataReader, RouteManifestBuilder | RouteManifestBuilderTests; RouteMetadataReaderTests |
 | AUC-GENERATORS-005 | Plugin Manifest | Ready to Start Product Implementation | PluginMetadataReader, PluginManifestBuilder | PluginManifestBuilderTests; PluginMetadataReaderTests |
 | AUC-GENERATORS-006 | Localization Manifest | Ready to Start Product Implementation | LocalizationMetadataReader, LocalizationManifestBuilder | LocalizationManifestBuilderTests; LocalizationMetadataReaderTests |
@@ -63,7 +63,7 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-GENERATORS-003 DI Manifest
 
 Feature ID: `AUC-GENERATORS-003`
-Status: Ready to Start Product Implementation
+Status: 已实现并通过产品合同测试
 Goal: 编译期生成 AOT 友好的服务注册 manifest。
 Public Contract: ServiceRegistrationMetadataReader, ServiceRegistrationManifestBuilder
 Runtime / Build Behavior: 读取 ServiceAttribute、lifetime marker、ExposeServices，输出稳定服务注册清单。

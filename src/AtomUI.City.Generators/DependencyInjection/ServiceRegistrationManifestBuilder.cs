@@ -14,13 +14,33 @@ public static class ServiceRegistrationManifestBuilder
         var diagnostics = new List<GeneratorDiagnostic>();
         var exposedServices = new Dictionary<string, ServiceRegistrationMetadata>(StringComparer.Ordinal);
 
+        foreach (var implementationGroup in registrations.GroupBy(registration => registration.ImplementationTypeName, StringComparer.Ordinal))
+        {
+            var lifetimes = implementationGroup
+                .Select(registration => registration.Lifetime)
+                .Distinct()
+                .ToArray();
+
+            if (lifetimes.Length <= 1)
+            {
+                continue;
+            }
+
+            diagnostics.Add(new GeneratorDiagnostic(
+                GeneratorDiagnostics.InvalidManifestInput,
+                $"Service implementation '{implementationGroup.Key}' has conflicting lifetimes: {string.Join(", ", lifetimes)}.",
+                implementationGroup.Key));
+        }
+
         foreach (var registration in registrations)
         {
             foreach (var exposedServiceTypeName in registration.ExposedServiceTypeNames)
             {
-                if (!exposedServices.TryGetValue(exposedServiceTypeName, out var existingRegistration))
+                var registrationKey = CreateRegistrationKey(exposedServiceTypeName, registration.Key);
+
+                if (!exposedServices.TryGetValue(registrationKey, out var existingRegistration))
                 {
-                    exposedServices.Add(exposedServiceTypeName, registration);
+                    exposedServices.Add(registrationKey, registration);
                     continue;
                 }
 
@@ -48,5 +68,12 @@ public static class ServiceRegistrationManifestBuilder
                 .ToArray());
 
         return new ServiceRegistrationManifestResult(manifest, diagnostics);
+    }
+
+    private static string CreateRegistrationKey(string exposedServiceTypeName, string? key)
+    {
+        return string.IsNullOrWhiteSpace(key)
+            ? exposedServiceTypeName
+            : $"{exposedServiceTypeName}|{key}";
     }
 }

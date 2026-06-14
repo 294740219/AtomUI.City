@@ -5,8 +5,8 @@
 ## 当前结论
 
 - 1.0 发布状态：不可发布。
-- 全局进度：25/118。
-- 模块 Feature 合同：25/109。
+- 全局进度：26/118。
+- 模块 Feature 合同：26/109。
 - 最终发布门禁：0/9。
 - 最近校准日期：2026-06-14。
 
@@ -36,7 +36,7 @@
 | Core | 7 | 0 | 7 | 已完成 |
 | Testing | 9 | 0 | 9 | 已完成 |
 | Build | 7 | 0 | 7 | 已完成 |
-| Generators | 2 | 6 | 8 | 产品化进行中 |
+| Generators | 3 | 5 | 8 | 产品化进行中 |
 | Routing | 0 | 8 | 8 | 未完成 |
 | Presentation | 0 | 8 | 8 | 未完成 |
 | MVVM | 0 | 6 | 6 | 未完成 |
@@ -86,7 +86,7 @@
 
 - [x] AUC-GENERATORS-001 Incremental Infrastructure。验收重点：incremental 输入隔离、hint name 稳定、无 runtime 依赖。
 - [x] AUC-GENERATORS-002 Module Graph。验收重点：DependsOn 图、循环诊断、默认 module id。
-- [ ] AUC-GENERATORS-003 DI Manifest。验收重点：lifetime、ExposeServices、显式注册和冲突诊断。
+- [x] AUC-GENERATORS-003 DI Manifest。验收重点：lifetime、ExposeServices、显式注册和冲突诊断。
 - [ ] AUC-GENERATORS-004 Route Manifest。验收重点：route attribute、template、target、排序和诊断。
 - [ ] AUC-GENERATORS-005 Plugin Manifest。验收重点：plugin metadata、capability、dependency、contribution。
 - [ ] AUC-GENERATORS-006 Localization Manifest。验收重点：culture、resource、fallback、重复 key 诊断。
