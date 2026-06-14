@@ -215,7 +215,7 @@ public sealed class InMemoryEventBus : IEventBus, IDisposable
         {
             WriteDiagnostic(
                 EventDiagnosticIds.EventRejected,
-                $"Posted event '{descriptor.ContractId.Value}' was rejected because publication was canceled before acceptance.",
+                $"Posted event '{descriptor.ContractId.Value}' with id '{eventId:D}' was rejected because publication was canceled before acceptance.",
                 HostDiagnosticSeverity.Warning);
 
             return ValueTask.FromResult(

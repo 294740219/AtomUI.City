@@ -36,6 +36,25 @@ public sealed class EventDiagnosticsTests
     }
 
     [Fact]
+    public async Task EventRejectedDiagnosticIncludesStableEventContext()
+    {
+        var diagnostics = new InMemoryHostDiagnostics();
+        var eventBus = new InMemoryEventBus(diagnostics: diagnostics);
+        using var cancellation = new CancellationTokenSource();
+        await cancellation.CancelAsync();
+
+        var result = await eventBus.PostAsync(
+            new TestEvent("rejected"),
+            cancellationToken: cancellation.Token);
+
+        var record = Assert.Single(
+            diagnostics.Records,
+            record => record.Code == EventDiagnosticIds.EventRejected);
+        Assert.Contains(result.ContractId.Value, record.Message, StringComparison.Ordinal);
+        Assert.Contains(result.EventId.ToString("D"), record.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task HandlerFailureIsReportedAndDoesNotStopIndependentHandlers()
     {
         var diagnostics = new InMemoryHostDiagnostics();
