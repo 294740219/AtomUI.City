@@ -14,7 +14,8 @@ public sealed class RouteDescriptor
         IReadOnlyList<Type>? enterGuardTypes = null,
         IReadOnlyList<Type>? leaveGuardTypes = null,
         IReadOnlyList<Type>? matchPolicyTypes = null,
-        RouteMetadataDescriptor? metadata = null)
+        RouteMetadataDescriptor? metadata = null,
+        string? contributionId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(routeId);
         ArgumentException.ThrowIfNullOrWhiteSpace(outletName);
@@ -31,6 +32,7 @@ public sealed class RouteDescriptor
         LeaveGuardTypes = AsReadOnly(leaveGuardTypes);
         MatchPolicyTypes = AsReadOnly(matchPolicyTypes);
         Metadata = metadata ?? RouteMetadataDescriptor.Empty;
+        ContributionId = string.IsNullOrWhiteSpace(contributionId) ? null : contributionId;
     }
 
     public string RouteId { get; }
@@ -56,6 +58,8 @@ public sealed class RouteDescriptor
     public IReadOnlyList<Type> MatchPolicyTypes { get; }
 
     public RouteMetadataDescriptor Metadata { get; }
+
+    public string? ContributionId { get; }
 
     private static IReadOnlyList<Type> AsReadOnly(IReadOnlyList<Type>? values)
     {

@@ -23,6 +23,8 @@
 - reader 必须拒绝高于支持版本的不可理解格式，并输出稳定诊断。
 - 生成输出 hint name、type name 和 field name 改变属于兼容性风险。
 - 1.0 起 `RouteTemplate.Parse` 必须拒绝 malformed brace、重复参数、非末尾 catch-all 和未知 constraint；放宽这些失败行为属于兼容性风险。
+- 1.0 起 `RouteDescriptor.ContributionId`、`RouteGraphSnapshot.GetContributionRoutes` 和 `RouteGraphSnapshot.WithoutContribution` 属于 graph contribution 兼容 contract。
+- 同级同 template 路由只有在至少一个候选声明 match policy 时才可共存；改变该冲突规则属于兼容性风险。
 
 ## 插件兼容
 

@@ -79,6 +79,40 @@ public sealed class RouteGraphAndMatcherTests
     }
 
     [Fact]
+    public void GraphRejectsSiblingTemplateConflicts()
+    {
+        var exception = Assert.Throws<RouteGraphException>(
+            () => RouteGraphSnapshot.Create(
+                [
+                    Route("settings", "settings", typeof(SettingsViewModel)),
+                    Route("settings-copy", "settings", typeof(ProfileViewModel)),
+                ]));
+
+        Assert.Equal(RouteGraphError.DuplicateRouteTemplate, exception.Error);
+    }
+
+    [Fact]
+    public void SnapshotRevokesContributionWithoutMutatingExistingSnapshot()
+    {
+        var snapshot = RouteGraphSnapshot.Create(
+            [
+                Route("settings", "settings", typeof(SettingsViewModel)),
+                Route("plugin-settings", "plugin-settings", typeof(DynamicViewModel), contributionId: "plugin.settings"),
+            ],
+            version: 7);
+
+        var next = snapshot.WithoutContribution("plugin.settings", version: 8);
+
+        Assert.Equal(7, snapshot.Version);
+        Assert.True(snapshot.TryGetRoute("plugin-settings", out _));
+        Assert.Equal(["plugin-settings"], snapshot.GetContributionRoutes("plugin.settings").Select(route => route.RouteId));
+        Assert.Equal(8, next.Version);
+        Assert.False(next.TryGetRoute("plugin-settings", out _));
+        Assert.Empty(next.GetContributionRoutes("plugin.settings"));
+        Assert.True(next.TryGetRoute("settings", out _));
+    }
+
+    [Fact]
     public void RouteDescriptorStoresLocalizationMetadata()
     {
         var descriptor = new RouteDescriptor(
@@ -156,14 +190,16 @@ public sealed class RouteGraphAndMatcherTests
         string id,
         string template,
         Type viewModelType,
-        string? parentRouteId = null)
+        string? parentRouteId = null,
+        string? contributionId = null)
     {
         return new RouteDescriptor(
             id,
             RouteDefinitionKind.Route,
             template,
             new ViewModelTargetDescriptor(viewModelType),
-            parentRouteId);
+            parentRouteId,
+            contributionId: contributionId);
     }
 
     private sealed class ShellViewModel;

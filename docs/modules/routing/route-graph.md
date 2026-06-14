@@ -142,6 +142,12 @@ Accept RouteContribution
 - Contribution 索引。
 - Diagnostics summary。
 
+公开 contract：
+
+- `GetContributionRoutes(contributionId)` 返回指定贡献的只读路由集合。
+- `WithoutContribution(contributionId, version)` 基于当前 snapshot 创建新 snapshot；旧 snapshot 必须继续可读且包含原路由。
+- 同级同路径冲突必须拒绝，除非候选通过 match policy 明确参与同路径筛选。
+
 导航开始时捕获一个 snapshot。本次导航不得访问全局 mutable graph。
 
 ### 6. 层级规则

@@ -7,7 +7,7 @@
 | Feature ID | 名称 | 状态 | Public Contract | 主测试 |
 | --- | --- | --- | --- | --- |
 | AUC-ROUTING-001 | Route Definition Syntax | 已实现并通过产品合同测试 | RouteTemplate, RouteDefinitionAttribute, RouteMapAttribute | RouteTemplateTests; RouteDefinitionAttributeTests |
-| AUC-ROUTING-002 | Route Graph Build and Snapshot | Ready to Start Product Implementation | RouteDescriptor, RouteGraphSnapshot, RouteGraphError | RouteGraphAndMatcherTests |
+| AUC-ROUTING-002 | Route Graph Build and Snapshot | 已实现并通过产品合同测试 | RouteDescriptor, RouteGraphSnapshot, RouteGraphError | RouteGraphAndMatcherTests |
 | AUC-ROUTING-003 | Route Matching and Parameters | Ready to Start Product Implementation | RouteMatcher, RouteMatch, RouteParameters | RouteGraphAndMatcherTests; RoutingParameterBoundaryTests |
 | AUC-ROUTING-004 | Navigation Transaction | Ready to Start Product Implementation | IRouter, NavigationScope, NavigationResult | NavigationScopeTests |
 | AUC-ROUTING-005 | Guard and Redirect Pipeline | Ready to Start Product Implementation | IRouteEnterGuard, IRouteLeaveGuard, RouteGuardResult | RouteGuardTests |
@@ -49,7 +49,7 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-ROUTING-002 Route Graph Build and Snapshot
 
 Feature ID: `AUC-ROUTING-002`
-Status: Ready to Start Product Implementation
+Status: 已实现并通过产品合同测试
 Goal: 把模块和插件声明合成为不可变 RouteGraphSnapshot。
 Public Contract: RouteDescriptor, RouteGraphSnapshot, RouteGraphError
 Runtime / Build Behavior: Graph build 先收集全部 route，再校验冲突、父子关系、layout/index 约束和 extension point，最后一次性发布 snapshot。
