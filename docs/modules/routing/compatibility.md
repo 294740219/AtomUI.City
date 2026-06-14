@@ -28,6 +28,7 @@
 - `RouteTemplate.TryMatch` 和 `RouteMatcher.Match/MatchAll` 的 null path 边界、constraint 拒绝语义和并发读能力属于 1.0 兼容 contract。
 - `NavigationConcurrencyPolicy` 的 `CancelPrevious`、`Queue`、`RejectIfBusy` 语义和 `NavigationScope` Dispose 后拒绝新导航属于 1.0 兼容 contract。
 - Guard hierarchy 顺序、redirect loop 诊断码、`NavigationResult.RedirectTarget` 和 Redirected 结果携带最终 route 的行为属于 1.0 兼容 contract。
+- `ViewModelTargetDescriptor` 的 ViewModelType、ParameterBindings、ReuseKey、ActivationHint 以及缺失或不可构造 target 的导航失败诊断码属于 1.0 兼容 contract。
 
 ## 插件兼容
 

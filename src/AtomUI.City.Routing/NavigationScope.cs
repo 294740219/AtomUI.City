@@ -274,6 +274,12 @@ public sealed class NavigationScope : IRouter, IDisposable, IAsyncDisposable
             : GetRouteHierarchy(CurrentSnapshot.ActiveRoute);
         var targetRouteChain = GetRouteHierarchy(route);
         var sharedRouteCount = GetSharedRoutePrefixLength(currentRouteChain, targetRouteChain);
+        var targetValidationFailure = ValidateViewModelTarget(navigationId, target, route);
+
+        if (targetValidationFailure is not null)
+        {
+            return targetValidationFailure;
+        }
 
         foreach (var leavingRoute in currentRouteChain.Skip(sharedRouteCount).Reverse())
         {
@@ -310,6 +316,35 @@ public sealed class NavigationScope : IRouter, IDisposable, IAsyncDisposable
         CurrentSnapshot = NavigationSnapshot.FromRoute(route, parameters, _routeGraph.Version);
 
         return NavigationResult.Success(navigationId, target, route, parameters);
+    }
+
+    private static NavigationResult? ValidateViewModelTarget(
+        Guid navigationId,
+        NavigationTarget target,
+        RouteDescriptor route)
+    {
+        if (route.ViewModelTarget is null)
+        {
+            return NavigationResult.Failed(
+                navigationId,
+                target,
+                "CITY-NAVIGATION-TARGET-MISSING",
+                $"Route '{route.RouteId}' does not declare a ViewModel target.");
+        }
+
+        var viewModelType = route.ViewModelTarget.ViewModelType;
+        if (!viewModelType.IsClass ||
+            viewModelType.IsAbstract ||
+            viewModelType.ContainsGenericParameters)
+        {
+            return NavigationResult.Failed(
+                navigationId,
+                target,
+                "CITY-NAVIGATION-TARGET-NOT-CONSTRUCTABLE",
+                $"Route '{route.RouteId}' declares non-constructable ViewModel target '{viewModelType.FullName}'.");
+        }
+
+        return null;
     }
 
     private static string GetNavigationTargetKey(NavigationTarget target)

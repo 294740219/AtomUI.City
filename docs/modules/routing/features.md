@@ -11,7 +11,7 @@
 | AUC-ROUTING-003 | Route Matching and Parameters | 已实现并通过产品合同测试 | RouteMatcher, RouteMatch, RouteParameters | RouteGraphAndMatcherTests; RoutingParameterBoundaryTests |
 | AUC-ROUTING-004 | Navigation Transaction | 已实现并通过产品合同测试 | IRouter, NavigationScope, NavigationResult | NavigationScopeTests |
 | AUC-ROUTING-005 | Guard and Redirect Pipeline | 已实现并通过产品合同测试 | IRouteEnterGuard, IRouteLeaveGuard, RouteGuardResult | RouteGuardTests |
-| AUC-ROUTING-006 | ViewModel Target Resolution | Ready to Start Product Implementation | NavigationTarget, ViewModelTargetDescriptor | RouteGraphAndMatcherTests |
+| AUC-ROUTING-006 | ViewModel Target Resolution | 已实现并通过产品合同测试 | NavigationTarget, ViewModelTargetDescriptor | RouteGraphAndMatcherTests; RoutingAssemblyTests |
 | AUC-ROUTING-007 | Plugin Route Contribution | Ready to Start Product Implementation | RouteExtensionPoint, RouteExtensionPointAttribute, RouteGraphSnapshot | RouteGraphAndMatcherTests |
 | AUC-ROUTING-008 | Navigation Journal and Reuse | Ready to Start Product Implementation | NavigationSnapshot, NavigationHistoryBehavior, NavigationOptions | NavigationScopeTests |
 
@@ -105,14 +105,14 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-ROUTING-006 ViewModel Target Resolution
 
 Feature ID: `AUC-ROUTING-006`
-Status: Ready to Start Product Implementation
+Status: 已实现并通过产品合同测试
 Goal: Routing 输出 Route -> ViewModel Target，不负责创建 View 或提交 UI。
 Public Contract: NavigationTarget, ViewModelTargetDescriptor
-Runtime / Build Behavior: RouteDescriptor 必须明确 ViewModel 类型、参数绑定、reuse key 和 activation hint；目标描述符只包含可序列化或可稳定比较的数据。
-Failure Behavior: 缺失 ViewModel target、target type 不可构造、参数无法绑定必须在 Presentation 前失败。
+Runtime / Build Behavior: RouteDescriptor 必须明确 ViewModel 类型、参数绑定、reuse key 和 activation hint；目标描述符只包含可稳定比较的数据。
+Failure Behavior: 缺失 ViewModel target、target type 不可构造、参数无法绑定必须在 Presentation 前失败并保持 current snapshot。
 Threading / Cancellation: target resolution 不触碰 VisualTree；需要 DI 的 resolver 必须支持取消。
 Diagnostics: target resolution failure 必须包含 route id、target type 和 parameter names。
-Tests: `RouteGraphAndMatcherTests`
+Tests: `RouteGraphAndMatcherTests; RoutingAssemblyTests`
 Required Assertions: 断言 target descriptor 内容完整、Routing 不依赖 Presentation、失败不创建 ViewModel。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 

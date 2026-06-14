@@ -11,4 +11,14 @@ public sealed class RoutingAssemblyTests
 
         Assert.Equal("AtomUI.City.Routing", assembly.GetName().Name);
     }
+
+    [Fact]
+    public void RoutingAssemblyDoesNotReferencePresentation()
+    {
+        var assembly = Assembly.Load("AtomUI.City.Routing");
+
+        Assert.DoesNotContain(
+            assembly.GetReferencedAssemblies(),
+            reference => string.Equals(reference.Name, "AtomUI.City.Presentation", StringComparison.Ordinal));
+    }
 }

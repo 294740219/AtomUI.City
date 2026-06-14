@@ -88,12 +88,12 @@ Presentation: ViewModel -> View
 | `ViewModelType` | ViewModel 类型。 |
 | `Factory` | 强类型工厂描述。 |
 | `ServiceContext` | 服务来源。 |
-| `ParameterBindings` | 路由参数绑定。 |
+| `ParameterBindings` | 路由参数绑定，运行时复制为只读集合。 |
 | `ResolvedDataBindings` | 解析数据绑定。 |
-| `ActivationPolicy` | 激活策略。 |
+| `ActivationHint` | 激活提示。 |
 | `Contribution` | 来源贡献。 |
 
-运行时不通过命名约定推断 ViewModel。
+运行时不通过命名约定推断 ViewModel。缺失或不可构造 ViewModel target 必须在进入 Presentation 前返回导航失败，且不得创建 ViewModel 实例。
 
 ### 3. 创建规则
 

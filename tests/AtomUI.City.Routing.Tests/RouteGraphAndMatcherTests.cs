@@ -159,6 +159,27 @@ public sealed class RouteGraphAndMatcherTests
     }
 
     [Fact]
+    public void ViewModelTargetDescriptorStoresStableTargetMetadata()
+    {
+        var parameterBindings = new[] { "id", "tab" };
+
+        var descriptor = new ViewModelTargetDescriptor(
+            typeof(ProfileViewModel),
+            parameterBindings,
+            reuseKey: "profile:{id}",
+            activationHint: "profile-detail");
+        var exposedBindings = Assert.IsAssignableFrom<IList<string>>(descriptor.ParameterBindings);
+
+        parameterBindings[0] = "changed";
+
+        Assert.Equal(typeof(ProfileViewModel), descriptor.ViewModelType);
+        Assert.Equal(["id", "tab"], descriptor.ParameterBindings);
+        Assert.Equal("profile:{id}", descriptor.ReuseKey);
+        Assert.Equal("profile-detail", descriptor.ActivationHint);
+        Assert.Throws<NotSupportedException>(() => exposedBindings[0] = "changed");
+    }
+
+    [Fact]
     public void RouteDescriptorGuardCollectionsRejectExternalListMutation()
     {
         Type[] enterGuards = [typeof(SettingsViewModel)];
@@ -200,6 +221,63 @@ public sealed class RouteGraphAndMatcherTests
         Assert.Equal(settings.RouteId, snapshot.GetChildren("shell")[0].RouteId);
     }
 
+    [Fact]
+    public async Task NavigationFailsBeforeCommitWhenRouteHasMissingViewModelTarget()
+    {
+        var snapshot = RouteGraphSnapshot.Create(
+            [
+                new RouteDescriptor(
+                    "missing-target",
+                    RouteDefinitionKind.Route,
+                    "missing-target",
+                    viewModelTarget: null),
+            ]);
+        var scope = new NavigationScope(snapshot);
+
+        var result = await scope.Router.NavigateByPathAsync("missing-target");
+
+        Assert.Equal(NavigationResultStatus.Failed, result.Status);
+        Assert.Equal("CITY-NAVIGATION-TARGET-MISSING", result.Error?.Code);
+        Assert.Null(scope.CurrentSnapshot.ActiveRoute);
+    }
+
+    [Fact]
+    public async Task NavigationFailsBeforeCommitWhenViewModelTargetIsNotConstructable()
+    {
+        var snapshot = RouteGraphSnapshot.Create(
+            [
+                new RouteDescriptor(
+                    "abstract-target",
+                    RouteDefinitionKind.Route,
+                    "abstract-target",
+                    new ViewModelTargetDescriptor(typeof(AbstractViewModel))),
+            ]);
+        var scope = new NavigationScope(snapshot);
+
+        var result = await scope.Router.NavigateByPathAsync("abstract-target");
+
+        Assert.Equal(NavigationResultStatus.Failed, result.Status);
+        Assert.Equal("CITY-NAVIGATION-TARGET-NOT-CONSTRUCTABLE", result.Error?.Code);
+        Assert.Null(scope.CurrentSnapshot.ActiveRoute);
+    }
+
+    [Fact]
+    public async Task NavigationResolvesTargetDescriptorWithoutCreatingViewModel()
+    {
+        ConstructedViewModel.ConstructorCalls = 0;
+        var snapshot = RouteGraphSnapshot.Create(
+            [
+                Route("constructed", "constructed", typeof(ConstructedViewModel)),
+            ]);
+        var scope = new NavigationScope(snapshot);
+
+        var result = await scope.Router.NavigateByPathAsync("constructed");
+
+        Assert.Equal(NavigationResultStatus.Success, result.Status);
+        Assert.Equal(typeof(ConstructedViewModel), result.Route.ViewModelTarget?.ViewModelType);
+        Assert.Equal(0, ConstructedViewModel.ConstructorCalls);
+    }
+
     private static RouteDescriptor Layout(string id, Type viewModelType)
     {
         return new RouteDescriptor(
@@ -233,4 +311,16 @@ public sealed class RouteGraphAndMatcherTests
     private sealed class ProfileViewModel;
 
     private sealed class DynamicViewModel;
+
+    private abstract class AbstractViewModel;
+
+    private sealed class ConstructedViewModel
+    {
+        public static int ConstructorCalls { get; set; }
+
+        public ConstructedViewModel()
+        {
+            ConstructorCalls++;
+        }
+    }
 }
