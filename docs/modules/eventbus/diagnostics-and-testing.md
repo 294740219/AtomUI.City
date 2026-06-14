@@ -163,6 +163,8 @@ Command operation
 - Payload size estimate。
 - 明确标记为安全的摘要字段。
 
+当前 1.0 实现的 EventBus 结构化 context key 为 `contractId`、`eventId`、`subscriptionId`、`eventType`、`dispatchPolicy` 和 `errorPolicy`。Delivery failure 与 cancellation 必须至少包含 `contractId`、`eventId` 和 `subscriptionId`，posted FailPublisher 后台失败也必须保留这些 delivery 定位字段。
+
 Payload diagnostics 必须 opt-in，并通过 contract 提供的稳定 formatter 生成 Host-owned snapshot。
 
 ### 6. Exception 记录

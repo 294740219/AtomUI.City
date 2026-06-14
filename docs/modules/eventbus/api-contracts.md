@@ -9,7 +9,7 @@
 | Publish | IEventBus, IEventPublisher, EventPublishOptions, EventPublishResult | 发布类型化事件。 | 返回每个 handler 结果。 |
 | Subscribe | IEventSubscriber, IEventHandler<TEvent>, IEventSubscription | 注册和释放 handler。 | owner 释放必须撤销。 |
 | Contract | IEventContractRegistry, EventContractDescriptor | 事件边界声明。 | 跨插件 contract 必须来自共享程序集。 |
-| Diagnostics | EventDiagnosticIds | 现有 EventBus.* 诊断。 | 保持现有字符串兼容。 |
+| Diagnostics | EventDiagnosticIds | 现有 EventBus.* 诊断。 | 保持现有字符串兼容；delivery failure/cancellation 诊断必须包含 contractId、eventId 和 subscriptionId context。 |
 
 ## 关键方法合同
 

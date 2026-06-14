@@ -1,3 +1,4 @@
+using System.Reflection;
 using AtomUI.City.Diagnostics;
 using AtomUI.City.EventBus;
 
@@ -5,6 +6,36 @@ namespace AtomUI.City.EventBus.Tests;
 
 public sealed class EventDiagnosticsTests
 {
+    [Fact]
+    public void EventDiagnosticIdsExposeStableCodeContract()
+    {
+        var fields = typeof(EventDiagnosticIds)
+            .GetFields(BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy)
+            .Where(field => field is { IsLiteral: true, IsInitOnly: false } &&
+                            field.FieldType == typeof(string))
+            .OrderBy(field => field.Name, StringComparer.Ordinal)
+            .ToArray();
+
+        var codes = fields
+            .Select(field => (string)field.GetRawConstantValue()!)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal(
+            [
+                "EventBus.EventAccepted",
+                "EventBus.EventDeliveryCancelled",
+                "EventBus.EventDeliveryFailed",
+                "EventBus.EventPublished",
+                "EventBus.EventRejected",
+                "EventBus.EventSubscriptionAdded",
+                "EventBus.EventSubscriptionDisposed"
+            ],
+            codes);
+        Assert.Equal(codes.Length, codes.Distinct(StringComparer.Ordinal).Count());
+        Assert.All(codes, code => Assert.StartsWith("EventBus.Event", code, StringComparison.Ordinal));
+    }
+
     [Fact]
     public async Task EventPublishedDiagnosticIncludesStableEventContext()
     {
@@ -93,6 +124,7 @@ public sealed class EventDiagnosticsTests
         Assert.Contains(result.ContractId.Value, record.Message, StringComparison.Ordinal);
         Assert.Contains(result.EventId.ToString("D"), record.Message, StringComparison.Ordinal);
         Assert.Contains(subscription.Id.ToString(), record.Message, StringComparison.Ordinal);
+        AssertDeliveryContext(record, result.ContractId, result.EventId, subscription.Id);
     }
 
     [Fact]
@@ -192,6 +224,36 @@ public sealed class EventDiagnosticsTests
         Assert.Contains(result.ContractId.Value, record.Message, StringComparison.Ordinal);
         Assert.Contains(result.EventId.ToString("D"), record.Message, StringComparison.Ordinal);
         Assert.Contains(subscription.Id.ToString(), record.Message, StringComparison.Ordinal);
+        AssertDeliveryContext(record, result.ContractId, result.EventId, subscription.Id);
+    }
+
+    [Fact]
+    public async Task PostedFailPublisherFailureDiagnosticsKeepDeliveryContext()
+    {
+        var diagnostics = new SignalingHostDiagnostics(EventDiagnosticIds.EventDeliveryFailed, expectedCount: 2);
+        var eventBus = new InMemoryEventBus(diagnostics: diagnostics);
+
+        var subscription = eventBus.Subscribe<TestEvent>(
+            _ => throw new InvalidOperationException("boom"),
+            EventSubscriptionOptions.Serialized.WithErrorPolicy(EventErrorPolicy.FailPublisher));
+
+        var result = await eventBus.PostAsync(new TestEvent("failure"));
+        Assert.True(result.Accepted);
+
+        await diagnostics.WaitForExpectedRecordsAsync();
+
+        var records = diagnostics.Records
+            .Where(record => record.Code == EventDiagnosticIds.EventDeliveryFailed)
+            .ToArray();
+
+        Assert.Equal(2, records.Length);
+        Assert.All(records, record =>
+        {
+            Assert.Contains(result.ContractId.Value, record.Message, StringComparison.Ordinal);
+            Assert.Contains(result.EventId.ToString("D"), record.Message, StringComparison.Ordinal);
+            Assert.Contains(subscription.Id.ToString(), record.Message, StringComparison.Ordinal);
+            AssertDeliveryContext(record, result.ContractId, result.EventId, subscription.Id);
+        });
     }
 
     [Fact]
@@ -255,4 +317,74 @@ public sealed class EventDiagnosticsTests
     }
 
     private sealed record TestEvent(string Value);
+
+    private static void AssertDeliveryContext(
+        HostDiagnosticRecord record,
+        EventContractId contractId,
+        Guid eventId,
+        EventSubscriptionId subscriptionId)
+    {
+        AssertContextValue(record, "contractId", contractId.Value);
+        AssertContextValue(record, "eventId", eventId.ToString("D"));
+        AssertContextValue(record, "subscriptionId", subscriptionId.ToString());
+    }
+
+    private static void AssertContextValue(
+        HostDiagnosticRecord record,
+        string key,
+        string expectedValue)
+    {
+        Assert.True(
+            record.Context.TryGetValue(key, out var actualValue),
+            $"Diagnostic '{record.Code}' must include context key '{key}'.");
+        Assert.Equal(expectedValue, actualValue);
+    }
+
+    private sealed class SignalingHostDiagnostics : IHostDiagnostics
+    {
+        private readonly object _syncRoot = new();
+        private readonly List<HostDiagnosticRecord> _records = [];
+        private readonly string _targetCode;
+        private readonly int _expectedCount;
+        private readonly TaskCompletionSource _expectedRecords = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public SignalingHostDiagnostics(string targetCode, int expectedCount)
+        {
+            _targetCode = targetCode;
+            _expectedCount = expectedCount;
+        }
+
+        public IReadOnlyList<HostDiagnosticRecord> Records
+        {
+            get
+            {
+                lock (_syncRoot)
+                {
+                    return Array.AsReadOnly(_records.ToArray());
+                }
+            }
+        }
+
+        public void Write(HostDiagnosticRecord record)
+        {
+            ArgumentNullException.ThrowIfNull(record);
+
+            lock (_syncRoot)
+            {
+                _records.Add(record);
+                if (_records.Count(item => item.Code == _targetCode) >= _expectedCount)
+                {
+                    _expectedRecords.TrySetResult();
+                }
+            }
+        }
+
+        public async Task WaitForExpectedRecordsAsync()
+        {
+            await _expectedRecords.Task
+                .WaitAsync(TimeSpan.FromSeconds(5))
+                .ConfigureAwait(false);
+        }
+    }
 }

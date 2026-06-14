@@ -5,6 +5,16 @@ namespace AtomUI.City.EventBus;
 
 public sealed class InMemoryEventBus : IEventBus, IDisposable
 {
+    private const string ContractIdContextKey = "contractId";
+    private const string EventIdContextKey = "eventId";
+    private const string EventTypeContextKey = "eventType";
+    private const string SubscriptionIdContextKey = "subscriptionId";
+    private const string DispatchPolicyContextKey = "dispatchPolicy";
+    private const string ErrorPolicyContextKey = "errorPolicy";
+    private const string DeliveryExceptionContractIdDataKey = "AtomUI.City.EventBus.ContractId";
+    private const string DeliveryExceptionEventIdDataKey = "AtomUI.City.EventBus.EventId";
+    private const string DeliveryExceptionSubscriptionIdDataKey = "AtomUI.City.EventBus.SubscriptionId";
+
     private readonly IEventContractRegistry _contractRegistry;
     private readonly IHostDiagnostics? _diagnostics;
     private readonly Dictionary<Type, List<EventSubscription>> _subscriptions = [];
@@ -150,7 +160,8 @@ public sealed class InMemoryEventBus : IEventBus, IDisposable
         WriteDiagnostic(
             EventDiagnosticIds.EventPublished,
             $"Event '{descriptor.ContractId.Value}' with id '{eventId:D}' was published.",
-            HostDiagnosticSeverity.Trace);
+            HostDiagnosticSeverity.Trace,
+            CreateEventDiagnosticContext(descriptor, eventId));
 
         foreach (var subscription in snapshot)
         {
@@ -217,7 +228,8 @@ public sealed class InMemoryEventBus : IEventBus, IDisposable
             WriteDiagnostic(
                 EventDiagnosticIds.EventRejected,
                 $"Posted event '{descriptor.ContractId.Value}' with id '{eventId:D}' was rejected because publication was canceled before acceptance.",
-                HostDiagnosticSeverity.Warning);
+                HostDiagnosticSeverity.Warning,
+                CreateEventDiagnosticContext(descriptor, eventId));
 
             return ValueTask.FromResult(
                 new EventPostResult(
@@ -230,7 +242,8 @@ public sealed class InMemoryEventBus : IEventBus, IDisposable
         WriteDiagnostic(
             EventDiagnosticIds.EventAccepted,
             $"Posted event '{descriptor.ContractId.Value}' with id '{eventId:D}' was accepted.",
-            HostDiagnosticSeverity.Trace);
+            HostDiagnosticSeverity.Trace,
+            CreateEventDiagnosticContext(descriptor, eventId));
 
         _ = Task.Run(
             async () =>
@@ -246,10 +259,17 @@ public sealed class InMemoryEventBus : IEventBus, IDisposable
                 }
                 catch (Exception exception)
                 {
+                    var context = CreatePostedFailureDiagnosticContext(descriptor, eventId, exception);
+                    var subscriptionMessage = context.TryGetValue(SubscriptionIdContextKey, out var subscriptionId) &&
+                                              !string.IsNullOrWhiteSpace(subscriptionId)
+                        ? $" subscription '{subscriptionId}'"
+                        : string.Empty;
+
                     WriteDiagnostic(
                         EventDiagnosticIds.EventDeliveryFailed,
-                        $"Posted event '{descriptor.ContractId.Value}' failed: {exception.Message}",
-                        HostDiagnosticSeverity.Error);
+                        $"Posted event '{descriptor.ContractId.Value}' with id '{eventId:D}'{subscriptionMessage} failed: {exception.Message}",
+                        HostDiagnosticSeverity.Error,
+                        context);
                 }
             },
             CancellationToken.None);
@@ -331,7 +351,8 @@ public sealed class InMemoryEventBus : IEventBus, IDisposable
         WriteDiagnostic(
             EventDiagnosticIds.EventSubscriptionAdded,
             $"Event subscription '{subscription.Id}' was added.",
-            HostDiagnosticSeverity.Trace);
+            HostDiagnosticSeverity.Trace,
+            CreateSubscriptionDiagnosticContext(subscription));
 
         return subscription;
     }
@@ -381,15 +402,102 @@ public sealed class InMemoryEventBus : IEventBus, IDisposable
         WriteDiagnostic(
             EventDiagnosticIds.EventSubscriptionDisposed,
             $"Event subscription '{subscription.Id}' was disposed.",
-            HostDiagnosticSeverity.Trace);
+            HostDiagnosticSeverity.Trace,
+            CreateSubscriptionDiagnosticContext(subscription));
     }
 
     private void WriteDiagnostic(
         string code,
         string message,
-        HostDiagnosticSeverity severity)
+        HostDiagnosticSeverity severity,
+        IReadOnlyDictionary<string, string?>? context = null)
     {
-        _diagnostics?.Write(new HostDiagnosticRecord(code, message, severity));
+        var record = new HostDiagnosticRecord(code, message, severity);
+        if (context is not null)
+        {
+            record = record with { Context = context };
+        }
+
+        _diagnostics?.Write(record);
+    }
+
+    private static IReadOnlyDictionary<string, string?> CreateEventDiagnosticContext(
+        EventContractDescriptor descriptor,
+        Guid eventId)
+    {
+        return new Dictionary<string, string?>(StringComparer.Ordinal)
+        {
+            [ContractIdContextKey] = descriptor.ContractId.Value,
+            [EventIdContextKey] = eventId.ToString("D"),
+            [EventTypeContextKey] = descriptor.EventType.FullName
+        };
+    }
+
+    private static IReadOnlyDictionary<string, string?> CreateSubscriptionDiagnosticContext(
+        EventSubscription subscription)
+    {
+        return new Dictionary<string, string?>(StringComparer.Ordinal)
+        {
+            [SubscriptionIdContextKey] = subscription.Id.ToString(),
+            [EventTypeContextKey] = subscription.EventType.FullName,
+            [DispatchPolicyContextKey] = subscription.Options.DispatchPolicy.ToString(),
+            [ErrorPolicyContextKey] = subscription.Options.ErrorPolicy.ToString()
+        };
+    }
+
+    private static IReadOnlyDictionary<string, string?> CreateDeliveryDiagnosticContext(
+        EventContractDescriptor descriptor,
+        Guid eventId,
+        EventSubscriptionId subscriptionId,
+        EventSubscriptionOptions options)
+    {
+        return new Dictionary<string, string?>(StringComparer.Ordinal)
+        {
+            [ContractIdContextKey] = descriptor.ContractId.Value,
+            [EventIdContextKey] = eventId.ToString("D"),
+            [SubscriptionIdContextKey] = subscriptionId.ToString(),
+            [EventTypeContextKey] = descriptor.EventType.FullName,
+            [DispatchPolicyContextKey] = options.DispatchPolicy.ToString(),
+            [ErrorPolicyContextKey] = options.ErrorPolicy.ToString()
+        };
+    }
+
+    private static IReadOnlyDictionary<string, string?> CreatePostedFailureDiagnosticContext(
+        EventContractDescriptor descriptor,
+        Guid eventId,
+        Exception exception)
+    {
+        var context = new Dictionary<string, string?>(
+            CreateEventDiagnosticContext(descriptor, eventId),
+            StringComparer.Ordinal);
+
+        if (exception.Data[DeliveryExceptionSubscriptionIdDataKey] is string subscriptionId)
+        {
+            context[SubscriptionIdContextKey] = subscriptionId;
+        }
+
+        if (exception.Data[DeliveryExceptionContractIdDataKey] is string contractId)
+        {
+            context[ContractIdContextKey] = contractId;
+        }
+
+        if (exception.Data[DeliveryExceptionEventIdDataKey] is string deliveredEventId)
+        {
+            context[EventIdContextKey] = deliveredEventId;
+        }
+
+        return context;
+    }
+
+    private static void AttachDeliveryContextToException(
+        Exception exception,
+        EventContractId contractId,
+        Guid eventId,
+        EventSubscriptionId subscriptionId)
+    {
+        exception.Data[DeliveryExceptionContractIdDataKey] = contractId.Value;
+        exception.Data[DeliveryExceptionEventIdDataKey] = eventId.ToString("D");
+        exception.Data[DeliveryExceptionSubscriptionIdDataKey] = subscriptionId.ToString();
     }
 
     private void ThrowIfDisposed()
@@ -657,7 +765,10 @@ public sealed class InMemoryEventBus : IEventBus, IDisposable
                     new HostDiagnosticRecord(
                         EventDiagnosticIds.EventDeliveryCancelled,
                         $"Event handler '{Id}' was cancelled for contract '{descriptor.ContractId.Value}' event '{eventId:D}' subscription '{Id}': {exception.Message}",
-                        HostDiagnosticSeverity.Trace));
+                        HostDiagnosticSeverity.Trace)
+                    {
+                        Context = CreateDeliveryDiagnosticContext(descriptor, eventId, Id, Options)
+                    });
 
                 return new EventDeliveryResult(
                     Id,
@@ -672,10 +783,15 @@ public sealed class InMemoryEventBus : IEventBus, IDisposable
                     new HostDiagnosticRecord(
                         EventDiagnosticIds.EventDeliveryFailed,
                         $"Event handler '{Id}' failed for contract '{descriptor.ContractId.Value}' event '{eventId:D}' subscription '{Id}': {exception.Message}",
-                        HostDiagnosticSeverity.Error));
+                        HostDiagnosticSeverity.Error)
+                    {
+                        Context = CreateDeliveryDiagnosticContext(descriptor, eventId, Id, Options)
+                    });
 
                 if (Options.ErrorPolicy == EventErrorPolicy.FailPublisher)
                 {
+                    AttachDeliveryContextToException(exception, descriptor.ContractId, eventId, Id);
+
                     throw;
                 }
 

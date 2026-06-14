@@ -10,7 +10,7 @@
 | AUC-EVENTBUS-002 | Subscription Lifecycle | Completed | IEventSubscription, EventSubscriptionOptions | EventSubscriptionTests |
 | AUC-EVENTBUS-003 | Contract Registry | Completed | IEventContractRegistry, EventContractDescriptor | EventContractRegistryTests |
 | AUC-EVENTBUS-004 | Dispatch Policy | Completed | EventDispatchPolicy, EventErrorPolicy, EventSubscriptionOptions | EventDispatchingTests |
-| AUC-EVENTBUS-005 | Diagnostics | 产品化进行中 | EventDiagnosticIds | EventDiagnosticsTests |
+| AUC-EVENTBUS-005 | Diagnostics | Completed | EventDiagnosticIds | EventDiagnosticsTests |
 | AUC-EVENTBUS-006 | DI Registration | 准备开始产品实现 | EventBusServiceCollectionExtensions | EventBusRegistrationTests |
 
 ## Feature 硬门禁
@@ -86,15 +86,15 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-EVENTBUS-005 Diagnostics
 
 Feature ID: `AUC-EVENTBUS-005`
-Status: 产品化进行中
+Status: Completed
 Goal: 发布、拒绝、delivery 失败和订阅诊断。
 Public Contract: EventDiagnosticIds
-Runtime / Build Behavior: 发布、拒绝、delivery 失败和订阅诊断。
+Runtime / Build Behavior: 发布、拒绝、delivery 失败、取消和订阅诊断写入稳定 code，并在 HostDiagnosticRecord.Context 中携带定位字段。
 Failure Behavior: diagnostics collector 缺失不影响 publish。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `EventDiagnosticsTests`。
-Required Assertions: 断言 EventBus.Event* 现有代码、failure/cancellation 诊断包含 contract id、event id 和 subscription id。
+Required Assertions: 断言 EventBus.Event* 现有代码、failure/cancellation 诊断包含 contract id、event id 和 subscription id，并覆盖 posted FailPublisher 后台失败诊断。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 ## AUC-EVENTBUS-006 DI Registration
 

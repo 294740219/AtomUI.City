@@ -23,7 +23,7 @@
 ## 产品级必须诊断的失败
 
 - 未登记跨边界 contract：拒绝 publish 并诊断。
-- handler 抛异常：记录 contract id、event id、subscription id、eventType、handlerType、operationId。
+- handler 抛异常：记录 contract id、event id、subscription id，并与 posted FailPublisher 后台失败诊断保持同一 delivery 定位字段。
 - handler 取消：记录 contract id、event id、subscription id，并与 handler failure 诊断区分。
 - subscription dispose 中 handler 正在执行：等待完成或按 cancellation 策略结束。
 - 重复 dispose：幂等。
@@ -31,6 +31,15 @@
 ## 上下文字段
 
 推荐字段：`operationId`、`scopeId`、`module`、`pluginId`、`routeId`、`stateKey`、`eventType`、`handlerType`、`assembly`、`path`、`featureId`、`threadId`、`attempt`、`transportKind`。
+
+EventBus 当前稳定 context key：
+
+- `contractId`：事件 contract id。
+- `eventId`：单次发布 id。
+- `subscriptionId`：delivery 或订阅 id。
+- `eventType`：事件类型全名。
+- `dispatchPolicy`：订阅派发策略。
+- `errorPolicy`：订阅错误策略。
 
 ## 诊断缺口处理
 
