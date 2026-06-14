@@ -234,6 +234,17 @@ public sealed class StateCollectionTests
     }
 
     [Fact]
+    public void AddOrUpdateRangeRejectsDisposedCollection()
+    {
+        var collection = new StateCollection<string, int>();
+
+        collection.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(
+            () => collection.AddOrUpdateRange([new KeyValuePair<string, int>("settings", 1)]));
+    }
+
+    [Fact]
     public void AddOrUpdateRangeKeepsOldItemsWhenEnumerationFails()
     {
         var collection = new StateCollection<string, int>();

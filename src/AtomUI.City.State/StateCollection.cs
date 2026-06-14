@@ -228,6 +228,8 @@ public sealed class StateCollection<TKey, TItem> : IStateCollection<TKey, TItem>
 
         lock (_syncRoot)
         {
+            ThrowIfDisposed();
+
             var nextItems = new Dictionary<TKey, CollectionItem>(_items, _items.Comparer);
             var nextVersion = Version + 1;
             var changes = new List<StateCollectionChange<TKey, TItem>>();
