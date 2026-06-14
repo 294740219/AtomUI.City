@@ -103,6 +103,26 @@ public sealed class ProjectDependencyBoundaryTests
         }
     }
 
+    [Fact]
+    public void DependencyBoundaryGateChecksRuntimeProjectAndPackageReferences()
+    {
+        var repositoryRoot = RepositoryPaths.FindRepositoryRoot();
+        var scriptPath = Path.Combine(repositoryRoot, "engineering", "check-dependency-boundaries.sh");
+
+        Assert.True(File.Exists(scriptPath), "Expected dependency boundary gate at engineering/check-dependency-boundaries.sh.");
+
+        var script = File.ReadAllText(scriptPath);
+
+        Assert.Contains("runtime project references forbidden project", script, StringComparison.Ordinal);
+        Assert.Contains("source project references test project", script, StringComparison.Ordinal);
+        Assert.Contains("runtime project references forbidden package", script, StringComparison.Ordinal);
+        Assert.Contains("AtomUI.City.Testing", script, StringComparison.Ordinal);
+        Assert.Contains("AtomUI.City.Generators", script, StringComparison.Ordinal);
+        Assert.Contains("Microsoft.CodeAnalysis.CSharp", script, StringComparison.Ordinal);
+        Assert.Contains("Microsoft.NET.Test.Sdk", script, StringComparison.Ordinal);
+        Assert.Contains("xunit", script, StringComparison.Ordinal);
+    }
+
     private static string[] ReadProjectReferences(string projectPath)
     {
         var projectDirectory = Path.GetDirectoryName(projectPath)!;

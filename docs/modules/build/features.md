@@ -9,7 +9,7 @@
 | AUC-BUILD-001 | Output Layout | 已实现并通过产品合同测试 | Directory.Build.props, output path convention | OutputLayoutTests |
 | AUC-BUILD-002 | Package Metadata | 已实现并通过产品合同测试 | csproj package properties, pack target | PackageMetadataTests |
 | AUC-BUILD-003 | Project Inventory | 已实现并通过产品合同测试 | solution/project inventory conventions | ProjectInventoryTests |
-| AUC-BUILD-004 | Dependency Boundary | Ready to Start Product Implementation | project reference and package reference rules | ProjectDependencyBoundaryTests |
+| AUC-BUILD-004 | Dependency Boundary | 已实现并通过产品合同测试 | project reference and package reference rules | ProjectDependencyBoundaryTests |
 | AUC-BUILD-005 | Source Generator Packaging | Ready to Start Product Implementation | AtomUI.City.Generators package layout | SourceGeneratorProjectStructureTests |
 | AUC-BUILD-006 | Release Gates | Ready to Start Product Implementation | engineering/check-docs.sh, pack/test gates | EngineeringGateTests; PackagingReleaseGateTests |
 | AUC-BUILD-007 | Test Naming | Ready to Start Product Implementation | test project and test file naming convention | TestNamingConventionTests |
@@ -76,7 +76,7 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-BUILD-004 Dependency Boundary
 
 Feature ID: `AUC-BUILD-004`
-Status: Ready to Start Product Implementation
+Status: 已实现并通过产品合同测试
 Goal: 阻止 runtime 包带入测试或编译期依赖。
 Public Contract: project reference and package reference rules
 Runtime / Build Behavior: 扫描 project references 和 package references，按 runtime/test/generator 分类校验。
