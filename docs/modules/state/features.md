@@ -11,7 +11,7 @@
 | AUC-STATE-003 | Computed State | 产品化进行中 | IComputedState<T>, ComputedState<T> | ComputedStateTests |
 | AUC-STATE-004 | State Subscription | 产品化进行中 | IStateSubscription, IStateReaction, StateSubscriptionOptions | StateScopeTests; StateThreadingTests |
 | AUC-STATE-005 | State Snapshot | 产品化进行中 | StateSnapshot, StateSnapshotEntry | StateSnapshotTests |
-| AUC-STATE-006 | Collection State | 准备开始产品实现 | StateCollection<TKey,TItem> | StateCollectionTests |
+| AUC-STATE-006 | Collection State | 产品化进行中 | StateCollection<TKey,TItem> | StateCollectionTests |
 | AUC-STATE-007 | Diagnostics | 准备开始产品实现 | StateDiagnosticIds | StateDiagnosticsTests |
 | AUC-STATE-008 | Threading | 准备开始产品实现 | StateDispatchPolicy | StateThreadingTests |
 
@@ -101,15 +101,15 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-STATE-006 Collection State
 
 Feature ID: `AUC-STATE-006`
-Status: 准备开始产品实现
+Status: 产品化进行中
 Goal: 集合变更、快照和事件。
 Public Contract: StateCollection<TKey,TItem>
 Runtime / Build Behavior: 集合变更、快照和事件。
-Failure Behavior: 重复 key、missing key、clear。
+Failure Behavior: 重复 key、missing key、clear；集合快照和变更记录拒绝 null key、null 条目、未知 change kind 和负 version。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 implementation plan 中追踪。
 Tests: `StateCollectionTests`。
-Required Assertions: 断言 change kind。
+Required Assertions: 断言 change kind、item version、collection version、快照不可变、非法构造参数。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 ## AUC-STATE-007 Diagnostics
 

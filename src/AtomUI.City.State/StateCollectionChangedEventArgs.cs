@@ -11,14 +11,14 @@ public sealed class StateCollectionChangedEventArgs<TKey, TItem> : StateChangedE
     public StateCollectionChangedEventArgs(IReadOnlyList<StateCollectionChange<TKey, TItem>> changes)
         : base(oldValue: null, newValue: null, GetCollectionVersion(changes))
     {
-        ArgumentNullException.ThrowIfNull(changes);
+        var snapshotChanges = changes.ToArray();
 
-        if (changes.Count == 0)
+        if (snapshotChanges.Any(change => change is null))
         {
-            throw new ArgumentException("State collection change list cannot be empty.", nameof(changes));
+            throw new ArgumentException("State collection changes must not contain null.", nameof(changes));
         }
 
-        Changes = Array.AsReadOnly(changes.ToArray());
+        Changes = Array.AsReadOnly(snapshotChanges);
     }
 
     public StateCollectionChange<TKey, TItem> Change => Changes[0];
@@ -31,9 +31,12 @@ public sealed class StateCollectionChangedEventArgs<TKey, TItem> : StateChangedE
 
         if (changes.Count == 0)
         {
-            return 0;
+            throw new ArgumentException("State collection change list cannot be empty.", nameof(changes));
         }
 
-        return changes[^1].CollectionVersion;
+        var lastChange = changes[^1]
+            ?? throw new ArgumentException("State collection changes must not contain null.", nameof(changes));
+
+        return lastChange.CollectionVersion;
     }
 }

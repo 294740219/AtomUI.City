@@ -10,6 +10,7 @@
 | State Values | IWritableState<T>, IReadOnlyState<T> | 单值状态。 | 原子提交后通知。 |
 | Computed | IComputedState<T> | 派生状态。 | 依赖变更触发重算。 |
 | Snapshot | StateSnapshot | 状态快照。 | 不可变。 |
+| Collection State | StateCollection<TKey, TItem> | keyed collection state。 | 变更记录、item version 和 collection snapshot 稳定。 |
 | Diagnostics | StateDiagnosticIds | 状态错误诊断。 | AUCSTA001-010 稳定。 |
 
 ## 关键方法合同
@@ -23,6 +24,10 @@
 | StateDefinition.Create | 创建状态定义。 | key、lifetime、access、snapshotPolicy、schemaVersion 必须有效。 | StateDefinition<T>。 | 未知 enum 或 schemaVersion 小于 1 抛 `ArgumentOutOfRangeException`。 | 无。 | 创建结果不可变。 |
 | StateSnapshotEntry constructor | 创建快照条目。 | stateName/valueType/version/schemaVersion 必须有效。 | StateSnapshotEntry。 | version 小于 0 或 schemaVersion 小于 1 抛 `ArgumentOutOfRangeException`。 | 无。 | record init 属性只用于不可变快照载体。 |
 | StateSnapshot constructor | 创建快照。 | entries 不得为 null，且不得包含 null 项。 | StateSnapshot。 | entries 为 null 抛 `ArgumentNullException`；包含 null 项抛 `ArgumentException`。 | 无。 | entries 创建后不可变。 |
+| StateCollectionSnapshot<TKey,TItem> constructor | 创建集合快照。 | collectionVersion 必须大于等于 0；items 不得为 null，且不得包含 null 项。 | StateCollectionSnapshot<TKey,TItem>。 | collectionVersion 小于 0 抛 `ArgumentOutOfRangeException`；items 为 null 抛 `ArgumentNullException`；包含 null 项抛 `ArgumentException`。 | 无。 | items 创建后不可变。 |
+| StateCollectionSnapshotEntry<TKey,TItem> constructor | 创建集合快照条目。 | key 不得为 null；itemVersion 必须大于等于 0。 | StateCollectionSnapshotEntry<TKey,TItem>。 | key 为 null 抛 `ArgumentNullException`；itemVersion 小于 0 抛 `ArgumentOutOfRangeException`。 | 无。 | 条目创建后作为快照载体使用。 |
+| StateCollectionChange<TKey,TItem> constructor | 创建集合变更记录。 | kind 必须为已定义枚举；key 不得为 null；collectionVersion/itemVersion 必须大于等于 0。 | StateCollectionChange<TKey,TItem>。 | 未知 kind、负 collectionVersion 或负 itemVersion 抛 `ArgumentOutOfRangeException`；key 为 null 抛 `ArgumentNullException`。 | 无。 | 变更记录不可回写到集合，只用于通知和诊断。 |
+| StateCollectionChangedEventArgs<TKey,TItem> constructor | 创建集合变更事件参数。 | change 不得为 null；changes 不得为 null、空列表或包含 null 项。 | StateCollectionChangedEventArgs<TKey,TItem>。 | changes 为 null 抛 `ArgumentNullException`；空列表或包含 null 项抛 `ArgumentException`。 | 无。 | `Version` 取最后一条 change 的 collection version；changes 创建后不可变。 |
 
 ## Public 类型覆盖
 

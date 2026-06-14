@@ -27,7 +27,7 @@
 | AUC-STATE-003 | Unit | ComputedStateTests | 断言依赖失效、缓存、异常诊断。 | compute 异常、循环依赖、dispose。 | Required |
 | AUC-STATE-004 | Unit | StateScopeTests; StateThreadingTests | 断言 dispose 后不通知。 | 重复释放、owner dispose、callback 失败。 | Required |
 | AUC-STATE-005 | Unit | StateSnapshotTests | 断言不可变、过滤、restore diagnostics。 | 版本不兼容、policy 拒绝、restore 失败。 | Required |
-| AUC-STATE-006 | Unit | StateCollectionTests | 断言 change kind。 | 重复 key、missing key、clear。 | Required |
+| AUC-STATE-006 | Unit | StateCollectionTests | 断言 change kind、item version、collection version、快照不可变、非法构造参数。 | 重复 key、missing key、clear、null key、null 条目、未知 change kind、负 version。 | Required |
 | AUC-STATE-007 | Unit | StateDiagnosticsTests | 断言 AUCSTA001-010。 | diagnostics collector 缺失。 | Required |
 | AUC-STATE-008 | Unit | StateThreadingTests | 断言不隐式 UI。 | 并发写、调度器不可用。 | Required |
 

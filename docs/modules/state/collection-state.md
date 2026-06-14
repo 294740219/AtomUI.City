@@ -81,6 +81,7 @@ IStateCollection<TKey, TItem>
 - 发出集合级变更通知。
 - 支持 item 级版本。
 - 支持 snapshot。
+- 在集合快照、快照条目、变更记录和事件参数构造边界拒绝非法输入。
 
 不建议直接暴露可变 `List<T>` 或 `Dictionary<TKey,T>`。
 
@@ -95,6 +96,7 @@ IStateCollection<TKey, TItem>
 - 相同 key 的变更保持顺序。
 - 批量更新应合并通知。
 - 更新失败时保留旧集合。
+- public contract 载体必须在进入恢复或通知链路前拒绝 null key、null 条目、未知 change kind 和负 version。
 
 ### 4. 变更记录
 
@@ -108,16 +110,35 @@ IStateCollection<TKey, TItem>
 
 每条记录包含 key、旧值、新值、集合版本和 item 版本。
 
+变更记录合同：
+
+- `Kind` 必须是 `Added`、`Updated`、`Removed`、`Cleared` 或 `Reset`。
+- `Key` 不得为 null。
+- `CollectionVersion` 和 `ItemVersion` 必须大于等于 0。
+- `StateCollectionChangedEventArgs<TKey,TItem>` 的 change 列表不得为 null、空列表或包含 null 项。
+
 ### 5. Snapshot
 
-集合 snapshot 必须包含：
+当前运行时集合 snapshot 包含：
+
+- `CollectionVersion`。
+- item count。
+- item 列表。
+- 每个 item 的 key、value 和 item version。
+
+运行时 snapshot 合同：
+
+- `CollectionVersion` 必须大于等于 0。
+- snapshot item 列表不得为 null，且不得包含 null 项。
+- snapshot item 的 key 不得为 null。
+- snapshot item version 必须大于等于 0。
+- snapshot 和事件参数暴露的列表创建后不可变，外部修改输入列表不得影响内部结果。
+
+后续持久化 snapshot 格式必须补充：
 
 - collection key。
 - schema version。
-- collection version。
-- item count。
 - serialized items。
-- item version metadata。
 
 大型集合应支持分页或分块 snapshot，避免一次性占用过多内存。
 
@@ -142,3 +163,6 @@ Generator/Analyzer 负责：
 | 批量更新 | Unit | 通知合并且顺序稳定。 |
 | item version | Unit | item 更新递增版本。 |
 | collection snapshot | Unit | 保存和恢复集合。 |
+| snapshot 合同 | Unit | 拒绝负 collection version、null item、null key 和负 item version。 |
+| change 合同 | Unit | 拒绝未知 change kind、null key 和负 version。 |
+| event args 合同 | Unit | 拒绝空 change 列表和 null change 条目。 |

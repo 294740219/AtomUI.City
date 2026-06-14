@@ -420,6 +420,36 @@ public sealed class StateCollectionTests
     }
 
     [Fact]
+    public void SnapshotRejectsNegativeCollectionVersion()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new StateCollectionSnapshot<string, int>(collectionVersion: -1, []));
+    }
+
+    [Fact]
+    public void SnapshotRejectsNullItemEntries()
+    {
+        Assert.Throws<ArgumentException>(
+            () => new StateCollectionSnapshot<string, int>(
+                collectionVersion: 1,
+                [null!]));
+    }
+
+    [Fact]
+    public void SnapshotEntryRejectsNullKey()
+    {
+        Assert.Throws<ArgumentNullException>(
+            () => new StateCollectionSnapshotEntry<string, int>(null!, 1, ItemVersion: 1));
+    }
+
+    [Fact]
+    public void SnapshotEntryRejectsNegativeItemVersion()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new StateCollectionSnapshotEntry<string, int>("settings", 1, ItemVersion: -1));
+    }
+
+    [Fact]
     public void ChangedEventArgsCopiesChangesFromConstructorInput()
     {
         var changes = new List<StateCollectionChange<string, int>>
@@ -469,5 +499,74 @@ public sealed class StateCollectionTests
 
         Assert.Throws<NotSupportedException>(() => list[0] = replacement);
         Assert.Equal(change.Key, args.Changes[0].Key);
+    }
+
+    [Fact]
+    public void CollectionChangeRejectsInvalidKind()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new StateCollectionChange<string, int>(
+                (StateCollectionChangeKind)42,
+                "settings",
+                HasOldItem: false,
+                OldItem: default,
+                HasNewItem: true,
+                NewItem: 1,
+                CollectionVersion: 1,
+                ItemVersion: 1));
+    }
+
+    [Fact]
+    public void CollectionChangeRejectsNullKey()
+    {
+        Assert.Throws<ArgumentNullException>(
+            () => new StateCollectionChange<string, int>(
+                StateCollectionChangeKind.Added,
+                null!,
+                HasOldItem: false,
+                OldItem: default,
+                HasNewItem: true,
+                NewItem: 1,
+                CollectionVersion: 1,
+                ItemVersion: 1));
+    }
+
+    [Fact]
+    public void CollectionChangeRejectsNegativeCollectionVersion()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new StateCollectionChange<string, int>(
+                StateCollectionChangeKind.Added,
+                "settings",
+                HasOldItem: false,
+                OldItem: default,
+                HasNewItem: true,
+                NewItem: 1,
+                CollectionVersion: -1,
+                ItemVersion: 1));
+    }
+
+    [Fact]
+    public void CollectionChangeRejectsNegativeItemVersion()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new StateCollectionChange<string, int>(
+                StateCollectionChangeKind.Added,
+                "settings",
+                HasOldItem: false,
+                OldItem: default,
+                HasNewItem: true,
+                NewItem: 1,
+                CollectionVersion: 1,
+                ItemVersion: -1));
+    }
+
+    [Fact]
+    public void ChangedEventArgsRejectsInvalidChangeLists()
+    {
+        Assert.Throws<ArgumentException>(
+            () => new StateCollectionChangedEventArgs<string, int>([]));
+        Assert.Throws<ArgumentException>(
+            () => new StateCollectionChangedEventArgs<string, int>([null!]));
     }
 }
