@@ -29,6 +29,13 @@ public sealed class EventContext<TEvent>
                 "Event context publish depth cannot be negative.");
         }
         EventSubscriptionId.ThrowIfDefault(subscriptionId, nameof(subscriptionId));
+        if (!Enum.IsDefined(dispatchPolicy))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(dispatchPolicy),
+                dispatchPolicy,
+                "Event context dispatch policy is not supported.");
+        }
 
         Event = eventData;
         ContractId = contractId;

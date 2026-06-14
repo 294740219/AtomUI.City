@@ -180,6 +180,22 @@ public sealed class EventPublicationTests
     }
 
     [Fact]
+    public void EventContextRejectsUnknownDispatchPolicy()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new EventContext<TestEvent>(
+            new TestEvent("context"),
+            new EventContractId("atomui.city.tests.context.v1"),
+            Guid.NewGuid(),
+            "correlation",
+            causationId: null,
+            DateTimeOffset.UtcNow,
+            publishDepth: 0,
+            EventSubscriptionId.New(),
+            (EventDispatchPolicy)999,
+            CancellationToken.None));
+    }
+
+    [Fact]
     public async Task PostAsyncRejectsNullEvent()
     {
         var eventBus = new InMemoryEventBus();
