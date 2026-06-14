@@ -3,7 +3,7 @@ using AtomUI.City.Lifecycle;
 
 namespace AtomUI.City.EventBus;
 
-public sealed class InMemoryEventBus : IEventBus
+public sealed class InMemoryEventBus : IEventBus, IDisposable
 {
     private readonly IEventContractRegistry _contractRegistry;
     private readonly IHostDiagnostics? _diagnostics;

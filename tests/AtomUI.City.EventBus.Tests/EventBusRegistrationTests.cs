@@ -40,5 +40,19 @@ public sealed class EventBusRegistrationTests
         Assert.Equal(typeof(RegisteredEvent), descriptor.EventType);
     }
 
+    [Fact]
+    public async Task ServiceProviderDisposesEventBusSingleton()
+    {
+        var services = new ServiceCollection();
+        services.AddEventBus();
+        var serviceProvider = services.BuildServiceProvider();
+        var eventBus = (InMemoryEventBus)serviceProvider.GetRequiredService<IEventBus>();
+
+        await serviceProvider.DisposeAsync();
+
+        await Assert.ThrowsAsync<ObjectDisposedException>(async () =>
+            await eventBus.PublishAsync(new RegisteredEvent("disposed")));
+    }
+
     private sealed record RegisteredEvent(string Value);
 }
