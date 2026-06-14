@@ -11,4 +11,17 @@ public sealed class MvvmAssemblyTests
 
         Assert.Equal("AtomUI.City.Mvvm", assembly.GetName().Name);
     }
+
+    [Fact]
+    public void MvvmAssemblyDoesNotReferencePresentationOrAvaloniaVisuals()
+    {
+        var assembly = Assembly.Load("AtomUI.City.Mvvm");
+        var references = assembly.GetReferencedAssemblies()
+            .Select(reference => reference.Name)
+            .Where(name => name is not null)
+            .ToHashSet(StringComparer.Ordinal);
+
+        Assert.DoesNotContain("AtomUI.City.Presentation", references);
+        Assert.DoesNotContain(references, name => name!.StartsWith("Avalonia", StringComparison.Ordinal));
+    }
 }

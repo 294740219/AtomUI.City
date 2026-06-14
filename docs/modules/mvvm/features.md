@@ -6,7 +6,7 @@
 
 | Feature ID | 名称 | 状态 | Public Contract | 主测试 |
 | --- | --- | --- | --- | --- |
-| AUC-MVVM-001 | ViewModel Base and Notification | Ready to Start Product Implementation | ViewModelBase | ViewModelBaseTests |
+| AUC-MVVM-001 | ViewModel Base and Notification | Completed | ViewModelBase | ViewModelBaseTests |
 | AUC-MVVM-002 | Activation and Deactivation | Ready to Start Product Implementation | IActivatable, ICanDeactivate, ActivationScope | ActivationScopeTests; DeactivationTests |
 | AUC-MVVM-003 | Command Execution | Ready to Start Product Implementation | CommandFactory, OperationScope, OperationResult | CommandTests |
 | AUC-MVVM-004 | Interaction Requests | Ready to Start Product Implementation | Interaction<TRequest, TResult>, InteractionContext<TRequest> | InteractionTests |
@@ -33,11 +33,11 @@
 ## AUC-MVVM-001 ViewModel Base and Notification
 
 Feature ID: `AUC-MVVM-001`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 定义框架推荐 ViewModel 基类和属性变更语义。
 Public Contract: ViewModelBase
 Runtime / Build Behavior: 提供属性通知、释放入口和可观测状态；不引用 Avalonia visual。
-Failure Behavior: Dispose 后 mutating API 必须失败或静默拒绝并保持文档一致。
+Failure Behavior: Dispose 后 mutating API 抛出 `ObjectDisposedException`；空白 property name 抛出 `ArgumentException`。
 Threading / Cancellation: 属性通知发生在调用线程；需要 UI marshal 的工作由 Presentation 处理。
 Diagnostics: 重复 notification storm 必须可通过测试定位到 property name。
 Tests: `ViewModelBaseTests`

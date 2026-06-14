@@ -1,10 +1,91 @@
 using AtomUI.City.Mvvm;
 using CommunityToolkit.Mvvm.ComponentModel;
+using System.Reflection;
 
 namespace AtomUI.City.Mvvm.Tests;
 
 public sealed class ViewModelBaseTests
 {
+    [Fact]
+    public void SetPropertyRaisesPropertyChangedWithStablePropertyName()
+    {
+        var viewModel = new TestViewModel();
+        var raisedProperties = new List<string?>();
+
+        viewModel.PropertyChanged += (_, args) => raisedProperties.Add(args.PropertyName);
+
+        var changed = viewModel.UpdateTitle("Settings");
+
+        Assert.True(changed);
+        Assert.Equal("Settings", viewModel.Title);
+        Assert.Equal(new[] { nameof(TestViewModel.Title) }, raisedProperties);
+    }
+
+    [Fact]
+    public void SetPropertySkipsEquivalentValueNotifications()
+    {
+        var viewModel = new TestViewModel();
+        viewModel.UpdateTitle("Settings");
+        var raisedProperties = new List<string?>();
+
+        viewModel.PropertyChanged += (_, args) => raisedProperties.Add(args.PropertyName);
+
+        var changed = viewModel.UpdateTitle("Settings");
+
+        Assert.False(changed);
+        Assert.Empty(raisedProperties);
+    }
+
+    [Fact]
+    public void SetPropertyRejectsEmptyPropertyName()
+    {
+        var viewModel = new TestViewModel();
+
+        var exception = Assert.Throws<ArgumentException>(() =>
+            viewModel.UpdateTitleWithPropertyName("Settings", string.Empty));
+
+        Assert.Equal("propertyName", exception.ParamName);
+    }
+
+    [Fact]
+    public void DisposeIsIdempotentAndMarksViewModelDisposed()
+    {
+        var viewModel = new TestViewModel();
+        var disposable = Assert.IsAssignableFrom<IDisposable>(viewModel);
+
+        disposable.Dispose();
+        disposable.Dispose();
+
+        Assert.Equal(ActivationState.Disposed, viewModel.ActivationState);
+        Assert.False(viewModel.IsActive);
+    }
+
+    [Fact]
+    public void ViewModelBaseExposesDisposeInheritanceHook()
+    {
+        var method = typeof(ViewModelBase).GetMethod(
+            "OnDisposed",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+
+        Assert.NotNull(method);
+        Assert.True(method.IsVirtual);
+        Assert.Equal(typeof(void), method.ReturnType);
+        Assert.Empty(method.GetParameters());
+    }
+
+    [Fact]
+    public void SetPropertyAfterDisposeThrowsObjectDisposedException()
+    {
+        var viewModel = new TestViewModel();
+        var disposable = Assert.IsAssignableFrom<IDisposable>(viewModel);
+        disposable.Dispose();
+
+        var exception = Assert.Throws<ObjectDisposedException>(() => viewModel.UpdateTitle("Settings"));
+
+        Assert.Equal(typeof(TestViewModel).FullName, exception.ObjectName);
+        Assert.Equal(ActivationState.Disposed, viewModel.ActivationState);
+    }
+
     [Fact]
     public async Task ActivateAndDeactivateCallTemplateMethods()
     {
@@ -58,6 +139,25 @@ public sealed class ViewModelBaseTests
     }
 
     [Fact]
+    public async Task DisposeReleasesCurrentActivationResources()
+    {
+        using var scope = new ActivationScope();
+        var binding = new TestDisposable();
+        var viewModel = new TestViewModel();
+
+        scope.Add(binding);
+        await viewModel.ActivateAsync(new ActivationContext(scope));
+        var disposable = Assert.IsAssignableFrom<IDisposable>(viewModel);
+
+        disposable.Dispose();
+
+        Assert.True(binding.IsDisposed);
+        Assert.Null(viewModel.CurrentActivationScope);
+        Assert.Null(viewModel.ActivationContext);
+        Assert.Equal(ActivationState.Disposed, viewModel.ActivationState);
+    }
+
+    [Fact]
     public void ActivationScopeAccessorRestoresPreviousScope()
     {
         var accessor = new ActivationScopeAccessor();
@@ -95,9 +195,23 @@ public sealed class ViewModelBaseTests
 
     public sealed class TestViewModel : ViewModelBase
     {
+        private string? _title;
+
+        public string? Title => _title;
+
         public int ActivatedCount { get; private set; }
 
         public int DeactivatedCount { get; private set; }
+
+        public bool UpdateTitle(string? value)
+        {
+            return SetProperty(ref _title, value, nameof(Title));
+        }
+
+        public bool UpdateTitleWithPropertyName(string? value, string propertyName)
+        {
+            return SetProperty(ref _title, value, propertyName);
+        }
 
         protected override ValueTask OnActivatedAsync(IActivationScope scope)
         {

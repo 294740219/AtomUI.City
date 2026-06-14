@@ -16,7 +16,8 @@
 
 | Method | Purpose | Parameters | Return | Failure Behavior | Cancellation | Concurrency / Idempotency |
 | --- | --- | --- | --- | --- | --- | --- |
-| ViewModelBase.SetProperty | 更新属性并触发通知。 | propertyName 必须稳定，比较器可选。 | bool 表示是否变化。 | Dispose 后按合同拒绝或忽略。 | 同步 API 无 token。 | 调用线程发布通知；UI marshal 由 Presentation 负责。 |
+| ViewModelBase.SetProperty | 更新属性并触发通知。 | propertyName 必须稳定且非空白，比较器可选。 | bool 表示是否变化。 | Dispose 后抛 `ObjectDisposedException`；空白 propertyName 抛 `ArgumentException`。 | 同步 API 无 token。 | 相等值不重复通知；调用线程发布通知，UI marshal 由 Presentation 负责。 |
+| ViewModelBase.Dispose | 释放 ViewModel 生命周期资源。 | 无。 | void。 | 重复 Dispose 幂等；释放当前 ActivationScope。 | 同步 API 无 token。 | 进入 Disposed 终态，后续 mutation 被拒绝。 |
 | ActivationScope.ActivateAsync | 激活 ViewModel。 | ActivationContext 不得为 null。 | ActivationState 或 OperationResult。 | 激活异常进入 Failed，不进入 Active。 | 必须观察 token。 | 重复 Activate 在 Active 状态下幂等或返回已激活。 |
 | ICanDeactivate.CanDeactivateAsync | 离开前确认。 | context 包含原因和目标。 | DeactivationResult。 | 拒绝返回 Denied，不抛业务异常。 | 必须观察 token。 | 同一 scope 内并发 deactivation 串行。 |
 | CommandFactory.CreateAsyncCommand | 创建异步命令。 | execute 不得为 null；canExecute 可选。 | ICommand 或框架 command wrapper。 | execute 异常映射 OperationResult Failed。 | 命令 token 必须传递到 execute。 | 并发执行按 policy 拒绝或串行。 |
