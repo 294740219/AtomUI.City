@@ -125,7 +125,11 @@ Unknown
 | gRPC Unauthenticated | AuthenticationRequired / AuthenticationExpired。 |
 | gRPC PermissionDenied | AuthorizationForbidden。 |
 | gRPC DeadlineExceeded | DeadlineExceeded / Timeout。 |
-| gRPC Unavailable | NetworkUnavailable / Unavailable。 |
+| gRPC InvalidArgument / OutOfRange | ValidationFailed。 |
+| gRPC ResourceExhausted | PolicyRejected。 |
+| gRPC FailedPrecondition / Aborted | Conflict。 |
+| gRPC Unavailable | ServiceUnavailable。 |
+| gRPC Unimplemented / Internal / DataLoss | ServerError。 |
 | SignalR reconnect failed | ReconnectFailed。 |
 | SignalR closed | ConnectionClosed。 |
 | Scope cancellation | Cancelled。 |

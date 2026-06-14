@@ -34,13 +34,20 @@ public static class DataErrorMapper
         var kind = statusCode switch
         {
             GrpcStatusCode.Cancelled => DataErrorKind.Cancelled,
+            GrpcStatusCode.InvalidArgument => DataErrorKind.ValidationFailed,
             GrpcStatusCode.DeadlineExceeded => DataErrorKind.DeadlineExceeded,
             GrpcStatusCode.Unauthenticated => DataErrorKind.AuthenticationRequired,
             GrpcStatusCode.PermissionDenied => DataErrorKind.AuthorizationForbidden,
             GrpcStatusCode.NotFound => DataErrorKind.NotFound,
             GrpcStatusCode.AlreadyExists => DataErrorKind.Conflict,
+            GrpcStatusCode.ResourceExhausted => DataErrorKind.PolicyRejected,
+            GrpcStatusCode.FailedPrecondition => DataErrorKind.Conflict,
+            GrpcStatusCode.Aborted => DataErrorKind.Conflict,
+            GrpcStatusCode.OutOfRange => DataErrorKind.ValidationFailed,
+            GrpcStatusCode.Unimplemented => DataErrorKind.ServerError,
             GrpcStatusCode.Unavailable => DataErrorKind.ServiceUnavailable,
             GrpcStatusCode.Internal => DataErrorKind.ServerError,
+            GrpcStatusCode.DataLoss => DataErrorKind.ServerError,
             _ => DataErrorKind.Unknown,
         };
 
@@ -74,6 +81,8 @@ public static class DataErrorMapper
             DataErrorKind.AuthorizationForbidden => "Errors.AuthorizationForbidden",
             DataErrorKind.NotFound => "Errors.NotFound",
             DataErrorKind.DeadlineExceeded => "Errors.Timeout",
+            DataErrorKind.ValidationFailed => "Errors.ValidationFailed",
+            DataErrorKind.Conflict => "Errors.Conflict",
             DataErrorKind.ServiceUnavailable => "Errors.ServiceUnavailable",
             DataErrorKind.ServerError => "Errors.ServerError",
             _ => null,

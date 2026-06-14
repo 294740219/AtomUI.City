@@ -113,17 +113,25 @@ gRPC channel 可以跨多个 call。
 
 ### 6. Status 映射
 
-| gRPC status | DataError |
-|---|---|
-| Cancelled | Cancelled / StreamCancelled。 |
-| DeadlineExceeded | DeadlineExceeded / Timeout。 |
-| Unauthenticated | AuthenticationRequired / AuthenticationExpired。 |
-| PermissionDenied | AuthorizationForbidden。 |
-| NotFound | NotFound。 |
-| AlreadyExists | Conflict。 |
-| Unavailable | NetworkUnavailable / ServiceUnavailable。 |
-| Internal | ServerError。 |
-| Unknown | Unknown。 |
+| gRPC status | 数值 | DataError |
+|---|---:|---|
+| OK | 0 | 仅用于成功结果。 |
+| Cancelled | 1 | Cancelled / StreamCancelled。 |
+| Unknown | 2 | Unknown。 |
+| InvalidArgument | 3 | ValidationFailed。 |
+| DeadlineExceeded | 4 | DeadlineExceeded / Timeout。 |
+| NotFound | 5 | NotFound。 |
+| AlreadyExists | 6 | Conflict。 |
+| PermissionDenied | 7 | AuthorizationForbidden。 |
+| ResourceExhausted | 8 | PolicyRejected。 |
+| FailedPrecondition | 9 | Conflict。 |
+| Aborted | 10 | Conflict。 |
+| OutOfRange | 11 | ValidationFailed。 |
+| Unimplemented | 12 | ServerError。 |
+| Internal | 13 | ServerError。 |
+| Unavailable | 14 | ServiceUnavailable。 |
+| DataLoss | 15 | ServerError。 |
+| Unauthenticated | 16 | AuthenticationRequired / AuthenticationExpired。 |
 
 ### 7. Streaming
 
