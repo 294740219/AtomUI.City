@@ -10,7 +10,7 @@
 | AUC-GENERATORS-002 | Module Graph | 已实现并通过产品合同测试 | ModuleMetadataReader, ModuleDependencyGraphBuilder | ModuleDependencyGraphBuilderTests; ModuleMetadataReaderTests |
 | AUC-GENERATORS-003 | DI Manifest | 已实现并通过产品合同测试 | ServiceRegistrationMetadataReader, ServiceRegistrationManifestBuilder | ServiceRegistrationManifestBuilderTests; ServiceRegistrationMetadataReaderTests |
 | AUC-GENERATORS-004 | Route Manifest | 已实现并通过产品合同测试 | RouteMetadataReader, RouteManifestBuilder | RouteManifestBuilderTests; RouteMetadataReaderTests |
-| AUC-GENERATORS-005 | Plugin Manifest | Ready to Start Product Implementation | PluginMetadataReader, PluginManifestBuilder | PluginManifestBuilderTests; PluginMetadataReaderTests |
+| AUC-GENERATORS-005 | Plugin Manifest | 已实现并通过产品合同测试 | PluginMetadataReader, PluginManifestBuilder | PluginManifestBuilderTests; PluginMetadataReaderTests |
 | AUC-GENERATORS-006 | Localization Manifest | Ready to Start Product Implementation | LocalizationMetadataReader, LocalizationManifestBuilder | LocalizationManifestBuilderTests; LocalizationMetadataReaderTests |
 | AUC-GENERATORS-007 | Presentation View Manifest | Ready to Start Product Implementation | PresentationViewMetadataReader, PresentationViewManifestBuilder | PresentationViewManifestBuilderTests; PresentationViewRegistrarSourceBuilderTests |
 | AUC-GENERATORS-008 | Diagnostics | Ready to Start Product Implementation | GeneratorDiagnosticIds, GeneratorDiagnostics | GeneratorDiagnosticTests |
@@ -91,7 +91,7 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-GENERATORS-005 Plugin Manifest
 
 Feature ID: `AUC-GENERATORS-005`
-Status: Ready to Start Product Implementation
+Status: 已实现并通过产品合同测试
 Goal: 编译期生成插件 manifest。
 Public Contract: PluginMetadataReader, PluginManifestBuilder
 Runtime / Build Behavior: 读取 Plugin、capability、dependency、contribution 属性，输出 plugin manifest model。

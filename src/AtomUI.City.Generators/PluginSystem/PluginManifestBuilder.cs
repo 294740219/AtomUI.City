@@ -33,6 +33,7 @@ public static class PluginManifestBuilder
         AddDuplicateContributionDiagnostics(metadata.Contributions, diagnostics);
         AddDuplicateCapabilityDiagnostics(metadata.Capabilities, diagnostics);
         AddContributionPathDiagnostics(metadata.Contributions, diagnostics);
+        AddDependencyVersionRangeDiagnostics(metadata.Dependencies, diagnostics);
 
         if (diagnostics.Count > 0)
         {
@@ -197,5 +198,143 @@ public static class PluginManifestBuilder
             .Split('/')
             .Any(segment => string.Equals(segment, ".", StringComparison.Ordinal) ||
                 string.Equals(segment, "..", StringComparison.Ordinal));
+    }
+
+    private static void AddDependencyVersionRangeDiagnostics(
+        IEnumerable<PluginDependencyMetadata> dependencies,
+        ICollection<GeneratorDiagnostic> diagnostics)
+    {
+        foreach (var dependency in dependencies)
+        {
+            if (IsValidDependencyVersionRange(dependency.VersionRange))
+            {
+                continue;
+            }
+
+            diagnostics.Add(new GeneratorDiagnostic(
+                GeneratorDiagnostics.InvalidManifestInput,
+                $"Plugin dependency '{dependency.PluginId}' has invalid version range '{dependency.VersionRange}'.",
+                dependency.PluginId));
+        }
+    }
+
+    private static bool IsValidDependencyVersionRange(string? versionRange)
+    {
+        if (string.IsNullOrWhiteSpace(versionRange))
+        {
+            return true;
+        }
+
+        var range = versionRange!.Trim();
+        if (range.Length < 2)
+        {
+            return IsValidSemanticVersion(range);
+        }
+
+        var hasLowerBound = range[0] == '[' || range[0] == '(';
+        var hasUpperBound = range[range.Length - 1] == ']' || range[range.Length - 1] == ')';
+        if (!hasLowerBound || !hasUpperBound)
+        {
+            return IsValidSemanticVersion(range);
+        }
+
+        var body = range.Substring(1, range.Length - 2);
+        var commaIndex = body.IndexOf(",", StringComparison.Ordinal);
+        if (commaIndex < 0)
+        {
+            return false;
+        }
+
+        var lowerBound = body.Substring(0, commaIndex).Trim();
+        var upperBound = body.Substring(commaIndex + 1).Trim();
+
+        return (lowerBound.Length == 0 || IsValidSemanticVersion(lowerBound)) &&
+            (upperBound.Length == 0 || IsValidSemanticVersion(upperBound));
+    }
+
+    private static bool IsValidSemanticVersion(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        var buildSeparatorIndex = value.IndexOf('+');
+        var valueWithoutBuild = buildSeparatorIndex < 0
+            ? value
+            : value.Substring(0, buildSeparatorIndex);
+        var build = buildSeparatorIndex < 0
+            ? null
+            : value.Substring(buildSeparatorIndex + 1);
+
+        if (build is not null && !IsValidIdentifierList(build, allowLeadingZeroNumbers: true))
+        {
+            return false;
+        }
+
+        var prereleaseSeparatorIndex = valueWithoutBuild.IndexOf('-');
+        var core = prereleaseSeparatorIndex < 0
+            ? valueWithoutBuild
+            : valueWithoutBuild.Substring(0, prereleaseSeparatorIndex);
+        var prerelease = prereleaseSeparatorIndex < 0
+            ? null
+            : valueWithoutBuild.Substring(prereleaseSeparatorIndex + 1);
+
+        if (prerelease is not null && !IsValidIdentifierList(prerelease, allowLeadingZeroNumbers: false))
+        {
+            return false;
+        }
+
+        var coreParts = core.Split('.');
+        return coreParts.Length == 3 &&
+            IsValidCoreVersionIdentifier(coreParts[0]) &&
+            IsValidCoreVersionIdentifier(coreParts[1]) &&
+            IsValidCoreVersionIdentifier(coreParts[2]);
+    }
+
+    private static bool IsValidIdentifierList(string value, bool allowLeadingZeroNumbers)
+    {
+        return value.Length > 0 &&
+            value
+                .Split('.')
+                .All(identifier => IsValidIdentifier(identifier, allowLeadingZeroNumbers));
+    }
+
+    private static bool IsValidIdentifier(string identifier, bool allowLeadingZeroNumbers)
+    {
+        if (identifier.Length == 0 ||
+            identifier.Any(character => !IsAsciiLetterOrDigit(character) && character != '-'))
+        {
+            return false;
+        }
+
+        return allowLeadingZeroNumbers ||
+            !IsNumericIdentifier(identifier) ||
+            IsValidCoreVersionIdentifier(identifier);
+    }
+
+    private static bool IsValidCoreVersionIdentifier(string identifier)
+    {
+        return IsNumericIdentifier(identifier) &&
+            (identifier.Length == 1 || identifier[0] != '0') &&
+            int.TryParse(identifier, out _);
+    }
+
+    private static bool IsNumericIdentifier(string identifier)
+    {
+        return identifier.Length > 0 &&
+            identifier.All(IsAsciiDigit);
+    }
+
+    private static bool IsAsciiLetterOrDigit(char character)
+    {
+        return IsAsciiDigit(character) ||
+            character is >= 'A' and <= 'Z' ||
+            character is >= 'a' and <= 'z';
+    }
+
+    private static bool IsAsciiDigit(char character)
+    {
+        return character is >= '0' and <= '9';
     }
 }

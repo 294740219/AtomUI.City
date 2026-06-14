@@ -31,7 +31,9 @@ public sealed class PluginManifestBuilderTests
         Assert.Equal("Company.Sales.Plugin", result.Manifest.PackageId);
         Assert.Equal(["localization", "routes"], result.Manifest.Capabilities.Select(capability => capability.Name));
         Assert.Equal(["localization", "routes"], result.Manifest.Contributions.Select(contribution => contribution.Type));
-        Assert.Equal("com.company.identity", Assert.Single(result.Manifest.Dependencies).PluginId);
+        var dependency = Assert.Single(result.Manifest.Dependencies);
+        Assert.Equal("com.company.identity", dependency.PluginId);
+        Assert.Equal("[1.0.0,2.0.0)", dependency.VersionRange);
     }
 
     [Fact]
@@ -97,6 +99,24 @@ public sealed class PluginManifestBuilderTests
 
         Assert.Equal(GeneratorDiagnosticIds.InvalidManifestInput, diagnostic.Id);
         Assert.Empty(result.Manifest.Contributions);
+    }
+
+    [Fact]
+    public void BuildReportsInvalidDependencyVersionRanges()
+    {
+        var result = PluginManifestBuilder.Build(
+            Metadata(
+                dependencies:
+                [
+                    Dependency("com.company.identity", "[1.0.0,not-a-version)"),
+                ]));
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+
+        Assert.Equal(GeneratorDiagnosticIds.InvalidManifestInput, diagnostic.Id);
+        Assert.Contains("version range", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Equal("com.company.identity", diagnostic.Target);
+        Assert.Empty(result.Manifest.Dependencies);
     }
 
     [Fact]
