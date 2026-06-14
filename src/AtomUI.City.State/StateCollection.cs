@@ -402,6 +402,8 @@ public sealed class StateCollection<TKey, TItem> : IStateCollection<TKey, TItem>
 
         lock (_syncRoot)
         {
+            ThrowIfDisposed();
+
             _subscriptions.Add(subscription);
         }
 
