@@ -81,6 +81,7 @@ IStateCollection<TKey, TItem>
 - 发出集合级变更通知。
 - 支持 item 级版本。
 - 支持 snapshot。
+- 支持 `IStateCollection<TKey,TItem>` / `StateCollection<TKey,TItem>` dispose 生命周期。
 - 在集合快照、快照条目、变更记录和事件参数构造边界拒绝非法输入。
 
 不建议直接暴露可变 `List<T>` 或 `Dictionary<TKey,T>`。
@@ -97,6 +98,9 @@ IStateCollection<TKey, TItem>
 - 批量更新应合并通知。
 - 更新失败时保留旧集合。
 - public contract 载体必须在进入恢复或通知链路前拒绝 null key、null 条目、未知 change kind 和负 version。
+- 集合 Dispose 必须幂等，且释放现有 subscriptions。
+- Dispose 后 `Version`、`Items`、`TryGetItemVersion` 和 `CreateSnapshot` 仍可读取。
+- Dispose 后 `AddOrUpdate`、`AddOrUpdateRange`、`Remove`、`Clear`、`RestoreSnapshot` 和 `OnChange` 必须抛 `ObjectDisposedException`。
 
 ### 4. 变更记录
 
@@ -163,6 +167,9 @@ Generator/Analyzer 负责：
 | 批量更新 | Unit | 通知合并且顺序稳定。 |
 | item version | Unit | item 更新递增版本。 |
 | collection snapshot | Unit | 保存和恢复集合。 |
+| collection dispose | Unit | 重复 Dispose 幂等，Dispose 后读 API 可用。 |
+| disposed collection mutation | Unit | Dispose 后 mutation、restore 和 subscription API 抛 `ObjectDisposedException`。 |
+| disposed collection subscriptions | Unit | Dispose 清空 active subscriptions，subscription 重复 Dispose 幂等。 |
 | snapshot 合同 | Unit | 拒绝负 collection version、null item、null key 和负 item version。 |
 | change 合同 | Unit | 拒绝未知 change kind、null key 和负 version。 |
 | event args 合同 | Unit | 拒绝空 change 列表和 null change 条目。 |

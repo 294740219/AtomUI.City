@@ -10,6 +10,7 @@ AtomUI.City.State 作为 Host 服务或模块贡献接入 Core 生命周期，�
 
 - StateScope: Created -> Active -> Disposing -> Disposed
 - WritableState: Registered -> Active -> Disposed
+- StateCollection: Registered -> Active -> Disposed
 - Subscription: Active -> Disposed
 - Snapshot: Created -> Immutable
 

@@ -10,7 +10,7 @@
 | State Values | IWritableState<T>, IReadOnlyState<T> | 单值状态。 | 原子提交后通知。 |
 | Computed | IComputedState<T> | 派生状态。 | 依赖变更触发重算。 |
 | Snapshot | StateSnapshot | 状态快照。 | 不可变。 |
-| Collection State | StateCollection<TKey, TItem> | keyed collection state。 | 变更记录、item version 和 collection snapshot 稳定。 |
+| Collection State | IStateCollection<TKey, TItem>, StateCollection<TKey, TItem> | keyed collection state。 | 变更记录、item version、collection snapshot 和 dispose 生命周期稳定。 |
 | Diagnostics | StateDiagnosticIds | 状态错误诊断。 | AUCSTA001-010 稳定。 |
 
 ## 关键方法合同
@@ -21,6 +21,8 @@
 | IReadOnlyState<T>.OnChange | 订阅状态。 | handler/options。 | IStateSubscription。 | handler/options 为 null 抛 `ArgumentNullException`；`WritableState<T>` Dispose 后抛 `ObjectDisposedException`；handler 失败写 diagnostics。 | 调度由 StateDispatchPolicy；Background 不得阻塞状态提交。 | subscription dispose 后不再通知；重复 dispose 幂等。 |
 | WritableState<T>.Dispose | 结束可写状态生命周期。 | 无。 | 无。 | 重复 Dispose 不抛异常；Dispose 后读属性仍可读取，mutation、subscription 和 restore-style mutation 抛 `ObjectDisposedException`。 | 无。 | 清空现有 subscriptions；不在状态锁内调用 handler。 |
 | IApplicationState.Get / OnChange; IApplicationStateWriter.GetWritable / Set / Update | 读取、订阅或写入注册状态。 | key 必须有效；OnChange handler 和 Update updater 不得为 null。 | IReadOnlyState<T>、IStateSubscription、IWritableState<T> 或提交结果。 | default key 抛 `ArgumentException` 且不写 not registered diagnostics；未注册 key 抛 `StateNotRegisteredException` 并写 diagnostics；handler/updater 为 null 抛 `ArgumentNullException`。 | 同步提交，不隐式切线程。 | 未注册状态不得隐式创建；写入规则由对应 `WritableState<T>` 合同决定。 |
+| IStateCollection<TKey,TItem>.AddOrUpdate / AddOrUpdateRange / Remove / Clear / RestoreSnapshot / OnChange | 修改、恢复或订阅 keyed collection state。 | key、items、snapshot、handler/options 必须有效。 | 是否提交变更或 IStateSubscription。 | key/items/snapshot/handler/options 为 null 按标准参数异常；`StateCollection<TKey,TItem>` Dispose 后 mutation、restore 和 subscription API 抛 `ObjectDisposedException`。 | 同步提交，不隐式切线程。 | 并发写串行化；无变化不递增 version、不通知；subscription dispose 后不再通知。 |
+| IStateCollection<TKey,TItem>.Dispose | 结束集合状态生命周期。 | 无。 | 无。 | 重复 Dispose 不抛异常；Dispose 后读属性、item version 查询和 snapshot 仍可读取，mutation、restore 和 subscription API 抛 `ObjectDisposedException`。 | 无。 | 清空现有 subscriptions；不在状态锁内调用 handler。 |
 | ComputedState<T> constructor | 创建计算状态。 | compute 不能为 null；dependencies 不得为 null 且不得包含 null 项。 | ComputedState<T>。 | compute/dependencies 为 null 抛 `ArgumentNullException`；dependency 项为 null 抛 `ArgumentException`。 | 无。 | 依赖订阅随 computed dispose 释放。 |
 | ComputedState<T>.Value | 读取计算值。 | 无。 | 当前计算值。 | compute 失败保留上一有效值并写 diagnostics。 | 同步计算，不执行 IO。 | 依赖变化后无订阅者只标记 dirty，读取时才重算；依赖变化且有订阅者时立即重算并通知。 |
 | StateDefinition.Create | 创建状态定义。 | key、lifetime、access、snapshotPolicy、schemaVersion 必须有效。 | StateDefinition<T>。 | default key 抛 `ArgumentException`；未知 enum 或 schemaVersion 小于 1 抛 `ArgumentOutOfRangeException`。 | 无。 | 创建结果不可变。 |
@@ -91,6 +93,8 @@
 
 - `WritableState<T>` 的 `Value`、`Version`、`ValueType` 在 Dispose 后仍可读取。
 - `WritableState<T>` 的 `Set`、`SetValue`、`Update`、`OnChange` 和 restore-style mutation 在 Dispose 后必须失败并抛 `ObjectDisposedException`。
+- `StateCollection<TKey,TItem>` 的 `Version`、`Items`、`TryGetItemVersion` 和 `CreateSnapshot` 在 Dispose 后仍可读取。
+- `StateCollection<TKey,TItem>` 的 `AddOrUpdate`、`AddOrUpdateRange`、`Remove`、`Clear`、`RestoreSnapshot` 和 `OnChange` 在 Dispose 后必须失败并抛 `ObjectDisposedException`。
 - 查询 immutable descriptor、manifest、snapshot、result 的 API 可以继续读取。
 - 重复 Dispose、Stop、Unload、Unsubscribe、Revoke 必须幂等。
 

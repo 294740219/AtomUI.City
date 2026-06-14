@@ -9,7 +9,7 @@
 | AUC-STATE-003 | 是 | 是 | ComputedStateTests | 已有基线 | 部分通过 | 断言 lazy invalidation、依赖失效、缓存、异常诊断、null dependency 拒绝。 | 仍需完整产品合同测试 | 产品化进行中 |
 | AUC-STATE-004 | 是 | 是 | StateScopeTests; StateThreadingTests | 已有基线 | 部分通过 | 断言 dispose 后不通知、Background 不阻塞状态提交、Background handler 失败诊断。 | 仍需完整产品合同测试 | 产品化进行中 |
 | AUC-STATE-005 | 是 | 是 | StateSnapshotTests | 已有基线 | 部分通过 | 断言不可变、过滤、restore diagnostics、entry version/schema 边界、entries 不含 null。 | 仍需完整产品合同测试 | 产品化进行中 |
-| AUC-STATE-006 | 是 | 是 | StateCollectionTests | 已有基线 | 部分通过 | 断言 change kind、item version、collection version、快照不可变、非法构造参数。 | 仍需完整产品合同测试 | 产品化进行中 |
+| AUC-STATE-006 | 是 | 是 | StateCollectionTests | 已有基线 | 部分通过 | 断言 change kind、item version、collection version、快照不可变、非法构造参数、dispose 幂等、dispose 后读 API 可用、mutation/restore/subscription API 拒绝。 | 仍需完整产品合同测试 | 产品化进行中 |
 | AUC-STATE-007 | 是 | 是 | StateDiagnosticsTests | 已有基线 | 必需 | 断言 AUCSTA001-010。 | 必需 | 准备开始产品实现 |
 | AUC-STATE-008 | 是 | 是 | StateThreadingTests | 已有基线 | 必需 | 断言不隐式 UI。 | 必需 | 准备开始产品实现 |
 
@@ -18,6 +18,7 @@
 - AUC-STATE-002 已补充 `StateDefinition.Create` 与 application state registry 对 default `StateKey<T>` 的拒绝测试，确保无效 key 不会落入内部 name 或 dictionary 边界。
 - AUC-STATE-005 已补充 `StateSnapshotEntry` constructor/init 边界测试，覆盖 stateName、valueType、version 和 schemaVersion。
 - AUC-STATE-006 已补充 `StateCollectionSnapshotEntry<TKey,TItem>` 与 `StateCollectionChange<TKey,TItem>` constructor/init 边界测试，覆盖 key、kind、collectionVersion 和 itemVersion。
+- AUC-STATE-006 已补充 `StateCollection<TKey,TItem>` dispose 生命周期测试，覆盖幂等释放、dispose 后读 API 可用、mutation/restore/subscription API 拒绝、active subscription 清理，以及 `IStateCollection<TKey,TItem>` 的 `IDisposable` 合同。
 
 ## 更新规则
 
