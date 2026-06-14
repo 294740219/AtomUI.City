@@ -37,11 +37,11 @@
 | Feature ID | 相关能力 | 测试文件 |
 | --- | --- | --- |
 | AUC-MVVM-001 | ViewModel Base | ViewModelBaseTests |
-| AUC-MVVM-002 | Activation | ActivationScopeTests |
+| AUC-MVVM-002 | Activation and Deactivation | ActivationScopeTests; DeactivationTests; ViewModelBaseTests |
 | AUC-MVVM-003 | Commands | CommandTests |
-| AUC-MVVM-004 | Deactivation | DeactivationTests |
-| AUC-MVVM-005 | Interactions | InteractionTests |
-| AUC-MVVM-006 | Validation | ValidationScopeTests |
+| AUC-MVVM-004 | Interactions | InteractionTests |
+| AUC-MVVM-005 | Validation | ValidationScopeTests |
+| AUC-MVVM-006 | Operation Scope | CommandTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -182,6 +182,10 @@ Mvvm 在其上补充框架行为：
 
 - 每次 async command 执行创建 OperationScope。
 - OperationScope 提供 cancellation token。
+- OperationScope 持有 Running 或终态 status、result、error 和 elapsed。
+- OperationScope 的 Complete、Cancel、Fail、Reject 首次终态胜出，重复终态返回同一个 OperationResult。
+- OperationScope 取消必须先提交 Canceled 状态，再通知 cancellation token callback。
+- OperationScope Dispose 取消未完成 operation，并在释放后拒绝 mutating API。
 - Command 错误进入 ErrorPolicy。
 - Command 状态可接入 Security 权限。
 - Command 状态可接入 Routing 状态。

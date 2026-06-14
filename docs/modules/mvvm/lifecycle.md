@@ -9,7 +9,8 @@ AtomUI.City.Mvvm 作为 Host 服务或模块贡献接入 Core 生命周期，必
 ## 模块特有状态机
 
 - ViewModel: Created -> Activating -> Active -> Deactivating -> Inactive -> Disposed
-- Command: Idle -> Executing -> Completed 或 Failed 或 Cancelled
+- Command: Idle -> Running -> Completed 或 Failed 或 Canceled 或 Rejected
+- OperationScope: Running -> Completed、Failed、Canceled 或 Rejected；首次终态胜出，Dispose 后保持只读结果。
 
 ## 生命周期流程
 
@@ -21,7 +22,7 @@ AtomUI.City.Mvvm 作为 Host 服务或模块贡献接入 Core 生命周期，必
 ## Host Shutdown / 执行结束行为
 
 - Host 停止时阻止新操作进入。
-- 取消未完成后台任务。
+- 取消未完成后台任务；OperationScope 必须先提交 Canceled 状态，再通知 operation token callback。
 - 从 leaf owner 到 root owner 释放资源。
 - 释放失败记录诊断并继续释放其他资源。
 

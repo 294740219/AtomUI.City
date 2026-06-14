@@ -6,4 +6,5 @@ public enum OperationStatus
     Failed,
     Canceled,
     Rejected,
+    Running,
 }

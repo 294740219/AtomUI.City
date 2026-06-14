@@ -86,11 +86,13 @@ AsyncRelayCommand
 OperationScope 负责：
 
 - 提供 CancellationToken。
+- 持有 operation id、Running 或终态 status、终态 result、error 和 elapsed。
 - 记录 Command 执行诊断。
 - 关联当前 ViewModel。
 - 关联当前 ActivationScope。
 - 记录执行耗时和结果。
 - 将错误交给 ErrorPolicy。
+- 在外部 token 取消时先提交 Canceled result，再通知执行体观察到 operation token 取消。
 
 执行流程：
 
@@ -102,6 +104,13 @@ CanExecute check
 -> Capture error or cancellation
 -> Dispose OperationScope
 ```
+
+终态规则：
+
+- `Complete`、`Cancel`、`Fail`、`Reject` 首次调用决定唯一终态。
+- 重复终态返回同一个 `OperationResult`，不改写 `Elapsed` 或 `Error`。
+- `Cancel` 和 active `Dispose` 都必须在取消 token callback 前提交 `Canceled` 状态。
+- `Dispose` 后 `Id`、`Status`、`Result`、`Error`、`Elapsed` 仍可读取，mutating API 抛 `ObjectDisposedException`。
 
 Command 失败不应导致 ViewModel 死亡。
 

@@ -41,7 +41,7 @@ public static class CommandFactory
         Action execute,
         CommandExecutionState state)
     {
-        var operation = OperationScope.Start(CancellationToken.None);
+        using var operation = OperationScope.Start(CancellationToken.None);
 
         if (!state.TryBegin(operation.CancellationToken))
         {
@@ -69,7 +69,7 @@ public static class CommandFactory
         using var linkedCancellationTokenSource = activationScope is null
             ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)
             : CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, activationScope.CancellationToken);
-        var operation = OperationScope.Start(linkedCancellationTokenSource.Token);
+        using var operation = OperationScope.Start(linkedCancellationTokenSource.Token);
 
         if (!state.TryBegin(operation.CancellationToken))
         {

@@ -157,6 +157,99 @@ public sealed class CommandTests
     }
 
     [Fact]
+    public void OperationScopeStartsRunningAndCompletesWithStableResult()
+    {
+        using var operation = OperationScope.Start(CancellationToken.None);
+
+        Assert.NotEqual(Guid.Empty, operation.Id);
+        Assert.Equal(OperationStatus.Running, operation.Status);
+        Assert.Null(operation.Result);
+        Assert.Null(operation.Error);
+        Assert.True(operation.Elapsed >= TimeSpan.Zero);
+
+        var result = operation.Complete();
+        var elapsed = operation.Elapsed;
+
+        Thread.Sleep(5);
+
+        Assert.Equal(OperationStatus.Completed, operation.Status);
+        Assert.Same(result, operation.Result);
+        Assert.Null(operation.Error);
+        Assert.Equal(result.Elapsed, operation.Elapsed);
+        Assert.Equal(elapsed, operation.Elapsed);
+    }
+
+    [Fact]
+    public void OperationScopeKeepsFirstTerminalResult()
+    {
+        using var operation = OperationScope.Start(CancellationToken.None);
+        var result = operation.Complete();
+
+        Assert.Same(result, operation.Fail(new InvalidOperationException("late")));
+        Assert.Same(result, operation.Cancel());
+        Assert.Same(result, operation.Reject());
+        Assert.Equal(OperationStatus.Completed, operation.Status);
+        Assert.Null(operation.Error);
+        Assert.Equal(result.Elapsed, operation.Elapsed);
+    }
+
+    [Fact]
+    public void OperationScopeMarksCanceledBeforeNotifyingCancellationCallbacks()
+    {
+        using var operation = OperationScope.Start(CancellationToken.None);
+        OperationStatus? observedStatus = null;
+        using var registration = operation.CancellationToken.Register(() =>
+        {
+            observedStatus = operation.Status;
+        });
+
+        var result = operation.Cancel();
+
+        Assert.Equal(OperationStatus.Canceled, result.Status);
+        Assert.Equal(OperationStatus.Canceled, observedStatus);
+        Assert.True(operation.CancellationToken.IsCancellationRequested);
+    }
+
+    [Fact]
+    public void OperationScopeLinksExternalCancellationAfterStateChange()
+    {
+        using var cancellation = new CancellationTokenSource();
+        using var operation = OperationScope.Start(cancellation.Token);
+        OperationStatus? observedStatus = null;
+        using var registration = operation.CancellationToken.Register(() =>
+        {
+            observedStatus = operation.Status;
+        });
+
+        cancellation.Cancel();
+
+        Assert.Equal(OperationStatus.Canceled, operation.Status);
+        Assert.Equal(OperationStatus.Canceled, operation.Result?.Status);
+        Assert.Equal(OperationStatus.Canceled, observedStatus);
+    }
+
+    [Fact]
+    public void OperationScopeDisposeCancelsActiveOperationAndRejectsMutation()
+    {
+        var operation = OperationScope.Start(CancellationToken.None);
+        OperationStatus? observedStatus = null;
+        using var registration = operation.CancellationToken.Register(() =>
+        {
+            observedStatus = operation.Status;
+        });
+
+        operation.Dispose();
+        operation.Dispose();
+
+        Assert.True(operation.IsDisposed);
+        Assert.Equal(OperationStatus.Canceled, operation.Status);
+        Assert.Equal(OperationStatus.Canceled, operation.Result?.Status);
+        Assert.Equal(OperationStatus.Canceled, observedStatus);
+        Assert.Throws<ObjectDisposedException>(() => operation.Complete());
+        Assert.Throws<ObjectDisposedException>(() => operation.Cancel());
+    }
+
+    [Fact]
     public void CommandGroupExecutesOnlyActiveCommands()
     {
         var firstCalls = 0;

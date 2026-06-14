@@ -11,7 +11,7 @@
 | AUC-MVVM-003 | Command Execution | Completed | CommandFactory, OperationScope, OperationResult | CommandTests |
 | AUC-MVVM-004 | Interaction Requests | Completed | Interaction<TRequest, TResult>, InteractionContext<TRequest> | InteractionTests |
 | AUC-MVVM-005 | Validation Model | Completed | ValidationScope, ValidationMessage, ValidationStatus | ValidationScopeTests |
-| AUC-MVVM-006 | Operation and Cancellation Scope | Ready to Start Product Implementation | OperationScope, CommandExecutionState | CommandTests |
+| AUC-MVVM-006 | Operation and Cancellation Scope | Completed | OperationScope, CommandExecutionState | CommandTests |
 
 ## Feature 硬门禁
 
@@ -103,12 +103,12 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-MVVM-006 Operation and Cancellation Scope
 
 Feature ID: `AUC-MVVM-006`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 为命令、激活、交互提供统一 operation 状态和取消边界。
 Public Contract: OperationScope, CommandExecutionState
-Runtime / Build Behavior: OperationScope 持有 operation id、状态、取消源和异常摘要；结束后只读。
-Failure Behavior: 重复 Complete/Fail/Cancel 按首次终态生效；Dispose 后不能启动新操作。
-Threading / Cancellation: 取消必须先标记状态再通知执行体，避免状态乱序。
+Runtime / Build Behavior: OperationScope 持有 operation id、Running 或终态 status、取消源、终态 result、error 和 elapsed；结束后只读。
+Failure Behavior: 重复 Complete/Fail/Cancel/Reject 按首次终态生效；Dispose 后 mutating API 抛 `ObjectDisposedException`。
+Threading / Cancellation: 取消先标记 Canceled 状态再通知执行体，避免状态乱序；外部 token 取消也通过 OperationScope 状态提交。
 Diagnostics: operation diagnostics 必须包含 operation id、status 和 elapsed。
 Tests: `CommandTests`
 Required Assertions: 断言状态转换、取消顺序、重复终态、耗时字段和资源释放。
