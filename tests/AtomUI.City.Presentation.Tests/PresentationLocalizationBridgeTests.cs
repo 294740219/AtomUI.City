@@ -29,7 +29,7 @@ public sealed class PresentationLocalizationBridgeTests
     }
 
     [Fact]
-    public async Task ApplyCultureAsyncStopsWhenApplierFails()
+    public async Task ApplyCultureAsyncReturnsFirstFailureAfterRunningRemainingAppliers()
     {
         var dispatcher = new RecordingDispatcher();
         var failing = new RecordingCultureApplier("failing", dispatcher)
@@ -38,15 +38,36 @@ public sealed class PresentationLocalizationBridgeTests
                 LocalizationErrorKind.PresentationApplyFailed,
                 "Resource dictionary apply failed."),
         };
-        var skipped = new RecordingCultureApplier("skipped", dispatcher);
-        var bridge = new PresentationLocalizationBridge(dispatcher, [failing, skipped]);
+        var next = new RecordingCultureApplier("next", dispatcher);
+        var bridge = new PresentationLocalizationBridge(dispatcher, [failing, next]);
 
         var result = await bridge.ApplyCultureAsync(State("en-US"));
 
         Assert.False(result.Succeeded);
         Assert.Equal(failing.Failure, result.Error);
         Assert.Equal(["failing:en-US"], failing.AppliedCultures);
-        Assert.Empty(skipped.AppliedCultures);
+        Assert.Equal(["next:en-US"], next.AppliedCultures);
+    }
+
+    [Fact]
+    public async Task ApplyCultureAsyncContinuesAfterApplierFailure()
+    {
+        var dispatcher = new RecordingDispatcher();
+        var failing = new RecordingCultureApplier("failing", dispatcher)
+        {
+            Failure = new LocalizationError(
+                LocalizationErrorKind.PresentationApplyFailed,
+                "Text binding refresh failed."),
+        };
+        var next = new RecordingCultureApplier("next", dispatcher);
+        var bridge = new PresentationLocalizationBridge(dispatcher, [failing, next]);
+
+        var result = await bridge.ApplyCultureAsync(State("en-US"));
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(failing.Failure, result.Error);
+        Assert.Equal(["failing:en-US"], failing.AppliedCultures);
+        Assert.Equal(["next:en-US"], next.AppliedCultures);
     }
 
     [Fact]
@@ -171,7 +192,10 @@ public sealed class PresentationLocalizationBridgeTests
                 record.Code == PresentationDiagnosticIds.ResourceDictionaryApplied &&
                 record.Severity == HostDiagnosticSeverity.Info &&
                 record.Message.Contains("zh-CN", StringComparison.Ordinal) &&
-                record.Message.Contains("Host.zh-CN", StringComparison.Ordinal));
+                record.Message.Contains("Host.zh-CN", StringComparison.Ordinal) &&
+                record.Context["culture"] == "zh-CN" &&
+                record.Context["packageIds"] == "Host.zh-CN, Orders.zh-CN" &&
+                record.Context["targetCount"] == "1");
     }
 
     [Fact]
@@ -196,7 +220,37 @@ public sealed class PresentationLocalizationBridgeTests
                 record.Code == PresentationDiagnosticIds.ResourceDictionaryApplyFailed &&
                 record.Severity == HostDiagnosticSeverity.Error &&
                 record.Message.Contains("zh-CN", StringComparison.Ordinal) &&
-                record.Message.Contains("Resource dictionary apply failed.", StringComparison.Ordinal));
+                record.Message.Contains("Resource dictionary apply failed.", StringComparison.Ordinal) &&
+                record.Context["culture"] == "zh-CN" &&
+                record.Context["errorKind"] == nameof(LocalizationErrorKind.PresentationApplyFailed));
+    }
+
+    [Fact]
+    public async Task ResourceDictionaryApplierContinuesAfterTargetFailure()
+    {
+        var diagnostics = new InMemoryHostDiagnostics();
+        var dispatcher = new RecordingDispatcher();
+        var failing = new RecordingResourceDictionaryTarget(dispatcher)
+        {
+            ApplyFailure = new LocalizationError(
+                LocalizationErrorKind.PresentationApplyFailed,
+                "Resource dictionary apply failed."),
+        };
+        var next = new RecordingResourceDictionaryTarget(dispatcher);
+        var applier = new CultureResourceDictionaryApplier([failing, next], diagnostics);
+
+        var result = await applier.ApplyCultureAsync(
+            State("zh-CN", loadedPackageIds: ["Host.zh-CN"]));
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(["zh-CN"], failing.AppliedCultures);
+        Assert.Equal(["zh-CN"], next.AppliedCultures);
+        Assert.Contains(
+            diagnostics.Records,
+            record =>
+                record.Code == PresentationDiagnosticIds.ResourceDictionaryApplyFailed &&
+                record.Context["culture"] == "zh-CN" &&
+                record.Context["targetCount"] == "2");
     }
 
     [Fact]
@@ -247,7 +301,10 @@ public sealed class PresentationLocalizationBridgeTests
                 record.Code == PresentationDiagnosticIds.ResourceDictionaryRevoked &&
                 record.Severity == HostDiagnosticSeverity.Info &&
                 record.Message.Contains("plugin.orders", StringComparison.Ordinal) &&
-                record.Message.Contains("plugin.orders.resources", StringComparison.Ordinal));
+                record.Message.Contains("plugin.orders.resources", StringComparison.Ordinal) &&
+                record.Context["pluginId"] == "plugin.orders" &&
+                record.Context["contributionId"] == "plugin.orders.resources" &&
+                record.Context["targetCount"] == "1");
     }
 
     [Fact]
@@ -277,7 +334,43 @@ public sealed class PresentationLocalizationBridgeTests
                 record.Code == PresentationDiagnosticIds.ResourceDictionaryRevokeFailed &&
                 record.Severity == HostDiagnosticSeverity.Error &&
                 record.Message.Contains("plugin.orders", StringComparison.Ordinal) &&
-                record.Message.Contains("Resource dictionary revoke failed.", StringComparison.Ordinal));
+                record.Message.Contains("Resource dictionary revoke failed.", StringComparison.Ordinal) &&
+                record.Context["pluginId"] == "plugin.orders" &&
+                record.Context["contributionId"] == "plugin.orders.resources" &&
+                record.Context["errorKind"] == nameof(LocalizationErrorKind.PresentationApplyFailed));
+    }
+
+    [Fact]
+    public async Task ResourceDictionaryRevokerContinuesAfterTargetFailure()
+    {
+        var diagnostics = new InMemoryHostDiagnostics();
+        var dispatcher = new RecordingDispatcher();
+        var failing = new RecordingResourceDictionaryTarget(dispatcher)
+        {
+            RevokeFailure = new LocalizationError(
+                LocalizationErrorKind.PresentationApplyFailed,
+                "Resource dictionary revoke failed."),
+        };
+        var next = new RecordingResourceDictionaryTarget(dispatcher);
+        var revoker = new PresentationResourceDictionaryRevoker(
+            dispatcher,
+            [failing, next],
+            diagnostics);
+
+        var result = await revoker.RevokeAsync(
+            new PresentationResourceDictionaryRevocation(
+                "plugin.orders",
+                contributionId: "plugin.orders.resources"));
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(["plugin.orders"], failing.RevokedPluginIds);
+        Assert.Equal(["plugin.orders"], next.RevokedPluginIds);
+        Assert.Contains(
+            diagnostics.Records,
+            record =>
+                record.Code == PresentationDiagnosticIds.ResourceDictionaryRevokeFailed &&
+                record.Context["pluginId"] == "plugin.orders" &&
+                record.Context["targetCount"] == "2");
     }
 
     private static CultureState State(

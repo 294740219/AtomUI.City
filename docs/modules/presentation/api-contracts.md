@@ -26,6 +26,9 @@
 | VisualLifecycleHub.Notify | 发布 attach/detach/focus/visibility 等 visual 事件。 | view 不得为 null；VisualLifecycleEventKind 必须是声明值。 | void。 | handler 失败被隔离并诊断，不阻断后续 handler，不破坏 VisualTree。 | 同步 API 无 token；由 UI 捕获方保证 dispatcher 边界。 | 按 UI 捕获顺序和订阅顺序发布；unsubscribe 后不再接收事件。 |
 | InteractionHandlerRegistry.HandleAsync | 把 MVVM interaction request 交给当前 handler。 | request、result type 和 token。 | InteractionResult。 | 无 handler 返回 NotHandled；handler 异常返回 Failed；handler owner 撤销后不再调用。 | 预取消不调用 handler；运行中 owner revoke 或 activation scope dispose 返回 Canceled。 | 同 key 使用最后注册且未释放的 handler；plugin/contribution revoke 幂等移除。 |
 | ValidationVisualStateBinding.ApplyAsync | 把 ValidationScope snapshot 应用到 UI target。 | ValidationScope、IValidationVisualStateTarget 和 token。 | ValueTask。 | target apply 失败原样传播并记录诊断；disposed target 失败不吞掉。 | 预取消不调用 target 且不记录失败诊断。 | 每次 Apply 使用新的 immutable snapshot，target 接收消息变化。 |
+| PresentationLocalizationBridge.ApplyCultureAsync | 把 culture state 应用到 Presentation appliers。 | CultureState 和 token。 | LocalizationResult。 | 局部 applier 失败不会阻断后续 applier；返回首个失败。 | dispatcher work 前和每个 applier 前观察取消。 | applier 按注册顺序执行。 |
+| PresentationResourceRegistry.Register / Revoke | 注册和撤销 Presentation resource contribution。 | contribution、plugin id 或 contribution id。 | lease 或 revoked count。 | 单个 resource dispose 失败记录诊断并继续撤销其他资源。 | 同步 API 无 token。 | lease dispose 幂等；Contributions snapshot 不可外部修改。 |
+| PresentationResourceDictionaryRevoker.RevokeAsync | 插件卸载或贡献撤销时撤销 resource dictionary target。 | revocation 和 token。 | LocalizationResult。 | 局部 target 失败不会阻断后续 target；返回首个失败。 | dispatcher work 前和每个 target 前观察取消。 | target 按注册顺序执行。 |
 | PresentationPluginUnloadCoordinator.CoordinateAsync | 插件卸载前撤销 UI contribution。 | plugin id 和 unload request。 | PresentationPluginUnloadResult。 | active view 拒绝关闭或资源撤销失败时阻止 unload。 | 必须观察 token。 | 同一 plugin unload 串行且幂等。 |
 
 ## Public 类型覆盖

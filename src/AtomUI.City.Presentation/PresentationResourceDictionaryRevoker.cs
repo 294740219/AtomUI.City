@@ -48,14 +48,29 @@ public sealed class PresentationResourceDictionaryRevoker : IPresentationResourc
                         {
                             dispatcherCancellationToken.ThrowIfCancellationRequested();
 
-                            var revokeResult = await target
-                                .RevokeResourcesAsync(revocation, dispatcherCancellationToken)
-                                .ConfigureAwait(false);
-
-                            if (!revokeResult.Succeeded)
+                            try
                             {
-                                result = revokeResult;
-                                return;
+                                var revokeResult = await target
+                                    .RevokeResourcesAsync(revocation, dispatcherCancellationToken)
+                                    .ConfigureAwait(false);
+
+                                if (!revokeResult.Succeeded && result.Succeeded)
+                                {
+                                    result = revokeResult;
+                                }
+                            }
+                            catch (OperationCanceledException)
+                                when (dispatcherCancellationToken.IsCancellationRequested)
+                            {
+                                throw;
+                            }
+                            catch (Exception exception) when (result.Succeeded)
+                            {
+                                result = LocalizationResult.Failed(
+                                    new LocalizationError(
+                                        LocalizationErrorKind.PresentationApplyFailed,
+                                        "Presentation resource dictionary revoke failed.",
+                                        exception));
                             }
                         }
                     },
@@ -89,7 +104,10 @@ public sealed class PresentationResourceDictionaryRevoker : IPresentationResourc
             _diagnostics?.Write(new HostDiagnosticRecord(
                 PresentationDiagnosticIds.ResourceDictionaryRevoked,
                 $"Presentation resource dictionary revoked plugin '{revocation.PluginId}' contribution '{NormalizeContributionId(revocation.ContributionId)}'.",
-                HostDiagnosticSeverity.Info));
+                HostDiagnosticSeverity.Info)
+            {
+                Context = CreateDiagnosticContext(revocation, result),
+            });
 
             return;
         }
@@ -97,7 +115,24 @@ public sealed class PresentationResourceDictionaryRevoker : IPresentationResourc
         _diagnostics?.Write(new HostDiagnosticRecord(
             PresentationDiagnosticIds.ResourceDictionaryRevokeFailed,
             $"Presentation resource dictionary failed to revoke plugin '{revocation.PluginId}' contribution '{NormalizeContributionId(revocation.ContributionId)}': {result.Error?.Message}",
-            HostDiagnosticSeverity.Error));
+            HostDiagnosticSeverity.Error)
+        {
+            Context = CreateDiagnosticContext(revocation, result),
+        });
+    }
+
+    private IReadOnlyDictionary<string, string?> CreateDiagnosticContext(
+        PresentationResourceDictionaryRevocation revocation,
+        LocalizationResult result)
+    {
+        return new Dictionary<string, string?>(StringComparer.Ordinal)
+        {
+            ["pluginId"] = revocation.PluginId,
+            ["contributionId"] = revocation.ContributionId,
+            ["targetCount"] = _targets.Count.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["errorKind"] = result.Error?.Kind.ToString(),
+            ["error"] = result.Error?.Exception?.GetType().FullName,
+        };
     }
 
     private static string NormalizeContributionId(string? contributionId)

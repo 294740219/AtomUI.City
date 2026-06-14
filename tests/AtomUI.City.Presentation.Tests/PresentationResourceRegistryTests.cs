@@ -39,7 +39,11 @@ public sealed class PresentationResourceRegistryTests
                 record.Code == PresentationDiagnosticIds.ResourceContributionRegistered &&
                 record.Severity == HostDiagnosticSeverity.Info &&
                 record.Message.Contains("com.company.sales", StringComparison.Ordinal) &&
-                record.Message.Contains("sales.style", StringComparison.Ordinal));
+                record.Message.Contains("sales.style", StringComparison.Ordinal) &&
+                record.Context["kind"] == "style" &&
+                record.Context["pluginId"] == "com.company.sales" &&
+                record.Context["contributionId"] == "sales.style" &&
+                record.Context["resourceType"] == typeof(DisposableResource).FullName);
 
         lease.Dispose();
 
@@ -50,7 +54,10 @@ public sealed class PresentationResourceRegistryTests
             record =>
                 record.Code == PresentationDiagnosticIds.ResourceContributionRevoked &&
                 record.Severity == HostDiagnosticSeverity.Info &&
-                record.Message.Contains("sales.style", StringComparison.Ordinal));
+                record.Message.Contains("sales.style", StringComparison.Ordinal) &&
+                record.Context["kind"] == "style" &&
+                record.Context["pluginId"] == "com.company.sales" &&
+                record.Context["contributionId"] == "sales.style");
     }
 
     [Fact]
@@ -135,7 +142,11 @@ public sealed class PresentationResourceRegistryTests
             record =>
                 record.Code == PresentationDiagnosticIds.ResourceContributionRevokeFailed &&
                 record.Severity == HostDiagnosticSeverity.Error &&
-                record.Message.Contains("resource dispose failed", StringComparison.Ordinal));
+                record.Message.Contains("resource dispose failed", StringComparison.Ordinal) &&
+                record.Context["kind"] == "style" &&
+                record.Context["pluginId"] == "com.company.sales" &&
+                record.Context["contributionId"] == "sales.failing" &&
+                record.Context["error"] == typeof(InvalidOperationException).FullName);
     }
 
     private sealed class DisposableResource : IDisposable

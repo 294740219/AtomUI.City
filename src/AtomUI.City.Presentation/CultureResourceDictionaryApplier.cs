@@ -29,26 +29,48 @@ public sealed class CultureResourceDictionaryApplier : IPresentationCultureAppli
     {
         ArgumentNullException.ThrowIfNull(state);
 
+        var result = LocalizationResult.Success();
+
         foreach (var target in _targets)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var result = await target
-                .ApplyResourcesAsync(state, cancellationToken)
-                .ConfigureAwait(false);
-
-            if (!result.Succeeded)
+            try
             {
-                WriteApplyFailedDiagnostic(state, result);
+                var targetResult = await target
+                    .ApplyResourcesAsync(state, cancellationToken)
+                    .ConfigureAwait(false);
 
-                return result;
+                if (!targetResult.Succeeded && result.Succeeded)
+                {
+                    result = targetResult;
+                }
+            }
+            catch (OperationCanceledException)
+                when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception) when (result.Succeeded)
+            {
+                result = LocalizationResult.Failed(
+                    new LocalizationError(
+                        LocalizationErrorKind.PresentationApplyFailed,
+                        "Presentation resource dictionary apply failed.",
+                        exception));
             }
         }
 
-        var success = LocalizationResult.Success();
-        WriteAppliedDiagnostic(state);
+        if (result.Succeeded)
+        {
+            WriteAppliedDiagnostic(state);
+        }
+        else
+        {
+            WriteApplyFailedDiagnostic(state, result);
+        }
 
-        return success;
+        return result;
     }
 
     private void WriteAppliedDiagnostic(CultureState state)
@@ -56,7 +78,10 @@ public sealed class CultureResourceDictionaryApplier : IPresentationCultureAppli
         _diagnostics?.Write(new HostDiagnosticRecord(
             PresentationDiagnosticIds.ResourceDictionaryApplied,
             $"Presentation resource dictionary applied culture '{state.CurrentCulture.Name}' with packages '{FormatPackageIds(state.LoadedPackageIds)}'.",
-            HostDiagnosticSeverity.Info));
+            HostDiagnosticSeverity.Info)
+        {
+            Context = CreateDiagnosticContext(state, result: null),
+        });
     }
 
     private void WriteApplyFailedDiagnostic(
@@ -66,7 +91,25 @@ public sealed class CultureResourceDictionaryApplier : IPresentationCultureAppli
         _diagnostics?.Write(new HostDiagnosticRecord(
             PresentationDiagnosticIds.ResourceDictionaryApplyFailed,
             $"Presentation resource dictionary failed to apply culture '{state.CurrentCulture.Name}' with packages '{FormatPackageIds(state.LoadedPackageIds)}': {result.Error?.Message}",
-            HostDiagnosticSeverity.Error));
+            HostDiagnosticSeverity.Error)
+        {
+            Context = CreateDiagnosticContext(state, result),
+        });
+    }
+
+    private IReadOnlyDictionary<string, string?> CreateDiagnosticContext(
+        CultureState state,
+        LocalizationResult? result)
+    {
+        return new Dictionary<string, string?>(StringComparer.Ordinal)
+        {
+            ["culture"] = state.CurrentCulture.Name,
+            ["uiCulture"] = state.CurrentUICulture.Name,
+            ["packageIds"] = FormatPackageIds(state.LoadedPackageIds),
+            ["targetCount"] = _targets.Count.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["errorKind"] = result?.Error?.Kind.ToString(),
+            ["error"] = result?.Error?.Exception?.GetType().FullName,
+        };
     }
 
     private static string FormatPackageIds(IReadOnlyList<string> packageIds)

@@ -114,7 +114,10 @@ public sealed class PresentationResourceRegistry : IPresentationResourceRegistry
         _diagnostics?.Write(new HostDiagnosticRecord(
             PresentationDiagnosticIds.ResourceContributionRegistered,
             $"Presentation resource contribution registered kind '{contribution.Kind}' plugin '{Normalize(contribution.PluginId)}' contribution '{Normalize(contribution.ContributionId)}'.",
-            HostDiagnosticSeverity.Info));
+            HostDiagnosticSeverity.Info)
+        {
+            Context = CreateDiagnosticContext(contribution, exception: null),
+        });
     }
 
     private void WriteRevokedDiagnostic(PresentationResourceContribution contribution)
@@ -122,7 +125,10 @@ public sealed class PresentationResourceRegistry : IPresentationResourceRegistry
         _diagnostics?.Write(new HostDiagnosticRecord(
             PresentationDiagnosticIds.ResourceContributionRevoked,
             $"Presentation resource contribution revoked kind '{contribution.Kind}' plugin '{Normalize(contribution.PluginId)}' contribution '{Normalize(contribution.ContributionId)}'.",
-            HostDiagnosticSeverity.Info));
+            HostDiagnosticSeverity.Info)
+        {
+            Context = CreateDiagnosticContext(contribution, exception: null),
+        });
     }
 
     private void WriteRevokeFailedDiagnostic(
@@ -132,7 +138,24 @@ public sealed class PresentationResourceRegistry : IPresentationResourceRegistry
         _diagnostics?.Write(new HostDiagnosticRecord(
             PresentationDiagnosticIds.ResourceContributionRevokeFailed,
             $"Presentation resource contribution failed to revoke kind '{contribution.Kind}' plugin '{Normalize(contribution.PluginId)}' contribution '{Normalize(contribution.ContributionId)}': {exception.Message}",
-            HostDiagnosticSeverity.Error));
+            HostDiagnosticSeverity.Error)
+        {
+            Context = CreateDiagnosticContext(contribution, exception),
+        });
+    }
+
+    private static IReadOnlyDictionary<string, string?> CreateDiagnosticContext(
+        PresentationResourceContribution contribution,
+        Exception? exception)
+    {
+        return new Dictionary<string, string?>(StringComparer.Ordinal)
+        {
+            ["kind"] = contribution.Kind,
+            ["pluginId"] = contribution.PluginId,
+            ["contributionId"] = contribution.ContributionId,
+            ["resourceType"] = contribution.Resource.GetType().FullName,
+            ["error"] = exception?.GetType().FullName,
+        };
     }
 
     private static string Normalize(string? value)

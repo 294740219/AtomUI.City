@@ -37,14 +37,29 @@ public sealed class PresentationLocalizationBridge : IPresentationLocalizationBr
                         {
                             dispatcherCancellationToken.ThrowIfCancellationRequested();
 
-                            var applyResult = await applier
-                                .ApplyCultureAsync(state, dispatcherCancellationToken)
-                                .ConfigureAwait(false);
-
-                            if (!applyResult.Succeeded)
+                            try
                             {
-                                result = applyResult;
-                                return;
+                                var applyResult = await applier
+                                    .ApplyCultureAsync(state, dispatcherCancellationToken)
+                                    .ConfigureAwait(false);
+
+                                if (!applyResult.Succeeded && result.Succeeded)
+                                {
+                                    result = applyResult;
+                                }
+                            }
+                            catch (OperationCanceledException)
+                                when (dispatcherCancellationToken.IsCancellationRequested)
+                            {
+                                throw;
+                            }
+                            catch (Exception exception) when (result.Succeeded)
+                            {
+                                result = LocalizationResult.Failed(
+                                    new LocalizationError(
+                                        LocalizationErrorKind.PresentationApplyFailed,
+                                        "Presentation culture apply failed.",
+                                        exception));
                             }
                         }
                     },

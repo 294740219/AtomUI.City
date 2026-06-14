@@ -14,6 +14,8 @@
 - `VisualLifecycleEventKind` 的 Attached、Detached、Loaded、Unloaded、Focused、Unfocused、Visible、Hidden 值，以及 `VisualLifecycleHub` 的订阅顺序、失败隔离和 `VisualLifecycleAdapter*` 诊断上下文字段属于 1.0 兼容 contract。
 - `InteractionHandlerRegistry` 的最后注册 handler 选择、plugin/contribution revoke、预取消不调用 handler、owner revoke 取消 pending interaction 和 `Interaction*` 诊断上下文字段属于 1.0 兼容 contract。
 - `ValidationVisualStateBinding` 的 immutable snapshot、消息变化重新应用、预取消不调用 target、target 释放失败传播和 `ValidationVisualState*` 诊断上下文字段属于 1.0 兼容 contract。
+- `PresentationLocalizationBridge`、`CultureResourceDictionaryApplier` 和 `PresentationResourceDictionaryRevoker` 的局部失败隔离、返回首个失败、dispatcher 执行和 `ResourceDictionary*` 诊断上下文字段属于 1.0 兼容 contract。
+- `PresentationResourceRegistry` 的 resource lease、plugin/contribution revoke、dispose 失败继续撤销其他资源和 `ResourceContribution*` 诊断上下文字段属于 1.0 兼容 contract。
 - 插件 View、resource dictionary、localized binding 必须绑定 plugin lease。
 - VisualTree 变化必须反馈到 ViewModel/State。
 

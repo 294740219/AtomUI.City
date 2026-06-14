@@ -12,7 +12,7 @@
 | AUC-PRESENTATION-004 | Route Outlet Commit | 已实现并通过产品合同测试 | IRouteOutlet, RouteOutlet, RouteOutletCommitResult | RouteOutletTests |
 | AUC-PRESENTATION-005 | Visual Lifecycle Feedback | 已实现并通过产品合同测试 | VisualLifecycleHub, VisualLifecycleEvent | VisualFeedbackTests |
 | AUC-PRESENTATION-006 | Interaction and Validation Bridge | 已实现并通过产品合同测试 | InteractionHandlerRegistry, ValidationVisualStateBinding | PresentationInteractionHandlerTests; ValidationVisualStateBindingTests |
-| AUC-PRESENTATION-007 | Localization and Resource Bridge | Ready to Start Product Implementation | PresentationLocalizationBridge, PresentationResourceRegistry | PresentationLocalizationBridgeTests; PresentationResourceRegistryTests |
+| AUC-PRESENTATION-007 | Localization and Resource Bridge | 已实现并通过产品合同测试 | PresentationLocalizationBridge, PresentationResourceRegistry | PresentationLocalizationBridgeTests; PresentationResourceRegistryTests |
 | AUC-PRESENTATION-008 | Plugin UI Unload Coordination | Ready to Start Product Implementation | ActivePluginViewRegistry, PresentationPluginUnloadCoordinator | ActivePluginViewRegistryTests; PresentationPluginUnloadCoordinatorTests |
 
 ## Feature 硬门禁
@@ -119,13 +119,13 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-PRESENTATION-007 Localization and Resource Bridge
 
 Feature ID: `AUC-PRESENTATION-007`
-Status: Ready to Start Product Implementation
+Status: 已实现并通过产品合同测试
 Goal: 把 Localization culture 变化同步到 AtomUI/Avalonia 资源和文本绑定。
 Public Contract: PresentationLocalizationBridge, PresentationResourceRegistry
-Runtime / Build Behavior: culture change 批量刷新 text binding、flow direction 和 resource dictionary；资源绑定 owner 可撤销。
-Failure Behavior: 语言包缺失、resource dictionary 加载失败、target 已释放必须诊断并继续刷新其他 target。
-Threading / Cancellation: 刷新在 UI dispatcher 执行；后台语言包加载完成后再 marshal。
-Diagnostics: localization bridge diagnostics 必须包含 culture、resource key 和 target type。
+Runtime / Build Behavior: culture change 批量刷新 text binding、flow direction 和 resource dictionary；resource contribution 通过 lease 绑定 plugin/contribution owner 并可撤销。
+Failure Behavior: 语言包缺失或 resource dictionary 加载失败按 LocalizationResult 返回；局部 applier/target/resource dispose 失败必须诊断并继续刷新或撤销其他 target。
+Threading / Cancellation: 刷新和撤销在 UI dispatcher 执行；dispatcher work 前和每个 applier/target 前观察取消。
+Diagnostics: localization/resource diagnostics 包含 culture、UI culture、package ids、plugin id、contribution id、target count、resource type 和 error。
 Tests: `PresentationLocalizationBridgeTests; PresentationResourceRegistryTests`
 Required Assertions: 断言 culture 切换、fallback、resource revoke、插件资源卸载和局部失败隔离。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
