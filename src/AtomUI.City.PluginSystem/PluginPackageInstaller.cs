@@ -14,20 +14,22 @@ public sealed class PluginPackageInstaller
         ArgumentException.ThrowIfNullOrWhiteSpace(pluginsRoot);
         cancellationToken.ThrowIfCancellationRequested();
 
+        var normalizedPackageRoot = Path.GetFullPath(packageRoot);
+        var normalizedPluginsRoot = Path.GetFullPath(pluginsRoot);
         var stagingRoot = Path.Combine(
-            pluginsRoot,
+            normalizedPluginsRoot,
             PluginPackagePaths.StagingDirectoryName,
             Guid.NewGuid().ToString("N"));
         var extractRoot = Path.Combine(stagingRoot, "extract");
 
         try
         {
-            CopyDirectory(packageRoot, extractRoot);
+            CopyDirectory(normalizedPackageRoot, extractRoot);
 
             return await InstallFromExtractedRootAsync(
                     extractRoot,
                     stagingRoot,
-                    pluginsRoot,
+                    normalizedPluginsRoot,
                     cancellationToken)
                 .ConfigureAwait(false);
         }
@@ -47,8 +49,10 @@ public sealed class PluginPackageInstaller
         ArgumentException.ThrowIfNullOrWhiteSpace(pluginsRoot);
         cancellationToken.ThrowIfCancellationRequested();
 
+        var normalizedPackagePath = Path.GetFullPath(packagePath);
+        var normalizedPluginsRoot = Path.GetFullPath(pluginsRoot);
         var stagingRoot = Path.Combine(
-            pluginsRoot,
+            normalizedPluginsRoot,
             PluginPackagePaths.StagingDirectoryName,
             Guid.NewGuid().ToString("N"));
         var extractRoot = Path.Combine(stagingRoot, "extract");
@@ -56,7 +60,7 @@ public sealed class PluginPackageInstaller
 
         try
         {
-            ZipFile.ExtractToDirectory(packagePath, extractRoot);
+            ZipFile.ExtractToDirectory(normalizedPackagePath, extractRoot);
         }
         catch (Exception exception) when (exception is InvalidDataException or IOException or UnauthorizedAccessException)
         {
@@ -66,8 +70,8 @@ public sealed class PluginPackageInstaller
                 [
                     new PluginDiagnostic(
                         PluginDiagnosticIds.PackageExtractionFailed,
-                        $"Plugin package '{packagePath}' extraction failed: {exception.Message}",
-                        Path: packagePath),
+                        $"Plugin package '{normalizedPackagePath}' extraction failed: {exception.Message}",
+                        Path: normalizedPackagePath),
                 ]);
         }
 
@@ -76,7 +80,7 @@ public sealed class PluginPackageInstaller
             return await InstallFromExtractedRootAsync(
                     extractRoot,
                     stagingRoot,
-                    pluginsRoot,
+                    normalizedPluginsRoot,
                     cancellationToken)
                 .ConfigureAwait(false);
         }

@@ -173,6 +173,7 @@ Resolve package source
 - 验证失败不能写入 `installed`。
 - `staging` 目录中的内容不能被加载。
 - 移动到 `installed` 应尽可能使用原子目录移动。
+- `pluginsRoot`、package path 和 install record 中的 `RootPath`/`ManifestPath` 必须规范化。
 - 锁定文件更新必须在文件落盘后执行。
 - 安装成功不等于启用成功。
 

@@ -8,7 +8,7 @@
 | --- | --- | --- | --- | --- |
 | AUC-PLUGIN-001 | Plugin Metadata | Completed | PluginAttribute, PluginManifest, PluginDescriptor | PluginDeclarationAttributeTests; PluginManifestTests |
 | AUC-PLUGIN-002 | Dependency Validation | Completed | PluginDependencyValidator, PluginSemanticVersion | PluginDependencyTests |
-| AUC-PLUGIN-003 | Package Installation | Ready to Start Product Implementation | PluginPackageInstaller, PluginInstallationReader, PluginPackagePaths | PluginPackageTests |
+| AUC-PLUGIN-003 | Package Installation | Completed | PluginPackageInstaller, PluginInstallationReader, PluginPackagePaths | PluginPackageTests |
 | AUC-PLUGIN-004 | Discovery | Ready to Start Product Implementation | PluginDiscoveryScanner | PluginLoadingTests |
 | AUC-PLUGIN-005 | Loading | Ready to Start Product Implementation | PluginLoader, PluginLoadResult | PluginLoadingTests |
 | AUC-PLUGIN-006 | MSBuild Contract | Ready to Start Product Implementation | PluginMsBuildContract | PluginMsBuildContractTests |
@@ -63,15 +63,15 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-PLUGIN-003 Package Installation
 
 Feature ID: `AUC-PLUGIN-003`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 安装包布局、staging、installed、rollback。
 Public Contract: PluginPackageInstaller, PluginInstallationReader, PluginPackagePaths
-Runtime / Build Behavior: 安装包布局、staging、installed、rollback。
-Failure Behavior: 路径穿越、包布局缺失、重复安装、取消。
+Runtime / Build Behavior: 安装包布局、staging、installed、install record 和规范化安装路径。
+Failure Behavior: 路径穿越、包布局缺失、重复安装、取消、解压失败。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `PluginPackageTests`。
-Required Assertions: 断言 staging cleanup、installed record、path normalization。
+Required Assertions: 断言 staging cleanup、installed record、path normalization、取消和解压失败。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 ## AUC-PLUGIN-004 Discovery
 

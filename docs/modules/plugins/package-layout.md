@@ -145,6 +145,7 @@ plugins/
 - Host 只从 `root` 加载插件程序集和资源。
 - `install.json` 不放在 `root` 内，避免被插件当作自身资源写入。
 - 安装目录完成后不可变。
+- `install.json` 中的 `rootPath` 和 `manifestPath` 必须是规范化路径。
 
 ### 5. 资源布局
 

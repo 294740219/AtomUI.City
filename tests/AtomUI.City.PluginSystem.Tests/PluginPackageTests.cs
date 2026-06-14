@@ -96,6 +96,33 @@ public sealed class PluginPackageTests
     }
 
     [Fact]
+    public async Task InstallerNormalizesInstalledRecordPaths()
+    {
+        using var workspace = new PluginTestWorkspace();
+        workspace.WriteStandardManifest();
+        workspace.CopyMainAssembly("Company.Sales.Plugin.dll");
+        var pluginsRoot = Path.Combine(workspace.Temp, "plugins", "..", "plugins");
+        var normalizedPluginsRoot = Path.GetFullPath(pluginsRoot);
+        Directory.CreateDirectory(normalizedPluginsRoot);
+        var installer = new PluginPackageInstaller();
+
+        var result = await installer.InstallFromDirectoryAsync(workspace.Root, pluginsRoot);
+
+        Assert.True(result.Succeeded);
+        Assert.NotNull(result.Installation);
+        var expectedRootPath = Path.Combine(
+            normalizedPluginsRoot,
+            "installed",
+            "com.company.sales",
+            "1.0.0",
+            "root");
+        Assert.Equal(expectedRootPath, result.Installation.RootPath);
+        Assert.Equal(
+            Path.Combine(expectedRootPath, "atomui-city", "plugin.json"),
+            result.Installation.ManifestPath);
+    }
+
+    [Fact]
     public async Task InstallationReaderReadsInstallRecord()
     {
         using var workspace = new PluginTestWorkspace();
