@@ -54,8 +54,6 @@ public sealed class VisualLifecycleHub
             catch (Exception exception)
             {
                 WriteAdapterFailedDiagnostic(lifecycleEvent, exception);
-
-                throw;
             }
         }
     }
@@ -73,7 +71,10 @@ public sealed class VisualLifecycleHub
         _diagnostics?.Write(new HostDiagnosticRecord(
             PresentationDiagnosticIds.VisualLifecycleAdapterExecuted,
             $"Visual lifecycle adapter handled {lifecycleEvent.Kind} for view '{lifecycleEvent.View.GetType().FullName}'.",
-            HostDiagnosticSeverity.Info));
+            HostDiagnosticSeverity.Info)
+        {
+            Context = CreateDiagnosticContext(lifecycleEvent, exception: null),
+        });
     }
 
     private void WriteAdapterFailedDiagnostic(
@@ -83,7 +84,28 @@ public sealed class VisualLifecycleHub
         _diagnostics?.Write(new HostDiagnosticRecord(
             PresentationDiagnosticIds.VisualLifecycleAdapterFailed,
             $"Visual lifecycle adapter failed while handling {lifecycleEvent.Kind} for view '{lifecycleEvent.View.GetType().FullName}': {exception.Message}",
-            HostDiagnosticSeverity.Error));
+            HostDiagnosticSeverity.Error)
+        {
+            Context = CreateDiagnosticContext(lifecycleEvent, exception),
+        });
+    }
+
+    private static IReadOnlyDictionary<string, string?> CreateDiagnosticContext(
+        VisualLifecycleEvent lifecycleEvent,
+        Exception? exception)
+    {
+        var viewType = lifecycleEvent.View.GetType();
+        var viewModel = lifecycleEvent.View is IViewDataContextAware dataContextAware
+            ? dataContextAware.DataContext
+            : null;
+
+        return new Dictionary<string, string?>(StringComparer.Ordinal)
+        {
+            ["viewType"] = viewType.FullName,
+            ["viewModelType"] = viewModel?.GetType().FullName,
+            ["eventKind"] = lifecycleEvent.Kind.ToString(),
+            ["error"] = exception?.GetType().FullName,
+        };
     }
 
     private sealed class Subscription : IDisposable

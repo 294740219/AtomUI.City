@@ -10,7 +10,7 @@
 | AUC-PRESENTATION-002 | View Registry and Locator | 已实现并通过产品合同测试 | ViewRegistry, IViewLocator, ViewForAttribute | ViewLocatorTests |
 | AUC-PRESENTATION-003 | View Factory and Binding | 已实现并通过产品合同测试 | ViewFactory, ViewBinder, BoundViewHandle | ViewBindingTests |
 | AUC-PRESENTATION-004 | Route Outlet Commit | 已实现并通过产品合同测试 | IRouteOutlet, RouteOutlet, RouteOutletCommitResult | RouteOutletTests |
-| AUC-PRESENTATION-005 | Visual Lifecycle Feedback | Ready to Start Product Implementation | VisualLifecycleHub, VisualLifecycleEvent | VisualFeedbackTests |
+| AUC-PRESENTATION-005 | Visual Lifecycle Feedback | 已实现并通过产品合同测试 | VisualLifecycleHub, VisualLifecycleEvent | VisualFeedbackTests |
 | AUC-PRESENTATION-006 | Interaction and Validation Bridge | Ready to Start Product Implementation | InteractionHandlerRegistry, ValidationVisualStateBinding | PresentationInteractionHandlerTests; ValidationVisualStateBindingTests |
 | AUC-PRESENTATION-007 | Localization and Resource Bridge | Ready to Start Product Implementation | PresentationLocalizationBridge, PresentationResourceRegistry | PresentationLocalizationBridgeTests; PresentationResourceRegistryTests |
 | AUC-PRESENTATION-008 | Plugin UI Unload Coordination | Ready to Start Product Implementation | ActivePluginViewRegistry, PresentationPluginUnloadCoordinator | ActivePluginViewRegistryTests; PresentationPluginUnloadCoordinatorTests |
@@ -91,13 +91,13 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-PRESENTATION-005 Visual Lifecycle Feedback
 
 Feature ID: `AUC-PRESENTATION-005`
-Status: Ready to Start Product Implementation
+Status: 已实现并通过产品合同测试
 Goal: 把 VisualTree attach/detach/focus/visibility 变化反馈给 ViewModel、State 或 EventBus。
 Public Contract: VisualLifecycleHub, VisualLifecycleEvent, UiStateFeedbackPolicy
-Runtime / Build Behavior: Visual 变化统一发布为 lifecycle event；策略决定反馈到 ViewModel activation、State 或 event。
-Failure Behavior: 未知 visual、重复 detach、反馈 handler 失败不得破坏 VisualTree。
-Threading / Cancellation: visual event 必须在 UI dispatcher 捕获；后台消费者通过调度策略接收。
-Diagnostics: visual feedback diagnostics 必须包含 event kind、view type 和 target ViewModel。
+Runtime / Build Behavior: Visual 变化统一发布为 lifecycle event；attach、detach、load、unload、focus 和 visibility 事件保留通知顺序；策略决定哪些 UI state feedback 可以进入 ViewModel。
+Failure Behavior: 反馈 handler 失败被隔离并写入诊断，不阻断后续 handler，不破坏 VisualTree。
+Threading / Cancellation: visual event 必须在 UI dispatcher 捕获；同步发布无 token，异步消费者由上层调度策略承接。
+Diagnostics: visual feedback diagnostics 包含 event kind、view type、target ViewModel type 和 error。
 Tests: `VisualFeedbackTests`
 Required Assertions: 断言 attach/detach、focus、visibility、反馈顺序和 handler 失败隔离。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。

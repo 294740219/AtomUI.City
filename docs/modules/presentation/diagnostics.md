@@ -23,6 +23,8 @@
 | `AUCPRS011` | OutletCommitPlanned | Info | RouteOutlet 收到 commit plan。 | `outletName`, `requestedOutletName`, `operation`, `currentViewType`, `newViewType` |
 | `AUCPRS012` | OutletCommitSucceeded | Info | RouteOutlet 成功提交 replace 或 clear。 | `outletName`, `requestedOutletName`, `operation`, `currentViewType`, `newViewType` |
 | `AUCPRS013` | OutletCommitFailed | Error | RouteOutlet commit 失败、outlet mismatch、dispatcher 失败或 rejected handle dispose 失败。 | `outletName`, `requestedOutletName`, `operation`, `currentViewType`, `newViewType`, `error` |
+| `AUCPRS014` | VisualLifecycleAdapterExecuted | Info | Visual lifecycle handler 成功处理事件。 | `viewType`, `viewModelType`, `eventKind`, `error` |
+| `AUCPRS015` | VisualLifecycleAdapterFailed | Error | Visual lifecycle handler 处理事件失败。 | `viewType`, `viewModelType`, `eventKind`, `error` |
 
 ## 产品级必须诊断的失败
 
@@ -32,6 +34,7 @@
 - View 创建失败：不替换现有 outlet。
 - View binding 失败：释放已创建 View 并诊断。
 - Outlet commit 失败：保留旧 content，释放被拒绝的新 handle，并记录 outlet、operation、view type 和 error。
+- Visual lifecycle handler 失败：记录失败并继续通知后续 handler。
 - 插件卸载 active view：detach 并撤销资源。
 
 ## 上下文字段

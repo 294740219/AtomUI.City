@@ -23,7 +23,7 @@
 | ViewFactory.CreateAsync | 在 UI dispatcher 上创建 View。 | ViewDescriptor；descriptor 可携带 constructor parameter metadata。 | View object。 | 构造失败记录 `ViewCreationFailed` 并传播异常；取消前不得执行 factory。 | UI 创建必须支持取消前检查。 | 每次创建独立 View。 |
 | ViewBinder.Bind | 设置 DataContext 并建立 binding handle。 | ViewDescriptor、View、ViewModel。 | BoundViewHandle。 | binding 失败释放已创建 View；handle dispose 清理 DataContext 并发布 detach lifecycle。 | 同步 API 无 token。 | handle dispose 幂等。 |
 | IRouteOutlet.CommitAsync | 把 bound view 提交到 outlet。 | RouteOutletCommitPlan。 | RouteOutletCommitResult。 | 失败不替换旧 content；old deactivate 拒绝则中止。 | attach 前可取消；attach 后完成回滚或提交。 | 同一 outlet commit 串行。 |
-| VisualLifecycleHub.Publish | 发布 attach/detach/focus 等 visual 事件。 | VisualLifecycleEvent。 | void 或 result。 | handler 失败被隔离并诊断。 | 按 dispatcher 策略执行。 | 事件顺序按 UI 捕获顺序。 |
+| VisualLifecycleHub.Notify | 发布 attach/detach/focus/visibility 等 visual 事件。 | view 不得为 null；VisualLifecycleEventKind 必须是声明值。 | void。 | handler 失败被隔离并诊断，不阻断后续 handler，不破坏 VisualTree。 | 同步 API 无 token；由 UI 捕获方保证 dispatcher 边界。 | 按 UI 捕获顺序和订阅顺序发布；unsubscribe 后不再接收事件。 |
 | PresentationPluginUnloadCoordinator.CoordinateAsync | 插件卸载前撤销 UI contribution。 | plugin id 和 unload request。 | PresentationPluginUnloadResult。 | active view 拒绝关闭或资源撤销失败时阻止 unload。 | 必须观察 token。 | 同一 plugin unload 串行且幂等。 |
 
 ## Public 类型覆盖

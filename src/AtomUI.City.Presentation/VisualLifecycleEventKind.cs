@@ -6,4 +6,8 @@ public enum VisualLifecycleEventKind
     Detached,
     Loaded,
     Unloaded,
+    Focused,
+    Unfocused,
+    Visible,
+    Hidden,
 }
