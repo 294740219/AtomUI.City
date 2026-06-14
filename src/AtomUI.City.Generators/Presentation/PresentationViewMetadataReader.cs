@@ -14,13 +14,13 @@ public static class PresentationViewMetadataReader
         }
 
         var viewTypeName = GetTypeName(type);
-        var constructorParameters = ReadConstructorParameters(type);
+        var constructorSelection = ReadConstructorSelection(type);
 
         return Array.AsReadOnly(
             type
                 .GetAttributes()
                 .Where(attribute => string.Equals(GetAttributeTypeName(attribute), ViewForAttributeName, StringComparison.Ordinal))
-                .Select(attribute => ReadView(viewTypeName, constructorParameters, attribute))
+                .Select(attribute => ReadView(viewTypeName, constructorSelection, attribute))
                 .Where(view => view is not null)
                 .Cast<PresentationViewMetadata>()
                 .ToArray());
@@ -28,7 +28,7 @@ public static class PresentationViewMetadataReader
 
     private static PresentationViewMetadata? ReadView(
         string viewTypeName,
-        IReadOnlyList<PresentationViewConstructorParameter> constructorParameters,
+        ConstructorSelection constructorSelection,
         AttributeData attribute)
     {
         var viewModelTypeName = ReadConstructorTypeName(attribute, 0);
@@ -44,24 +44,35 @@ public static class PresentationViewMetadataReader
             ReadNamedString(attribute, "PluginId"),
             ReadNamedString(attribute, "ContributionId"),
             attribute.ApplicationSyntaxReference?.GetSyntax().GetLocation(),
-            constructorParameters);
+            constructorSelection.Parameters,
+            constructorSelection.HasAmbiguousConstructors);
     }
 
-    private static IReadOnlyList<PresentationViewConstructorParameter> ReadConstructorParameters(INamedTypeSymbol type)
+    private static ConstructorSelection ReadConstructorSelection(INamedTypeSymbol type)
     {
-        var constructor = type.InstanceConstructors
+        var constructors = type.InstanceConstructors
             .Where(candidate => candidate.DeclaredAccessibility == Accessibility.Public)
             .OrderByDescending(candidate => candidate.Parameters.Length)
-            .FirstOrDefault();
+            .ThenBy(GetConstructorSignature, StringComparer.Ordinal)
+            .ToArray();
 
-        if (constructor is null || constructor.Parameters.Length == 0)
+        if (constructors.Length == 0 || constructors[0].Parameters.Length == 0)
         {
-            return [];
+            return new ConstructorSelection([], hasAmbiguousConstructors: false);
         }
 
-        return constructor.Parameters
+        var maxParameterCount = constructors[0].Parameters.Length;
+        var hasAmbiguousConstructors = constructors.Count(constructor => constructor.Parameters.Length == maxParameterCount) > 1;
+        var parameters = constructors[0].Parameters
             .Select(parameter => new PresentationViewConstructorParameter(GetTypeName(parameter.Type)))
             .ToArray();
+
+        return new ConstructorSelection(parameters, hasAmbiguousConstructors);
+    }
+
+    private static string GetConstructorSignature(IMethodSymbol constructor)
+    {
+        return string.Join(",", constructor.Parameters.Select(parameter => GetTypeName(parameter.Type)));
     }
 
     private static string? ReadConstructorTypeName(AttributeData attribute, int index)
@@ -95,5 +106,20 @@ public static class PresentationViewMetadataReader
     private static string GetTypeName(ITypeSymbol type)
     {
         return type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
+    }
+
+    private sealed class ConstructorSelection
+    {
+        public ConstructorSelection(
+            IReadOnlyList<PresentationViewConstructorParameter> parameters,
+            bool hasAmbiguousConstructors)
+        {
+            Parameters = parameters;
+            HasAmbiguousConstructors = hasAmbiguousConstructors;
+        }
+
+        public IReadOnlyList<PresentationViewConstructorParameter> Parameters { get; }
+
+        public bool HasAmbiguousConstructors { get; }
     }
 }

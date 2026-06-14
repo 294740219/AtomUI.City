@@ -17,6 +17,7 @@ public static class PresentationViewManifestBuilder
         foreach (var view in views)
         {
             AddPluginContributionDiagnostics(view, diagnostics);
+            AddConstructorDiagnostics(view, diagnostics);
 
             var key = CreateViewModelKey(view.ViewModelTypeName, view.ViewKey);
             if (!viewsByViewModelAndKey.ContainsKey(key))
@@ -68,6 +69,21 @@ public static class PresentationViewManifestBuilder
         diagnostics.Add(new GeneratorDiagnostic(
             GeneratorDiagnostics.InvalidManifestInput,
             $"Presentation plugin view '{view.ViewTypeName}' must declare {missingField}.",
+            view.ViewTypeName));
+    }
+
+    private static void AddConstructorDiagnostics(
+        PresentationViewMetadata view,
+        ICollection<GeneratorDiagnostic> diagnostics)
+    {
+        if (!view.HasAmbiguousConstructors)
+        {
+            return;
+        }
+
+        diagnostics.Add(new GeneratorDiagnostic(
+            GeneratorDiagnostics.InvalidManifestInput,
+            $"Presentation view '{view.ViewTypeName}' has ambiguous public constructors.",
             view.ViewTypeName));
     }
 

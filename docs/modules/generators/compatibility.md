@@ -16,6 +16,7 @@
 - public 类型、成员、枚举值、attribute 参数和扩展方法默认视为兼容性承诺。
 - 删除、重命名、改变默认行为、异常类型、Result status 或诊断码语义属于 breaking change。
 - 新增 API 可以 minor 版本发布，但必须有文档、测试和迁移说明。
+- `PresentationViewMetadata.HasAmbiguousConstructors` 是 1.0 前新增 metadata 成员；后续不能删除或改为允许 ambiguous registrar generation。
 
 ## 数据格式兼容
 

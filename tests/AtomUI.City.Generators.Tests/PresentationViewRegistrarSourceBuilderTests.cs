@@ -52,4 +52,31 @@ public sealed class PresentationViewRegistrarSourceBuilderTests
         Assert.Contains("@\"com.company.sales\"", source, StringComparison.Ordinal);
         Assert.Contains("@\"plugin.settings\\view\"", source, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void BuildCreatesFactoryForConstructorParameters()
+    {
+        var manifest = new PresentationViewManifest(
+            [
+                new PresentationViewManifestEntry(
+                    "Sample.App.SettingsView",
+                    "Sample.App.SettingsViewModel",
+                    viewKey: null,
+                    pluginId: null,
+                    contributionId: null,
+                    constructorParameters:
+                    [
+                        new PresentationViewConstructorParameter("Sample.App.SettingsService"),
+                    ]),
+            ]);
+
+        var source = PresentationViewRegistrarSourceBuilder.Build(manifest);
+
+        Assert.Contains("new global::Sample.App.SettingsView(", source, StringComparison.Ordinal);
+        Assert.Contains(
+            "context.Services.GetService(typeof(global::Sample.App.SettingsService))",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains("Required service 'Sample.App.SettingsService' was not registered.", source, StringComparison.Ordinal);
+    }
 }

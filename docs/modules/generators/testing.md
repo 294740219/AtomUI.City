@@ -27,7 +27,7 @@
 | AUC-GENERATORS-004 | Generator | RouteManifestBuilderTests; RouteMetadataReaderTests | 断言 route attribute、template、target、排序和诊断。 | 模板非法、route 冲突、target 缺失输出 diagnostic。 | Implemented |
 | AUC-GENERATORS-005 | Generator | PluginManifestBuilderTests; PluginMetadataReaderTests | 断言 plugin metadata、capability、dependency、contribution。 | metadata 缺失、dependency 格式错误、重复 capability 输出 diagnostic。 | Implemented |
 | AUC-GENERATORS-006 | Generator | LocalizationManifestBuilderTests; LocalizationMetadataReaderTests | 断言 culture、resource、fallback、重复 key 诊断。 | culture 非法、重复 key、resource 缺失输出 diagnostic。 | Implemented |
-| AUC-GENERATORS-007 | Generator | PresentationViewManifestBuilderTests; PresentationViewRegistrarSourceBuilderTests | 断言 ViewFor、constructor、registrar source 和诊断。 | 构造函数不明确、ViewModel 缺失、重复 mapping 输出 diagnostic。 | Required |
+| AUC-GENERATORS-007 | Generator | PresentationViewManifestBuilderTests; PresentationViewRegistrarSourceBuilderTests | 断言 ViewFor、constructor、registrar source 和诊断。 | 构造函数不明确、ViewModel 缺失、重复 mapping 输出 diagnostic。 | Implemented |
 | AUC-GENERATORS-008 | Generator | GeneratorDiagnosticTests | 断言 diagnostic id、severity、message args 和 source location。 | id 复用、severity 漂移、缺少 location 必须测试失败。 | Required |
 
 ## 缺口处理

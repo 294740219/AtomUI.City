@@ -128,6 +128,45 @@ public sealed class PresentationViewMetadataReaderTests
     }
 
     [Fact]
+    public void ReadMarksAmbiguousViewConstructors()
+    {
+        var views = ReadViews(
+            """
+            using AtomUI.City.Presentation;
+
+            namespace Sample.App;
+
+            public sealed class FirstService
+            {
+            }
+
+            public sealed class SecondService
+            {
+            }
+
+            public sealed class SettingsViewModel
+            {
+            }
+
+            [ViewFor(typeof(SettingsViewModel))]
+            public sealed class SettingsView
+            {
+                public SettingsView(FirstService service)
+                {
+                }
+
+                public SettingsView(SecondService service)
+                {
+                }
+            }
+            """);
+
+        var view = Assert.Single(views);
+
+        Assert.True(view.HasAmbiguousConstructors);
+    }
+
+    [Fact]
     public void ReadResultRejectsExternalListMutation()
     {
         var views = ReadViews(

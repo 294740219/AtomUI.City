@@ -105,6 +105,25 @@ public sealed class PresentationViewManifestBuilderTests
     }
 
     [Fact]
+    public void BuildReportsAmbiguousViewConstructors()
+    {
+        var result = PresentationViewManifestBuilder.Build(
+            [
+                View(
+                    "Sample.App.SettingsView",
+                    "Sample.App.SettingsViewModel",
+                    hasAmbiguousConstructors: true),
+            ]);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+
+        Assert.Equal(GeneratorDiagnosticIds.InvalidManifestInput, diagnostic.Id);
+        Assert.Contains("constructor", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Equal("Sample.App.SettingsView", diagnostic.Target);
+        Assert.Empty(result.Manifest.Views);
+    }
+
+    [Fact]
     public void BuildReturnsReadonlyPresentationViewCollections()
     {
         var result = PresentationViewManifestBuilder.Build(
@@ -156,13 +175,15 @@ public sealed class PresentationViewManifestBuilderTests
         string viewModelTypeName,
         string? viewKey = null,
         string? pluginId = null,
-        string? contributionId = null)
+        string? contributionId = null,
+        bool hasAmbiguousConstructors = false)
     {
         return new PresentationViewMetadata(
             viewTypeName,
             viewModelTypeName,
             viewKey,
             pluginId,
-            contributionId);
+            contributionId,
+            hasAmbiguousConstructors: hasAmbiguousConstructors);
     }
 }

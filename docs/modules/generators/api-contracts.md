@@ -12,6 +12,12 @@
 | Source Builders | PresentationViewRegistrarSourceBuilder | 生成 C# 注册代码。 | hint name 稳定；生成代码不依赖 runtime reflection。 |
 | Diagnostics | GeneratorDiagnosticIds, GeneratorDiagnostics, GeneratorDiagnosticDefinition | 编译期诊断定义和创建。 | diagnostic id、severity、category 和 message args 稳定。 |
 
+## Presentation View Metadata 合同
+
+- `PresentationViewMetadata.HasAmbiguousConstructors` 表示 View 类型存在多个同最大参数数量的 public constructor。
+- `PresentationViewMetadataReader` 必须用确定性构造签名排序选择参数列表，并保留 ambiguity 标记。
+- `PresentationViewManifestBuilder` 必须拒绝 ambiguity 标记为 true 的 View metadata，输出 stable diagnostic，且不得生成 registrar entry。
+
 ## 关键方法合同
 
 | Method | Purpose | Parameters | Return | Failure Behavior | Cancellation | Concurrency / Idempotency |

@@ -12,7 +12,7 @@
 | AUC-GENERATORS-004 | Route Manifest | 已实现并通过产品合同测试 | RouteMetadataReader, RouteManifestBuilder | RouteManifestBuilderTests; RouteMetadataReaderTests |
 | AUC-GENERATORS-005 | Plugin Manifest | 已实现并通过产品合同测试 | PluginMetadataReader, PluginManifestBuilder | PluginManifestBuilderTests; PluginMetadataReaderTests |
 | AUC-GENERATORS-006 | Localization Manifest | 已实现并通过产品合同测试 | LocalizationMetadataReader, LocalizationManifestBuilder | LocalizationManifestBuilderTests; LocalizationMetadataReaderTests |
-| AUC-GENERATORS-007 | Presentation View Manifest | Ready to Start Product Implementation | PresentationViewMetadataReader, PresentationViewManifestBuilder | PresentationViewManifestBuilderTests; PresentationViewRegistrarSourceBuilderTests |
+| AUC-GENERATORS-007 | Presentation View Manifest | 已实现并通过产品合同测试 | PresentationViewMetadataReader, PresentationViewManifestBuilder | PresentationViewManifestBuilderTests; PresentationViewRegistrarSourceBuilderTests |
 | AUC-GENERATORS-008 | Diagnostics | Ready to Start Product Implementation | GeneratorDiagnosticIds, GeneratorDiagnostics | GeneratorDiagnosticTests |
 
 ## Feature 硬门禁
@@ -119,7 +119,7 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-GENERATORS-007 Presentation View Manifest
 
 Feature ID: `AUC-GENERATORS-007`
-Status: Ready to Start Product Implementation
+Status: 已实现并通过产品合同测试
 Goal: 编译期生成 ViewModel -> View 注册代码。
 Public Contract: PresentationViewMetadataReader, PresentationViewManifestBuilder, PresentationViewRegistrarSourceBuilder
 Runtime / Build Behavior: 读取 ViewFor metadata，验证 View 构造函数，生成 registrar source。

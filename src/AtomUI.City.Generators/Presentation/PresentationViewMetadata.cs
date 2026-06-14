@@ -11,7 +11,8 @@ public sealed class PresentationViewMetadata
         string? pluginId,
         string? contributionId,
         Location? location = null,
-        IReadOnlyList<PresentationViewConstructorParameter>? constructorParameters = null)
+        IReadOnlyList<PresentationViewConstructorParameter>? constructorParameters = null,
+        bool hasAmbiguousConstructors = false)
     {
         if (string.IsNullOrWhiteSpace(viewTypeName))
         {
@@ -30,6 +31,7 @@ public sealed class PresentationViewMetadata
         ContributionId = string.IsNullOrWhiteSpace(contributionId) ? null : contributionId;
         Location = location;
         ConstructorParameters = Array.AsReadOnly(constructorParameters?.ToArray() ?? []);
+        HasAmbiguousConstructors = hasAmbiguousConstructors;
     }
 
     public string ViewTypeName { get; }
@@ -45,4 +47,6 @@ public sealed class PresentationViewMetadata
     public Location? Location { get; }
 
     public IReadOnlyList<PresentationViewConstructorParameter> ConstructorParameters { get; }
+
+    public bool HasAmbiguousConstructors { get; }
 }
