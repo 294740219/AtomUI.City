@@ -43,8 +43,10 @@
 | AUC-PRESENTATION-002 | View Locator | ViewLocatorTests |
 | AUC-PRESENTATION-003 | View Binding | ViewBindingTests |
 | AUC-PRESENTATION-004 | Route Outlet | RouteOutletTests |
-| AUC-PRESENTATION-005 | Presentation Runtime | PresentationRuntimeTests |
-| AUC-PRESENTATION-006 | Localization Bridge | PresentationLocalizationBridgeTests |
+| AUC-PRESENTATION-005 | Visual Lifecycle Feedback | VisualFeedbackTests |
+| AUC-PRESENTATION-006 | Interaction and Validation Bridge | PresentationInteractionHandlerTests; ValidationVisualStateBindingTests |
+| AUC-PRESENTATION-007 | Localization and Resource Bridge | PresentationLocalizationBridgeTests; PresentationResourceRegistryTests |
+| AUC-PRESENTATION-008 | Plugin UI Unload Coordination | ActivePluginViewRegistryTests; PresentationPluginUnloadCoordinatorTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -99,6 +101,10 @@ Commit plan
 - Commit 必须在 UI Thread。
 - Commit 失败时必须尽量恢复旧 content。
 - Presentation 不决定导航成功，只返回 commit result。
+- 同一 Outlet 的 commit 串行执行；重复提交当前 handle 不释放当前 View。
+- 取消发生在 attach 前时保持旧 content，并释放被拒绝的新 handle。
+- 旧 handle dispose 失败时保持旧 content，新 handle 被释放，结果返回失败。
+- `OutletCommitPlanned`、`OutletCommitSucceeded`、`OutletCommitFailed` 诊断必须包含 outlet、operation、view type 和 error 上下文。
 
 ### 4. 失败回滚
 
@@ -141,3 +147,5 @@ Presentation 返回：
 | replace | Unit | 旧 View detach，新 View attach。 |
 | commit failure | Unit | 旧 content 保留。 |
 | disposal diagnostics | Unit | detach/dispose 失败被聚合。 |
+| repeated commit | Unit | 当前 handle 重复提交为 no-op。 |
+| cancellation | Unit | attach 前取消不替换旧 content。 |

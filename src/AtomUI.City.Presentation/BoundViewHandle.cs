@@ -61,7 +61,7 @@ public sealed class BoundViewHandle : IDisposable
             return;
         }
 
-        IsDisposed = true;
         _dispose?.Invoke();
+        IsDisposed = true;
     }
 }

@@ -20,6 +20,9 @@
 | `AUCPRS008` | ViewCreationFailed | Error | ViewFactory 创建 View 失败。 | `viewModelType`, `viewType`, `viewKey`, `constructorParameters`, `elapsedMilliseconds`, `error` |
 | `AUCPRS009` | ViewBound | Info | ViewBinder 设置 DataContext 并建立 BoundViewHandle。 | `viewModelType`, `viewType`, `viewKey`, `elapsedMilliseconds` |
 | `AUCPRS010` | ViewBindingFailed | Error | ViewBinder binding 失败并释放已创建 View。 | `viewModelType`, `viewType`, `viewKey`, `elapsedMilliseconds`, `error` |
+| `AUCPRS011` | OutletCommitPlanned | Info | RouteOutlet 收到 commit plan。 | `outletName`, `requestedOutletName`, `operation`, `currentViewType`, `newViewType` |
+| `AUCPRS012` | OutletCommitSucceeded | Info | RouteOutlet 成功提交 replace 或 clear。 | `outletName`, `requestedOutletName`, `operation`, `currentViewType`, `newViewType` |
+| `AUCPRS013` | OutletCommitFailed | Error | RouteOutlet commit 失败、outlet mismatch、dispatcher 失败或 rejected handle dispose 失败。 | `outletName`, `requestedOutletName`, `operation`, `currentViewType`, `newViewType`, `error` |
 
 ## 产品级必须诊断的失败
 
@@ -28,6 +31,7 @@
 - View lookup 未注册或 owner 已撤销：返回失败并诊断。
 - View 创建失败：不替换现有 outlet。
 - View binding 失败：释放已创建 View 并诊断。
+- Outlet commit 失败：保留旧 content，释放被拒绝的新 handle，并记录 outlet、operation、view type 和 error。
 - 插件卸载 active view：detach 并撤销资源。
 
 ## 上下文字段

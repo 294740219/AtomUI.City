@@ -24,7 +24,7 @@
 | AUC-PRESENTATION-001 | PlatformIntegration | AvaloniaUiDispatcherTests; PresentationPlatformIntegrationTests | 断言 UI 线程识别、后台 marshal、取消、异常映射和平台不可用。 | dispatcher unavailable、work exception、取消。 | Implemented |
 | AUC-PRESENTATION-002 | PlatformIntegration | ViewLocatorTests | 断言 manifest 注册、显式覆盖、重复拒绝、插件撤销和 O(1) lookup 路径。 | 未注册、重复注册、owner revoked。 | Implemented |
 | AUC-PRESENTATION-003 | PlatformIntegration | ViewBindingTests | 断言构造参数、DataContext、失败回滚、handle dispose 和 lifecycle event。 | 构造失败、binding 失败、取消。 | Implemented |
-| AUC-PRESENTATION-004 | PlatformIntegration | RouteOutletTests | 断言成功替换、失败回滚、取消、重复 commit、旧 view dispose 和结果状态。 | commit 失败、dispatcher 失败、old view deactivate 拒绝。 | Required |
+| AUC-PRESENTATION-004 | PlatformIntegration | RouteOutletTests | 断言成功替换、失败回滚、取消、重复 commit、旧 view dispose 和结果状态。 | commit 失败、dispatcher 失败、old view deactivate 拒绝。 | Implemented |
 | AUC-PRESENTATION-005 | PlatformIntegration | VisualFeedbackTests | 断言 attach/detach、focus、visibility、反馈顺序和 handler 失败隔离。 | 未知 visual、重复 detach、反馈 handler 失败。 | Required |
 | AUC-PRESENTATION-006 | PlatformIntegration | PresentationInteractionHandlerTests; ValidationVisualStateBindingTests | 断言 handler 注册撤销、无 handler、验证消息变化、控件释放和取消。 | 无 handler、重复 handler、控件已释放。 | Required |
 | AUC-PRESENTATION-007 | PlatformIntegration | PresentationLocalizationBridgeTests; PresentationResourceRegistryTests | 断言 culture 切换、fallback、resource revoke、插件资源卸载和局部失败隔离。 | 语言包缺失、resource dictionary 加载失败、target 已释放。 | Required |

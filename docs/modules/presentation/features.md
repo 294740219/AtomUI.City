@@ -9,7 +9,7 @@
 | AUC-PRESENTATION-001 | UI Dispatcher Bridge | 已实现并通过产品合同测试 | AvaloniaUiDispatcher, IUiDispatcher | AvaloniaUiDispatcherTests; PresentationPlatformIntegrationTests |
 | AUC-PRESENTATION-002 | View Registry and Locator | 已实现并通过产品合同测试 | ViewRegistry, IViewLocator, ViewForAttribute | ViewLocatorTests |
 | AUC-PRESENTATION-003 | View Factory and Binding | 已实现并通过产品合同测试 | ViewFactory, ViewBinder, BoundViewHandle | ViewBindingTests |
-| AUC-PRESENTATION-004 | Route Outlet Commit | Ready to Start Product Implementation | IRouteOutlet, RouteOutlet, RouteOutletCommitResult | RouteOutletTests |
+| AUC-PRESENTATION-004 | Route Outlet Commit | 已实现并通过产品合同测试 | IRouteOutlet, RouteOutlet, RouteOutletCommitResult | RouteOutletTests |
 | AUC-PRESENTATION-005 | Visual Lifecycle Feedback | Ready to Start Product Implementation | VisualLifecycleHub, VisualLifecycleEvent | VisualFeedbackTests |
 | AUC-PRESENTATION-006 | Interaction and Validation Bridge | Ready to Start Product Implementation | InteractionHandlerRegistry, ValidationVisualStateBinding | PresentationInteractionHandlerTests; ValidationVisualStateBindingTests |
 | AUC-PRESENTATION-007 | Localization and Resource Bridge | Ready to Start Product Implementation | PresentationLocalizationBridge, PresentationResourceRegistry | PresentationLocalizationBridgeTests; PresentationResourceRegistryTests |
@@ -77,13 +77,13 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-PRESENTATION-004 Route Outlet Commit
 
 Feature ID: `AUC-PRESENTATION-004`
-Status: Ready to Start Product Implementation
+Status: 已实现并通过产品合同测试
 Goal: 把 Routing/MVVM 产生的 View 提交到桌面 UI 容器。
 Public Contract: IRouteOutlet, RouteOutlet, RouteOutletCommitPlan, RouteOutletCommitResult
-Runtime / Build Behavior: commit 分 prepare、detach old、attach new、activate visual、publish result；失败不替换现有 content。
-Failure Behavior: commit 失败、dispatcher 失败、old view deactivate 拒绝都返回失败并保持旧 visual。
-Threading / Cancellation: commit 必须在 UI dispatcher 串行执行；取消只允许发生在 attach 前。
-Diagnostics: outlet diagnostics 必须包含 outlet id、old target、new target 和 stage。
+Runtime / Build Behavior: replace 和 clear 通过 dispatcher 提交；同一 outlet 的 commit 串行执行；重复提交当前 handle 为 no-op；replace 成功前先释放旧 handle，再设置新 content。
+Failure Behavior: outlet mismatch、dispatcher 失败、旧 handle dispose 失败或非法 replace plan 都返回失败并保持旧 visual；被拒绝的新 handle 会释放，释放失败写入诊断。
+Threading / Cancellation: commit 必须在 UI dispatcher 串行执行；取消发生在 dispatcher attach 前时不替换 content，并释放被拒绝 handle。
+Diagnostics: outlet diagnostics 包含 outlet name、requested outlet、operation、current view type、new view type 和 error。
 Tests: `RouteOutletTests`
 Required Assertions: 断言成功替换、失败回滚、取消、重复 commit、旧 view dispose 和结果状态。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
