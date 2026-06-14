@@ -38,7 +38,7 @@ public sealed class AtomUICityIncrementalGenerator : IIncrementalGenerator
                 {
                     foreach (var diagnostic in result.Diagnostics)
                     {
-                        sourceContext.ReportDiagnostic(CreateDiagnostic(diagnostic, views));
+                        sourceContext.ReportDiagnostic(CreateDiagnostic(GeneratorFeature.Presentation, diagnostic, views));
                     }
 
                     return;
@@ -63,6 +63,7 @@ public sealed class AtomUICityIncrementalGenerator : IIncrementalGenerator
     }
 
     private static Diagnostic CreateDiagnostic(
+        GeneratorFeature feature,
         GeneratorDiagnostic diagnostic,
         IReadOnlyList<PresentationViewMetadata> views)
     {
@@ -70,7 +71,7 @@ public sealed class AtomUICityIncrementalGenerator : IIncrementalGenerator
             diagnostic.Id,
             diagnostic.Title,
             diagnostic.Message,
-            "AtomUI.City.Generators",
+            $"AtomUI.City.Generators.{GeneratorFeatureNames.GetName(feature)}",
             ToDiagnosticSeverity(diagnostic.Severity),
             isEnabledByDefault: true);
 

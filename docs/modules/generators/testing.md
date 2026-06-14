@@ -21,7 +21,7 @@
 
 | Feature ID | Test Type | Test File | Required Assertions | Failure Paths | Status |
 | --- | --- | --- | --- | --- | --- |
-| AUC-GENERATORS-001 | Generator | IncrementalGeneratorInfrastructureTests | 断言 incremental 输入隔离、hint name 稳定、无 runtime 依赖。 | 无关输入导致全量重算、hint name 不稳定、runtime dependency 出现必须失败。 | Required |
+| AUC-GENERATORS-001 | Generator | IncrementalGeneratorInfrastructureTests | 断言 incremental 输入隔离、hint name 稳定、无 runtime 依赖。 | 无关输入导致全量重算、hint name 不稳定、runtime dependency 出现必须失败。 | Implemented |
 | AUC-GENERATORS-002 | Generator | ModuleDependencyGraphBuilderTests; ModuleMetadataReaderTests | 断言 DependsOn 图、循环诊断、默认 module id。 | 循环依赖、重复 module、缺失依赖输出 diagnostic。 | Required |
 | AUC-GENERATORS-003 | Generator | ServiceRegistrationManifestBuilderTests; ServiceRegistrationMetadataReaderTests | 断言 lifetime、ExposeServices、显式注册和冲突诊断。 | lifetime 冲突、重复服务、不可构造类型输出 diagnostic。 | Required |
 | AUC-GENERATORS-004 | Generator | RouteManifestBuilderTests; RouteMetadataReaderTests | 断言 route attribute、template、target、排序和诊断。 | 模板非法、route 冲突、target 缺失输出 diagnostic。 | Required |

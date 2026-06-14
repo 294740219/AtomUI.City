@@ -1,4 +1,7 @@
 using AtomUI.City.Generators;
+using AtomUI.City.Generators.Diagnostics;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 
 namespace AtomUI.City.Generators.Tests;
 
@@ -22,5 +25,100 @@ public sealed class IncrementalGeneratorInfrastructureTests
         Assert.Contains(
             generatorType.GetCustomAttributesData(),
             attribute => string.Equals(attribute.AttributeType.FullName, "Microsoft.CodeAnalysis.GeneratorAttribute", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void FeatureDiagnosticsIncludeFeatureCategoryAndSourceLocation()
+    {
+        var compilation = CreateCompilation(
+            """
+            namespace AtomUI.City.Presentation
+            {
+                [System.AttributeUsage(System.AttributeTargets.Class, AllowMultiple = true, Inherited = false)]
+                public sealed class ViewForAttribute : System.Attribute
+                {
+                    public ViewForAttribute(System.Type viewModelType)
+                    {
+                    }
+                }
+            }
+
+            namespace Sample.App
+            {
+                public sealed class SettingsViewModel
+                {
+                }
+
+                [AtomUI.City.Presentation.ViewFor(typeof(SettingsViewModel))]
+                public sealed class SettingsView
+                {
+                }
+
+                [AtomUI.City.Presentation.ViewFor(typeof(SettingsViewModel))]
+                public sealed class AlternateSettingsView
+                {
+                }
+            }
+            """);
+        var driver = CSharpGeneratorDriver.Create(new AtomUICityIncrementalGenerator());
+
+        var runResult = driver.RunGenerators(compilation).GetRunResult();
+        var diagnostic = Assert.Single(Assert.Single(runResult.Results).Diagnostics);
+
+        Assert.Equal(GeneratorDiagnosticIds.DuplicatePresentationView, diagnostic.Id);
+        Assert.Equal("AtomUI.City.Generators.Presentation", diagnostic.Descriptor.Category);
+        Assert.True(diagnostic.Location.IsInSource);
+    }
+
+    [Fact]
+    public void GeneratorAssemblyDoesNotReferenceRuntimePackages()
+    {
+        var referencedAssemblies = typeof(AtomUICityIncrementalGenerator)
+            .Assembly
+            .GetReferencedAssemblies()
+            .Select(assembly => assembly.Name)
+            .Where(name => name is not null && name.StartsWith("AtomUI.City.", StringComparison.Ordinal))
+            .ToArray();
+
+        Assert.Empty(referencedAssemblies);
+    }
+
+    [Fact]
+    public void UnrelatedAttributedTypesDoNotEmitGeneratedSources()
+    {
+        var compilation = CreateCompilation(
+            """
+            namespace Sample.App
+            {
+                [System.Obsolete]
+                public sealed class UnrelatedType
+                {
+                }
+            }
+            """);
+        var driver = CSharpGeneratorDriver.Create(new AtomUICityIncrementalGenerator());
+
+        var runResult = driver.RunGenerators(compilation).GetRunResult();
+        var generatorResult = Assert.Single(runResult.Results);
+
+        Assert.Empty(generatorResult.GeneratedSources);
+        Assert.Empty(generatorResult.Diagnostics);
+    }
+
+    private static CSharpCompilation CreateCompilation(string source)
+    {
+        var sourceTree = CSharpSyntaxTree.ParseText(source);
+        var references = AppDomain.CurrentDomain
+            .GetAssemblies()
+            .Where(assembly => !assembly.IsDynamic && !string.IsNullOrWhiteSpace(assembly.Location))
+            .Select(assembly => MetadataReference.CreateFromFile(assembly.Location))
+            .DistinctBy(reference => reference.Display)
+            .ToArray();
+
+        return CSharpCompilation.Create(
+            "Sample.App",
+            [sourceTree],
+            references,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
     }
 }

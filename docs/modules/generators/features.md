@@ -6,7 +6,7 @@
 
 | Feature ID | 名称 | 状态 | Public Contract | 主测试 |
 | --- | --- | --- | --- | --- |
-| AUC-GENERATORS-001 | Incremental Infrastructure | Ready to Start Product Implementation | AtomUICityIncrementalGenerator, GeneratorFeature | IncrementalGeneratorInfrastructureTests |
+| AUC-GENERATORS-001 | Incremental Infrastructure | 已实现并通过产品合同测试 | AtomUICityIncrementalGenerator, GeneratorFeature | IncrementalGeneratorInfrastructureTests |
 | AUC-GENERATORS-002 | Module Graph | Ready to Start Product Implementation | ModuleMetadataReader, ModuleDependencyGraphBuilder | ModuleDependencyGraphBuilderTests; ModuleMetadataReaderTests |
 | AUC-GENERATORS-003 | DI Manifest | Ready to Start Product Implementation | ServiceRegistrationMetadataReader, ServiceRegistrationManifestBuilder | ServiceRegistrationManifestBuilderTests; ServiceRegistrationMetadataReaderTests |
 | AUC-GENERATORS-004 | Route Manifest | Ready to Start Product Implementation | RouteMetadataReader, RouteManifestBuilder | RouteManifestBuilderTests; RouteMetadataReaderTests |
@@ -35,7 +35,7 @@
 ## AUC-GENERATORS-001 Incremental Infrastructure
 
 Feature ID: `AUC-GENERATORS-001`
-Status: Ready to Start Product Implementation
+Status: 已实现并通过产品合同测试
 Goal: 提供 Roslyn incremental generator 入口和 feature pipeline。
 Public Contract: AtomUICityIncrementalGenerator, GeneratorFeature
 Runtime / Build Behavior: 按 feature 组合 syntax provider、metadata reader、builder 和 source output。
