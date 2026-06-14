@@ -16,8 +16,10 @@
 | Method | Purpose | Parameters | Return | Failure Behavior | Cancellation | Concurrency / Idempotency |
 | --- | --- | --- | --- | --- | --- | --- |
 | RouteTemplate.Parse | 解析 route pattern。 | pattern 不得为空；constraint 必须可识别。 | RouteTemplate 或声明异常。 | 非法 segment、重复参数名、catch-all 位置错误。 | 纯 CPU，无 token。 | 无共享状态，可并发。 |
+| RouteTemplate.TryMatch | 对单个模板匹配 path。 | path 不得为 null。 | bool 和只读参数字典。 | constraint 拒绝或 segment 不匹配返回 false。 | 纯 CPU，无 token。 | 无共享状态，可并发。 |
 | RouteGraphSnapshot.Create | 从 descriptors 发布 graph。 | descriptors 稳定排序且 owner 明确。 | RouteGraphSnapshot。 | 重复 id、同级模板冲突、缺失 parent 返回 RouteGraphError。 | 批量 build 应观察 token。 | 发布后不可变；旧 snapshot 继续可读。 |
 | RouteGraphSnapshot.WithoutContribution | 按 contribution 发布撤销后的新 graph。 | contributionId 必须非空；version 可显式指定。 | 新 RouteGraphSnapshot。 | 撤销后剩余 route graph 非法时返回 RouteGraphError。 | 纯 CPU，无 token。 | 旧 snapshot 不变；新 snapshot 版本单调递增。 |
+| RouteMatcher.Match / MatchAll | 在 immutable snapshot 上匹配 path。 | path 不得为 null。 | RouteMatch 或只读 RouteMatch 列表。 | 无匹配返回 NotFound 或空列表；constraint 拒绝不进入 guard。 | 纯 CPU，无 token。 | 允许多线程并发读取。 |
 | IRouter.NavigateAsync | 执行导航事务。 | target route、parameters、NavigationOptions。 | NavigationResult。 | match/guard/resolver/commit 任一失败都不改变 current snapshot。 | 取消后返回 Cancelled 或 OperationCanceledException，不能提交。 | 按 NavigationConcurrencyPolicy 串行、替换或拒绝。 |
 | IRouteEnterGuard.CanEnterAsync | 进入 route 前授权或重定向。 | RouteGuardContext 必须包含 route、parameters、services。 | RouteGuardResult。 | 异常映射为 navigation failed；redirect loop 必须检测。 | 必须观察 token。 | guard 实例并发策略由 DI lifetime 决定，结果无共享可变状态。 |
 | NavigationScope.DisposeAsync | 结束导航作用域并释放临时资源。 | 允许重复调用。 | ValueTask。 | 释放失败记录诊断并继续清理。 | 不启动新 work。 | Dispose 幂等。 |

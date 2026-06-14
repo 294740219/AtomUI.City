@@ -98,4 +98,12 @@ public sealed class RouteTemplateTests
         Assert.Equal("zh-CN", values["lang"]);
         Assert.Equal("guides/getting-started", values["path"]);
     }
+
+    [Fact]
+    public void TryMatchRejectsNullPath()
+    {
+        var template = RouteTemplate.Parse("docs/{id:int}");
+
+        Assert.Throws<ArgumentNullException>(() => template.TryMatch(null!, out _));
+    }
 }

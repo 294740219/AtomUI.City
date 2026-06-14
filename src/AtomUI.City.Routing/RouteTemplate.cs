@@ -33,6 +33,8 @@ public sealed class RouteTemplate
 
     public bool TryMatch(string path, out IReadOnlyDictionary<string, string> values)
     {
+        ArgumentNullException.ThrowIfNull(path);
+
         var routeValues = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var pathSegments = NormalizePattern(path)
             .Split('/', StringSplitOptions.RemoveEmptyEntries);

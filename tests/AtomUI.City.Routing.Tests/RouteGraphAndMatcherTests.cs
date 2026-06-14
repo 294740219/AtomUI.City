@@ -52,6 +52,30 @@ public sealed class RouteGraphAndMatcherTests
     }
 
     [Fact]
+    public async Task MatcherCanRunConcurrentMatchesAgainstImmutableSnapshot()
+    {
+        var snapshot = RouteGraphSnapshot.Create(
+            [
+                Route("profile", "profile/{id:int}", typeof(ProfileViewModel)),
+                Route("settings", "settings", typeof(SettingsViewModel)),
+            ]);
+
+        var matches = await Task.WhenAll(
+            Enumerable
+                .Range(1, 32)
+                .Select(index => Task.Run(() => snapshot.Matcher.Match("profile/" + index.ToString()))));
+
+        Assert.All(
+            matches,
+            match =>
+            {
+                Assert.Equal(RouteMatchStatus.Success, match.Status);
+                Assert.Equal("profile", match.Route.RouteId);
+                Assert.True(int.TryParse(match.Parameters["id"], out _));
+            });
+    }
+
+    [Fact]
     public void MatcherMatchAllRejectsExternalListMutation()
     {
         var snapshot = RouteGraphSnapshot.Create(

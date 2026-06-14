@@ -8,7 +8,7 @@
 | --- | --- | --- | --- | --- |
 | AUC-ROUTING-001 | Route Definition Syntax | 已实现并通过产品合同测试 | RouteTemplate, RouteDefinitionAttribute, RouteMapAttribute | RouteTemplateTests; RouteDefinitionAttributeTests |
 | AUC-ROUTING-002 | Route Graph Build and Snapshot | 已实现并通过产品合同测试 | RouteDescriptor, RouteGraphSnapshot, RouteGraphError | RouteGraphAndMatcherTests |
-| AUC-ROUTING-003 | Route Matching and Parameters | Ready to Start Product Implementation | RouteMatcher, RouteMatch, RouteParameters | RouteGraphAndMatcherTests; RoutingParameterBoundaryTests |
+| AUC-ROUTING-003 | Route Matching and Parameters | 已实现并通过产品合同测试 | RouteMatcher, RouteMatch, RouteParameters | RouteGraphAndMatcherTests; RoutingParameterBoundaryTests |
 | AUC-ROUTING-004 | Navigation Transaction | Ready to Start Product Implementation | IRouter, NavigationScope, NavigationResult | NavigationScopeTests |
 | AUC-ROUTING-005 | Guard and Redirect Pipeline | Ready to Start Product Implementation | IRouteEnterGuard, IRouteLeaveGuard, RouteGuardResult | RouteGuardTests |
 | AUC-ROUTING-006 | ViewModel Target Resolution | Ready to Start Product Implementation | NavigationTarget, ViewModelTargetDescriptor | RouteGraphAndMatcherTests |
@@ -63,7 +63,7 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-ROUTING-003 Route Matching and Parameters
 
 Feature ID: `AUC-ROUTING-003`
-Status: Ready to Start Product Implementation
+Status: 已实现并通过产品合同测试
 Goal: 在不可变 graph 上完成高性能匹配和参数绑定。
 Public Contract: RouteMatcher, RouteMatch, RouteParameters
 Runtime / Build Behavior: 匹配必须确定性选择最具体 route；参数转换和默认值绑定在 commit 前完成。
