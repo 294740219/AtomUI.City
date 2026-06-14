@@ -254,6 +254,21 @@ public sealed class EventPublicationTests
     }
 
     [Fact]
+    public void PostResultEnforcesRejectionReasonConsistency()
+    {
+        Assert.Throws<ArgumentException>(() => new EventPostResult(
+            Guid.NewGuid(),
+            new EventContractId("atomui.city.tests.event.v1"),
+            Accepted: true,
+            RejectionReason: "not rejected"));
+
+        Assert.Throws<ArgumentException>(() => new EventPostResult(
+            Guid.NewGuid(),
+            new EventContractId("atomui.city.tests.event.v1"),
+            Accepted: false));
+    }
+
+    [Fact]
     public async Task PostAsyncRejectsNegativePublishDepthBeforeAcceptance()
     {
         var diagnostics = new InMemoryHostDiagnostics();
