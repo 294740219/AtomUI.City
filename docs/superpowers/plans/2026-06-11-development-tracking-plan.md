@@ -5,8 +5,8 @@
 ## 当前结论
 
 - 1.0 发布状态：不可发布。
-- 全局进度：21/118。
-- 模块 Feature 合同：21/109。
+- 全局进度：22/118。
+- 模块 Feature 合同：22/109。
 - 最终发布门禁：0/9。
 - 最近校准日期：2026-06-14。
 
@@ -35,7 +35,7 @@
 | --- | ---: | ---: | ---: | --- |
 | Core | 7 | 0 | 7 | 已完成 |
 | Testing | 9 | 0 | 9 | 已完成 |
-| Build | 5 | 2 | 7 | 产品化进行中 |
+| Build | 6 | 1 | 7 | 产品化进行中 |
 | Generators | 0 | 8 | 8 | 未完成 |
 | Routing | 0 | 8 | 8 | 未完成 |
 | Presentation | 0 | 8 | 8 | 未完成 |
@@ -79,7 +79,7 @@
 - [x] AUC-BUILD-003 Project Inventory。验收重点：src/tests 项目被 inventory 覆盖。
 - [x] AUC-BUILD-004 Dependency Boundary。验收重点：runtime 不依赖 Testing、Roslyn 或 test packages。
 - [x] AUC-BUILD-005 Source Generator Packaging。验收重点：generator target、analyzer layout、runtime 不引用 generator。
-- [ ] AUC-BUILD-006 Release Gates。验收重点：docs、format、pack、test gate 可本地执行。
+- [x] AUC-BUILD-006 Release Gates。验收重点：docs、format、pack、test gate 可本地执行。
 - [ ] AUC-BUILD-007 Test Naming。验收重点：测试命名和模块对应关系。
 
 ## Generators

@@ -1,7 +1,8 @@
+using System.Text;
+
 using AtomUI.City.Testing;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
-using System.Text;
 
 namespace AtomUI.City.Testing.Tests;
 

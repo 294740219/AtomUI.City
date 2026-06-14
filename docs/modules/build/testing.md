@@ -26,7 +26,7 @@
 | AUC-BUILD-003 | Build | ProjectInventoryTests | 断言 src/tests 项目被 inventory 覆盖。 | 新增项目未登记、测试项目缺失、孤儿项目失败。 | Implemented |
 | AUC-BUILD-004 | Build | ProjectDependencyBoundaryTests | 断言 runtime 不依赖 Testing/Roslyn/test packages。 | runtime 引用 Testing、test packages、Roslyn analyzer internals 失败。 | Implemented |
 | AUC-BUILD-005 | Build | SourceGeneratorProjectStructureTests | 断言 generator target、analyzer layout、runtime 不引用 generator。 | target 错误、analyzer 路径缺失、runtime 依赖失败。 | Implemented |
-| AUC-BUILD-006 | Build | EngineeringGateTests; PackagingReleaseGateTests | 断言 docs、format、pack、test gate 可本地执行。 | 任一 gate 失败阻止 release。 | Required |
+| AUC-BUILD-006 | Build | EngineeringGateTests; PackagingReleaseGateTests | 断言 docs、format、pack、test gate 可本地执行。 | 任一 gate 失败阻止 release。 | Implemented |
 | AUC-BUILD-007 | Build | TestNamingConventionTests | 断言测试命名和模块对应关系。 | 测试项目命名偏离、模块缺少测试项目失败。 | Required |
 
 ## 缺口处理

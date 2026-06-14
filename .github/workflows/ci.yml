@@ -27,32 +27,5 @@ jobs:
       - name: Restore
         run: dotnet restore AtomUICity.slnx
 
-      - name: Build
-        run: dotnet build AtomUICity.slnx --no-restore
-
-      - name: Public API
-        run: bash engineering/check-public-api.sh
-
-      - name: Test
-        run: bash engineering/test-ci.sh
-
-      - name: Format
-        run: dotnet format AtomUICity.slnx --verify-no-changes --no-restore
-
-      - name: License Headers
-        run: bash engineering/check-license.sh
-
-      - name: Documentation
-        run: bash engineering/check-docs.sh
-
-      - name: Release Notes
-        run: bash engineering/generate-release-notes.sh
-
-      - name: Pack
-        run: bash engineering/pack.sh --no-build
-
-      - name: Package Validation
-        run: bash engineering/validate-packages.sh
-
-      - name: Template Smoke
-        run: bash engineering/check-template-smoke.sh
+      - name: Release Gates
+        run: bash engineering/check-release.sh --no-restore

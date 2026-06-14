@@ -203,12 +203,14 @@ public sealed class PackagingReleaseGateTests
     {
         var repositoryRoot = RepositoryPaths.FindRepositoryRoot();
         var workflow = File.ReadAllText(Path.Combine(repositoryRoot, ".github", "workflows", "ci.yml"));
+        var releaseGate = File.ReadAllText(Path.Combine(repositoryRoot, EngineeringScriptsDirectoryName, "check-release.sh"));
 
-        Assert.Contains("bash engineering/check-public-api.sh", workflow, StringComparison.Ordinal);
-        Assert.Contains("bash engineering/pack.sh --no-build", workflow, StringComparison.Ordinal);
-        Assert.Contains("bash engineering/validate-packages.sh", workflow, StringComparison.Ordinal);
-        Assert.Contains("bash engineering/check-template-smoke.sh", workflow, StringComparison.Ordinal);
-        Assert.Contains("bash engineering/generate-release-notes.sh", workflow, StringComparison.Ordinal);
+        Assert.Contains("bash engineering/check-release.sh --no-restore", workflow, StringComparison.Ordinal);
+        Assert.Contains("bash engineering/check-public-api.sh", releaseGate, StringComparison.Ordinal);
+        Assert.Contains("bash engineering/pack.sh --configuration \"$configuration\" --no-build", releaseGate, StringComparison.Ordinal);
+        Assert.Contains("bash engineering/validate-packages.sh --configuration \"$configuration\"", releaseGate, StringComparison.Ordinal);
+        Assert.Contains("bash engineering/check-template-smoke.sh", releaseGate, StringComparison.Ordinal);
+        Assert.Contains("bash engineering/generate-release-notes.sh", releaseGate, StringComparison.Ordinal);
     }
 
     private static IReadOnlyDictionary<string, string> ReadProperties(XDocument document)

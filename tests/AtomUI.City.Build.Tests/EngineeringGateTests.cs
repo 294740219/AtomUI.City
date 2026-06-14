@@ -34,11 +34,32 @@ public sealed class EngineeringGateTests
         var workflow = File.ReadAllText(workflowPath);
 
         Assert.Contains("dotnet restore AtomUICity.slnx", workflow, StringComparison.Ordinal);
-        Assert.Contains("dotnet build AtomUICity.slnx --no-restore", workflow, StringComparison.Ordinal);
-        Assert.Contains("bash engineering/test-ci.sh", workflow, StringComparison.Ordinal);
-        Assert.Contains("dotnet format AtomUICity.slnx --verify-no-changes --no-restore", workflow, StringComparison.Ordinal);
-        Assert.Contains("bash engineering/check-license.sh", workflow, StringComparison.Ordinal);
-        Assert.Contains("bash engineering/check-docs.sh", workflow, StringComparison.Ordinal);
+        Assert.Contains("bash engineering/check-release.sh --no-restore", workflow, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void LocalReleaseGateRunsRequiredEngineeringGates()
+    {
+        var repositoryRoot = RepositoryPaths.FindRepositoryRoot();
+        var scriptPath = Path.Combine(repositoryRoot, EngineeringScriptsDirectoryName, "check-release.sh");
+
+        Assert.True(File.Exists(scriptPath), "Expected local release gate at engineering/check-release.sh.");
+
+        var script = File.ReadAllText(scriptPath);
+
+        Assert.Contains("release gate failed", script, StringComparison.Ordinal);
+        Assert.Contains("dotnet restore AtomUICity.slnx", script, StringComparison.Ordinal);
+        Assert.Contains("dotnet format AtomUICity.slnx --verify-no-changes --no-restore", script, StringComparison.Ordinal);
+        Assert.Contains("dotnet build AtomUICity.slnx --no-restore", script, StringComparison.Ordinal);
+        Assert.Contains("bash engineering/check-docs.sh", script, StringComparison.Ordinal);
+        Assert.Contains("bash engineering/check-license.sh", script, StringComparison.Ordinal);
+        Assert.Contains("bash engineering/check-project-inventory.sh", script, StringComparison.Ordinal);
+        Assert.Contains("bash engineering/check-dependency-boundaries.sh", script, StringComparison.Ordinal);
+        Assert.Contains("bash engineering/check-public-api.sh", script, StringComparison.Ordinal);
+        Assert.Contains("bash engineering/test-ci.sh", script, StringComparison.Ordinal);
+        Assert.Contains("bash engineering/pack.sh --configuration \"$configuration\" --no-build", script, StringComparison.Ordinal);
+        Assert.Contains("bash engineering/validate-packages.sh --configuration \"$configuration\"", script, StringComparison.Ordinal);
+        Assert.Contains("bash engineering/check-template-smoke.sh", script, StringComparison.Ordinal);
     }
 
     [Fact]

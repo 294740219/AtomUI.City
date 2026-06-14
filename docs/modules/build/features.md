@@ -11,7 +11,7 @@
 | AUC-BUILD-003 | Project Inventory | 已实现并通过产品合同测试 | solution/project inventory conventions | ProjectInventoryTests |
 | AUC-BUILD-004 | Dependency Boundary | 已实现并通过产品合同测试 | project reference and package reference rules | ProjectDependencyBoundaryTests |
 | AUC-BUILD-005 | Source Generator Packaging | 已实现并通过产品合同测试 | AtomUI.City.Generators package layout | SourceGeneratorProjectStructureTests |
-| AUC-BUILD-006 | Release Gates | Ready to Start Product Implementation | engineering/check-docs.sh, pack/test gates | EngineeringGateTests; PackagingReleaseGateTests |
+| AUC-BUILD-006 | Release Gates | 已实现并通过产品合同测试 | engineering/check-docs.sh, pack/test gates | EngineeringGateTests; PackagingReleaseGateTests |
 | AUC-BUILD-007 | Test Naming | Ready to Start Product Implementation | test project and test file naming convention | TestNamingConventionTests |
 
 ## Feature 硬门禁
@@ -104,7 +104,7 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-BUILD-006 Release Gates
 
 Feature ID: `AUC-BUILD-006`
-Status: Ready to Start Product Implementation
+Status: 已实现并通过产品合同测试
 Goal: 聚合发布前工程验证。
 Public Contract: engineering/check-docs.sh, pack/test gates
 Runtime / Build Behavior: 本地和 CI 都执行 docs、format、build、test、pack、package verification。
