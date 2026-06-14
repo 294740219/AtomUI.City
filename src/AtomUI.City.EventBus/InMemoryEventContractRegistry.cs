@@ -36,6 +36,12 @@ public sealed class InMemoryEventContractRegistry : IEventContractRegistry
 
     private void RegisterCore(EventContractDescriptor descriptor)
     {
+        if (descriptor.Plane != EventContractPlane.Shared)
+        {
+            throw new InvalidOperationException(
+                $"Shared event contract registry cannot register plugin-private contract '{descriptor.ContractId.Value}'.");
+        }
+
         if (_byContractId.TryGetValue(descriptor.ContractId, out var existingContract)
             && existingContract.EventType != descriptor.EventType)
         {

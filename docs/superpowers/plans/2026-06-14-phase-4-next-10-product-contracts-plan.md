@@ -96,12 +96,12 @@
 - Modify: `docs/modules/eventbus/testing.md`
 - Modify: this plan file
 
-- [ ] **Step 1: Add a failing test that `InMemoryEventContractRegistry.Register(EventContractDescriptor.PluginPrivate<TEvent>(...))` throws `InvalidOperationException`.**
-- [ ] **Step 2: Run focused registry tests and verify the new test fails.**
-- [ ] **Step 3: Reject plugin-private descriptors in the shared in-memory registry.**
-- [ ] **Step 4: Update EventBus contract registry docs and status.**
-- [ ] **Step 5: Run focused EventBus tests, docs check, public API check, and `git diff --check`.**
-- [ ] **Step 6: Commit with `fix(EventBus): reject private descriptors in shared registry`.**
+- [x] **Step 1: Add a failing test that `InMemoryEventContractRegistry.Register(EventContractDescriptor.PluginPrivate<TEvent>(...))` throws `InvalidOperationException`.**
+- [x] **Step 2: Run focused registry tests and verify the new test fails.**
+- [x] **Step 3: Reject plugin-private descriptors in the shared in-memory registry.**
+- [x] **Step 4: Update EventBus contract registry docs and status.**
+- [x] **Step 5: Run focused EventBus tests, docs check, public API check, and `git diff --check`.**
+- [x] **Step 6: Commit with `fix(EventBus): reject private descriptors in shared registry`.**
 
 ### Task 7: StopAsync remains idempotent after disposal
 

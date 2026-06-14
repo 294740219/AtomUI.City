@@ -42,6 +42,18 @@ public sealed class EventContractRegistryTests
     }
 
     [Fact]
+    public void SharedContractRegistryRejectsPluginPrivateDescriptor()
+    {
+        var contractId = new EventContractId("atomui.city.tests.private.v1");
+        var registry = new InMemoryEventContractRegistry();
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => registry.Register(EventContractDescriptor.PluginPrivate<TestEvent>(contractId)));
+
+        Assert.Contains(contractId.Value, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ContractRegistryReturnsDefaultDescriptorForUnregisteredInternalEvent()
     {
         var registry = new InMemoryEventContractRegistry();

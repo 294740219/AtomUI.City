@@ -6,7 +6,7 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | AUC-EVENTBUS-001 | 是 | 是 | EventPublicationTests | 已有基线 | 部分通过 | 断言 delivery result、null event、预取消 token、error policy、diagnostics。 | 仍需完整产品合同测试 | 产品化进行中 |
 | AUC-EVENTBUS-002 | 是 | 是 | EventSubscriptionTests | 已有基线 | 必需 | 断言 dispose 后不再收到事件。 | 必需 | 准备开始产品实现 |
-| AUC-EVENTBUS-003 | 是 | 是 | EventContractRegistryTests | 已有基线 | 必需 | 断言 shared contract、private plugin type 拒绝。 | 必需 | 准备开始产品实现 |
+| AUC-EVENTBUS-003 | 是 | 是 | EventContractRegistryTests | 已有基线 | 部分通过 | 断言 shared contract assembly match、重复 contract id、稳定默认映射、shared registry 拒绝 plugin-private descriptor。 | 仍需完整产品合同测试 | 产品化进行中 |
 | AUC-EVENTBUS-004 | 是 | 是 | EventDispatchingTests | 已有基线 | 部分通过 | 断言顺序、异常聚合、停止策略、未知 error policy 拒绝。 | 仍需完整产品合同测试 | 产品化进行中 |
 | AUC-EVENTBUS-005 | 是 | 是 | EventDiagnosticsTests | 已有基线 | 必需 | 断言 EventBus.Event* 现有代码。 | 必需 | 准备开始产品实现 |
 | AUC-EVENTBUS-006 | 是 | 是 | EventBusRegistrationTests | 已有基线 | 必需 | 断言默认服务和可替换 diagnostics。 | 必需 | 准备开始产品实现 |

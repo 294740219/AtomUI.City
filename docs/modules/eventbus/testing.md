@@ -24,7 +24,7 @@
 | --- | --- | --- | --- | --- | --- |
 | AUC-EVENTBUS-001 | Unit | EventPublicationTests | 断言 delivery result、error policy、diagnostics。 | contract 未登记、handler 失败、取消。 | Required |
 | AUC-EVENTBUS-002 | RuntimeLifecycle | EventSubscriptionTests | 断言 dispose 后不再收到事件。 | 重复释放、owner dispose、插件 unload。 | Required |
-| AUC-EVENTBUS-003 | Unit | EventContractRegistryTests | 断言 shared contract、private plugin type 拒绝。 | 跨插件私有类型拒绝。 | Required |
+| AUC-EVENTBUS-003 | Unit | EventContractRegistryTests | 断言 shared contract assembly match、重复 contract id、稳定默认映射、shared registry 拒绝 plugin-private descriptor。 | 跨插件私有类型拒绝。 | 部分通过 |
 | AUC-EVENTBUS-004 | Unit | EventDispatchingTests | 断言顺序、异常聚合、停止策略。 | handler 异常、取消、继续或停止。 | Required |
 | AUC-EVENTBUS-005 | Unit | EventDiagnosticsTests | 断言 EventBus.Event* 现有代码。 | diagnostics collector 缺失不影响 publish。 | Required |
 | AUC-EVENTBUS-006 | Unit | EventBusRegistrationTests | 断言默认服务和可替换 diagnostics。 | 重复注册和 override 行为。 | Required |
