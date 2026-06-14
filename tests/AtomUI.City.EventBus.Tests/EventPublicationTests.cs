@@ -396,6 +396,20 @@ public sealed class EventPublicationTests
     }
 
     [Fact]
+    public void DeliveryResultRejectsSuccessfulErrorMessageInitMutation()
+    {
+        var delivery = new EventDeliveryResult(
+            EventSubscriptionId.New(),
+            EventDispatchPolicy.Serialized,
+            Succeeded: true);
+
+        Assert.Throws<ArgumentException>(() => delivery with
+        {
+            ErrorMessage = "should not be present",
+        });
+    }
+
+    [Fact]
     public async Task PostAsyncReturnsAcceptedEventIdUsedByDelivery()
     {
         var eventBus = new InMemoryEventBus();

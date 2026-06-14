@@ -64,6 +64,14 @@ public sealed record EventDeliveryResult(
 
     public bool Succeeded { get; init; } = ValidateSucceeded(Succeeded, Canceled, ErrorMessage);
 
+    private string? _errorMessage = ValidateErrorMessage(Succeeded, ErrorMessage);
+
+    public string? ErrorMessage
+    {
+        get => _errorMessage;
+        init => _errorMessage = ValidateErrorMessage(Succeeded, value);
+    }
+
     private bool _canceled = ValidateCanceled(Succeeded, Canceled);
 
     public bool Canceled
@@ -90,6 +98,16 @@ public sealed record EventDeliveryResult(
         }
 
         return dispatchPolicy;
+    }
+
+    private static string? ValidateErrorMessage(bool succeeded, string? errorMessage)
+    {
+        if (succeeded && !string.IsNullOrWhiteSpace(errorMessage))
+        {
+            throw new ArgumentException("Successful event delivery result cannot include an error message.", nameof(ErrorMessage));
+        }
+
+        return errorMessage;
     }
 
     private static bool ValidateCanceled(bool succeeded, bool canceled)
