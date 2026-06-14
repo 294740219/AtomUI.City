@@ -29,6 +29,40 @@ public sealed class ComputedStateTests
     }
 
     [Fact]
+    public void ComputedStateInvalidatesWithoutSubscribersAndRecomputesOnRead()
+    {
+        var source = new WritableState<int>(1);
+        var computeCount = 0;
+        var computed = new ComputedState<int>(
+            () =>
+            {
+                computeCount++;
+                return source.Value * 2;
+            },
+            source);
+
+        Assert.Equal(2, computed.Value);
+        Assert.Equal(1, computeCount);
+
+        source.SetValue(2);
+
+        Assert.Equal(1, computeCount);
+        Assert.Equal(0, computed.Version);
+
+        Assert.Equal(4, computed.Value);
+        Assert.Equal(2, computeCount);
+        Assert.Equal(1, computed.Version);
+    }
+
+    [Fact]
+    public void ComputedStateRejectsNullDependency()
+    {
+        IReadOnlyState[] dependencies = [null!];
+
+        Assert.Throws<ArgumentException>(() => new ComputedState<int>(() => 1, dependencies));
+    }
+
+    [Fact]
     public void ComputedStateNotifiesWhenComputedValueChanges()
     {
         var source = new WritableState<int>(1);

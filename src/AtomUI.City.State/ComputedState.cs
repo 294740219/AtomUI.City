@@ -11,6 +11,7 @@ public sealed class ComputedState<T> : IComputedState<T>, IDisposable
     private readonly List<IStateSubscription> _dependencySubscriptions = [];
     private bool _hasComputeFailure;
     private bool _hasValue;
+    private bool _isDirty = true;
     private bool _isDisposed;
     private T? _value;
 
@@ -32,7 +33,12 @@ public sealed class ComputedState<T> : IComputedState<T>, IDisposable
 
         foreach (var dependency in dependencies)
         {
-            _dependencySubscriptions.Add(dependency.OnChange(_ => RecomputeAndNotify()));
+            if (dependency is null)
+            {
+                throw new ArgumentException("Computed state dependencies must not contain null.", nameof(dependencies));
+            }
+
+            _dependencySubscriptions.Add(dependency.OnChange(_ => InvalidateAndNotify()));
         }
     }
 
@@ -82,7 +88,7 @@ public sealed class ComputedState<T> : IComputedState<T>, IDisposable
 
             _subscriptions.Add(subscription);
 
-            return subscription;
+            return new RemovingStateSubscription(this, subscription);
         }
     }
 
@@ -125,7 +131,7 @@ public sealed class ComputedState<T> : IComputedState<T>, IDisposable
         _subscriptions.Clear();
     }
 
-    private void RecomputeAndNotify()
+    private void InvalidateAndNotify()
     {
         StateChangedEventArgs<T>? change = null;
         StateSubscription[] subscriptions;
@@ -137,23 +143,19 @@ public sealed class ComputedState<T> : IComputedState<T>, IDisposable
                 return;
             }
 
-            var oldValue = _value;
-            var hadValue = _hasValue;
-            var newValue = TryCompute();
-
-            if (!_hasValue)
+            _isDirty = true;
+            if (_subscriptions.Count == 0)
             {
                 return;
             }
 
-            if (hadValue && EqualityComparer<T>.Default.Equals(oldValue, newValue))
-            {
-                return;
-            }
-
-            Version++;
-            change = new StateChangedEventArgs<T>(oldValue!, newValue!, Version);
+            change = RecomputeForNotification();
             subscriptions = _subscriptions.ToArray();
+        }
+
+        if (change is null)
+        {
+            return;
         }
 
         foreach (var subscription in subscriptions)
@@ -164,12 +166,42 @@ public sealed class ComputedState<T> : IComputedState<T>, IDisposable
 
     private void EnsureValue()
     {
-        if (_hasValue || _hasComputeFailure)
+        if (!_isDirty && (_hasValue || _hasComputeFailure))
         {
             return;
         }
 
-        TryCompute();
+        var oldValue = _value;
+        var hadValue = _hasValue;
+        var newValue = TryCompute();
+
+        if (_hasValue &&
+            hadValue &&
+            !EqualityComparer<T>.Default.Equals(oldValue, newValue))
+        {
+            Version++;
+        }
+    }
+
+    private StateChangedEventArgs<T>? RecomputeForNotification()
+    {
+        var oldValue = _value;
+        var hadValue = _hasValue;
+        var newValue = TryCompute();
+
+        if (!_hasValue)
+        {
+            return null;
+        }
+
+        if (hadValue && EqualityComparer<T>.Default.Equals(oldValue, newValue))
+        {
+            return null;
+        }
+
+        Version++;
+
+        return new StateChangedEventArgs<T>(oldValue!, newValue!, Version);
     }
 
     private T? TryCompute()
@@ -179,6 +211,7 @@ public sealed class ComputedState<T> : IComputedState<T>, IDisposable
             _value = _compute();
             _hasComputeFailure = false;
             _hasValue = true;
+            _isDirty = false;
             LastError = null;
 
             return _value;
@@ -186,6 +219,7 @@ public sealed class ComputedState<T> : IComputedState<T>, IDisposable
         catch (Exception exception)
         {
             _hasComputeFailure = true;
+            _isDirty = false;
             LastError = exception;
             _diagnostics?.Write(new HostDiagnosticRecord(
                 StateDiagnosticIds.ComputedStateComputeFailed,
@@ -216,6 +250,41 @@ public sealed class ComputedState<T> : IComputedState<T>, IDisposable
                 StateDiagnosticIds.ComputedStateDisposeFailed,
                 $"Computed state failed to dispose value type '{typeof(T).FullName}' subscription: {exception.Message}",
                 HostDiagnosticSeverity.Error));
+        }
+    }
+
+    private void Remove(StateSubscription subscription)
+    {
+        lock (_syncRoot)
+        {
+            _subscriptions.Remove(subscription);
+        }
+    }
+
+    private sealed class RemovingStateSubscription : IStateSubscription
+    {
+        private readonly ComputedState<T> _state;
+        private readonly StateSubscription _subscription;
+        private bool _disposed;
+
+        public RemovingStateSubscription(
+            ComputedState<T> state,
+            StateSubscription subscription)
+        {
+            _state = state;
+            _subscription = subscription;
+        }
+
+        public void Dispose()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            _subscription.Dispose();
+            _state.Remove(_subscription);
         }
     }
 }
