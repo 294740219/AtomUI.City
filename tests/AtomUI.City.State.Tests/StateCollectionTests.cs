@@ -200,6 +200,22 @@ public sealed class StateCollectionTests
     }
 
     [Fact]
+    public void DisposeClearsActiveSubscriptions()
+    {
+        var collection = new StateCollection<string, int>();
+        var subscription = collection.OnChange(_ => { });
+
+        collection.Dispose();
+
+        var subscriptions = Assert.IsAssignableFrom<System.Collections.ICollection>(
+            typeof(StateCollection<string, int>)
+                .GetField("_subscriptions", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+                .GetValue(collection));
+        Assert.Empty(subscriptions);
+        subscription.Dispose();
+    }
+
+    [Fact]
     public void AddOrUpdateRangeMergesChangesIntoSingleNotificationInInputOrder()
     {
         var collection = new StateCollection<string, int>();

@@ -372,6 +372,8 @@ public sealed class StateCollection<TKey, TItem> : IStateCollection<TKey, TItem>
 
     public void Dispose()
     {
+        StateSubscription[] subscriptions;
+
         lock (_syncRoot)
         {
             if (_disposed)
@@ -380,6 +382,13 @@ public sealed class StateCollection<TKey, TItem> : IStateCollection<TKey, TItem>
             }
 
             _disposed = true;
+            subscriptions = _subscriptions.ToArray();
+            _subscriptions.Clear();
+        }
+
+        foreach (var subscription in subscriptions)
+        {
+            subscription.Dispose();
         }
     }
 
