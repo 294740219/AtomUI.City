@@ -67,6 +67,21 @@ public sealed class PackageMetadataTests
         Assert.Empty(packageReferencesWithInlineVersions);
     }
 
+    [Fact]
+    public void PackageValidationScriptChecksNuspecMetadataAndDependencyGroups()
+    {
+        var repositoryRoot = RepositoryPaths.FindRepositoryRoot();
+        var validatePackagesScript = File.ReadAllText(Path.Combine(repositoryRoot, "engineering", "validate-packages.sh"));
+
+        Assert.Contains("require_nuspec_metadata", validatePackagesScript, StringComparison.Ordinal);
+        Assert.Contains("<id>$project_name</id>", validatePackagesScript, StringComparison.Ordinal);
+        Assert.Contains("<version>$version</version>", validatePackagesScript, StringComparison.Ordinal);
+        Assert.Contains("LGPL-3.0-only", validatePackagesScript, StringComparison.Ordinal);
+        Assert.Contains("https://github.com/AtomUI/AtomUICity", validatePackagesScript, StringComparison.Ordinal);
+        Assert.Contains("require_nuspec_dependency_group", validatePackagesScript, StringComparison.Ordinal);
+        Assert.Contains("<group targetFramework=", validatePackagesScript, StringComparison.Ordinal);
+    }
+
     private static IReadOnlyDictionary<string, string> ReadProperties(XDocument document)
     {
         return document

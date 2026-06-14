@@ -5,8 +5,8 @@
 ## 当前结论
 
 - 1.0 发布状态：不可发布。
-- 全局进度：17/118。
-- 模块 Feature 合同：17/109。
+- 全局进度：18/118。
+- 模块 Feature 合同：18/109。
 - 最终发布门禁：0/9。
 - 最近校准日期：2026-06-14。
 
@@ -35,7 +35,7 @@
 | --- | ---: | ---: | ---: | --- |
 | Core | 7 | 0 | 7 | 已完成 |
 | Testing | 9 | 0 | 9 | 已完成 |
-| Build | 1 | 6 | 7 | 产品化进行中 |
+| Build | 2 | 5 | 7 | 产品化进行中 |
 | Generators | 0 | 8 | 8 | 未完成 |
 | Routing | 0 | 8 | 8 | 未完成 |
 | Presentation | 0 | 8 | 8 | 未完成 |
@@ -75,7 +75,7 @@
 ## Build
 
 - [x] AUC-BUILD-001 Output Layout。验收重点：artifacts、packages、logs、test-results 都在 output 下。
-- [ ] AUC-BUILD-002 Package Metadata。验收重点：LGPL v3、repository、symbol、package id 和 dependency group。
+- [x] AUC-BUILD-002 Package Metadata。验收重点：LGPL v3、repository、symbol、package id 和 dependency group。
 - [ ] AUC-BUILD-003 Project Inventory。验收重点：src/tests 项目被 inventory 覆盖。
 - [ ] AUC-BUILD-004 Dependency Boundary。验收重点：runtime 不依赖 Testing、Roslyn 或 test packages。
 - [ ] AUC-BUILD-005 Source Generator Packaging。验收重点：generator target、analyzer layout、runtime 不引用 generator。

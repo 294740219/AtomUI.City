@@ -60,6 +60,12 @@
 
 适用范围：应用 publish、静态插件、bundled plugin、资源包、Native AOT、发布 manifest 和发布诊断
 
+NuGet 包 metadata 由 `build/PackageMetaInfo.props` 提供统一默认值，`engineering/validate-packages.sh` 必须在真实 nupkg 上检查：
+
+- nuspec `id`、`version`、LGPL-3.0-only license、repository、readme 和 release notes。
+- 非 generator/template 包必须包含 target framework dependency group。
+- snupkg、XML docs、NuGet readme、release notes 和 license 必须随包输出。
+
 ### 1. 目标
 
 Build 负责定义 AtomUI.City 应用发布输出。发布输出必须同时服务普通 CoreCLR 桌面部署、动态插件部署、静态插件部署和 Native AOT 部署。

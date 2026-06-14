@@ -59,6 +59,38 @@ require_entry_pattern() {
   fi
 }
 
+require_nuspec_metadata() {
+  local package="$1"
+  local nuspec="$2"
+  local project_name="$3"
+
+  require_nuspec_text "$package" "$nuspec" "<id>$project_name</id>"
+  require_nuspec_text "$package" "$nuspec" "<version>$version</version>"
+  require_nuspec_text "$package" "$nuspec" '<license type="expression">LGPL-3.0-only</license>'
+  require_nuspec_text "$package" "$nuspec" '<repository type="git" url="https://github.com/AtomUI/AtomUICity"'
+  require_nuspec_text "$package" "$nuspec" '<readme>README.nuget.md</readme>'
+  require_nuspec_text "$package" "$nuspec" '<releaseNotes>See RELEASE_NOTES.md for release notes.</releaseNotes>'
+}
+
+require_nuspec_dependency_group() {
+  local package="$1"
+  local nuspec="$2"
+
+  require_nuspec_text "$package" "$nuspec" '<dependencies>'
+  require_nuspec_text "$package" "$nuspec" '<group targetFramework='
+}
+
+require_nuspec_text() {
+  local package="$1"
+  local nuspec="$2"
+  local text="$3"
+
+  if ! grep -Fq "$text" <<< "$nuspec"; then
+    printf 'Package %s nuspec is missing text: %s\n' "$package" "$text" >&2
+    exit 1
+  fi
+}
+
 while IFS= read -r project; do
   project_name="$(basename "$project" .csproj)"
   nupkg="$package_dir/$project_name.$version.nupkg"
@@ -68,6 +100,8 @@ while IFS= read -r project; do
 
   entries="$(unzip -Z1 "$nupkg")"
   require_entry "$nupkg" "$entries" "$project_name.nuspec"
+  nuspec="$(unzip -p "$nupkg" "$project_name.nuspec")"
+  require_nuspec_metadata "$nupkg" "$nuspec" "$project_name"
   require_entry "$nupkg" "$entries" "LICENSE"
   require_entry "$nupkg" "$entries" "README.nuget.md"
   require_entry "$nupkg" "$entries" "RELEASE_NOTES.md"
@@ -83,6 +117,7 @@ while IFS= read -r project; do
       require_entry "$nupkg" "$entries" "content/templates/atomui-city-plugin/.template.config/template.json"
       ;;
     *)
+      require_nuspec_dependency_group "$nupkg" "$nuspec"
       require_file "$snupkg"
       require_entry_pattern "$nupkg" "$entries" "^lib/.+/$project_name\\.dll$"
       require_entry_pattern "$nupkg" "$entries" "^lib/.+/$project_name\\.xml$"
