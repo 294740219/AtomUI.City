@@ -158,6 +158,16 @@ public sealed class StateCollectionTests
     }
 
     [Fact]
+    public void AddOrUpdateRejectsDisposedCollection()
+    {
+        var collection = new StateCollection<string, int>();
+
+        collection.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(() => collection.AddOrUpdate("settings", 1));
+    }
+
+    [Fact]
     public void AddOrUpdateRangeMergesChangesIntoSingleNotificationInInputOrder()
     {
         var collection = new StateCollection<string, int>();

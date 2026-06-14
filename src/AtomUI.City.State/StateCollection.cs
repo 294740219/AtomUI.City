@@ -171,6 +171,8 @@ public sealed class StateCollection<TKey, TItem> : IStateCollection<TKey, TItem>
 
         lock (_syncRoot)
         {
+            ThrowIfDisposed();
+
             StateCollectionChange<TKey, TItem> change;
 
             if (_items.TryGetValue(key, out var currentItem))
@@ -440,6 +442,14 @@ public sealed class StateCollection<TKey, TItem> : IStateCollection<TKey, TItem>
         lock (_syncRoot)
         {
             _subscriptions.Remove(subscription);
+        }
+    }
+
+    private void ThrowIfDisposed()
+    {
+        if (_disposed)
+        {
+            throw new ObjectDisposedException(GetType().FullName);
         }
     }
 
