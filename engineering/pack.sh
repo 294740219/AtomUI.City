@@ -22,13 +22,16 @@ while [[ $# -gt 0 ]]; do
 done
 
 package_output="output/NuGet/$configuration"
-mkdir -p "$package_output"
+log_output="output/logs/$configuration"
+mkdir -p "$package_output" "$log_output"
 
 while IFS= read -r project; do
+  project_name="$(basename "$project" .csproj)"
+
   if [[ "$no_build" == true ]]; then
     dotnet restore "$project" -p:Configuration="$configuration"
-    dotnet pack "$project" --configuration "$configuration" --output "$package_output" --no-build -p:TreatWarningsAsErrors=true
+    dotnet pack "$project" --configuration "$configuration" --output "$package_output" --no-build -p:TreatWarningsAsErrors=true -bl:$log_output/pack-$project_name.binlog
   else
-    dotnet pack "$project" --configuration "$configuration" --output "$package_output" -p:TreatWarningsAsErrors=true
+    dotnet pack "$project" --configuration "$configuration" --output "$package_output" -p:TreatWarningsAsErrors=true -bl:$log_output/pack-$project_name.binlog
   fi
 done < <(find src/AtomUI.City.* -name 'AtomUI.City.*.csproj' | sort)

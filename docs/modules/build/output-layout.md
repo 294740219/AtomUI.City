@@ -85,6 +85,19 @@ output/
 <AtomUICityOutputRoot>output</AtomUICityOutputRoot>
 ```
 
+当前 1.0 合同由 `build/Output.props` 和工程脚本共同提供：
+
+| 输出类型 | 默认路径 |
+|---|---|
+| Binary output | `output/bin/<Configuration>/<ProjectName>` |
+| Intermediate output | `output/<ProjectName>/obj/<Configuration>` |
+| Package output | `output/NuGet/<Configuration>` |
+| Artifact root | `output/artifacts/<Configuration>` |
+| Build logs | `output/logs/<Configuration>` |
+| Test results | `output/test-results/<Configuration>` |
+
+`engineering/pack.sh` 必须把 pack binlog 写入 `output/logs/<Configuration>`；`engineering/test-ci.sh` 必须把 TRX test results 写入 `output/test-results/<Configuration>`。
+
 规则：
 
 - 相对路径基于 repo root 或 solution root 解析。

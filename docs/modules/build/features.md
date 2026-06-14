@@ -6,7 +6,7 @@
 
 | Feature ID | 名称 | 状态 | Public Contract | 主测试 |
 | --- | --- | --- | --- | --- |
-| AUC-BUILD-001 | Output Layout | Ready to Start Product Implementation | Directory.Build.props, output path convention | OutputLayoutTests |
+| AUC-BUILD-001 | Output Layout | 已实现并通过产品合同测试 | Directory.Build.props, output path convention | OutputLayoutTests |
 | AUC-BUILD-002 | Package Metadata | Ready to Start Product Implementation | csproj package properties, pack target | PackageMetadataTests |
 | AUC-BUILD-003 | Project Inventory | Ready to Start Product Implementation | solution/project inventory conventions | ProjectInventoryTests |
 | AUC-BUILD-004 | Dependency Boundary | Ready to Start Product Implementation | project reference and package reference rules | ProjectDependencyBoundaryTests |
@@ -34,7 +34,7 @@
 ## AUC-BUILD-001 Output Layout
 
 Feature ID: `AUC-BUILD-001`
-Status: Ready to Start Product Implementation
+Status: 已实现并通过产品合同测试
 Goal: 定义 repo 统一输出目录。
 Public Contract: Directory.Build.props, output path convention
 Runtime / Build Behavior: build/test/pack/logs 都写到 output 子目录。

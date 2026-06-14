@@ -1,10 +1,16 @@
 <Project>
   <PropertyGroup>
-    <PackageOutputPath>$(MSBuildThisFileDirectory)../output/NuGet/$(Configuration)</PackageOutputPath>
+    <AtomUICityOutputRoot>$(MSBuildThisFileDirectory)../output</AtomUICityOutputRoot>
+    <AtomUICityArtifactsOutputPath>$(AtomUICityOutputRoot)/artifacts/$(Configuration)</AtomUICityArtifactsOutputPath>
+    <AtomUICityPackagesOutputPath>$(AtomUICityOutputRoot)/NuGet/$(Configuration)</AtomUICityPackagesOutputPath>
+    <AtomUICityLogsOutputPath>$(AtomUICityOutputRoot)/logs/$(Configuration)</AtomUICityLogsOutputPath>
+    <AtomUICityTestResultsOutputPath>$(AtomUICityOutputRoot)/test-results/$(Configuration)</AtomUICityTestResultsOutputPath>
+    <PackageOutputPath>$(AtomUICityPackagesOutputPath)</PackageOutputPath>
     <OutputPathWithoutFramework>$(MSBuildThisFileDirectory)../output/bin/$(Configuration)/$(MSBuildProjectName)</OutputPathWithoutFramework>
     <OutputPath>$(OutputPathWithoutFramework)</OutputPath>
     <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)../output/$(MSBuildProjectName)/obj</BaseIntermediateOutputPath>
     <IntermediateOutputPathWithoutFramework>$(BaseIntermediateOutputPath)</IntermediateOutputPathWithoutFramework>
     <IntermediateOutputPath>$(BaseIntermediateOutputPath)/$(Configuration)</IntermediateOutputPath>
+    <VSTestResultsDirectory>$(AtomUICityTestResultsOutputPath)</VSTestResultsDirectory>
   </PropertyGroup>
 </Project>

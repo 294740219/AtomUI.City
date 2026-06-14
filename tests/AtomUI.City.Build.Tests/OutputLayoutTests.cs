@@ -25,11 +25,17 @@ public sealed class OutputLayoutTests
             .Where(element => element.Parent?.Name.LocalName == "PropertyGroup")
             .ToDictionary(element => element.Name.LocalName, element => element.Value, StringComparer.Ordinal);
 
-        Assert.Equal("$(MSBuildThisFileDirectory)../output/NuGet/$(Configuration)", properties["PackageOutputPath"]);
+        Assert.Equal("$(AtomUICityPackagesOutputPath)", properties["PackageOutputPath"]);
         Assert.Equal("$(MSBuildThisFileDirectory)../output/bin/$(Configuration)/$(MSBuildProjectName)", properties["OutputPathWithoutFramework"]);
         Assert.Equal("$(OutputPathWithoutFramework)", properties["OutputPath"]);
         Assert.Equal("$(MSBuildThisFileDirectory)../output/$(MSBuildProjectName)/obj", properties["BaseIntermediateOutputPath"]);
         Assert.Equal("$(BaseIntermediateOutputPath)/$(Configuration)", properties["IntermediateOutputPath"]);
+        Assert.Equal("$(MSBuildThisFileDirectory)../output", properties["AtomUICityOutputRoot"]);
+        Assert.Equal("$(AtomUICityOutputRoot)/artifacts/$(Configuration)", properties["AtomUICityArtifactsOutputPath"]);
+        Assert.Equal("$(AtomUICityOutputRoot)/NuGet/$(Configuration)", properties["AtomUICityPackagesOutputPath"]);
+        Assert.Equal("$(AtomUICityOutputRoot)/logs/$(Configuration)", properties["AtomUICityLogsOutputPath"]);
+        Assert.Equal("$(AtomUICityOutputRoot)/test-results/$(Configuration)", properties["AtomUICityTestResultsOutputPath"]);
+        Assert.Equal("$(AtomUICityTestResultsOutputPath)", properties["VSTestResultsDirectory"]);
     }
 
     [Fact]
@@ -45,5 +51,19 @@ public sealed class OutputLayoutTests
             .ToArray();
 
         Assert.Contains("$(MSBuildThisFileDirectory)/build/Output.props", imports);
+    }
+
+    [Fact]
+    public void EngineeringScriptsWriteLogsAndTestResultsUnderRepositoryOutput()
+    {
+        var repositoryRoot = RepositoryPaths.FindRepositoryRoot();
+        var packScript = File.ReadAllText(Path.Combine(repositoryRoot, "engineering", "pack.sh"));
+        var testScript = File.ReadAllText(Path.Combine(repositoryRoot, "engineering", "test-ci.sh"));
+
+        Assert.Contains("output/logs/$configuration", packScript, StringComparison.Ordinal);
+        Assert.Contains("-bl:$log_output/", packScript, StringComparison.Ordinal);
+        Assert.Contains("output/test-results/$configuration", testScript, StringComparison.Ordinal);
+        Assert.Contains("--results-directory \"$test_results\"", testScript, StringComparison.Ordinal);
+        Assert.Contains("--logger \"trx;LogFilePrefix=ci-tests\"", testScript, StringComparison.Ordinal);
     }
 }
