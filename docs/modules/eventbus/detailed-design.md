@@ -398,7 +398,7 @@ EventBus 需要定义 handler 错误策略：
 |---|---|
 | `ContinueAndReport` | 记录失败并继续其他订阅。默认。 |
 | `StopPublication` | 停止当前事件剩余投递。 |
-| `FailPublisher` | 发布结果标记失败，由发布方处理。 |
+| `FailPublisher` | 传播 handler 异常给 publisher。 |
 | `DisableSubscription` | 达到连续失败阈值后禁用订阅。 |
 
 错误规则：

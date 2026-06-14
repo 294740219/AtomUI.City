@@ -9,7 +9,7 @@
 | AUC-EVENTBUS-001 | Typed Publish | Completed | IEventBus.PublishAsync, IEventBus.PostAsync, EventPublishResult | EventPublicationTests |
 | AUC-EVENTBUS-002 | Subscription Lifecycle | Completed | IEventSubscription, EventSubscriptionOptions | EventSubscriptionTests |
 | AUC-EVENTBUS-003 | Contract Registry | Completed | IEventContractRegistry, EventContractDescriptor | EventContractRegistryTests |
-| AUC-EVENTBUS-004 | Dispatch Policy | 产品化进行中 | EventDispatchPolicy, EventErrorPolicy, EventSubscriptionOptions | EventDispatchingTests |
+| AUC-EVENTBUS-004 | Dispatch Policy | Completed | EventDispatchPolicy, EventErrorPolicy, EventSubscriptionOptions | EventDispatchingTests |
 | AUC-EVENTBUS-005 | Diagnostics | 产品化进行中 | EventDiagnosticIds | EventDiagnosticsTests |
 | AUC-EVENTBUS-006 | DI Registration | 准备开始产品实现 | EventBusServiceCollectionExtensions | EventBusRegistrationTests |
 
@@ -73,15 +73,15 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-EVENTBUS-004 Dispatch Policy
 
 Feature ID: `AUC-EVENTBUS-004`
-Status: 产品化进行中
+Status: Completed
 Goal: 顺序派发和错误策略。
 Public Contract: EventDispatchPolicy, EventErrorPolicy
-Runtime / Build Behavior: 顺序派发和错误策略。
-Failure Behavior: handler 异常、取消、继续或停止、未知 error policy。
+Runtime / Build Behavior: 默认 Serialized 派发；Current、UiThread、Background、Serialized 和错误策略语义稳定。
+Failure Behavior: handler 异常按 ContinueAndReport 聚合并继续、StopPublication 停止剩余 delivery、FailPublisher 传播异常；未知 error policy 拒绝。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `EventDispatchingTests`。
-Required Assertions: 断言顺序、异常聚合、停止策略、未知 error policy 拒绝。
+Required Assertions: 断言默认 Serialized、dispatch/error enum 稳定值、异常聚合、停止策略、FailPublisher 传播、未知 error policy 拒绝。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 ## AUC-EVENTBUS-005 Diagnostics
 

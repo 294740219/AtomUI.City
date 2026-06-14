@@ -194,7 +194,7 @@ EventBus 错误策略：
 |---|---|
 | `ContinueAndReport` | 继续独立 handler，聚合失败。默认。 |
 | `StopPublication` | 不再开始剩余 delivery。 |
-| `FailPublisher` | EventPublishResult 为 failed。 |
+| `FailPublisher` | 传播 handler 异常给 publisher。 |
 | `DisableSubscription` | 订阅进入 quiescing 并移除。 |
 
 错误策略分层：
