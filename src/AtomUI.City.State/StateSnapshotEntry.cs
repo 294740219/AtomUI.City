@@ -2,6 +2,8 @@ namespace AtomUI.City.State;
 
 public sealed record StateSnapshotEntry
 {
+    private string _stateName = null!;
+
     public StateSnapshotEntry(
         string stateName,
         Type valueType,
@@ -39,7 +41,16 @@ public sealed record StateSnapshotEntry
         PluginId = pluginId;
     }
 
-    public string StateName { get; init; }
+    public string StateName
+    {
+        get => _stateName;
+        init
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(value);
+
+            _stateName = value;
+        }
+    }
 
     public Type ValueType { get; init; }
 

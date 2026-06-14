@@ -91,6 +91,23 @@ public sealed class StateSnapshotTests
     }
 
     [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void SnapshotEntryRejectsInvalidStateNameInit(string stateName)
+    {
+        var entry = new StateSnapshotEntry(
+            "AtomUI.City.Tests.Theme",
+            typeof(string),
+            "light",
+            version: 0,
+            schemaVersion: 1,
+            ownerModule: null,
+            pluginId: null);
+
+        Assert.Throws<ArgumentException>(() => entry with { StateName = stateName });
+    }
+
+    [Theory]
     [InlineData(0)]
     [InlineData(-1)]
     public void SnapshotEntryRejectsInvalidSchemaVersion(int schemaVersion)
