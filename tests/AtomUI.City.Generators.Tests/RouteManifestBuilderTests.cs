@@ -5,6 +5,8 @@ namespace AtomUI.City.Generators.Tests;
 
 public sealed class RouteManifestBuilderTests
 {
+    private const string DefaultViewModelTypeName = "__default_view_model__";
+
     [Fact]
     public void BuildSortsRoutesDeterministicallyAndResolvesParentRouteIds()
     {
@@ -61,6 +63,31 @@ public sealed class RouteManifestBuilderTests
         var diagnostic = Assert.Single(result.Diagnostics);
 
         Assert.Equal(GeneratorDiagnosticIds.DuplicateRoute, diagnostic.Id);
+        Assert.Empty(result.Manifest.Routes);
+    }
+
+    [Fact]
+    public void BuildReportsInvalidTemplatesAndMissingRouteTargets()
+    {
+        var result = RouteManifestBuilder.Build(
+            [
+                Route("Sample.App.AppRoutes", "Settings", "app.settings", RouteDefinitionMetadataKind.Route, "settings/{id", viewModelTypeName: null),
+            ]);
+
+        Assert.Collection(
+            result.Diagnostics,
+            diagnostic =>
+            {
+                Assert.Equal(GeneratorDiagnosticIds.InvalidManifestInput, diagnostic.Id);
+                Assert.Contains("requires a ViewModel target", diagnostic.Message, StringComparison.Ordinal);
+                Assert.Equal("app.settings", diagnostic.Target);
+            },
+            diagnostic =>
+            {
+                Assert.Equal(GeneratorDiagnosticIds.InvalidManifestInput, diagnostic.Id);
+                Assert.Contains("invalid route template", diagnostic.Message, StringComparison.Ordinal);
+                Assert.Equal("app.settings", diagnostic.Target);
+            });
         Assert.Empty(result.Manifest.Routes);
     }
 
@@ -132,7 +159,8 @@ public sealed class RouteManifestBuilderTests
         string id,
         RouteDefinitionMetadataKind kind,
         string? template,
-        string? parentMethodName = null)
+        string? parentMethodName = null,
+        string? viewModelTypeName = DefaultViewModelTypeName)
     {
         return new RouteDefinitionMetadata(
             routeMapTypeName,
@@ -140,7 +168,9 @@ public sealed class RouteManifestBuilderTests
             id,
             kind,
             template,
-            viewModelTypeName: "Sample.App." + methodName + "ViewModel",
+            string.Equals(viewModelTypeName, DefaultViewModelTypeName, StringComparison.Ordinal)
+                ? "Sample.App." + methodName + "ViewModel"
+                : viewModelTypeName,
             parentMethodName,
             outletName: "primary",
             extensionPoint: null,

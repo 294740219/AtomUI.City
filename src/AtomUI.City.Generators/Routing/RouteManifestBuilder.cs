@@ -40,6 +40,8 @@ public static class RouteManifestBuilder
         var parentRouteIds = new Dictionary<string, string?>(StringComparer.Ordinal);
         var redirectTargetRouteIds = new Dictionary<string, string?>(StringComparer.Ordinal);
 
+        ValidateRouteDefinitions(routes, diagnostics);
+
         foreach (var route in routes)
         {
             parentRouteIds[route.Id] = ResolveReferencedRouteId(route, route.ParentMethodName, routesByMethod, diagnostics, "parent");
@@ -72,6 +74,62 @@ public static class RouteManifestBuilder
             .ToArray();
 
         return new RouteManifestResult(new RouteManifest(manifestRoutes), diagnostics);
+    }
+
+    private static void ValidateRouteDefinitions(
+        IEnumerable<RouteDefinitionMetadata> routes,
+        ICollection<GeneratorDiagnostic> diagnostics)
+    {
+        foreach (var route in routes)
+        {
+            if (route.Kind is RouteDefinitionMetadataKind.Route or RouteDefinitionMetadataKind.Layout or RouteDefinitionMetadataKind.Index &&
+                string.IsNullOrWhiteSpace(route.ViewModelTypeName))
+            {
+                diagnostics.Add(new GeneratorDiagnostic(
+                    GeneratorDiagnostics.InvalidManifestInput,
+                    $"Route '{route.Id}' requires a ViewModel target.",
+                    route.Id));
+            }
+
+            if (!string.IsNullOrWhiteSpace(route.Template) && !IsValidTemplate(route.Template!))
+            {
+                diagnostics.Add(new GeneratorDiagnostic(
+                    GeneratorDiagnostics.InvalidManifestInput,
+                    $"Route '{route.Id}' has an invalid route template '{route.Template}'.",
+                    route.Id));
+            }
+        }
+    }
+
+    private static bool IsValidTemplate(string template)
+    {
+        var parameterOpen = false;
+
+        foreach (var character in template)
+        {
+            if (character == '{')
+            {
+                if (parameterOpen)
+                {
+                    return false;
+                }
+
+                parameterOpen = true;
+                continue;
+            }
+
+            if (character == '}')
+            {
+                if (!parameterOpen)
+                {
+                    return false;
+                }
+
+                parameterOpen = false;
+            }
+        }
+
+        return !parameterOpen;
     }
 
     private static string? ResolveReferencedRouteId(
