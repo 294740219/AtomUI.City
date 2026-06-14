@@ -7,7 +7,7 @@
 | Feature ID | 名称 | 状态 | Public Contract | 主测试 |
 | --- | --- | --- | --- | --- |
 | AUC-PLUGIN-001 | Plugin Metadata | Completed | PluginAttribute, PluginManifest, PluginDescriptor | PluginDeclarationAttributeTests; PluginManifestTests |
-| AUC-PLUGIN-002 | Dependency Validation | Ready to Start Product Implementation | PluginDependencyValidator, PluginSemanticVersion | PluginDependencyTests |
+| AUC-PLUGIN-002 | Dependency Validation | Completed | PluginDependencyValidator, PluginSemanticVersion | PluginDependencyTests |
 | AUC-PLUGIN-003 | Package Installation | Ready to Start Product Implementation | PluginPackageInstaller, PluginInstallationReader, PluginPackagePaths | PluginPackageTests |
 | AUC-PLUGIN-004 | Discovery | Ready to Start Product Implementation | PluginDiscoveryScanner | PluginLoadingTests |
 | AUC-PLUGIN-005 | Loading | Ready to Start Product Implementation | PluginLoader, PluginLoadResult | PluginLoadingTests |
@@ -50,15 +50,15 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-PLUGIN-002 Dependency Validation
 
 Feature ID: `AUC-PLUGIN-002`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 校验插件依赖、版本范围和循环。
 Public Contract: PluginDependencyValidator, PluginSemanticVersion
-Runtime / Build Behavior: 校验插件依赖、版本范围和循环。
-Failure Behavior: 缺失、循环、版本不满足。
+Runtime / Build Behavior: 校验插件依赖、版本范围和循环；循环中的每个插件都产生诊断。
+Failure Behavior: 缺失、循环、版本不满足、重复 plugin id。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `PluginDependencyTests`。
-Required Assertions: 断言 missing、cycle、version mismatch diagnostics。
+Required Assertions: 断言 missing、cycle、version mismatch、duplicate id diagnostics，并断言 cycle 内每个 plugin id 都可定位。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 ## AUC-PLUGIN-003 Package Installation
 

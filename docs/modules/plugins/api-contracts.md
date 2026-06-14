@@ -9,7 +9,7 @@
 | Manifest | PluginManifest, PluginManifestReader, PluginManifestValidator | 读取和校验 plugin.json。 | 不执行插件代码；schema、version、mainAssembly、targetFramework 和 required field 稳定。 |
 | Package | PluginPackageInstaller, PluginPackageLayoutValidator, PluginInstallationReader | 安装、布局校验和安装记录。 | staging 原子切换；非法路径拒绝。 |
 | Runtime | PluginLoader, PluginRuntime, PluginRuntimeState, PluginLoadResult | 加载、启用、停用、卸载。 | 状态机显式；失败有 diagnostics。 |
-| Dependencies | PluginDependencyAttribute, PluginDependencyValidator, PluginSemanticVersion | 依赖和版本校验。 | 缺失、循环、版本不满足结构化返回。 |
+| Dependencies | PluginDependencyAttribute, PluginDependencyValidator, PluginSemanticVersion | 依赖和版本校验。 | 缺失、循环、版本不满足和重复 plugin id 结构化返回；循环中的每个 plugin id 必须有诊断。 |
 | Diagnostics | PluginDiagnosticIds, PluginDiagnostic | 插件错误码和诊断。 | 现有 AUCPLG0000-0021 保持稳定。 |
 
 ## 关键方法合同

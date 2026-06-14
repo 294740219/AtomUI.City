@@ -138,6 +138,7 @@ Host contract 必须从 Host 默认加载上下文解析。
 - 依赖插件之间应通过共享 contract 或 Host registry 交互。
 - 被依赖插件必须先验证和启用。
 - 依赖图存在环时，默认拒绝相关插件启用。
+- 依赖图存在环时，环中的每个 plugin id 必须产生 `PluginDependencyCycle` 诊断。
 - 依赖插件停用时，依赖方必须先停用或降级能力。
 
 ### 6. 加载上下文

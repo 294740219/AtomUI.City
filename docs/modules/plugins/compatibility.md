@@ -19,6 +19,7 @@
 - 删除、重命名、改变默认行为、异常类型、Result status 或诊断码语义属于 breaking change。
 - 新增 API 可以 minor 版本发布，但必须有文档、测试和迁移说明。
 - `PluginManifest` 的 required fields、schema `1.x` 支持边界、semantic version、mainAssembly 文件名和 targetFramework 非路径校验进入 1.0 兼容承诺。
+- `PluginDependencyValidator` 的 missing dependency、version mismatch、duplicate plugin id 和 cycle diagnostics 进入 1.0 兼容承诺；cycle 中每个 plugin id 必须可定位。
 
 ## 数据格式兼容
 

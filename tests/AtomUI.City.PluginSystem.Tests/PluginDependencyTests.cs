@@ -119,4 +119,34 @@ public sealed class PluginDependencyTests
         Assert.False(result.Succeeded);
         Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == PluginDiagnosticIds.PluginDependencyCycle);
     }
+
+    [Fact]
+    public void DependencyValidatorReportsEveryPluginInDependencyCycle()
+    {
+        var first = PluginDescriptor.FromManifest(
+            PluginManifestBuilder.Minimal(
+                pluginId: "com.company.first",
+                packageId: "Company.First.Plugin",
+                version: "1.0.0",
+                dependencies: [new PluginDependencyDescriptor("com.company.second", null)]),
+            rootPath: "/plugins/installed/com.company.first/1.0.0/root");
+        var second = PluginDescriptor.FromManifest(
+            PluginManifestBuilder.Minimal(
+                pluginId: "com.company.second",
+                packageId: "Company.Second.Plugin",
+                version: "1.0.0",
+                dependencies: [new PluginDependencyDescriptor("com.company.first", null)]),
+            rootPath: "/plugins/installed/com.company.second/1.0.0/root");
+
+        var result = PluginDependencyValidator.Validate([first, second]);
+        var cycleDiagnostics = result.Diagnostics
+            .Where(diagnostic => diagnostic.Code == PluginDiagnosticIds.PluginDependencyCycle)
+            .ToArray();
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(2, cycleDiagnostics.Length);
+        Assert.Contains(cycleDiagnostics, diagnostic => diagnostic.PluginId == "com.company.first");
+        Assert.Contains(cycleDiagnostics, diagnostic => diagnostic.PluginId == "com.company.second");
+        Assert.All(cycleDiagnostics, diagnostic => Assert.Equal("dependencies", diagnostic.Field));
+    }
 }

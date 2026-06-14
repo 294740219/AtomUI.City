@@ -142,10 +142,11 @@ public static class PluginDependencyValidator
     {
         var visiting = new HashSet<string>(StringComparer.Ordinal);
         var visited = new HashSet<string>(StringComparer.Ordinal);
+        var reportedCycles = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var plugin in plugins)
         {
-            Visit(plugin, byPluginId, visiting, visited, diagnostics);
+            Visit(plugin, byPluginId, visiting, visited, reportedCycles, [], diagnostics);
         }
     }
 
@@ -154,6 +155,8 @@ public static class PluginDependencyValidator
         IReadOnlyDictionary<string, PluginDescriptor> byPluginId,
         ISet<string> visiting,
         ISet<string> visited,
+        ISet<string> reportedCycles,
+        List<string> path,
         ICollection<PluginDiagnostic> diagnostics)
     {
         if (visited.Contains(plugin.PluginId))
@@ -163,23 +166,49 @@ public static class PluginDependencyValidator
 
         if (!visiting.Add(plugin.PluginId))
         {
-            diagnostics.Add(new PluginDiagnostic(
-                PluginDiagnosticIds.PluginDependencyCycle,
-                $"Plugin dependency cycle contains '{plugin.PluginId}'.",
-                plugin.PluginId,
-                "dependencies"));
+            AddCycleDiagnostics(path, plugin.PluginId, reportedCycles, diagnostics);
             return;
         }
 
+        path.Add(plugin.PluginId);
         foreach (var dependency in plugin.Manifest.Dependencies)
         {
             if (byPluginId.TryGetValue(dependency.PluginId, out var dependencyPlugin))
             {
-                Visit(dependencyPlugin, byPluginId, visiting, visited, diagnostics);
+                Visit(dependencyPlugin, byPluginId, visiting, visited, reportedCycles, path, diagnostics);
             }
         }
 
+        path.RemoveAt(path.Count - 1);
         visiting.Remove(plugin.PluginId);
         visited.Add(plugin.PluginId);
+    }
+
+    private static void AddCycleDiagnostics(
+        List<string> path,
+        string repeatedPluginId,
+        ISet<string> reportedCycles,
+        ICollection<PluginDiagnostic> diagnostics)
+    {
+        var cycleStart = path.IndexOf(repeatedPluginId);
+        if (cycleStart < 0)
+        {
+            return;
+        }
+
+        for (var index = cycleStart; index < path.Count; index++)
+        {
+            var pluginId = path[index];
+            if (!reportedCycles.Add(pluginId))
+            {
+                continue;
+            }
+
+            diagnostics.Add(new PluginDiagnostic(
+                PluginDiagnosticIds.PluginDependencyCycle,
+                $"Plugin dependency cycle contains '{pluginId}'.",
+                pluginId,
+                "dependencies"));
+        }
     }
 }
