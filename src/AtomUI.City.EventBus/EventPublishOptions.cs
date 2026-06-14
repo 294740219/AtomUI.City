@@ -2,11 +2,16 @@ namespace AtomUI.City.EventBus;
 
 public sealed class EventPublishOptions
 {
+    private string? _correlationId;
     private int _publishDepth;
 
     public static EventPublishOptions Default { get; } = new();
 
-    public string? CorrelationId { get; init; }
+    public string? CorrelationId
+    {
+        get => _correlationId;
+        init => _correlationId = EventCorrelationIds.ValidateOptional(value, nameof(CorrelationId));
+    }
 
     public string? CausationId { get; init; }
 

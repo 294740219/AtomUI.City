@@ -71,6 +71,19 @@ public sealed class EventPublicationTests
         });
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData(" trace ")]
+    [InlineData("trace\nid")]
+    public void PublishOptionsRejectInvalidCorrelationIds(string correlationId)
+    {
+        Assert.Throws<ArgumentException>(() => new EventPublishOptions
+        {
+            CorrelationId = correlationId,
+        });
+    }
+
     [Fact]
     public async Task PostAsyncRejectsNullEvent()
     {
