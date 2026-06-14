@@ -12,6 +12,7 @@
 ## 并发冲突策略
 
 - 订阅回调失败：记录 subscriptionId，不回滚已提交状态。
+- `StateDispatchPolicy.Dispatcher` 使用的 dispatcher 不可用时，状态提交仍保持成功，handler 不执行，失败写入 `AUCSTA002` 并包含 dispatch policy、version 和 dispatcher type context。
 
 ## UI 线程规则
 

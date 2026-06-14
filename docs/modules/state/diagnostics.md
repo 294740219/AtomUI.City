@@ -39,7 +39,7 @@
 | Code | Required Context |
 | --- | --- |
 | `AUCSTA001` | `valueType`、`version`；collection changed event 还应包含 `keyType`、`itemType`、`changeCount`。 |
-| `AUCSTA002` | `dispatchPolicy`、`version`。 |
+| `AUCSTA002` | `dispatchPolicy`、`version`；Dispatcher policy failure 还应包含 `dispatcherType`。 |
 | `AUCSTA003` | `stateKey`、`valueType`。 |
 | `AUCSTA004` | `accessPolicy`、`stateKey`、`valueType`。 |
 | `AUCSTA005` | `valueType`。 |

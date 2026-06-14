@@ -167,14 +167,25 @@ internal sealed class StateSubscription : IStateSubscription
         StateChangedEventArgs args,
         Exception exception)
     {
+        var context = new List<(string Key, string? Value)>
+        {
+            ("dispatchPolicy", _options.DispatchPolicy.ToString()),
+            ("version", StateDiagnosticContext.Version(args.Version))
+        };
+
+        if (_options.UiDispatcher is not null)
+        {
+            context.Add((
+                "dispatcherType",
+                StateDiagnosticContext.TypeName(_options.UiDispatcher.GetType())));
+        }
+
         _diagnostics?.Write(new HostDiagnosticRecord(
             StateDiagnosticIds.SubscriptionHandlerFailed,
             $"State subscription handler failed at version {args.Version}: {exception.Message}",
             HostDiagnosticSeverity.Error)
         {
-            Context = StateDiagnosticContext.Create(
-                ("dispatchPolicy", _options.DispatchPolicy.ToString()),
-                ("version", StateDiagnosticContext.Version(args.Version)))
+            Context = StateDiagnosticContext.Create([.. context])
         });
     }
 }

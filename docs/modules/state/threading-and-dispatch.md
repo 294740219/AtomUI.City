@@ -141,6 +141,7 @@ OperationScope 取消后不应继续提交状态更新。
 | 锁外通知 | Unit | handler 重入不会死锁。 |
 | 顺序通知 | Unit | 同一 key 通知顺序稳定。 |
 | UI 调度 | Unit | fake dispatcher 收到 UI 订阅。 |
+| UI 调度不可用 | Unit | 不可用 dispatcher 不回滚状态提交，handler 不执行，诊断包含 dispatcher type。 |
 | UI 延迟回调释放 | Unit | Dispatcher pending callback 在 subscription Dispose 后不执行 handler。 |
 | Background 调度 | Unit | handler 阻塞时 SetValue 先返回，handler 失败写 diagnostics。 |
 | Scope 停用 | Unit | 停用后不再投递 UI 更新。 |

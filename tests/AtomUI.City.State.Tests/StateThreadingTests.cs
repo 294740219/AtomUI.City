@@ -7,6 +7,15 @@ namespace AtomUI.City.State.Tests;
 public sealed class StateThreadingTests
 {
     [Fact]
+    public void StateDispatchPolicyKeepsStableValues()
+    {
+        Assert.Equal(0, (int)StateDispatchPolicy.Immediate);
+        Assert.Equal(1, (int)StateDispatchPolicy.Queued);
+        Assert.Equal(2, (int)StateDispatchPolicy.Dispatcher);
+        Assert.Equal(3, (int)StateDispatchPolicy.Background);
+    }
+
+    [Fact]
     public async Task ConcurrentUpdatesAreAtomicAndVersioned()
     {
         var state = new WritableState<int>(0);
@@ -54,6 +63,34 @@ public sealed class StateThreadingTests
 
         Assert.Equal(5, observed);
         Assert.Equal(1, dispatcher.InvokeCount);
+    }
+
+    [Fact]
+    public void UnavailableDispatcherSubscriptionRecordsDiagnosticsAndKeepsCommittedState()
+    {
+        var diagnostics = new InMemoryHostDiagnostics();
+        var dispatcher = new UnavailableUiDispatcher();
+        var state = new WritableState<int>(0, diagnostics: diagnostics);
+        var handlerCalled = false;
+
+        state.OnChange(
+            _ => handlerCalled = true,
+            StateSubscriptionOptions.Dispatcher(dispatcher));
+
+        state.SetValue(5);
+
+        Assert.Equal(5, state.Value);
+        Assert.False(handlerCalled);
+        var record = Assert.Single(diagnostics.Records);
+        Assert.Equal(StateDiagnosticIds.SubscriptionHandlerFailed, record.Code);
+        Assert.Equal(HostDiagnosticSeverity.Error, record.Severity);
+        Assert.Equal(
+            StateDispatchPolicy.Dispatcher.ToString(),
+            record.Context["dispatchPolicy"]);
+        Assert.Equal(
+            typeof(UnavailableUiDispatcher).FullName,
+            record.Context["dispatcherType"]);
+        Assert.Equal("1", record.Context["version"]);
     }
 
     [Fact]

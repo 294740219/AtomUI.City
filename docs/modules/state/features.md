@@ -13,7 +13,7 @@
 | AUC-STATE-005 | State Snapshot | Completed | StateSnapshot, StateSnapshotEntry | StateSnapshotTests |
 | AUC-STATE-006 | Collection State | Completed | StateCollection<TKey,TItem> | StateCollectionTests |
 | AUC-STATE-007 | Diagnostics | Completed | StateDiagnosticIds | StateDiagnosticsTests |
-| AUC-STATE-008 | Threading | 准备开始产品实现 | StateDispatchPolicy | StateThreadingTests |
+| AUC-STATE-008 | Threading | Completed | StateDispatchPolicy | StateThreadingTests |
 
 ## Feature 硬门禁
 
@@ -127,13 +127,13 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-STATE-008 Threading
 
 Feature ID: `AUC-STATE-008`
-Status: 准备开始产品实现
+Status: Completed
 Goal: 多线程更新和派发策略。
 Public Contract: StateDispatchPolicy
-Runtime / Build Behavior: 多线程更新和派发策略。
-Failure Behavior: 并发写、调度器不可用。
+Runtime / Build Behavior: 多线程更新保持原子提交和 version；Immediate 不隐式切 UI；Dispatcher、Background、Queued 策略语义稳定。
+Failure Behavior: 并发写串行化；不可用 dispatcher 失败被 diagnostics 隔离，不回滚已提交状态。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `StateThreadingTests`。
-Required Assertions: 断言不隐式 UI。
+Required Assertions: 断言不隐式 UI、并发写、锁外通知、dispatcher unavailable diagnostics、Background 不阻塞和 Queued 顺序。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。

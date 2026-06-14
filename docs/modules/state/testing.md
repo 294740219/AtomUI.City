@@ -29,7 +29,7 @@
 | AUC-STATE-005 | Unit | StateSnapshotTests | 断言不可变、过滤、restore diagnostics、entry version/schema 边界、entries 不含 null。 | 版本不兼容、policy 拒绝、restore 失败、entry 边界非法。 | Completed |
 | AUC-STATE-006 | Unit | StateCollectionTests | 断言 change kind、item version、collection version、快照不可变、非法构造参数、dispose 幂等、dispose 后读 API 可用、mutation/restore/subscription API 拒绝。 | 重复 key、missing key、clear、disposed collection、null key、null 条目、未知 change kind、负 version、null single change。 | Completed |
 | AUC-STATE-007 | Unit | StateDiagnosticsTests | 断言 AUCSTA001-010、唯一性、格式、severity 和定位 context。 | handler、update、restore、dispose、access failure、diagnostics collector 缺失。 | Completed |
-| AUC-STATE-008 | Unit | StateThreadingTests | 断言不隐式 UI。 | 并发写、调度器不可用。 | Required |
+| AUC-STATE-008 | Unit | StateThreadingTests | 断言不隐式 UI、并发写、锁外通知、dispatcher unavailable diagnostics、Background 不阻塞和 Queued 顺序。 | 并发写、调度器不可用、延迟回调释放。 | Completed |
 
 ## 缺口处理
 
