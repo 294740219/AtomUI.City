@@ -262,6 +262,8 @@ public sealed class InMemoryEventBus : IEventBus
 
     public void Dispose()
     {
+        EventSubscription[] subscriptions;
+
         lock (_syncRoot)
         {
             if (_disposed)
@@ -270,6 +272,15 @@ public sealed class InMemoryEventBus : IEventBus
             }
 
             _disposed = true;
+            subscriptions = _subscriptions.Values
+                .SelectMany(group => group)
+                .ToArray();
+            _subscriptions.Clear();
+        }
+
+        foreach (var subscription in subscriptions)
+        {
+            subscription.Dispose();
         }
     }
 

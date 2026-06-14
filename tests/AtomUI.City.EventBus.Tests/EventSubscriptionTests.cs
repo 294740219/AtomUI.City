@@ -40,6 +40,18 @@ public sealed class EventSubscriptionTests
     }
 
     [Fact]
+    public void DisposeClearsActiveSubscriptions()
+    {
+        var eventBus = new InMemoryEventBus();
+        var subscription = eventBus.Subscribe<TestEvent>(_ => ValueTask.CompletedTask);
+
+        eventBus.Dispose();
+
+        Assert.Equal(EventSubscriptionState.Disposed, subscription.State);
+        subscription.Dispose();
+    }
+
+    [Fact]
     public async Task DisposedSubscriptionNoLongerReceivesEvents()
     {
         var eventBus = new InMemoryEventBus();
