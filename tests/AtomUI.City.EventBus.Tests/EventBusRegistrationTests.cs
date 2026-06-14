@@ -54,5 +54,11 @@ public sealed class EventBusRegistrationTests
             await eventBus.PublishAsync(new RegisteredEvent("disposed")));
     }
 
+    [Fact]
+    public void EventBusInterfaceExposesDisposeContract()
+    {
+        Assert.True(typeof(IDisposable).IsAssignableFrom(typeof(IEventBus)));
+    }
+
     private sealed record RegisteredEvent(string Value);
 }

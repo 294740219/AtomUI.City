@@ -2,7 +2,7 @@ using AtomUI.City.Lifecycle;
 
 namespace AtomUI.City.EventBus;
 
-public interface IEventBus : IEventPublisher, IEventSubscriber
+public interface IEventBus : IEventPublisher, IEventSubscriber, IDisposable
 {
 }
 
