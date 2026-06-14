@@ -120,6 +120,7 @@ IStateCollection<TKey, TItem>
 - `Key` 不得为 null。
 - `CollectionVersion` 和 `ItemVersion` 必须大于等于 0。
 - `StateCollectionChangedEventArgs<TKey,TItem>` 的 change 列表不得为 null、空列表或包含 null 项。
+- 单项 change 构造参数为 null 时必须抛 `ArgumentNullException`。
 
 ### 5. Snapshot
 

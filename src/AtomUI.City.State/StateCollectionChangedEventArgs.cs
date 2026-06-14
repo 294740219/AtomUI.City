@@ -4,7 +4,7 @@ public sealed class StateCollectionChangedEventArgs<TKey, TItem> : StateChangedE
     where TKey : notnull
 {
     public StateCollectionChangedEventArgs(StateCollectionChange<TKey, TItem> change)
-        : this([change])
+        : this(CreateChangeList(change))
     {
     }
 
@@ -38,5 +38,13 @@ public sealed class StateCollectionChangedEventArgs<TKey, TItem> : StateChangedE
             ?? throw new ArgumentException("State collection changes must not contain null.", nameof(changes));
 
         return lastChange.CollectionVersion;
+    }
+
+    private static StateCollectionChange<TKey, TItem>[] CreateChangeList(
+        StateCollectionChange<TKey, TItem> change)
+    {
+        ArgumentNullException.ThrowIfNull(change);
+
+        return [change];
     }
 }

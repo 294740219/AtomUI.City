@@ -753,4 +753,12 @@ public sealed class StateCollectionTests
         Assert.Throws<ArgumentException>(
             () => new StateCollectionChangedEventArgs<string, int>([null!]));
     }
+
+    [Fact]
+    public void ChangedEventArgsRejectsNullSingleChange()
+    {
+        Assert.Throws<ArgumentNullException>(
+            () => new StateCollectionChangedEventArgs<string, int>(
+                (StateCollectionChange<string, int>)null!));
+    }
 }

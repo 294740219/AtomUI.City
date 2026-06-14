@@ -5,8 +5,8 @@
 ## 当前结论
 
 - 1.0 发布状态：不可发布。
-- 全局进度：58/118。
-- 模块 Feature 合同：58/109。
+- 全局进度：59/118。
+- 模块 Feature 合同：59/109。
 - 最终发布门禁：0/9。
 - 最近校准日期：2026-06-14。
 
@@ -40,7 +40,7 @@
 | Routing | 8 | 0 | 8 | 已完成 |
 | Presentation | 8 | 0 | 8 | 已完成 |
 | MVVM | 6 | 0 | 6 | 已完成 |
-| State | 5 | 3 | 8 | 产品化进行中 |
+| State | 6 | 2 | 8 | 产品化进行中 |
 | EventBus | 0 | 6 | 6 | 产品化进行中 |
 | PluginSystem | 0 | 8 | 8 | 未完成 |
 | Data | 0 | 9 | 9 | 未完成 |
@@ -131,7 +131,7 @@
 - [x] AUC-STATE-003 Computed State。验收重点：lazy invalidation、依赖失效、缓存、异常诊断、null dependency 拒绝。
 - [x] AUC-STATE-004 State Subscription。验收重点：dispose 后不通知、Background 不阻塞状态提交、Background handler 失败诊断。
 - [x] AUC-STATE-005 State Snapshot。验收重点：不可变、过滤、restore diagnostics、entry version/schema 边界、entries 不含 null。
-- [ ] AUC-STATE-006 Collection State。验收重点：change kind、item version、collection version、快照不可变、非法构造参数、dispose 幂等、dispose 后读 API 可用、mutation/restore/subscription API 拒绝。
+- [x] AUC-STATE-006 Collection State。验收重点：change kind、item version、collection version、快照不可变、非法构造参数、dispose 幂等、dispose 后读 API 可用、mutation/restore/subscription API 拒绝。
 - [ ] AUC-STATE-007 Diagnostics。验收重点：AUCSTA001-010。
 - [ ] AUC-STATE-008 Threading。验收重点：不隐式 UI。
 
