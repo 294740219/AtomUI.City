@@ -22,6 +22,7 @@
 - manifest、snapshot、generated output、CLI JSON、template variables 和 MSBuild properties 必须有版本或稳定字段说明。
 - reader 必须拒绝高于支持版本的不可理解格式，并输出稳定诊断。
 - 生成输出 hint name、type name 和 field name 改变属于兼容性风险。
+- 1.0 起 `RouteTemplate.Parse` 必须拒绝 malformed brace、重复参数、非末尾 catch-all 和未知 constraint；放宽这些失败行为属于兼容性风险。
 
 ## 插件兼容
 

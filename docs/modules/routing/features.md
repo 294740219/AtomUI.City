@@ -6,7 +6,7 @@
 
 | Feature ID | 名称 | 状态 | Public Contract | 主测试 |
 | --- | --- | --- | --- | --- |
-| AUC-ROUTING-001 | Route Definition Syntax | Ready to Start Product Implementation | RouteTemplate, RouteDefinitionAttribute, RouteMapAttribute | RouteTemplateTests; RouteDefinitionAttributeTests |
+| AUC-ROUTING-001 | Route Definition Syntax | 已实现并通过产品合同测试 | RouteTemplate, RouteDefinitionAttribute, RouteMapAttribute | RouteTemplateTests; RouteDefinitionAttributeTests |
 | AUC-ROUTING-002 | Route Graph Build and Snapshot | Ready to Start Product Implementation | RouteDescriptor, RouteGraphSnapshot, RouteGraphError | RouteGraphAndMatcherTests |
 | AUC-ROUTING-003 | Route Matching and Parameters | Ready to Start Product Implementation | RouteMatcher, RouteMatch, RouteParameters | RouteGraphAndMatcherTests; RoutingParameterBoundaryTests |
 | AUC-ROUTING-004 | Navigation Transaction | Ready to Start Product Implementation | IRouter, NavigationScope, NavigationResult | NavigationScopeTests |
@@ -35,7 +35,7 @@
 ## AUC-ROUTING-001 Route Definition Syntax
 
 Feature ID: `AUC-ROUTING-001`
-Status: Ready to Start Product Implementation
+Status: 已实现并通过产品合同测试
 Goal: 定义接近 ASP.NET routing 的桌面路由模板语法。
 Public Contract: RouteTemplate, RouteDefinitionAttribute, RouteMapAttribute
 Runtime / Build Behavior: 解析 literal、parameter、optional、catch-all、constraint 和 index/layout/redirect route；RouteTemplate 发布后不可变。

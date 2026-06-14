@@ -60,6 +60,19 @@ public sealed class RouteTemplateTests
         Assert.Equal("int", template.Segments[1].Constraints[0]);
     }
 
+    [Theory]
+    [InlineData("items/{id}/{id}")]
+    [InlineData("docs/{*path}/edit")]
+    [InlineData("items/{id:unknown}")]
+    [InlineData("settings/{id")]
+    [InlineData("settings/id}")]
+    public void ParseRejectsInvalidTemplateSyntax(string pattern)
+    {
+        var exception = Assert.Throws<RouteGraphException>(() => RouteTemplate.Parse(pattern));
+
+        Assert.Equal(RouteGraphError.InvalidRouteTemplate, exception.Error);
+    }
+
     [Fact]
     public void TryMatchExtractsParametersAndAppliesConstraints()
     {

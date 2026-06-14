@@ -26,10 +26,7 @@ public sealed class RouteTemplate
         var normalizedPattern = NormalizePattern(pattern);
         var segments = normalizedPattern.Length == 0
             ? []
-            : normalizedPattern
-                .Split('/', StringSplitOptions.RemoveEmptyEntries)
-                .Select(ParseSegment)
-                .ToArray();
+            : ParseSegments(normalizedPattern);
 
         return new RouteTemplate(normalizedPattern, segments);
     }
@@ -119,10 +116,54 @@ public sealed class RouteTemplate
         });
     }
 
+    private static IReadOnlyList<RouteTemplateSegment> ParseSegments(string normalizedPattern)
+    {
+        var rawSegments = normalizedPattern.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        var segments = new List<RouteTemplateSegment>(rawSegments.Length);
+        var parameterNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        for (var index = 0; index < rawSegments.Length; index++)
+        {
+            var parsedSegment = ParseSegment(rawSegments[index]);
+
+            if (parsedSegment.Kind == RouteTemplateSegmentKind.CatchAll && index != rawSegments.Length - 1)
+            {
+                throw new RouteGraphException(
+                    RouteGraphError.InvalidRouteTemplate,
+                    "Route catch-all parameter must be the last segment.");
+            }
+
+            if (parsedSegment.Kind != RouteTemplateSegmentKind.Literal &&
+                !parameterNames.Add(parsedSegment.Name!))
+            {
+                throw new RouteGraphException(
+                    RouteGraphError.InvalidRouteTemplate,
+                    $"Route parameter '{parsedSegment.Name}' is declared more than once.");
+            }
+
+            segments.Add(parsedSegment);
+        }
+
+        return segments;
+    }
+
     private static RouteTemplateSegment ParseSegment(string segment)
     {
-        if (!segment.StartsWith('{') || !segment.EndsWith('}'))
+        var startsWithParameter = segment.StartsWith('{');
+        var endsWithParameter = segment.EndsWith('}');
+
+        if (startsWithParameter != endsWithParameter)
         {
+            throw new RouteGraphException(RouteGraphError.InvalidRouteTemplate, $"Route segment '{segment}' has unbalanced braces.");
+        }
+
+        if (!startsWithParameter)
+        {
+            if (segment.Contains('{') || segment.Contains('}'))
+            {
+                throw new RouteGraphException(RouteGraphError.InvalidRouteTemplate, $"Route segment '{segment}' has invalid braces.");
+            }
+
             return RouteTemplateSegment.LiteralSegment(segment);
         }
 
@@ -144,9 +185,9 @@ public sealed class RouteTemplate
             body = body[..defaultSeparatorIndex];
         }
 
-        var parts = body.Split(':', StringSplitOptions.RemoveEmptyEntries);
+        var parts = body.Split(':');
 
-        if (parts.Length == 0)
+        if (parts.Length == 0 || parts.Any(string.IsNullOrWhiteSpace))
         {
             throw new RouteGraphException(RouteGraphError.InvalidRouteTemplate, "Route parameter name cannot be empty.");
         }
@@ -164,12 +205,23 @@ public sealed class RouteTemplate
             throw new RouteGraphException(RouteGraphError.InvalidRouteTemplate, "Route parameter name cannot be empty.");
         }
 
+        var constraints = parts.Skip(1).ToArray();
+        foreach (var constraint in constraints)
+        {
+            if (!IsKnownConstraint(constraint))
+            {
+                throw new RouteGraphException(
+                    RouteGraphError.InvalidRouteTemplate,
+                    $"Route constraint '{constraint}' is not supported.");
+            }
+        }
+
         return RouteTemplateSegment.ParameterSegment(
             kind,
             name,
             isOptional,
             defaultValue,
-            parts.Skip(1).ToArray());
+            constraints);
     }
 
     private static bool SatisfiesConstraints(string value, IReadOnlyList<string> constraints)
@@ -198,8 +250,22 @@ public sealed class RouteTemplate
             "int" => int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out _),
             "long" => long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out _),
             "alpha" => value.All(char.IsLetter),
-            _ => true,
+            _ => false,
         };
+    }
+
+    private static bool IsKnownConstraint(string constraint)
+    {
+        return constraint is
+            "bool" or
+            "datetime" or
+            "decimal" or
+            "double" or
+            "float" or
+            "guid" or
+            "int" or
+            "long" or
+            "alpha";
     }
 
     private static string NormalizePattern(string pattern)
