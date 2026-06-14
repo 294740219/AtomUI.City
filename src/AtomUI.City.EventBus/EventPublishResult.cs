@@ -48,10 +48,25 @@ public sealed record EventDeliveryResult(
 {
     public EventSubscriptionId SubscriptionId { get; init; } = ValidateSubscriptionId(SubscriptionId);
 
+    public EventDispatchPolicy DispatchPolicy { get; init; } = ValidateDispatchPolicy(DispatchPolicy);
+
     private static EventSubscriptionId ValidateSubscriptionId(EventSubscriptionId subscriptionId)
     {
         EventSubscriptionId.ThrowIfDefault(subscriptionId, nameof(SubscriptionId));
 
         return subscriptionId;
+    }
+
+    private static EventDispatchPolicy ValidateDispatchPolicy(EventDispatchPolicy dispatchPolicy)
+    {
+        if (!Enum.IsDefined(dispatchPolicy))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(DispatchPolicy),
+                dispatchPolicy,
+                "Event delivery dispatch policy is not supported.");
+        }
+
+        return dispatchPolicy;
     }
 }

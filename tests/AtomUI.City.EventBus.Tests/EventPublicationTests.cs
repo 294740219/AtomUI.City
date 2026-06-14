@@ -172,6 +172,15 @@ public sealed class EventPublicationTests
     }
 
     [Fact]
+    public void DeliveryResultRejectsUnknownDispatchPolicy()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new EventDeliveryResult(
+            EventSubscriptionId.New(),
+            (EventDispatchPolicy)999,
+            Succeeded: true));
+    }
+
+    [Fact]
     public async Task PostAsyncReturnsAcceptedEventIdUsedByDelivery()
     {
         var eventBus = new InMemoryEventBus();
