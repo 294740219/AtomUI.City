@@ -443,6 +443,14 @@ public sealed class StateCollectionTests
     }
 
     [Fact]
+    public void SnapshotEntryRejectsNullKeyInit()
+    {
+        var entry = new StateCollectionSnapshotEntry<string, int>("settings", 1, ItemVersion: 1);
+
+        Assert.Throws<ArgumentNullException>(() => entry with { Key = null! });
+    }
+
+    [Fact]
     public void SnapshotEntryRejectsNegativeItemVersion()
     {
         Assert.Throws<ArgumentOutOfRangeException>(

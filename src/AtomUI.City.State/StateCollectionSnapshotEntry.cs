@@ -3,6 +3,8 @@ namespace AtomUI.City.State;
 public sealed record StateCollectionSnapshotEntry<TKey, TItem>
     where TKey : notnull
 {
+    private TKey _key = default!;
+
     public StateCollectionSnapshotEntry(TKey Key, TItem Item, long ItemVersion)
     {
         ArgumentNullException.ThrowIfNull(Key);
@@ -20,7 +22,16 @@ public sealed record StateCollectionSnapshotEntry<TKey, TItem>
         this.ItemVersion = ItemVersion;
     }
 
-    public TKey Key { get; init; }
+    public TKey Key
+    {
+        get => _key;
+        init
+        {
+            ArgumentNullException.ThrowIfNull(value);
+
+            _key = value;
+        }
+    }
 
     public TItem Item { get; init; }
 
