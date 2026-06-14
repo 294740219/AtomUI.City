@@ -7,10 +7,10 @@
 | Feature ID | 名称 | 状态 | 公开合同 | 主测试 |
 | --- | --- | --- | --- | --- |
 | AUC-EVENTBUS-001 | Typed Publish | 产品化进行中 | IEventBus.PublishAsync, IEventBus.PostAsync, EventPublishResult | EventPublicationTests |
-| AUC-EVENTBUS-002 | Subscription Lifecycle | 准备开始产品实现 | IEventSubscription, EventSubscriptionOptions | EventSubscriptionTests |
+| AUC-EVENTBUS-002 | Subscription Lifecycle | 产品化进行中 | IEventSubscription, EventSubscriptionOptions | EventSubscriptionTests |
 | AUC-EVENTBUS-003 | Contract Registry | 产品化进行中 | IEventContractRegistry, EventContractDescriptor | EventContractRegistryTests |
 | AUC-EVENTBUS-004 | Dispatch Policy | 产品化进行中 | EventDispatchPolicy, EventErrorPolicy, EventSubscriptionOptions | EventDispatchingTests |
-| AUC-EVENTBUS-005 | Diagnostics | 准备开始产品实现 | EventDiagnosticIds | EventDiagnosticsTests |
+| AUC-EVENTBUS-005 | Diagnostics | 产品化进行中 | EventDiagnosticIds | EventDiagnosticsTests |
 | AUC-EVENTBUS-006 | DI Registration | 准备开始产品实现 | EventBusServiceCollectionExtensions | EventBusRegistrationTests |
 
 ## Feature 硬门禁
@@ -42,20 +42,20 @@ Failure Behavior: event 为 null、contract 未登记、handler 失败、取消�
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 implementation plan 中追踪。
 Tests: `EventPublicationTests`。
-Required Assertions: 断言 delivery result、null event、预取消 token、error policy、diagnostics。
+Required Assertions: 断言 delivery result、null event、预取消 token、publish options 边界、result immutable/null delivery、error policy、diagnostics。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 ## AUC-EVENTBUS-002 Subscription Lifecycle
 
 Feature ID: `AUC-EVENTBUS-002`
-Status: 准备开始产品实现
+Status: 产品化进行中
 Goal: 订阅 Active/Disposed 和 owner 释放。
 Public Contract: IEventSubscription, EventSubscriptionOptions
 Runtime / Build Behavior: 订阅 Active/Disposed 和 owner 释放。
-Failure Behavior: 重复释放、owner dispose、插件 unload。
+Failure Behavior: 重复释放、owner dispose、插件 unload、已 Disposed 后 stop with canceled token。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 implementation plan 中追踪。
 Tests: `EventSubscriptionTests`。
-Required Assertions: 断言 dispose 后不再收到事件。
+Required Assertions: 断言 dispose 后不再收到事件、StopAsync 移除新发布快照、等待 in-flight handler、owner stop/cancellation 释放、已 Disposed 后 StopAsync 幂等。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 ## AUC-EVENTBUS-003 Contract Registry
 
@@ -86,7 +86,7 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-EVENTBUS-005 Diagnostics
 
 Feature ID: `AUC-EVENTBUS-005`
-Status: 准备开始产品实现
+Status: 产品化进行中
 Goal: 发布、拒绝、delivery 失败和订阅诊断。
 Public Contract: EventDiagnosticIds
 Runtime / Build Behavior: 发布、拒绝、delivery 失败和订阅诊断。
@@ -94,7 +94,7 @@ Failure Behavior: diagnostics collector 缺失不影响 publish。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 implementation plan 中追踪。
 Tests: `EventDiagnosticsTests`。
-Required Assertions: 断言 EventBus.Event* 现有代码。
+Required Assertions: 断言 EventBus.Event* 现有代码、failure/cancellation 诊断包含 contract id、event id 和 subscription id。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 ## AUC-EVENTBUS-006 DI Registration
 

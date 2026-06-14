@@ -156,7 +156,7 @@
 - Modify: `docs/modules/eventbus/testing.md`
 - Modify: this plan file
 
-- [ ] **Step 1: Review AUC-EVENTBUS-001 through AUC-EVENTBUS-006 statuses after the first nine tasks.**
-- [ ] **Step 2: Mark newly covered product-contract slices as `产品化进行中` / `部分通过` without declaring full release readiness.**
-- [ ] **Step 3: Run `dotnet test tests/AtomUI.City.EventBus.Tests/AtomUI.City.EventBus.Tests.csproj`, `dotnet build AtomUICity.slnx`, `dotnet test AtomUICity.slnx --no-build`, `bash engineering/check-docs.sh`, `bash engineering/check-public-api.sh`, and `git diff --check`.**
-- [ ] **Step 4: Commit with `docs(EventBus): track product contract progress`.**
+- [x] **Step 1: Review AUC-EVENTBUS-001 through AUC-EVENTBUS-006 statuses after the first nine tasks.**
+- [x] **Step 2: Mark newly covered product-contract slices as `产品化进行中` / `部分通过` without declaring full release readiness.**
+- [x] **Step 3: Run `dotnet test tests/AtomUI.City.EventBus.Tests/AtomUI.City.EventBus.Tests.csproj`, `dotnet build AtomUICity.slnx`, `dotnet test AtomUICity.slnx --no-build`, `bash engineering/check-docs.sh`, `bash engineering/check-public-api.sh`, and `git diff --check`.**
+- [x] **Step 4: Commit with `docs(EventBus): track product contract progress`.**
