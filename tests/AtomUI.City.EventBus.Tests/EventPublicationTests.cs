@@ -236,6 +236,15 @@ public sealed class EventPublicationTests
     }
 
     [Fact]
+    public void PostResultRejectsEmptyEventId()
+    {
+        Assert.Throws<ArgumentException>(() => new EventPostResult(
+            Guid.Empty,
+            new EventContractId("atomui.city.tests.event.v1"),
+            Accepted: true));
+    }
+
+    [Fact]
     public async Task PostAsyncRejectsNegativePublishDepthBeforeAcceptance()
     {
         var diagnostics = new InMemoryHostDiagnostics();
