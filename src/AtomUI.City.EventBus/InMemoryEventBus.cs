@@ -148,7 +148,7 @@ public sealed class InMemoryEventBus : IEventBus, IDisposable
 
         WriteDiagnostic(
             EventDiagnosticIds.EventPublished,
-            $"Event '{descriptor.ContractId.Value}' was published.",
+            $"Event '{descriptor.ContractId.Value}' with id '{eventId:D}' was published.",
             HostDiagnosticSeverity.Trace);
 
         foreach (var subscription in snapshot)
