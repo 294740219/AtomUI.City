@@ -41,7 +41,12 @@ public sealed class ActivePluginViewRegistryTests
                 record.Code == PresentationDiagnosticIds.PluginViewTracked &&
                 record.Severity == HostDiagnosticSeverity.Info &&
                 record.Message.Contains("com.company.sales", StringComparison.Ordinal) &&
-                record.Message.Contains("sales.settings", StringComparison.Ordinal));
+                record.Message.Contains("sales.settings", StringComparison.Ordinal) &&
+                record.Context["pluginId"] == "com.company.sales" &&
+                record.Context["contributionId"] == "sales.settings" &&
+                record.Context["outletName"] == "primary" &&
+                record.Context["viewType"] == typeof(SettingsView).FullName &&
+                record.Context["viewModelType"] == typeof(SettingsViewModel).FullName);
 
         lease.Dispose();
 
@@ -179,13 +184,19 @@ public sealed class ActivePluginViewRegistryTests
             record =>
                 record.Code == PresentationDiagnosticIds.PluginViewCloseFailed &&
                 record.Severity == HostDiagnosticSeverity.Error &&
-                record.Message.Contains("outlet close failed", StringComparison.Ordinal));
+                record.Message.Contains("outlet close failed", StringComparison.Ordinal) &&
+                record.Context["pluginId"] == "com.company.sales" &&
+                record.Context["contributionId"] == "sales.failing" &&
+                record.Context["outletName"] == "failing");
         Assert.Contains(
             diagnostics.Records,
             record =>
                 record.Code == PresentationDiagnosticIds.PluginViewClosed &&
                 record.Severity == HostDiagnosticSeverity.Info &&
-                record.Message.Contains("sales.healthy", StringComparison.Ordinal));
+                record.Message.Contains("sales.healthy", StringComparison.Ordinal) &&
+                record.Context["pluginId"] == "com.company.sales" &&
+                record.Context["contributionId"] == "sales.healthy" &&
+                record.Context["outletName"] == "healthy");
     }
 
     private sealed class InlineDispatcher : IUiDispatcher

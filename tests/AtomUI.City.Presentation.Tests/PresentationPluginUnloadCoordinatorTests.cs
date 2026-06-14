@@ -1,6 +1,7 @@
 using AtomUI.City.Diagnostics;
 using AtomUI.City.Localization;
 using AtomUI.City.Presentation;
+using AtomUI.City.Threading;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace AtomUI.City.Presentation.Tests;
@@ -111,7 +112,14 @@ public sealed class PresentationPluginUnloadCoordinatorTests
             record =>
                 record.Code == PresentationDiagnosticIds.PluginUnloadCleanupCompleted &&
                 record.Severity == HostDiagnosticSeverity.Info &&
-                record.Message.Contains("com.company.sales", StringComparison.Ordinal));
+                record.Message.Contains("com.company.sales", StringComparison.Ordinal) &&
+                record.Context["pluginId"] == "com.company.sales" &&
+                record.Context["contributionId"] == "<all>" &&
+                record.Context["closedViewCount"] == "2" &&
+                record.Context["revokedInteractionHandlerCount"] == "3" &&
+                record.Context["revokedViewDescriptorCount"] == "4" &&
+                record.Context["revokedResourceContributionCount"] == "5" &&
+                record.Context["resourceDictionariesRevoked"] == bool.TrueString);
     }
 
     [Fact]
@@ -200,7 +208,70 @@ public sealed class PresentationPluginUnloadCoordinatorTests
             record =>
                 record.Code == PresentationDiagnosticIds.PluginUnloadCleanupFailed &&
                 record.Severity == HostDiagnosticSeverity.Error &&
-                record.Message.Contains("active plugin view", StringComparison.OrdinalIgnoreCase));
+                record.Message.Contains("active plugin view", StringComparison.OrdinalIgnoreCase) &&
+                record.Context["pluginId"] == "com.company.sales" &&
+                record.Context["errorKinds"] == nameof(PresentationPluginUnloadErrorKind.ActiveViewsRemaining));
+    }
+
+    [Fact]
+    public async Task CleanupPluginCanBeRepeatedAfterContributionsAreRevoked()
+    {
+        var dispatcher = new InlineDispatcher();
+        var activeViews = new ActivePluginViewRegistry();
+        var interactions = new InteractionHandlerRegistry(dispatcher);
+        var viewRegistry = new ViewRegistry();
+        var resources = new PresentationResourceRegistry();
+        var resourceDictionaries = new RecordingResourceDictionaryRevoker();
+        var outlet = new RouteOutlet("primary", dispatcher);
+        var handle = BoundViewHandle.FromExisting(new SettingsView(), new SettingsViewModel());
+        await outlet.CommitAsync(RouteOutletCommitPlan.Replace("primary", handle));
+        activeViews.Track(new ActivePluginView(
+            "com.company.sales",
+            outlet,
+            handle,
+            contributionId: "sales.settings"));
+        interactions.Register<ConfirmRequest, bool>(
+            (_, _) => ValueTask.FromResult(true),
+            new InteractionHandlerRegistrationOptions
+            {
+                PluginId = "com.company.sales",
+                ContributionId = "sales.settings",
+            });
+        viewRegistry.Register(new ViewDescriptor(
+            typeof(SettingsViewModel),
+            typeof(SettingsView),
+            viewKey: null,
+            _ => new SettingsView(),
+            pluginId: "com.company.sales",
+            contributionId: "sales.settings"));
+        resources.Register(new PresentationResourceContribution(
+            "style",
+            new DisposableResource(),
+            pluginId: "com.company.sales",
+            contributionId: "sales.settings"));
+        var coordinator = new PresentationPluginUnloadCoordinator(
+            activeViews,
+            interactions,
+            viewRegistry,
+            resources,
+            resourceDictionaries);
+
+        var first = await coordinator.CleanupAsync(
+            new PresentationPluginUnloadRequest("com.company.sales"));
+        var second = await coordinator.CleanupAsync(
+            new PresentationPluginUnloadRequest("com.company.sales"));
+
+        Assert.True(first.Succeeded);
+        Assert.Equal(1, first.ClosedViewCount);
+        Assert.Equal(1, first.RevokedInteractionHandlerCount);
+        Assert.Equal(1, first.RevokedViewDescriptorCount);
+        Assert.Equal(1, first.RevokedResourceContributionCount);
+        Assert.True(second.Succeeded);
+        Assert.Equal(0, second.ClosedViewCount);
+        Assert.Equal(0, second.RevokedInteractionHandlerCount);
+        Assert.Equal(0, second.RevokedViewDescriptorCount);
+        Assert.Equal(0, second.RevokedResourceContributionCount);
+        Assert.Equal(2, resourceDictionaries.RevokeCount);
     }
 
     [Fact]
@@ -497,10 +568,13 @@ public sealed class PresentationPluginUnloadCoordinatorTests
 
         public LocalizationError? Failure { get; init; }
 
+        public int RevokeCount { get; private set; }
+
         public ValueTask<LocalizationResult> RevokeAsync(
             PresentationResourceDictionaryRevocation revocation,
             CancellationToken cancellationToken = default)
         {
+            RevokeCount++;
             _callOrder.Add(
                 $"revoke-dictionaries:{revocation.PluginId}:{revocation.ContributionId ?? "<all>"}");
 
@@ -522,6 +596,47 @@ public sealed class PresentationPluginUnloadCoordinatorTests
             CancellationToken cancellationToken = default)
         {
             return ValueTask.FromResult(RouteOutletCommitResult.Success());
+        }
+    }
+
+    private sealed class InlineDispatcher : IUiDispatcher
+    {
+        public bool CheckAccess() => true;
+
+        public ValueTask InvokeAsync(Action callback, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            callback();
+
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask<T> InvokeAsync<T>(Func<T> callback, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            return ValueTask.FromResult(callback());
+        }
+
+        public ValueTask PostAsync(
+            Func<CancellationToken, ValueTask> callback,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            return callback(cancellationToken);
+        }
+    }
+
+    private sealed record ConfirmRequest(string Message);
+
+    private sealed class DisposableResource : IDisposable
+    {
+        public bool IsDisposed { get; private set; }
+
+        public void Dispose()
+        {
+            IsDisposed = true;
         }
     }
 

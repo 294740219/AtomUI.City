@@ -160,7 +160,10 @@ public sealed class ActivePluginViewRegistry : IActivePluginViewRegistry
         _diagnostics?.Write(new HostDiagnosticRecord(
             PresentationDiagnosticIds.PluginViewTracked,
             $"Presentation plugin view tracked plugin '{view.PluginId}' contribution '{Normalize(view.ContributionId)}' outlet '{view.Outlet.Name}' view '{view.Handle.View.GetType().FullName}' view model '{view.Handle.ViewModel.GetType().FullName}'.",
-            HostDiagnosticSeverity.Info));
+            HostDiagnosticSeverity.Info)
+        {
+            Context = CreateDiagnosticContext(view, error: null),
+        });
     }
 
     private void WriteClosedDiagnostic(ActivePluginView view)
@@ -168,7 +171,10 @@ public sealed class ActivePluginViewRegistry : IActivePluginViewRegistry
         _diagnostics?.Write(new HostDiagnosticRecord(
             PresentationDiagnosticIds.PluginViewClosed,
             $"Presentation plugin view closed plugin '{view.PluginId}' contribution '{Normalize(view.ContributionId)}' outlet '{view.Outlet.Name}' view '{view.Handle.View.GetType().FullName}' view model '{view.Handle.ViewModel.GetType().FullName}'.",
-            HostDiagnosticSeverity.Info));
+            HostDiagnosticSeverity.Info)
+        {
+            Context = CreateDiagnosticContext(view, error: null),
+        });
     }
 
     private void WriteCloseFailedDiagnostic(
@@ -178,7 +184,25 @@ public sealed class ActivePluginViewRegistry : IActivePluginViewRegistry
         _diagnostics?.Write(new HostDiagnosticRecord(
             PresentationDiagnosticIds.PluginViewCloseFailed,
             $"Presentation plugin view failed to close plugin '{view.PluginId}' contribution '{Normalize(view.ContributionId)}' outlet '{view.Outlet.Name}' view '{view.Handle.View.GetType().FullName}' view model '{view.Handle.ViewModel.GetType().FullName}': {message}",
-            HostDiagnosticSeverity.Error));
+            HostDiagnosticSeverity.Error)
+        {
+            Context = CreateDiagnosticContext(view, message),
+        });
+    }
+
+    private static IReadOnlyDictionary<string, string?> CreateDiagnosticContext(
+        ActivePluginView view,
+        string? error)
+    {
+        return new Dictionary<string, string?>(StringComparer.Ordinal)
+        {
+            ["pluginId"] = view.PluginId,
+            ["contributionId"] = view.ContributionId,
+            ["outletName"] = view.Outlet.Name,
+            ["viewType"] = view.Handle.View.GetType().FullName,
+            ["viewModelType"] = view.Handle.ViewModel.GetType().FullName,
+            ["error"] = error,
+        };
     }
 
     private static string Normalize(string? value)

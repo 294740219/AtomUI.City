@@ -38,6 +38,11 @@
 | `AUCPRS028` | ResourceContributionRegistered | Info | Presentation resource contribution 注册。 | `kind`, `pluginId`, `contributionId`, `resourceType`, `error` |
 | `AUCPRS029` | ResourceContributionRevoked | Info | Presentation resource contribution 撤销。 | `kind`, `pluginId`, `contributionId`, `resourceType`, `error` |
 | `AUCPRS030` | ResourceContributionRevokeFailed | Error | Presentation resource contribution 撤销失败。 | `kind`, `pluginId`, `contributionId`, `resourceType`, `error` |
+| `AUCPRS031` | PluginViewTracked | Info | Active plugin view lease 被 tracking。 | `pluginId`, `contributionId`, `outletName`, `viewType`, `viewModelType`, `error` |
+| `AUCPRS032` | PluginViewClosed | Info | Active plugin view 成功从 outlet 清理。 | `pluginId`, `contributionId`, `outletName`, `viewType`, `viewModelType`, `error` |
+| `AUCPRS033` | PluginViewCloseFailed | Error | Active plugin view outlet clear 失败。 | `pluginId`, `contributionId`, `outletName`, `viewType`, `viewModelType`, `error` |
+| `AUCPRS034` | PluginUnloadCleanupCompleted | Info | Plugin UI unload cleanup 成功完成。 | `pluginId`, `contributionId`, `closedViewCount`, `revokedInteractionHandlerCount`, `revokedViewDescriptorCount`, `revokedResourceContributionCount`, `resourceDictionariesRevoked`, `errorKinds` |
+| `AUCPRS035` | PluginUnloadCleanupFailed | Error | Plugin UI unload cleanup 失败或部分失败。 | `pluginId`, `contributionId`, `closedViewCount`, `revokedInteractionHandlerCount`, `revokedViewDescriptorCount`, `revokedResourceContributionCount`, `resourceDictionariesRevoked`, `errorKinds` |
 
 ## 产品级必须诊断的失败
 
@@ -52,7 +57,7 @@
 - Validation visual target 失败：记录 status、keys、message count、target type 和 error；用户取消不记录失败。
 - Culture 或 resource dictionary 局部失败：记录失败并继续刷新或撤销后续 target，返回首个失败。
 - Presentation resource contribution 撤销失败：记录失败并继续撤销同 plugin 或 contribution 下的其他资源。
-- 插件卸载 active view：detach 并撤销资源。
+- 插件卸载 active view：detach 并撤销资源；active view remaining 阻止 unload 并输出 failed cleanup 诊断。
 
 ## 上下文字段
 

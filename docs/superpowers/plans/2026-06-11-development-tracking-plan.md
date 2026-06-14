@@ -5,8 +5,8 @@
 ## 当前结论
 
 - 1.0 发布状态：不可发布。
-- 全局进度：46/118。
-- 模块 Feature 合同：46/109。
+- 全局进度：47/118。
+- 模块 Feature 合同：47/109。
 - 最终发布门禁：0/9。
 - 最近校准日期：2026-06-14。
 
@@ -38,7 +38,7 @@
 | Build | 7 | 0 | 7 | 已完成 |
 | Generators | 8 | 0 | 8 | 已完成 |
 | Routing | 8 | 0 | 8 | 已完成 |
-| Presentation | 7 | 1 | 8 | 产品化进行中 |
+| Presentation | 8 | 0 | 8 | 已完成 |
 | MVVM | 0 | 6 | 6 | 未完成 |
 | State | 0 | 8 | 8 | 产品化进行中 |
 | EventBus | 0 | 6 | 6 | 产品化进行中 |
@@ -113,7 +113,7 @@
 - [x] AUC-PRESENTATION-005 Visual Lifecycle Feedback。验收重点：attach/detach、focus、visibility、反馈顺序和 handler 失败隔离。
 - [x] AUC-PRESENTATION-006 Interaction and Validation Bridge。验收重点：handler 注册撤销、无 handler、验证消息变化、控件释放和取消。
 - [x] AUC-PRESENTATION-007 Localization and Resource Bridge。验收重点：culture 切换、fallback、resource revoke、插件资源卸载和局部失败隔离。
-- [ ] AUC-PRESENTATION-008 Plugin UI Unload Coordination。验收重点：active view lease、卸载撤销、拒绝卸载、资源释放和重复 unload。
+- [x] AUC-PRESENTATION-008 Plugin UI Unload Coordination。验收重点：active view lease、卸载撤销、拒绝卸载、资源释放和重复 unload。
 
 ## MVVM
 

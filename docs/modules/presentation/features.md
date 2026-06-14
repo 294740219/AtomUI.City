@@ -13,7 +13,7 @@
 | AUC-PRESENTATION-005 | Visual Lifecycle Feedback | 已实现并通过产品合同测试 | VisualLifecycleHub, VisualLifecycleEvent | VisualFeedbackTests |
 | AUC-PRESENTATION-006 | Interaction and Validation Bridge | 已实现并通过产品合同测试 | InteractionHandlerRegistry, ValidationVisualStateBinding | PresentationInteractionHandlerTests; ValidationVisualStateBindingTests |
 | AUC-PRESENTATION-007 | Localization and Resource Bridge | 已实现并通过产品合同测试 | PresentationLocalizationBridge, PresentationResourceRegistry | PresentationLocalizationBridgeTests; PresentationResourceRegistryTests |
-| AUC-PRESENTATION-008 | Plugin UI Unload Coordination | Ready to Start Product Implementation | ActivePluginViewRegistry, PresentationPluginUnloadCoordinator | ActivePluginViewRegistryTests; PresentationPluginUnloadCoordinatorTests |
+| AUC-PRESENTATION-008 | Plugin UI Unload Coordination | 已实现并通过产品合同测试 | ActivePluginViewRegistry, PresentationPluginUnloadCoordinator | ActivePluginViewRegistryTests; PresentationPluginUnloadCoordinatorTests |
 
 ## Feature 硬门禁
 
@@ -133,13 +133,13 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-PRESENTATION-008 Plugin UI Unload Coordination
 
 Feature ID: `AUC-PRESENTATION-008`
-Status: Ready to Start Product Implementation
+Status: 已实现并通过产品合同测试
 Goal: 插件卸载时撤销 active view、资源、handler 和 localization binding。
 Public Contract: ActivePluginViewRegistry, PresentationPluginUnloadCoordinator
-Runtime / Build Behavior: 插件 unload 前枚举 active view；可关闭则 detach，不能关闭则阻止 unload 或返回协调失败。
-Failure Behavior: active view 拒绝关闭、资源撤销失败、handler 仍被引用必须报告并避免半卸载。
-Threading / Cancellation: unload coordination 串行执行；所有 UI 变更在 dispatcher。
-Diagnostics: plugin UI diagnostics 必须包含 plugin id、active view count、failed contribution。
+Runtime / Build Behavior: plugin unload 前先关闭 active view，再撤销 interaction handler、view descriptor、resource dictionary 和 resource contribution；contribution unload 使用 contribution-specific revoke。
+Failure Behavior: active view remaining 阻止后续卸载；resource dictionary 或 descriptor revoke 失败聚合 error 并继续释放可释放资源；重复 cleanup 返回 0-count 成功结果。
+Threading / Cancellation: active view close 和 resource dictionary revoke 通过 dispatcher；cleanup 进入每个异步步骤前观察 token。
+Diagnostics: plugin UI diagnostics 包含 plugin id、contribution id、closed view count、各类 revoke count、resource dictionary 状态、view type、outlet 和 error kinds。
 Tests: `ActivePluginViewRegistryTests; PresentationPluginUnloadCoordinatorTests`
 Required Assertions: 断言 active view lease、卸载撤销、拒绝卸载、资源释放和重复 unload。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。

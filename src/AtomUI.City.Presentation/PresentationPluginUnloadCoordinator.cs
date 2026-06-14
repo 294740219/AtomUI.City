@@ -206,7 +206,10 @@ public sealed class PresentationPluginUnloadCoordinator : IPresentationPluginUnl
             _diagnostics?.Write(new HostDiagnosticRecord(
                 PresentationDiagnosticIds.PluginUnloadCleanupCompleted,
                 $"Presentation plugin unload cleanup completed plugin '{result.PluginId}' contribution '{contributionId}' closed views '{result.ClosedViewCount}' revoked interaction handlers '{result.RevokedInteractionHandlerCount}' revoked view descriptors '{result.RevokedViewDescriptorCount}' revoked resource contributions '{result.RevokedResourceContributionCount}'.",
-                HostDiagnosticSeverity.Info));
+                HostDiagnosticSeverity.Info)
+            {
+                Context = CreateDiagnosticContext(result),
+            });
 
             return;
         }
@@ -214,7 +217,26 @@ public sealed class PresentationPluginUnloadCoordinator : IPresentationPluginUnl
         _diagnostics?.Write(new HostDiagnosticRecord(
             PresentationDiagnosticIds.PluginUnloadCleanupFailed,
             $"Presentation plugin unload cleanup failed plugin '{result.PluginId}' contribution '{contributionId}': {FormatErrors(result.Errors)}",
-            HostDiagnosticSeverity.Error));
+            HostDiagnosticSeverity.Error)
+        {
+            Context = CreateDiagnosticContext(result),
+        });
+    }
+
+    private static IReadOnlyDictionary<string, string?> CreateDiagnosticContext(
+        PresentationPluginUnloadResult result)
+    {
+        return new Dictionary<string, string?>(StringComparer.Ordinal)
+        {
+            ["pluginId"] = result.PluginId,
+            ["contributionId"] = Normalize(result.ContributionId),
+            ["closedViewCount"] = result.ClosedViewCount.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["revokedInteractionHandlerCount"] = result.RevokedInteractionHandlerCount.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["revokedViewDescriptorCount"] = result.RevokedViewDescriptorCount.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["revokedResourceContributionCount"] = result.RevokedResourceContributionCount.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["resourceDictionariesRevoked"] = result.ResourceDictionariesRevoked.ToString(),
+            ["errorKinds"] = FormatErrorKinds(result.Errors),
+        };
     }
 
     private static string FormatErrors(IEnumerable<PresentationPluginUnloadError> errors)
@@ -222,6 +244,11 @@ public sealed class PresentationPluginUnloadCoordinator : IPresentationPluginUnl
         return string.Join(
             "; ",
             errors.Select(error => $"{error.Kind}: {error.Message}"));
+    }
+
+    private static string FormatErrorKinds(IEnumerable<PresentationPluginUnloadError> errors)
+    {
+        return string.Join(", ", errors.Select(static error => error.Kind.ToString()));
     }
 
     private static string Normalize(string? value)

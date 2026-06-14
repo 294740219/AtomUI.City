@@ -29,7 +29,8 @@
 | PresentationLocalizationBridge.ApplyCultureAsync | 把 culture state 应用到 Presentation appliers。 | CultureState 和 token。 | LocalizationResult。 | 局部 applier 失败不会阻断后续 applier；返回首个失败。 | dispatcher work 前和每个 applier 前观察取消。 | applier 按注册顺序执行。 |
 | PresentationResourceRegistry.Register / Revoke | 注册和撤销 Presentation resource contribution。 | contribution、plugin id 或 contribution id。 | lease 或 revoked count。 | 单个 resource dispose 失败记录诊断并继续撤销其他资源。 | 同步 API 无 token。 | lease dispose 幂等；Contributions snapshot 不可外部修改。 |
 | PresentationResourceDictionaryRevoker.RevokeAsync | 插件卸载或贡献撤销时撤销 resource dictionary target。 | revocation 和 token。 | LocalizationResult。 | 局部 target 失败不会阻断后续 target；返回首个失败。 | dispatcher work 前和每个 target 前观察取消。 | target 按注册顺序执行。 |
-| PresentationPluginUnloadCoordinator.CoordinateAsync | 插件卸载前撤销 UI contribution。 | plugin id 和 unload request。 | PresentationPluginUnloadResult。 | active view 拒绝关闭或资源撤销失败时阻止 unload。 | 必须观察 token。 | 同一 plugin unload 串行且幂等。 |
+| ActivePluginViewRegistry.ClosePluginViewsAsync / CloseContributionViewsAsync | 关闭插件或 contribution 的 active view lease。 | plugin id 或 contribution id。 | closed view count。 | outlet clear 失败保留 active view 并记录诊断，继续关闭其他 view。 | 每个 outlet commit 前观察 token。 | lease dispose 幂等；ActiveViews snapshot 不可外部修改。 |
+| PresentationPluginUnloadCoordinator.CleanupAsync | 插件卸载前撤销 UI contribution。 | plugin id 和 unload request。 | PresentationPluginUnloadResult。 | active view 拒绝关闭时阻止 unload；其他 revoke 失败聚合 error 并继续清理可清理资源。 | 必须观察 token。 | 重复 cleanup 返回稳定 0-count 成功结果。 |
 
 ## Public 类型覆盖
 
