@@ -143,7 +143,7 @@ Commit message: `fix(State): validate snapshot entry state names`
 - Modify: `src/AtomUI.City.State/StateSnapshotEntry.cs`
 - Test: `tests/AtomUI.City.State.Tests/StateSnapshotTests.cs`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```csharp
 [Fact]
@@ -162,21 +162,21 @@ public void SnapshotEntryRejectsNullValueTypeInit()
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `dotnet test tests/AtomUI.City.State.Tests/AtomUI.City.State.Tests.csproj --filter "FullyQualifiedName~SnapshotEntryRejectsNullValueTypeInit"`
 Expected: FAIL because `with` init currently accepts null `ValueType`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Back `StateSnapshotEntry.ValueType` with an init setter that calls `ArgumentNullException.ThrowIfNull`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `dotnet test tests/AtomUI.City.State.Tests/AtomUI.City.State.Tests.csproj --filter "FullyQualifiedName~SnapshotEntryRejectsNullValueTypeInit"`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit message: `fix(State): validate snapshot entry value types`
 

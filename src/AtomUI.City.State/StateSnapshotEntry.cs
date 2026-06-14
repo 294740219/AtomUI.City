@@ -3,6 +3,7 @@ namespace AtomUI.City.State;
 public sealed record StateSnapshotEntry
 {
     private string _stateName = null!;
+    private Type _valueType = null!;
 
     public StateSnapshotEntry(
         string stateName,
@@ -52,7 +53,16 @@ public sealed record StateSnapshotEntry
         }
     }
 
-    public Type ValueType { get; init; }
+    public Type ValueType
+    {
+        get => _valueType;
+        init
+        {
+            ArgumentNullException.ThrowIfNull(value);
+
+            _valueType = value;
+        }
+    }
 
     public object? Value { get; init; }
 

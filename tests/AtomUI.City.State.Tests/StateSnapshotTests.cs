@@ -107,6 +107,21 @@ public sealed class StateSnapshotTests
         Assert.Throws<ArgumentException>(() => entry with { StateName = stateName });
     }
 
+    [Fact]
+    public void SnapshotEntryRejectsNullValueTypeInit()
+    {
+        var entry = new StateSnapshotEntry(
+            "AtomUI.City.Tests.Theme",
+            typeof(string),
+            "light",
+            version: 0,
+            schemaVersion: 1,
+            ownerModule: null,
+            pluginId: null);
+
+        Assert.Throws<ArgumentNullException>(() => entry with { ValueType = null! });
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(-1)]
