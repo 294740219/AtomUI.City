@@ -318,7 +318,7 @@ Commit message: `fix(EventBus): validate context publish depth`
 - Modify: `src/AtomUI.City.EventBus/EventContext.cs`
 - Test: `tests/AtomUI.City.EventBus.Tests/EventPublicationTests.cs`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```csharp
 [Fact]
@@ -338,21 +338,21 @@ public void EventContextRejectsDefaultSubscriptionId()
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `dotnet test tests/AtomUI.City.EventBus.Tests/AtomUI.City.EventBus.Tests.csproj --filter "FullyQualifiedName~EventContextRejectsDefaultSubscriptionId"`
 Expected: FAIL because `EventContext<TEvent>` currently accepts default subscription ids.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Call `EventSubscriptionId.ThrowIfDefault(subscriptionId, nameof(subscriptionId))` in the context constructor.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `dotnet test tests/AtomUI.City.EventBus.Tests/AtomUI.City.EventBus.Tests.csproj --filter "FullyQualifiedName~EventContextRejectsDefaultSubscriptionId"`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit message: `fix(EventBus): validate context subscription ids`
 

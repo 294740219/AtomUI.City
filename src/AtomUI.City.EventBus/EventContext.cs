@@ -28,6 +28,7 @@ public sealed class EventContext<TEvent>
                 publishDepth,
                 "Event context publish depth cannot be negative.");
         }
+        EventSubscriptionId.ThrowIfDefault(subscriptionId, nameof(subscriptionId));
 
         Event = eventData;
         ContractId = contractId;
