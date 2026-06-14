@@ -1,4 +1,5 @@
 using AtomUI.City.Generators.Diagnostics;
+using System.Globalization;
 
 namespace AtomUI.City.Generators.Localization;
 
@@ -34,6 +35,8 @@ public static class LocalizationManifestBuilder
 
             packagesById.Add(package.PackageId, package);
         }
+
+        AddInvalidCultureDiagnostics(packages, diagnostics);
 
         var resourceKeys = new HashSet<string>(StringComparer.Ordinal);
 
@@ -130,5 +133,36 @@ public static class LocalizationManifestBuilder
     private static LocalizationManifest CreateEmptyManifest()
     {
         return new LocalizationManifest([], [], [], []);
+    }
+
+    private static void AddInvalidCultureDiagnostics(
+        IEnumerable<LanguagePackageMetadata> packages,
+        ICollection<GeneratorDiagnostic> diagnostics)
+    {
+        foreach (var package in packages)
+        {
+            if (!IsInvalidCulture(package.Culture))
+            {
+                continue;
+            }
+
+            diagnostics.Add(new GeneratorDiagnostic(
+                GeneratorDiagnostics.InvalidManifestInput,
+                $"Language package '{package.PackageId}' declares invalid culture '{package.Culture}'.",
+                package.PackageId));
+        }
+    }
+
+    private static bool IsInvalidCulture(string culture)
+    {
+        try
+        {
+            CultureInfo.GetCultureInfo(culture);
+            return false;
+        }
+        catch (CultureNotFoundException)
+        {
+            return true;
+        }
     }
 }

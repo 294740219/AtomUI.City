@@ -11,7 +11,7 @@
 | AUC-GENERATORS-003 | DI Manifest | 已实现并通过产品合同测试 | ServiceRegistrationMetadataReader, ServiceRegistrationManifestBuilder | ServiceRegistrationManifestBuilderTests; ServiceRegistrationMetadataReaderTests |
 | AUC-GENERATORS-004 | Route Manifest | 已实现并通过产品合同测试 | RouteMetadataReader, RouteManifestBuilder | RouteManifestBuilderTests; RouteMetadataReaderTests |
 | AUC-GENERATORS-005 | Plugin Manifest | 已实现并通过产品合同测试 | PluginMetadataReader, PluginManifestBuilder | PluginManifestBuilderTests; PluginMetadataReaderTests |
-| AUC-GENERATORS-006 | Localization Manifest | Ready to Start Product Implementation | LocalizationMetadataReader, LocalizationManifestBuilder | LocalizationManifestBuilderTests; LocalizationMetadataReaderTests |
+| AUC-GENERATORS-006 | Localization Manifest | 已实现并通过产品合同测试 | LocalizationMetadataReader, LocalizationManifestBuilder | LocalizationManifestBuilderTests; LocalizationMetadataReaderTests |
 | AUC-GENERATORS-007 | Presentation View Manifest | Ready to Start Product Implementation | PresentationViewMetadataReader, PresentationViewManifestBuilder | PresentationViewManifestBuilderTests; PresentationViewRegistrarSourceBuilderTests |
 | AUC-GENERATORS-008 | Diagnostics | Ready to Start Product Implementation | GeneratorDiagnosticIds, GeneratorDiagnostics | GeneratorDiagnosticTests |
 
@@ -105,7 +105,7 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-GENERATORS-006 Localization Manifest
 
 Feature ID: `AUC-GENERATORS-006`
-Status: Ready to Start Product Implementation
+Status: 已实现并通过产品合同测试
 Goal: 编译期生成 localization resource manifest。
 Public Contract: LocalizationMetadataReader, LocalizationManifestBuilder
 Runtime / Build Behavior: 读取 LanguagePackage、LocalizedResource 和 fallback metadata，输出 culture/resource 清单。

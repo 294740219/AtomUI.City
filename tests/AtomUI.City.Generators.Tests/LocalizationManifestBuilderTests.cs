@@ -48,6 +48,26 @@ public sealed class LocalizationManifestBuilderTests
     }
 
     [Fact]
+    public void BuildReportsInvalidPackageCultures()
+    {
+        var result = LocalizationManifestBuilder.Build(
+            [
+                Package("Settings.invalid", "invalid culture!"),
+            ],
+            [
+                Resource("Settings.Title", "Settings.invalid"),
+            ]);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+
+        Assert.Equal(GeneratorDiagnosticIds.InvalidManifestInput, diagnostic.Id);
+        Assert.Contains("culture", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Equal("Settings.invalid", diagnostic.Target);
+        Assert.Empty(result.Manifest.Packages);
+        Assert.Empty(result.Manifest.Resources);
+    }
+
+    [Fact]
     public void BuildReportsDuplicateResourceKeysWithinSamePackageAndScope()
     {
         var result = LocalizationManifestBuilder.Build(
