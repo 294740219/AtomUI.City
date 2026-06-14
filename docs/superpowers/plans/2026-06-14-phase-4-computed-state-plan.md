@@ -12,9 +12,9 @@
 
 ## 任务
 
-- [ ] 写失败测试：无订阅者时依赖变化只标记失效，不立即重算；下一次读取才重算。
-- [ ] 写失败测试：构造函数拒绝 dependencies 中的 null 项。
-- [ ] 实现 dirty 标记、订阅计数和 dependency null 校验。
-- [ ] 保持现有订阅场景：有订阅者时依赖变化立即重算并通知。
-- [ ] 同步 `docs/modules/state/api-contracts.md`、`docs/modules/state/features.md`、`docs/modules/state/implementation-plan.md`、`docs/modules/state/computed-state.md`。
+- [x] 写失败测试：无订阅者时依赖变化只标记失效，不立即重算；下一次读取才重算。
+- [x] 写失败测试：构造函数拒绝 dependencies 中的 null 项。
+- [x] 实现 dirty 标记、订阅计数和 dependency null 校验。
+- [x] 保持现有订阅场景：有订阅者时依赖变化立即重算并通知。
+- [x] 同步 `docs/modules/state/api-contracts.md`、`docs/modules/state/features.md`、`docs/modules/state/implementation-plan.md`、`docs/modules/state/computed-state.md`。
 - [ ] 运行完整门禁：`dotnet test tests/AtomUI.City.State.Tests/AtomUI.City.State.Tests.csproj`、`dotnet build AtomUICity.slnx`、`dotnet test AtomUICity.slnx --no-build`、`bash engineering/check-docs.sh`、`bash engineering/check-public-api.sh`、`git diff --check`。

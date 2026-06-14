@@ -6,7 +6,7 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | AUC-STATE-001 | 是 | 是 | WritableStateTests | 已有基线 | 必需 | 断言原子更新、version、通知顺序、写拒绝。 | 必需 | 准备开始产品实现 |
 | AUC-STATE-002 | 是 | 是 | ApplicationStateTests; StateDefinitionTests | 已有基线 | 部分通过 | 断言注册、读取、writer、not registered、StateDefinition enum 和 schema version 边界。 | 仍需完整产品合同测试 | 产品化进行中 |
-| AUC-STATE-003 | 是 | 是 | ComputedStateTests | 已有基线 | 必需 | 断言依赖失效、缓存、异常诊断。 | 必需 | 准备开始产品实现 |
+| AUC-STATE-003 | 是 | 是 | ComputedStateTests | 已有基线 | 部分通过 | 断言 lazy invalidation、依赖失效、缓存、异常诊断、null dependency 拒绝。 | 仍需完整产品合同测试 | 产品化进行中 |
 | AUC-STATE-004 | 是 | 是 | StateScopeTests; StateThreadingTests | 已有基线 | 部分通过 | 断言 dispose 后不通知、Background 不阻塞状态提交、Background handler 失败诊断。 | 仍需完整产品合同测试 | 产品化进行中 |
 | AUC-STATE-005 | 是 | 是 | StateSnapshotTests | 已有基线 | 部分通过 | 断言不可变、过滤、restore diagnostics、entry version/schema 边界、entries 不含 null。 | 仍需完整产品合同测试 | 产品化进行中 |
 | AUC-STATE-006 | 是 | 是 | StateCollectionTests | 已有基线 | 必需 | 断言 change kind。 | 必需 | 准备开始产品实现 |

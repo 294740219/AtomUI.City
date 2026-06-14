@@ -114,6 +114,8 @@ ComputedState
 - 有订阅或读取时才重新计算。
 - 计算结果相等时不通知。
 - 依赖通知顺序应保持确定性。
+- 依赖列表不能包含 null 项。
+- 无订阅者时依赖变化只标记 dirty，不立即运行计算函数。
 
 ### 5. 错误策略
 
@@ -159,7 +161,9 @@ Analyzer 应提示：
 | 初次计算 | Unit | 首次读取返回计算值。 |
 | 缓存 | Unit | 依赖未变时不重复计算。 |
 | 依赖失效 | Unit | 依赖变化后重新计算。 |
+| Lazy invalidation | Unit | 无订阅者时依赖变化不立即重算，下一次读取才重算。 |
 | 相等结果 | Unit | 结果相等时不通知。 |
 | 计算异常 | Unit | 保留旧值或 failed 状态，诊断记录。 |
+| null dependency | Unit | 构造函数拒绝 null dependency。 |
 | Scope 释放 | Unit | 释放后不再计算或通知。 |
 | 依赖无法静态分析 | Analyzer/Generator | 输出稳定诊断。 |

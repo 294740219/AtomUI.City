@@ -8,7 +8,7 @@
 | --- | --- | --- | --- | --- |
 | AUC-STATE-001 | Writable State | 准备开始产品实现 | IWritableState<T>, WritableState<T> | WritableStateTests |
 | AUC-STATE-002 | Application State | 产品化进行中 | IApplicationState, ApplicationStateRegistry, StateDefinition<T> | ApplicationStateTests; StateDefinitionTests |
-| AUC-STATE-003 | Computed State | 准备开始产品实现 | IComputedState<T>, ComputedState<T> | ComputedStateTests |
+| AUC-STATE-003 | Computed State | 产品化进行中 | IComputedState<T>, ComputedState<T> | ComputedStateTests |
 | AUC-STATE-004 | State Subscription | 产品化进行中 | IStateSubscription, IStateReaction, StateSubscriptionOptions | StateScopeTests; StateThreadingTests |
 | AUC-STATE-005 | State Snapshot | 产品化进行中 | StateSnapshot, StateSnapshotEntry | StateSnapshotTests |
 | AUC-STATE-006 | Collection State | 准备开始产品实现 | StateCollection<TKey,TItem> | StateCollectionTests |
@@ -36,7 +36,7 @@
 ## AUC-STATE-001 Writable State
 
 Feature ID: `AUC-STATE-001`
-Status: 产品化进行中
+Status: 准备开始产品实现
 Goal: 线程安全读写、变更通知和 access policy。
 Public Contract: IWritableState<T>, WritableState<T>
 Runtime / Build Behavior: 线程安全读写、变更通知和 access policy。
@@ -62,20 +62,20 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-STATE-003 Computed State
 
 Feature ID: `AUC-STATE-003`
-Status: 准备开始产品实现
+Status: 产品化进行中
 Goal: 依赖状态变更后重新计算。
 Public Contract: IComputedState<T>, ComputedState<T>
 Runtime / Build Behavior: 依赖状态变更后重新计算。
-Failure Behavior: compute 异常、循环依赖、dispose。
+Failure Behavior: compute 异常、循环依赖、dispose、null dependency。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 implementation plan 中追踪。
 Tests: `ComputedStateTests`。
-Required Assertions: 断言依赖失效、缓存、异常诊断。
+Required Assertions: 断言 lazy invalidation、依赖失效、缓存、异常诊断、null dependency 拒绝。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 ## AUC-STATE-004 State Subscription
 
 Feature ID: `AUC-STATE-004`
-Status: 准备开始产品实现
+Status: 产品化进行中
 Goal: 生命周期绑定订阅和释放。
 Public Contract: IStateSubscription, IStateReaction
 Runtime / Build Behavior: 生命周期绑定订阅和释放。
