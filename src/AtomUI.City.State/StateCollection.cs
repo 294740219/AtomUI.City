@@ -451,7 +451,14 @@ public sealed class StateCollection<TKey, TItem> : IStateCollection<TKey, TItem>
                 _diagnostics?.Write(new HostDiagnosticRecord(
                     StateDiagnosticIds.ChangedEventHandlerFailed,
                     $"State collection changed event handler failed for key type '{typeof(TKey).FullName}' and item type '{typeof(TItem).FullName}' at version {args.Version}: {exception.Message}",
-                    HostDiagnosticSeverity.Error));
+                    HostDiagnosticSeverity.Error)
+                {
+                    Context = StateDiagnosticContext.Create(
+                        ("changeCount", StateDiagnosticContext.Version(args.Changes.Count)),
+                        ("itemType", StateDiagnosticContext.TypeName(typeof(TItem))),
+                        ("keyType", StateDiagnosticContext.TypeName(typeof(TKey))),
+                        ("version", StateDiagnosticContext.Version(args.Version)))
+                });
             }
         }
     }

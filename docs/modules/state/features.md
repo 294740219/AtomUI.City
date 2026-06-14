@@ -12,7 +12,7 @@
 | AUC-STATE-004 | State Subscription | Completed | IStateSubscription, IStateReaction, StateSubscriptionOptions | StateScopeTests; StateThreadingTests |
 | AUC-STATE-005 | State Snapshot | Completed | StateSnapshot, StateSnapshotEntry | StateSnapshotTests |
 | AUC-STATE-006 | Collection State | Completed | StateCollection<TKey,TItem> | StateCollectionTests |
-| AUC-STATE-007 | Diagnostics | 准备开始产品实现 | StateDiagnosticIds | StateDiagnosticsTests |
+| AUC-STATE-007 | Diagnostics | Completed | StateDiagnosticIds | StateDiagnosticsTests |
 | AUC-STATE-008 | Threading | 准备开始产品实现 | StateDispatchPolicy | StateThreadingTests |
 
 ## Feature 硬门禁
@@ -114,15 +114,15 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-STATE-007 Diagnostics
 
 Feature ID: `AUC-STATE-007`
-Status: 准备开始产品实现
-Goal: 未注册、访问拒绝、订阅失败诊断。
+Status: Completed
+Goal: 稳定诊断码、关键失败路径诊断和定位上下文。
 Public Contract: StateDiagnosticIds
-Runtime / Build Behavior: 未注册、访问拒绝、订阅失败诊断。
-Failure Behavior: diagnostics collector 缺失。
+Runtime / Build Behavior: AUCSTA001-010 诊断码稳定；失败记录包含 code、severity、message 和定位 context。
+Failure Behavior: diagnostics collector 缺失时不得影响主流程；handler、update、restore、dispose 和 access failure 必须写入对应诊断。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `StateDiagnosticsTests`。
-Required Assertions: 断言 AUCSTA001-010。
+Required Assertions: 断言 AUCSTA001-010、唯一性、格式、severity 和定位 context。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 ## AUC-STATE-008 Threading
 

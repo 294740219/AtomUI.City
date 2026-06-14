@@ -240,7 +240,11 @@ public sealed class ComputedState<T> : IComputedState<T>, IDisposable
             _diagnostics?.Write(new HostDiagnosticRecord(
                 StateDiagnosticIds.ComputedStateComputeFailed,
                 $"Computed state failed to compute value type '{typeof(T).FullName}': {exception.Message}",
-                HostDiagnosticSeverity.Error));
+                HostDiagnosticSeverity.Error)
+            {
+                Context = StateDiagnosticContext.Create(
+                    ("valueType", StateDiagnosticContext.TypeName(typeof(T))))
+            });
 
             return _value;
         }
@@ -265,7 +269,11 @@ public sealed class ComputedState<T> : IComputedState<T>, IDisposable
             _diagnostics?.Write(new HostDiagnosticRecord(
                 StateDiagnosticIds.ComputedStateDisposeFailed,
                 $"Computed state failed to dispose value type '{typeof(T).FullName}' subscription: {exception.Message}",
-                HostDiagnosticSeverity.Error));
+                HostDiagnosticSeverity.Error)
+            {
+                Context = StateDiagnosticContext.Create(
+                    ("valueType", StateDiagnosticContext.TypeName(typeof(T))))
+            });
         }
     }
 

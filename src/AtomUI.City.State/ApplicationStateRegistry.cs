@@ -137,7 +137,12 @@ public sealed class ApplicationStateRegistry :
         _diagnostics?.Write(new HostDiagnosticRecord(
             StateDiagnosticIds.ApplicationStateNotRegistered,
             $"Application state '{stateName}' with value type '{valueType.FullName}' is not registered.",
-            HostDiagnosticSeverity.Warning));
+            HostDiagnosticSeverity.Warning)
+        {
+            Context = StateDiagnosticContext.Create(
+                ("stateKey", stateName),
+                ("valueType", StateDiagnosticContext.TypeName(valueType)))
+        });
     }
 
     private void WriteAlreadyRegisteredDiagnostic(string stateName, Type valueType)
@@ -145,7 +150,12 @@ public sealed class ApplicationStateRegistry :
         _diagnostics?.Write(new HostDiagnosticRecord(
             StateDiagnosticIds.ApplicationStateAlreadyRegistered,
             $"Application state '{stateName}' with value type '{valueType.FullName}' is already registered.",
-            HostDiagnosticSeverity.Warning));
+            HostDiagnosticSeverity.Warning)
+        {
+            Context = StateDiagnosticContext.Create(
+                ("stateKey", stateName),
+                ("valueType", StateDiagnosticContext.TypeName(valueType)))
+        });
     }
 
     private void WriteWriteDeniedDiagnostic(
@@ -156,7 +166,13 @@ public sealed class ApplicationStateRegistry :
         _diagnostics?.Write(new HostDiagnosticRecord(
             StateDiagnosticIds.ApplicationStateWriteDenied,
             $"Application state '{stateName}' with value type '{valueType.FullName}' rejected write because access policy is '{access}'.",
-            HostDiagnosticSeverity.Warning));
+            HostDiagnosticSeverity.Warning)
+        {
+            Context = StateDiagnosticContext.Create(
+                ("accessPolicy", access.ToString()),
+                ("stateKey", stateName),
+                ("valueType", StateDiagnosticContext.TypeName(valueType)))
+        });
     }
 
     private void WriteSnapshotRestoreFailedDiagnostic(
@@ -166,7 +182,13 @@ public sealed class ApplicationStateRegistry :
         _diagnostics?.Write(new HostDiagnosticRecord(
             StateDiagnosticIds.SnapshotRestoreFailed,
             $"State snapshot restore failed for state '{entry.StateName}': {reason}.",
-            HostDiagnosticSeverity.Warning));
+            HostDiagnosticSeverity.Warning)
+        {
+            Context = StateDiagnosticContext.Create(
+                ("reason", reason),
+                ("stateKey", entry.StateName),
+                ("valueType", StateDiagnosticContext.TypeName(entry.ValueType)))
+        });
     }
 
     private abstract class StateRegistration
@@ -297,7 +319,13 @@ public sealed class ApplicationStateRegistry :
             diagnostics?.Write(new HostDiagnosticRecord(
                 StateDiagnosticIds.SnapshotRestoreFailed,
                 $"State snapshot restore failed for state '{entry.StateName}': {reason}.",
-                HostDiagnosticSeverity.Warning));
+                HostDiagnosticSeverity.Warning)
+            {
+                Context = StateDiagnosticContext.Create(
+                    ("reason", reason),
+                    ("stateKey", entry.StateName),
+                    ("valueType", StateDiagnosticContext.TypeName(entry.ValueType)))
+            });
         }
     }
 }

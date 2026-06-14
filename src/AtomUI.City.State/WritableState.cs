@@ -247,7 +247,13 @@ public sealed class WritableState<T> : IWritableState<T>, IDisposable
                 _diagnostics?.Write(new HostDiagnosticRecord(
                     StateDiagnosticIds.ChangedEventHandlerFailed,
                     $"Writable state changed event handler failed for value type '{typeof(T).FullName}' at version {args.Version}: {exception.Message}",
-                    HostDiagnosticSeverity.Error));
+                    HostDiagnosticSeverity.Error)
+                {
+                    Context = StateDiagnosticContext.Create(
+                        ("stateKey", _stateName),
+                        ("valueType", StateDiagnosticContext.TypeName(typeof(T))),
+                        ("version", StateDiagnosticContext.Version(args.Version)))
+                });
             }
         }
     }
@@ -257,7 +263,13 @@ public sealed class WritableState<T> : IWritableState<T>, IDisposable
         _diagnostics?.Write(new HostDiagnosticRecord(
             StateDiagnosticIds.WritableStateUpdateFailed,
             $"Writable state failed to update value type '{typeof(T).FullName}' at version {Version}: {exception.Message}",
-            HostDiagnosticSeverity.Error));
+            HostDiagnosticSeverity.Error)
+        {
+            Context = StateDiagnosticContext.Create(
+                ("stateKey", _stateName),
+                ("valueType", StateDiagnosticContext.TypeName(typeof(T))),
+                ("version", StateDiagnosticContext.Version(Version)))
+        });
     }
 
     private void WriteWriteDeniedDiagnostic()
@@ -265,7 +277,13 @@ public sealed class WritableState<T> : IWritableState<T>, IDisposable
         _diagnostics?.Write(new HostDiagnosticRecord(
             StateDiagnosticIds.ApplicationStateWriteDenied,
             $"Writable state '{_stateName}' with value type '{typeof(T).FullName}' rejected write because access policy is '{_access}'.",
-            HostDiagnosticSeverity.Warning));
+            HostDiagnosticSeverity.Warning)
+        {
+            Context = StateDiagnosticContext.Create(
+                ("accessPolicy", _access.ToString()),
+                ("stateKey", _stateName),
+                ("valueType", StateDiagnosticContext.TypeName(typeof(T))))
+        });
     }
 
     private void ThrowIfDisposed()

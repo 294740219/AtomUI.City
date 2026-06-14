@@ -50,10 +50,7 @@ internal sealed class StateSubscription : IStateSubscription
         }
         catch (Exception exception)
         {
-            _diagnostics?.Write(new HostDiagnosticRecord(
-                StateDiagnosticIds.SubscriptionHandlerFailed,
-                $"State subscription handler failed at version {args.Version}: {exception.Message}",
-                HostDiagnosticSeverity.Error));
+            WriteHandlerFailedDiagnostic(args, exception);
         }
     }
 
@@ -128,10 +125,7 @@ internal sealed class StateSubscription : IStateSubscription
         }
         catch (Exception exception)
         {
-            _diagnostics?.Write(new HostDiagnosticRecord(
-                StateDiagnosticIds.SubscriptionHandlerFailed,
-                $"State subscription handler failed at version {args.Version}: {exception.Message}",
-                HostDiagnosticSeverity.Error));
+            WriteHandlerFailedDiagnostic(args, exception);
         }
     }
 
@@ -148,10 +142,7 @@ internal sealed class StateSubscription : IStateSubscription
         }
         catch (Exception exception)
         {
-            _diagnostics?.Write(new HostDiagnosticRecord(
-                StateDiagnosticIds.SubscriptionHandlerFailed,
-                $"State subscription handler failed at version {args.Version}: {exception.Message}",
-            HostDiagnosticSeverity.Error));
+            WriteHandlerFailedDiagnostic(args, exception);
         }
     }
 
@@ -168,11 +159,23 @@ internal sealed class StateSubscription : IStateSubscription
         }
         catch (Exception exception)
         {
-            _diagnostics?.Write(new HostDiagnosticRecord(
-                StateDiagnosticIds.SubscriptionHandlerFailed,
-                $"State subscription handler failed at version {args.Version}: {exception.Message}",
-                HostDiagnosticSeverity.Error));
+            WriteHandlerFailedDiagnostic(args, exception);
         }
+    }
+
+    private void WriteHandlerFailedDiagnostic(
+        StateChangedEventArgs args,
+        Exception exception)
+    {
+        _diagnostics?.Write(new HostDiagnosticRecord(
+            StateDiagnosticIds.SubscriptionHandlerFailed,
+            $"State subscription handler failed at version {args.Version}: {exception.Message}",
+            HostDiagnosticSeverity.Error)
+        {
+            Context = StateDiagnosticContext.Create(
+                ("dispatchPolicy", _options.DispatchPolicy.ToString()),
+                ("version", StateDiagnosticContext.Version(args.Version)))
+        });
     }
 }
 

@@ -57,7 +57,11 @@ public sealed class StateScope : IStateScope
         _diagnostics?.Write(new HostDiagnosticRecord(
             StateDiagnosticIds.StateScopeDisposeFailed,
             $"State scope '{Id}' subscription disposal failed: {exception.Message}",
-            HostDiagnosticSeverity.Error));
+            HostDiagnosticSeverity.Error)
+        {
+            Context = StateDiagnosticContext.Create(
+                ("scopeId", Id))
+        });
     }
 
     private void DisposeSubscription(IDisposable subscription)

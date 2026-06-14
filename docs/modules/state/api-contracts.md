@@ -11,7 +11,7 @@
 | Computed | IComputedState<T> | 派生状态。 | 依赖变更触发重算。 |
 | Snapshot | StateSnapshot | 状态快照。 | 不可变。 |
 | Collection State | IStateCollection<TKey, TItem>, StateCollection<TKey, TItem> | keyed collection state。 | 变更记录、item version、collection snapshot 和 dispose 生命周期稳定。 |
-| Diagnostics | StateDiagnosticIds | 状态错误诊断。 | AUCSTA001-010 稳定。 |
+| Diagnostics | StateDiagnosticIds | 状态错误诊断。 | AUCSTA001-010 稳定，诊断记录必须包含可定位 context。 |
 
 ## 关键方法合同
 
