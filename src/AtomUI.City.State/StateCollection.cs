@@ -339,6 +339,8 @@ public sealed class StateCollection<TKey, TItem> : IStateCollection<TKey, TItem>
 
         lock (_syncRoot)
         {
+            ThrowIfDisposed();
+
             if (_items.Count == 0)
             {
                 return false;

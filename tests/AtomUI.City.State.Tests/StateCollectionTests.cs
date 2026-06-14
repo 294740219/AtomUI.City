@@ -153,6 +153,17 @@ public sealed class StateCollectionTests
     }
 
     [Fact]
+    public void ClearRejectsDisposedCollection()
+    {
+        var collection = new StateCollection<string, int>();
+        collection.AddOrUpdate("settings", 1);
+
+        collection.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(() => collection.Clear());
+    }
+
+    [Fact]
     public void DisposeCanBeCalledMoreThanOnce()
     {
         var collection = new StateCollection<string, int>();
