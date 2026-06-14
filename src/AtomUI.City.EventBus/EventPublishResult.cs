@@ -12,6 +12,7 @@ public sealed class EventPublishResult
             throw new ArgumentException("Event publish result id cannot be empty.", nameof(eventId));
         }
 
+        EventContractId.ThrowIfDefault(contractId, nameof(contractId));
         ArgumentNullException.ThrowIfNull(deliveries);
         if (deliveries.Any(delivery => delivery is null))
         {

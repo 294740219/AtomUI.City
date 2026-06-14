@@ -154,6 +154,15 @@ public sealed class EventPublicationTests
     }
 
     [Fact]
+    public void PublishResultRejectsDefaultContractId()
+    {
+        Assert.Throws<ArgumentException>(() => new EventPublishResult(
+            Guid.NewGuid(),
+            default,
+            []));
+    }
+
+    [Fact]
     public async Task PostAsyncReturnsAcceptedEventIdUsedByDelivery()
     {
         var eventBus = new InMemoryEventBus();
