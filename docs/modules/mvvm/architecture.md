@@ -11,7 +11,7 @@ AtomUI.City.Mvvm 的架构目标是把模块职责变成可实现、可测试、
 
 - MVVM 不依赖具体 View 或 Avalonia visual。
 - Interaction 只表达请求，UI 展示由 Presentation handler 完成。
-- Command 状态支持取消和异常结果。
+- Command 状态支持完成、取消、异常和并发拒绝结果。
 
 ## 核心概念和所有权
 
@@ -38,6 +38,7 @@ AtomUI.City.Mvvm 的架构目标是把模块职责变成可实现、可测试、
 - CanDeactivate 拒绝：导航或关闭中止。
 - DeactivationGuard 异常：返回 Failed result，不让业务异常泄漏到 UI。
 - Command 抛异常：OperationResult Failed。
+- Command 并发执行：OperationResult Rejected，当前执行不被取消。
 - Interaction 无 handler：返回 Failed。
 
 ## 性能和资源边界

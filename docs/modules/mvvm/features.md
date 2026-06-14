@@ -8,7 +8,7 @@
 | --- | --- | --- | --- | --- |
 | AUC-MVVM-001 | ViewModel Base and Notification | Completed | ViewModelBase | ViewModelBaseTests |
 | AUC-MVVM-002 | Activation and Deactivation | Completed | IActivatable, ICanDeactivate, ActivationScope | ActivationScopeTests; DeactivationTests |
-| AUC-MVVM-003 | Command Execution | Ready to Start Product Implementation | CommandFactory, OperationScope, OperationResult | CommandTests |
+| AUC-MVVM-003 | Command Execution | Completed | CommandFactory, OperationScope, OperationResult | CommandTests |
 | AUC-MVVM-004 | Interaction Requests | Ready to Start Product Implementation | Interaction<TRequest, TResult>, InteractionContext<TRequest> | InteractionTests |
 | AUC-MVVM-005 | Validation Model | Ready to Start Product Implementation | ValidationScope, ValidationMessage, ValidationStatus | ValidationScopeTests |
 | AUC-MVVM-006 | Operation and Cancellation Scope | Ready to Start Product Implementation | OperationScope, CommandExecutionState | CommandTests |
@@ -61,13 +61,13 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-MVVM-003 Command Execution
 
 Feature ID: `AUC-MVVM-003`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 提供 .NET 风格命令执行、CanExecute、并发和错误结果。
 Public Contract: CommandFactory, OperationScope, OperationResult, CommandExecutionState
-Runtime / Build Behavior: Command 执行进入 OperationScope；同步和异步命令统一返回 OperationResult；CanExecute 变化可被 Presentation 绑定。
-Failure Behavior: 执行异常映射为 Failed；并发执行按 command policy 串行或拒绝；失败不得吞掉诊断。
+Runtime / Build Behavior: Command 执行进入 OperationScope；同步和异步命令都写入 CommandExecutionState 和 OperationResult；CanExecute 变化可被 Presentation 绑定。
+Failure Behavior: 执行异常映射为 Failed；并发执行返回 Rejected result；失败不得吞掉诊断。
 Threading / Cancellation: 异步命令必须观察 token；取消返回 Cancelled，不混用 Success。
-Diagnostics: command diagnostics 必须包含 command name、owner ViewModel 和 operation id。
+Diagnostics: command diagnostics 包含 command name、owner ViewModel type 和 operation id。
 Tests: `CommandTests`
 Required Assertions: 断言成功、失败、取消、并发拒绝、CanExecute 变化和异常不泄漏到 UI。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。

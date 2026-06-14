@@ -21,7 +21,8 @@
 | ViewModelBase.ActivateAsync | 激活 ViewModel。 | ActivationContext 不得为 null；scope 不得为 null。 | ValueTask。 | 激活异常不进入 Active，释放 ActivationScope，并在 exception data 写入 ViewModel type、scope id 和 stage。 | 必须观察 token；预取消释放候选 scope 后抛 `OperationCanceledException`。 | Active 状态下重复 Activate 幂等返回。 |
 | ViewModelBase.DeactivateAsync | 停用 ViewModel。 | CancellationToken 可选。 | ValueTask。 | 取消在进入 Deactivating 前抛出并保持 Active scope；已进入停用后释放当前 scope。 | 必须观察 token。 | Constructed、Deactivated 或 Disposed 状态下幂等返回。 |
 | DeactivationGuard.CanDeactivateAsync | 离开前确认。 | viewModel 不得为 null；可实现 ICanDeactivate 或 IConfirmDeactivate。 | DeactivationResult。 | 拒绝返回 Reject；取消返回 Cancel；异常映射 Failed，不抛业务异常。 | 预取消跳过 viewModel 并返回 Cancel。 | 先执行 ICanDeactivate，Allow 后再执行 IConfirmDeactivate。 |
-| CommandFactory.CreateAsyncCommand | 创建异步命令。 | execute 不得为 null；canExecute 可选。 | ICommand 或框架 command wrapper。 | execute 异常映射 OperationResult Failed。 | 命令 token 必须传递到 execute。 | 并发执行按 policy 拒绝或串行。 |
+| CommandFactory.Create | 创建同步命令。 | execute 不得为 null；canExecute 和 state 可选。 | IRelayCommand。 | execute 异常映射 OperationResult Failed，不外抛到 UI。 | 同步 API 无 token。 | 写入 CommandExecutionState；CanExecuteChanged 可通知 Presentation。 |
+| CommandFactory.CreateAsync | 创建异步命令。 | execute 不得为 null；state 和 activationScope 可选。 | IAsyncRelayCommand。 | execute 异常映射 OperationResult Failed；并发执行映射 Rejected。 | 命令 token 必须传递到 execute，并链接 ActivationScope token。 | 单一 command state 同时只允许一个 running operation。 |
 | Interaction.HandleAsync | 请求 UI interaction。 | request 不得为 null。 | InteractionResult<TResult>。 | 无 handler 或 handler 异常返回 Failed。 | 取消后不提交 handler result。 | 每次调用独立 context。 |
 | ValidationScope.SetMessages | 替换字段验证消息。 | field 可为空表示 global；messages 不得含 null。 | ValidationStatus。 | Dispose 后更新失败。 | 同步 API 无 token。 | 状态更新顺序必须稳定。 |
 

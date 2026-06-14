@@ -8,9 +8,12 @@ public sealed class OperationScope
 
     private OperationScope(CancellationToken cancellationToken)
     {
+        Id = Guid.NewGuid();
         CancellationToken = cancellationToken;
         _stopwatch = Stopwatch.StartNew();
     }
+
+    public Guid Id { get; }
 
     public CancellationToken CancellationToken { get; }
 
@@ -23,14 +26,14 @@ public sealed class OperationScope
     {
         _stopwatch.Stop();
 
-        return new OperationResult(OperationStatus.Completed, _stopwatch.Elapsed);
+        return new OperationResult(Id, OperationStatus.Completed, _stopwatch.Elapsed);
     }
 
     public OperationResult Cancel()
     {
         _stopwatch.Stop();
 
-        return new OperationResult(OperationStatus.Canceled, _stopwatch.Elapsed);
+        return new OperationResult(Id, OperationStatus.Canceled, _stopwatch.Elapsed);
     }
 
     public OperationResult Fail(Exception exception)
@@ -38,6 +41,13 @@ public sealed class OperationScope
         ArgumentNullException.ThrowIfNull(exception);
         _stopwatch.Stop();
 
-        return new OperationResult(OperationStatus.Failed, _stopwatch.Elapsed, exception);
+        return new OperationResult(Id, OperationStatus.Failed, _stopwatch.Elapsed, exception);
+    }
+
+    public OperationResult Reject()
+    {
+        _stopwatch.Stop();
+
+        return new OperationResult(Id, OperationStatus.Rejected, _stopwatch.Elapsed);
     }
 }

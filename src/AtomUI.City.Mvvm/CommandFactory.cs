@@ -1,16 +1,22 @@
+using System.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 namespace AtomUI.City.Mvvm;
 
 public static class CommandFactory
 {
-    public static IRelayCommand Create(Action execute, Func<bool>? canExecute = null)
+    public static IRelayCommand Create(
+        Action execute,
+        Func<bool>? canExecute = null,
+        CommandExecutionState? state = null)
     {
         ArgumentNullException.ThrowIfNull(execute);
 
+        var executionState = state ?? new CommandExecutionState();
+
         return canExecute is null
-            ? new RelayCommand(execute)
-            : new RelayCommand(execute, canExecute);
+            ? new RelayCommand(() => Execute(execute, executionState))
+            : new RelayCommand(() => Execute(execute, executionState), canExecute);
     }
 
     public static IAsyncRelayCommand CreateAsync(
@@ -22,12 +28,36 @@ public static class CommandFactory
 
         var executionState = state ?? new CommandExecutionState();
 
-        return new AsyncRelayCommand(
+        return new TrackedAsyncRelayCommand(
             cancellationToken => ExecuteAsync(
                 execute,
                 executionState,
                 activationScope,
-                cancellationToken));
+                cancellationToken),
+            executionState);
+    }
+
+    private static void Execute(
+        Action execute,
+        CommandExecutionState state)
+    {
+        var operation = OperationScope.Start(CancellationToken.None);
+
+        if (!state.TryBegin(operation.CancellationToken))
+        {
+            state.Reject(operation.Reject());
+            return;
+        }
+
+        try
+        {
+            execute();
+            state.Complete(operation.Complete());
+        }
+        catch (Exception exception)
+        {
+            state.Complete(operation.Fail(exception));
+        }
     }
 
     private static async Task ExecuteAsync(
@@ -41,7 +71,11 @@ public static class CommandFactory
             : CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, activationScope.CancellationToken);
         var operation = OperationScope.Start(linkedCancellationTokenSource.Token);
 
-        state.Begin(operation.CancellationToken);
+        if (!state.TryBegin(operation.CancellationToken))
+        {
+            state.Reject(operation.Reject());
+            return;
+        }
 
         try
         {
@@ -56,6 +90,104 @@ public static class CommandFactory
         catch (Exception exception)
         {
             state.Complete(operation.Fail(exception));
+        }
+    }
+
+    private sealed class TrackedAsyncRelayCommand : IAsyncRelayCommand, INotifyPropertyChanged
+    {
+        private readonly Func<CancellationToken, Task> _execute;
+        private readonly CommandExecutionState _state;
+        private CancellationTokenSource? _runningCancellation;
+
+        public TrackedAsyncRelayCommand(
+            Func<CancellationToken, Task> execute,
+            CommandExecutionState state)
+        {
+            _execute = execute;
+            _state = state;
+        }
+
+        public event EventHandler? CanExecuteChanged;
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        public Task? ExecutionTask { get; private set; }
+
+        public bool CanBeCanceled => _runningCancellation is { IsCancellationRequested: false };
+
+        public bool IsCancellationRequested => _runningCancellation?.IsCancellationRequested ?? false;
+
+        public bool IsRunning => _state.IsExecuting;
+
+        public bool CanExecute(object? parameter)
+        {
+            return !_state.IsExecuting;
+        }
+
+        public void Execute(object? parameter)
+        {
+            _ = ExecuteAsync(parameter);
+        }
+
+        public Task ExecuteAsync(object? parameter)
+        {
+            if (_state.IsExecuting)
+            {
+                ExecutionTask = _execute(CancellationToken.None);
+                OnPropertyChanged(nameof(ExecutionTask));
+                return ExecutionTask;
+            }
+
+            var cancellation = new CancellationTokenSource();
+            _runningCancellation = cancellation;
+
+            ExecutionTask = ExecuteCoreAsync(cancellation);
+            NotifyStateChanged();
+
+            return ExecutionTask;
+        }
+
+        public void Cancel()
+        {
+            _runningCancellation?.Cancel();
+            NotifyStateChanged();
+        }
+
+        public void NotifyCanExecuteChanged()
+        {
+            CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        private async Task ExecuteCoreAsync(CancellationTokenSource cancellation)
+        {
+            try
+            {
+                await _execute(cancellation.Token).ConfigureAwait(false);
+            }
+            finally
+            {
+                if (ReferenceEquals(_runningCancellation, cancellation))
+                {
+                    _runningCancellation.Dispose();
+                    _runningCancellation = null;
+                }
+
+                NotifyStateChanged();
+            }
+        }
+
+        private void NotifyStateChanged()
+        {
+            NotifyCanExecuteChanged();
+            OnPropertyChanged(nameof(ExecutionTask));
+            OnPropertyChanged(nameof(CanBeCanceled));
+            OnPropertyChanged(nameof(IsCancellationRequested));
+            OnPropertyChanged(nameof(IsRunning));
+        }
+
+        private void OnPropertyChanged(string propertyName)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
     }
 }

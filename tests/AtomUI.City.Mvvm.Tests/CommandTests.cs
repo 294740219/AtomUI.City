@@ -19,6 +19,48 @@ public sealed class CommandTests
     }
 
     [Fact]
+    public void SyncCommandCapturesFailureWithoutThrowing()
+    {
+        var exception = new InvalidOperationException("boom");
+        var state = new CommandExecutionState("save", typeof(SaveViewModel));
+        var command = CommandFactory.Create(
+            () => throw exception,
+            state: state);
+
+        command.Execute(null);
+
+        Assert.False(state.IsExecuting);
+        Assert.Equal(OperationStatus.Failed, state.LastResult?.Status);
+        Assert.Same(exception, state.LastError);
+        Assert.Same(exception, state.LastResult?.Error);
+        Assert.NotEqual(Guid.Empty, state.LastResult?.OperationId);
+        Assert.Equal("save", state.CommandName);
+        Assert.Equal(typeof(SaveViewModel), state.OwnerType);
+    }
+
+    [Fact]
+    public void SyncCommandNotifiesCanExecuteChanges()
+    {
+        var enabled = false;
+        var changes = 0;
+        var state = new CommandExecutionState("refresh", typeof(SaveViewModel));
+        var command = CommandFactory.Create(
+            () => { },
+            canExecute: () => enabled,
+            state: state);
+
+        command.CanExecuteChanged += (_, _) => changes++;
+
+        Assert.False(command.CanExecute(null));
+
+        enabled = true;
+        command.NotifyCanExecuteChanged();
+
+        Assert.True(command.CanExecute(null));
+        Assert.Equal(1, changes);
+    }
+
+    [Fact]
     public async Task AsyncCommandTracksSuccessfulExecution()
     {
         var state = new CommandExecutionState();
@@ -37,6 +79,41 @@ public sealed class CommandTests
         Assert.False(state.IsExecuting);
         Assert.Equal(OperationStatus.Completed, state.LastResult?.Status);
         Assert.Null(state.LastError);
+    }
+
+    [Fact]
+    public async Task AsyncCommandRejectsConcurrentExecution()
+    {
+        var state = new CommandExecutionState("load", typeof(SaveViewModel));
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var executions = 0;
+        var command = CommandFactory.CreateAsync(
+            async cancellationToken =>
+            {
+                executions++;
+                started.TrySetResult();
+                await release.Task.WaitAsync(cancellationToken);
+            },
+            state);
+
+        var first = command.ExecuteAsync(null);
+        await started.Task;
+
+        var second = command.ExecuteAsync(null);
+        await second;
+
+        Assert.True(state.IsExecuting);
+        Assert.Equal(1, executions);
+        Assert.Equal(1, state.RejectedExecutionCount);
+        Assert.Equal(OperationStatus.Rejected, state.LastRejectedResult?.Status);
+        Assert.NotEqual(Guid.Empty, state.LastRejectedResult?.OperationId);
+
+        release.SetResult();
+        await first;
+
+        Assert.False(state.IsExecuting);
+        Assert.Equal(OperationStatus.Completed, state.LastResult?.Status);
     }
 
     [Fact]
@@ -108,4 +185,6 @@ public sealed class CommandTests
 
         Assert.Equal(0, calls);
     }
+
+    private sealed class SaveViewModel;
 }

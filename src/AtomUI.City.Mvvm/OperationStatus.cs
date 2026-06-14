@@ -5,4 +5,5 @@ public enum OperationStatus
     Completed,
     Failed,
     Canceled,
+    Rejected,
 }
