@@ -5,6 +5,12 @@ namespace AtomUI.City.EventBus.Tests;
 public sealed class EventContractRegistryTests
 {
     [Fact]
+    public void ContractIdRejectsSurroundingWhitespace()
+    {
+        Assert.Throws<ArgumentException>(() => new EventContractId(" atomui.city.tests.event.v1 "));
+    }
+
+    [Fact]
     public void SharedContractDescriptorRequiresSharedAssemblyMatch()
     {
         var contractId = new EventContractId("atomui.city.tests.shared.v1");
