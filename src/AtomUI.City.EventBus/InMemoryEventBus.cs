@@ -509,6 +509,14 @@ public sealed class InMemoryEventBus : IEventBus
 
         public async ValueTask StopAsync(CancellationToken cancellationToken = default)
         {
+            lock (_stateGate)
+            {
+                if (_state == EventSubscriptionState.Disposed)
+                {
+                    return;
+                }
+            }
+
             cancellationToken.ThrowIfCancellationRequested();
             Task? drainTask;
             var removeFromBus = false;

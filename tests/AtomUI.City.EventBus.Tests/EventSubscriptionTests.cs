@@ -43,6 +43,20 @@ public sealed class EventSubscriptionTests
     }
 
     [Fact]
+    public async Task StopAsyncOnDisposedSubscriptionIgnoresCanceledToken()
+    {
+        var eventBus = new InMemoryEventBus();
+        var subscription = eventBus.Subscribe<TestEvent>(_ => ValueTask.CompletedTask);
+        using var cancellation = new CancellationTokenSource();
+
+        await subscription.StopAsync();
+        await cancellation.CancelAsync();
+        await subscription.StopAsync(cancellation.Token);
+
+        Assert.Equal(EventSubscriptionState.Disposed, subscription.State);
+    }
+
+    [Fact]
     public async Task StopAsyncWaitsForInFlightHandlerToComplete()
     {
         var eventBus = new InMemoryEventBus();

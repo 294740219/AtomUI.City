@@ -111,12 +111,12 @@
 - Modify: `docs/modules/eventbus/api-contracts.md`
 - Modify: this plan file
 
-- [ ] **Step 1: Add a failing test that calling `StopAsync` on an already disposed subscription with a canceled token returns without throwing.**
-- [ ] **Step 2: Run focused subscription tests and verify the new test fails.**
-- [ ] **Step 3: Check disposed state before observing cancellation in `StopAsync`.**
-- [ ] **Step 4: Document the idempotent disposed-stop boundary.**
-- [ ] **Step 5: Run focused EventBus tests, docs check, public API check, and `git diff --check`.**
-- [ ] **Step 6: Commit with `fix(EventBus): keep stopped subscriptions idempotent`.**
+- [x] **Step 1: Add a failing test that calling `StopAsync` on an already disposed subscription with a canceled token returns without throwing.**
+- [x] **Step 2: Run focused subscription tests and verify the new test fails.**
+- [x] **Step 3: Check disposed state before observing cancellation in `StopAsync`.**
+- [x] **Step 4: Document the idempotent disposed-stop boundary.**
+- [x] **Step 5: Run focused EventBus tests, docs check, public API check, and `git diff --check`.**
+- [x] **Step 6: Commit with `fix(EventBus): keep stopped subscriptions idempotent`.**
 
 ### Task 8: Delivery failure diagnostics include stable event context
 
