@@ -18,6 +18,7 @@
 - 删除、重命名、改变默认行为、异常类型、Result status 或诊断码语义属于 breaking change。
 - 新增 API 可以 minor 版本发布，但必须有文档、测试和迁移说明。
 - `DataRequestPipeline` 的 credential -> cache -> transport 顺序、取消后不写缓存、transient result retry 和 transport exception retry diagnostics 进入 1.0 兼容承诺。
+- `HttpDataTransport` 的非成功 status 映射进入 1.0 兼容承诺，特别是 422 -> `ValidationFailed`、504 -> `Timeout`。
 
 ## 数据格式兼容
 

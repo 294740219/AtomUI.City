@@ -120,6 +120,8 @@ Unknown
 |---|---|
 | HTTP 401 | AuthenticationRequired / AuthenticationExpired。 |
 | HTTP 403 | AuthorizationForbidden。 |
+| HTTP 422 | ValidationFailed。 |
+| HTTP 504 | Timeout。 |
 | gRPC Unauthenticated | AuthenticationRequired / AuthenticationExpired。 |
 | gRPC PermissionDenied | AuthorizationForbidden。 |
 | gRPC DeadlineExceeded | DeadlineExceeded / Timeout。 |

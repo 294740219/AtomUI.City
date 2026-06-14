@@ -5,8 +5,8 @@
 ## 当前结论
 
 - 1.0 发布状态：不可发布。
-- 全局进度：76/118。
-- 模块 Feature 合同：76/109。
+- 全局进度：77/118。
+- 模块 Feature 合同：77/109。
 - 最终发布门禁：0/9。
 - 最近校准日期：2026-06-15。
 
@@ -43,7 +43,7 @@
 | State | 8 | 0 | 8 | 已完成 |
 | EventBus | 6 | 0 | 6 | 已完成 |
 | PluginSystem | 8 | 0 | 8 | 已完成 |
-| Data | 1 | 8 | 9 | 产品化进行中 |
+| Data | 2 | 7 | 9 | 产品化进行中 |
 | Localization | 0 | 7 | 7 | 未完成 |
 | Security | 0 | 7 | 7 | 未完成 |
 | CLI | 0 | 6 | 6 | 未完成 |
@@ -158,7 +158,7 @@
 ## Data
 
 - [x] AUC-DATA-001 Request Pipeline。验收重点：执行顺序、取消不写缓存、retry diagnostics。
-- [ ] AUC-DATA-002 HTTP Transport。验收重点：status -> DataErrorKind 映射。
+- [x] AUC-DATA-002 HTTP Transport。验收重点：status -> DataErrorKind 映射。
 - [ ] AUC-DATA-003 gRPC Transport。验收重点：GrpcStatusCode 映射。
 - [ ] AUC-DATA-004 SignalR Transport。验收重点：invocation context。
 - [ ] AUC-DATA-005 Connection Lifecycle。验收重点：状态转换、owner 释放。

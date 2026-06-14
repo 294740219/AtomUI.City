@@ -123,12 +123,16 @@ HTTP 必须支持大载荷场景：
 
 | HTTP | DataError |
 |---|---|
-| 400 | ValidationFailed 或 BadRequest。 |
+| 400 | BadRequest。 |
 | 401 | AuthenticationRequired / AuthenticationExpired。 |
 | 403 | AuthorizationForbidden。 |
 | 404 | NotFound。 |
 | 409 | Conflict。 |
+| 422 | ValidationFailed。 |
 | 408 / timeout | Timeout。 |
+| 429 | PolicyRejected。 |
+| 503 | ServiceUnavailable。 |
+| 504 | Timeout。 |
 | 5xx | ServerError。 |
 | network error | NetworkUnavailable 或 TransportError。 |
 

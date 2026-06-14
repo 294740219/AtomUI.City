@@ -7,7 +7,7 @@
 | Feature ID | 名称 | 状态 | Public Contract | 主测试 |
 | --- | --- | --- | --- | --- |
 | AUC-DATA-001 | Request Pipeline | Completed | IDataRequestPipeline, DataRequestPipeline | DataPipelineTests |
-| AUC-DATA-002 | HTTP Transport | Ready to Start Product Implementation | HttpDataRequest<T>, HttpDataTransport | HttpDataTransportTests |
+| AUC-DATA-002 | HTTP Transport | Completed | HttpDataRequest<T>, HttpDataTransport | HttpDataTransportTests |
 | AUC-DATA-003 | gRPC Transport | Ready to Start Product Implementation | GrpcDataRequest<T>, GrpcDataTransport | GrpcDataTransportTests |
 | AUC-DATA-004 | SignalR Transport | Ready to Start Product Implementation | SignalRDataRequest<T>, SignalRDataTransport | SignalRDataTransportTests |
 | AUC-DATA-005 | Connection Lifecycle | Ready to Start Product Implementation | DataConnectionManager, IDataConnection | DataConnectionLifecycleTests |
@@ -50,15 +50,15 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-DATA-002 HTTP Transport
 
 Feature ID: `AUC-DATA-002`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: HTTP request/response 到 DataResult 映射。
 Public Contract: HttpDataRequest<T>, HttpDataTransport
-Runtime / Build Behavior: HTTP request/response 到 DataResult 映射。
-Failure Behavior: 非成功状态码、timeout、cancel。
+Runtime / Build Behavior: HTTP request/response 到 DataResult 映射；401、403、404、409、422、429、503、504 和 5xx 必须映射为稳定 DataErrorKind。
+Failure Behavior: 非成功状态码、validation failed、timeout、cancel。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `HttpDataTransportTests`。
-Required Assertions: 断言 status -> DataErrorKind 映射。
+Required Assertions: 断言 status -> DataErrorKind 映射，包含 validation failed 和 gateway timeout。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 ## AUC-DATA-003 gRPC Transport
 

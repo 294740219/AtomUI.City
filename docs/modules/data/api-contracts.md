@@ -7,7 +7,7 @@
 | API Family | 关键类型 | 职责 | 硬性行为 |
 | --- | --- | --- | --- |
 | Request Pipeline | IDataRequestPipeline, DataRequest<T>, DataRequestContext | 统一请求执行。 | 认证->缓存->传输->映射顺序稳定；transient transport exception 按 retry policy 处理。 |
-| Transports | HttpDataTransport, GrpcDataTransport, SignalRDataTransport | 具体传输适配。 | 只做传输。 |
+| Transports | HttpDataTransport, GrpcDataTransport, SignalRDataTransport | 具体传输适配。 | 只做传输；HTTP 422 映射为 ValidationFailed，504 映射为 Timeout。 |
 | Connection | DataConnectionManager, IDataConnection, DataConnectionOwner | 长连接生命周期。 | owner 必填。 |
 | Caching | IDataRequestCache, DataCacheKey | 请求缓存。 | key 组成稳定。 |
 | Diagnostics | DataDiagnosticIds | 数据访问诊断。 | AUCDATA001-020 稳定。 |
