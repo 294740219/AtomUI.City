@@ -420,7 +420,7 @@ Commit message: `fix(EventBus): validate post contract init`
 - Test: `tests/AtomUI.City.EventBus.Tests/EventPublicationTests.cs`
 - Modify: this plan file
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```csharp
 [Fact]
@@ -438,12 +438,12 @@ public void PostResultRejectsAcceptedRejectionReasonInitMutation()
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `dotnet test tests/AtomUI.City.EventBus.Tests/AtomUI.City.EventBus.Tests.csproj --filter "FullyQualifiedName~PostResultRejectsAcceptedRejectionReasonInitMutation"`
 Expected: FAIL because `RejectionReason` init mutations do not re-check accepted state.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Change `RejectionReason` to a validating backing field:
 
@@ -457,12 +457,12 @@ public string? RejectionReason
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `dotnet test tests/AtomUI.City.EventBus.Tests/AtomUI.City.EventBus.Tests.csproj --filter "FullyQualifiedName~PostResultRejectsAcceptedRejectionReasonInitMutation"`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit message: `fix(EventBus): validate post rejection init`
 

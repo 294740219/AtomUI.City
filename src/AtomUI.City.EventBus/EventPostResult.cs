@@ -22,7 +22,13 @@ public sealed record EventPostResult(
         init => _contractId = ValidateContractId(value);
     }
 
-    public string? RejectionReason { get; init; } = ValidateRejectionReason(Accepted, RejectionReason);
+    private string? _rejectionReason = ValidateRejectionReason(Accepted, RejectionReason);
+
+    public string? RejectionReason
+    {
+        get => _rejectionReason;
+        init => _rejectionReason = ValidateRejectionReason(Accepted, value);
+    }
 
     private static Guid ValidateEventId(Guid eventId)
     {
