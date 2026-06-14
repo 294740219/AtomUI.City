@@ -200,6 +200,7 @@ public sealed class InMemoryEventBus : IEventBus
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(eventData);
+        ThrowIfDisposed();
         var publishOptions = NormalizeAndValidatePublishOptions(options);
 
         var descriptor = _contractRegistry.GetOrCreate<TEvent>();
