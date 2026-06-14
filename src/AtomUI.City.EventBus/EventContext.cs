@@ -21,6 +21,7 @@ public sealed class EventContext<TEvent>
             throw new ArgumentException("Event context id cannot be empty.", nameof(eventId));
         }
         correlationId = EventCorrelationIds.ValidateRequired(correlationId, nameof(correlationId));
+        causationId = EventCorrelationIds.ValidateOptional(causationId, nameof(causationId));
         if (publishDepth < 0)
         {
             throw new ArgumentOutOfRangeException(

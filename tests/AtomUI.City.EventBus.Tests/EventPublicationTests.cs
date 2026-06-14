@@ -195,6 +195,26 @@ public sealed class EventPublicationTests
             CancellationToken.None));
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData(" cause ")]
+    [InlineData("cause\nid")]
+    public void EventContextRejectsInvalidCausationIds(string causationId)
+    {
+        Assert.Throws<ArgumentException>(() => new EventContext<TestEvent>(
+            new TestEvent("context"),
+            new EventContractId("atomui.city.tests.context.v1"),
+            Guid.NewGuid(),
+            "correlation",
+            causationId,
+            DateTimeOffset.UtcNow,
+            publishDepth: 0,
+            EventSubscriptionId.New(),
+            EventDispatchPolicy.Serialized,
+            CancellationToken.None));
+    }
+
     [Fact]
     public async Task PostAsyncRejectsNullEvent()
     {

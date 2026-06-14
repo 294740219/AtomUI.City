@@ -408,7 +408,7 @@ Commit message: `fix(EventBus): validate context dispatch policies`
 - Modify: `docs/modules/eventbus/implementation-plan.md`
 - Test: `tests/AtomUI.City.EventBus.Tests/EventPublicationTests.cs`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```csharp
 [Theory]
@@ -432,20 +432,20 @@ public void EventContextRejectsInvalidCausationIds(string causationId)
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `dotnet test tests/AtomUI.City.EventBus.Tests/AtomUI.City.EventBus.Tests.csproj --filter "FullyQualifiedName~EventContextRejectsInvalidCausationIds"`
 Expected: FAIL because `EventContext<TEvent>` currently accepts invalid causation ids.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Use `EventCorrelationIds.ValidateOptional` for `EventContext<TEvent>.CausationId`. Update `api-contracts.md` so `EventContext<TEvent>` documents all hardened constructor boundaries, and add a 2026-06-14 implementation-plan note for this batch.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `dotnet test tests/AtomUI.City.EventBus.Tests/AtomUI.City.EventBus.Tests.csproj --filter "FullyQualifiedName~EventContextRejectsInvalidCausationIds"`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit message: `fix(EventBus): validate context causation ids`

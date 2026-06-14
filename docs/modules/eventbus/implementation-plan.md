@@ -17,3 +17,7 @@
 - `产品合同测试` 为 `必需` 时，不能把 Feature 标记为已实现。
 - 新增 public API、manifest、diagnostic、MSBuild property、CLI command 或 template variable 时，必须先更新标准文档页。
 - 文档与代码不一致时，先修正文档并确认，再调整实现。
+
+## 2026-06-14 进展
+
+- 加固 `EventPublishOptions` 与 `EventContext<TEvent>` 边界：publish depth、correlation id、causation id、event id、contract id、subscription id 与 dispatch policy 的非法输入均由构造或 init 边界拒绝。
