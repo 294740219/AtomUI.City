@@ -6,7 +6,7 @@
 
 | API Family | 关键类型 | 职责 | 硬性行为 |
 | --- | --- | --- | --- |
-| Publish | IEventPublisher, EventPublishOptions, EventPublishResult | 发布类型化事件。 | 返回每个 handler 结果。 |
+| Publish | IEventBus, IEventPublisher, EventPublishOptions, EventPublishResult | 发布类型化事件。 | 返回每个 handler 结果。 |
 | Subscribe | IEventSubscriber, IEventHandler<TEvent>, IEventSubscription | 注册和释放 handler。 | owner 释放必须撤销。 |
 | Contract | IEventContractRegistry, EventContractDescriptor | 事件边界声明。 | 跨插件 contract 必须来自共享程序集。 |
 | Diagnostics | EventDiagnosticIds | 现有 EventBus.* 诊断。 | 保持现有字符串兼容。 |
@@ -15,9 +15,10 @@
 
 | Method | Purpose | Parameters | Return | Failure Behavior | Cancellation | Concurrency / Idempotency |
 | --- | --- | --- | --- | --- | --- | --- |
-| IEventPublisher.PublishAsync | 发布事件。 | event 实例非 null，options 可选。 | EventPublishResult。 | event 为 null 抛 `ArgumentNullException`；contract 非法、handler 失败、取消。 | 进入 contract registry、diagnostics 和 subscription snapshot 前必须观察 token；无订阅者时也不能把已取消 publish 报告为成功。 | 并发 publish 使用 subscription snapshot。 |
-| IEventPublisher.PostAsync | 接受异步发布请求。 | event 实例非 null，options 可选。 | EventPostResult。 | event 为 null 抛 `ArgumentNullException`；已取消 token 返回 rejected result。 | 接受前必须观察 token，接受后 delivery 取消进入 diagnostics。 | 返回的 EventId 必须用于后续 delivery。 |
+| IEventPublisher.PublishAsync | 发布事件。 | event 实例非 null，options 可选。 | EventPublishResult。 | event 为 null 抛 `ArgumentNullException`；disposed bus 抛 `ObjectDisposedException`；contract 非法、handler 失败、取消。 | 进入 contract registry、diagnostics 和 subscription snapshot 前必须观察 token；无订阅者时也不能把已取消 publish 报告为成功。 | 并发 publish 使用 subscription snapshot。 |
+| IEventPublisher.PostAsync | 接受异步发布请求。 | event 实例非 null，options 可选。 | EventPostResult。 | event 为 null 抛 `ArgumentNullException`；disposed bus 抛 `ObjectDisposedException`；已取消 token 返回 rejected result。 | 接受前必须观察 token，接受后 delivery 取消进入 diagnostics。 | 返回的 EventId 必须用于后续 delivery。 |
 | IEventSubscriber.Subscribe | 订阅事件。 | handler 非 null，owner/options 可选。 | IEventSubscription。 | Disposed bus 或非法 contract 失败。 | 无异步取消。 | 不得在锁内调用 handler。 |
+| IEventBus.Dispose | 结束进程内事件总线生命周期。 | 无。 | 无。 | 重复 Dispose 不抛异常；Dispose 后 publish、post 和 subscribe API 抛 `ObjectDisposedException`。 | 无。 | 清空并释放 active subscriptions；DI provider dispose 必须释放 singleton bus。 |
 | IEventContractRegistry.Register | 注册 shared event contract descriptor。 | descriptor 非 null 且 plane 必须为 Shared。 | 无。 | descriptor 为 null 抛 `ArgumentNullException`；plugin-private descriptor 或重复 id/type 冲突抛 `InvalidOperationException`。 | 无。 | 注册表内 contract id 和 event type 映射保持稳定。 |
 | IEventSubscription.DisposeAsync / StopAsync | 释放或停止订阅。 | 可重复调用。 | Disposed 状态。 | 释放中 handler 失败进入 diagnostics。 | 取消只影响等待；已 Disposed 后再次 StopAsync 即使 token 已取消也必须作为 no-op 返回。 | 并发 dispose 幂等。 |
 | EventPublishResult constructor | 创建发布结果。 | eventId 必须非空，contractId 必须已创建，deliveries 不得为 null 且不得包含 null 项。 | EventPublishResult。 | eventId 为空、contractId 为 default 或 deliveries 包含 null 项抛 `ArgumentException`；deliveries 为 null 抛 `ArgumentNullException`。 | 无。 | delivery 列表创建后不可由外部 mutation 改变。 |
@@ -26,6 +27,7 @@
 | EventPublishOptions | 描述 publish 上下文。 | `PublishDepth` 必须大于等于 0；`CorrelationId`/`CausationId` 为 null 或稳定 id，不得为空白、包含首尾空白或控制字符。 | EventPublishOptions。 | publish depth 小于 0 时，options init 和发布入口抛 `ArgumentOutOfRangeException`；CorrelationId/CausationId 非法时抛 `ArgumentException`。 | 无。 | 调用内只读取，不回写 options。 |
 | EventContext<TEvent> constructor | 创建 handler 执行上下文。 | eventData 非 null，contractId/subscriptionId 必须已创建，eventId 必须非空，correlationId 必须为稳定 id，causationId 为 null 或稳定 id，二者不得为空白、包含首尾空白或控制字符，publishDepth 必须大于等于 0，dispatchPolicy 必须是已定义值。 | EventContext<TEvent>。 | eventData 为 null 抛 `ArgumentNullException`；contractId/subscriptionId 为 default、eventId 为空或 correlationId/causationId 无效抛 `ArgumentException`；publishDepth 小于 0 或未知 dispatchPolicy 抛 `ArgumentOutOfRangeException`。 | 仅保存 token，不主动取消。 | 创建后不可变。 |
 | EventSubscriptionOptions.WithErrorPolicy | 派生错误策略选项。 | errorPolicy 必须是已定义 enum 值。 | EventSubscriptionOptions。 | 未知 error policy 抛 `ArgumentOutOfRangeException`。 | 无。 | 不修改原 options，返回新实例。 |
+| EventContractDescriptor.Shared / PluginPrivate | 创建事件 contract descriptor。 | contractId 必须已创建；Shared assembly 必须与事件类型定义程序集一致。 | EventContractDescriptor。 | contractId 为 default 抛 `ArgumentException`；Shared assembly 为 null 抛 `ArgumentNullException`；Shared assembly 不匹配抛 `InvalidOperationException`。 | 无。 | descriptor 创建后不可变。 |
 | EventContractId constructor | 创建稳定事件 contract id。 | value 非 null、非空白、不得包含首尾空白或控制字符。 | EventContractId。 | value 为 null、空白、包含首尾空白或控制字符时抛 `ArgumentException`。 | 无。 | 创建结果不可变。 |
 
 ## Public 类型覆盖
@@ -71,7 +73,8 @@
 
 ## Dispose 后行为
 
-- mutating API 在 Dispose 后必须失败。
+- `IEventBus.Dispose` 幂等，并释放 active subscriptions。
+- `IEventBus.PublishAsync`、`IEventBus.PostAsync` 和 `IEventSubscriber.Subscribe` 在 Dispose 后必须失败并抛 `ObjectDisposedException`。
 - 查询 immutable descriptor、manifest、snapshot、result 的 API 可以继续读取。
 - 重复 Dispose、Stop、Unload、Unsubscribe、Revoke 必须幂等。
 

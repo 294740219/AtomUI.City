@@ -38,24 +38,24 @@ Status: 产品化进行中
 Goal: 按事件类型发布并返回 handler 结果。
 Public Contract: IEventBus.PublishAsync, EventPublishResult
 Runtime / Build Behavior: 按事件类型发布并返回 handler 结果。
-Failure Behavior: event 为 null、contract 未登记、handler 失败、取消。
+Failure Behavior: event 为 null、contract 未登记、handler 失败、取消、disposed bus。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 implementation plan 中追踪。
 Tests: `EventPublicationTests`。
-Required Assertions: 断言 delivery result、null event、预取消 token、publish options 边界、result immutable/null delivery、error policy、diagnostics。
+Required Assertions: 断言 delivery result、null event、预取消 token、disposed bus、publish options 边界、result immutable/null delivery、error policy、diagnostics。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 ## AUC-EVENTBUS-002 Subscription Lifecycle
 
 Feature ID: `AUC-EVENTBUS-002`
 Status: 产品化进行中
-Goal: 订阅 Active/Disposed 和 owner 释放。
-Public Contract: IEventSubscription, EventSubscriptionOptions
-Runtime / Build Behavior: 订阅 Active/Disposed 和 owner 释放。
-Failure Behavior: 重复释放、owner dispose、插件 unload、已 Disposed 后 stop with canceled token。
+Goal: 订阅 Active/Disposed、owner 释放和 bus dispose 清理。
+Public Contract: IEventBus, IEventSubscription, EventSubscriptionOptions
+Runtime / Build Behavior: 订阅 Active/Disposed、owner 释放和 bus dispose 清理。
+Failure Behavior: 重复释放、owner dispose、bus dispose、插件 unload、已 Disposed 后 stop with canceled token。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 implementation plan 中追踪。
 Tests: `EventSubscriptionTests`。
-Required Assertions: 断言 dispose 后不再收到事件、StopAsync 移除新发布快照、等待 in-flight handler、owner stop/cancellation 释放、已 Disposed 后 StopAsync 幂等。
+Required Assertions: 断言 dispose 后不再收到事件、StopAsync 移除新发布快照、等待 in-flight handler、owner stop/cancellation 释放、bus dispose 清理 active subscriptions、已 Disposed 后 StopAsync 幂等。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 ## AUC-EVENTBUS-003 Contract Registry
 
@@ -64,11 +64,11 @@ Status: 产品化进行中
 Goal: 登记事件 contract 和 plane。
 Public Contract: IEventContractRegistry, EventContractDescriptor
 Runtime / Build Behavior: 登记事件 contract 和 plane。
-Failure Behavior: 跨插件私有类型拒绝。
+Failure Behavior: 跨插件私有类型拒绝、default contract id 拒绝。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 implementation plan 中追踪。
 Tests: `EventContractRegistryTests`。
-Required Assertions: 断言 shared contract assembly match、重复 contract id、稳定默认映射、shared registry 拒绝 plugin-private descriptor。
+Required Assertions: 断言 shared contract assembly match、重复 contract id、稳定默认映射、plugin-private descriptor default id 拒绝、shared registry 拒绝 plugin-private descriptor。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 ## AUC-EVENTBUS-004 Dispatch Policy
 
@@ -100,12 +100,12 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 
 Feature ID: `AUC-EVENTBUS-006`
 Status: 准备开始产品实现
-Goal: 注册总线和 registry。
+Goal: 注册总线、registry 和 DI 生命周期。
 Public Contract: EventBusServiceCollectionExtensions
-Runtime / Build Behavior: 注册总线和 registry。
+Runtime / Build Behavior: 注册总线、registry 和 DI provider dispose 释放 singleton bus。
 Failure Behavior: 重复注册和 override 行为。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 implementation plan 中追踪。
 Tests: `EventBusRegistrationTests`。
-Required Assertions: 断言默认服务和可替换 diagnostics。
+Required Assertions: 断言默认服务、可替换 diagnostics 和 provider dispose 释放 EventBus singleton。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。

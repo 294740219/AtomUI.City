@@ -220,6 +220,7 @@ plugin.state-changed.v1
 - Id 使用稳定、可读、与 CLR 类型名解耦的形式。
 - Id 一旦公开不能改变语义。
 - 破坏性变更创建新 Id 或新 major version。
+- default `EventContractId` 不是已创建 id，Shared 和 PluginPrivate descriptor 都必须拒绝。
 - 未显式声明的内部事件可以由 source generator 使用类型全名生成默认 Id。
 - 插件共享事件应显式声明 Id。
 
@@ -307,7 +308,7 @@ Plugin publishes private event
 -> Same plugin handlers only
 ```
 
-插件私有事件不能因为 namespace 看起来公共就进入 Shared Plane。判断依据是加载期生成并注册的 EventContract descriptor。
+插件私有事件不能因为 namespace 看起来公共就进入 Shared Plane。判断依据是加载期生成并注册的 EventContract descriptor。PluginPrivate descriptor 仍必须持有已创建的 `EventContractId`，不能使用 default id。
 
 ### 12. 插件之间通信
 

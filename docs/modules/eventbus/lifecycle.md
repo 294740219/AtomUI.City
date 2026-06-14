@@ -8,6 +8,7 @@ AtomUI.City.EventBus 作为 Host 服务或模块贡献接入 Core 生命周期�
 
 ## 模块特有状态机
 
+- EventBus: Active -> Disposed
 - Subscription: Created -> Active -> Disposing -> Disposed
 - Publish: Created -> Dispatching -> Completed 或 Failed 或 Cancelled
 - Contract registry: MutableDuringConfiguration -> FrozenAtRuntime；插件动态贡献走 snapshot 替换
@@ -17,6 +18,7 @@ AtomUI.City.EventBus 作为 Host 服务或模块贡献接入 Core 生命周期�
 - Subscribe 验证 contract、记录 owner、创建 subscription id。
 - Publish 创建 EventContext，选定 dispatch policy，按稳定顺序调用 handler。
 - handler 失败按 EventErrorPolicy 继续、停止或聚合错误。
+- EventBus Dispose 幂等，释放 active subscriptions，并阻止新的 publish、post 和 subscribe。
 - owner dispose 或插件 unload 释放 subscription。
 
 ## Host Shutdown / 执行结束行为
@@ -37,7 +39,8 @@ AtomUI.City.EventBus 作为 Host 服务或模块贡献接入 Core 生命周期�
 - 未登记跨边界 contract：拒绝 publish 并诊断。
 - handler 抛异常：记录 eventType、handlerType、operationId。
 - subscription dispose 中 handler 正在执行：等待完成或按 cancellation 策略结束。
-- 重复 dispose：幂等。
+- EventBus 重复 dispose：幂等。
+- Subscription 重复 dispose：幂等。
 
 ## 生命周期测试要求
 

@@ -22,12 +22,12 @@
 
 | Feature ID | Test Type | Test File | Required Assertions | Failure Paths | Status |
 | --- | --- | --- | --- | --- | --- |
-| AUC-EVENTBUS-001 | Unit | EventPublicationTests | 断言 delivery/post result 边界、null event、预取消 token、publish options 边界、result immutable/null delivery、error policy、diagnostics。 | contract 未登记、handler 失败、取消、非法 options、非法 result。 | 部分通过 |
-| AUC-EVENTBUS-002 | RuntimeLifecycle | EventSubscriptionTests | 断言 dispose 后不再收到事件、StopAsync 移除新发布快照、等待 in-flight handler、owner stop/cancellation 释放、已 Disposed 后 StopAsync 幂等。 | 重复释放、owner dispose、插件 unload。 | 部分通过 |
-| AUC-EVENTBUS-003 | Unit | EventContractRegistryTests | 断言 shared contract assembly match、重复 contract id、稳定默认映射、shared registry 拒绝 plugin-private descriptor。 | 跨插件私有类型拒绝。 | 部分通过 |
+| AUC-EVENTBUS-001 | Unit | EventPublicationTests | 断言 delivery/post result 边界、null event、预取消 token、disposed bus、publish options 边界、result immutable/null delivery、error policy、diagnostics。 | contract 未登记、handler 失败、取消、disposed bus、非法 options、非法 result。 | 部分通过 |
+| AUC-EVENTBUS-002 | RuntimeLifecycle | EventSubscriptionTests | 断言 dispose 后不再收到事件、StopAsync 移除新发布快照、等待 in-flight handler、owner stop/cancellation 释放、bus dispose 清理 active subscriptions、已 Disposed 后 StopAsync 幂等。 | 重复释放、owner dispose、bus dispose、插件 unload。 | 部分通过 |
+| AUC-EVENTBUS-003 | Unit | EventContractRegistryTests | 断言 shared contract assembly match、重复 contract id、稳定默认映射、plugin-private descriptor default id 拒绝、shared registry 拒绝 plugin-private descriptor。 | 跨插件私有类型拒绝、default contract id。 | 部分通过 |
 | AUC-EVENTBUS-004 | Unit | EventDispatchingTests | 断言顺序、异常聚合、停止策略、未知 error policy 拒绝。 | handler 异常、取消、继续或停止、未知 error policy。 | 部分通过 |
 | AUC-EVENTBUS-005 | Unit | EventDiagnosticsTests | 断言 EventBus.Event* 现有代码、failure/cancellation 诊断包含 contract id、event id 和 subscription id。 | diagnostics collector 缺失不影响 publish。 | 部分通过 |
-| AUC-EVENTBUS-006 | Unit | EventBusRegistrationTests | 断言默认服务和可替换 diagnostics。 | 重复注册和 override 行为。 | Required |
+| AUC-EVENTBUS-006 | Unit | EventBusRegistrationTests | 断言默认服务、可替换 diagnostics 和 provider dispose 释放 EventBus singleton。 | 重复注册、override 行为、DI lifecycle。 | Required |
 
 ## 缺口处理
 
