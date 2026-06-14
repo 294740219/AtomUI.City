@@ -75,7 +75,7 @@ Commit message: `fix(EventBus): validate delivery subscription init`
 - Test: `tests/AtomUI.City.EventBus.Tests/EventPublicationTests.cs`
 - Modify: this plan file
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```csharp
 [Fact]
@@ -93,12 +93,12 @@ public void DeliveryResultRejectsUnknownDispatchPolicyInitMutation()
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `dotnet test tests/AtomUI.City.EventBus.Tests/AtomUI.City.EventBus.Tests.csproj --filter "FullyQualifiedName~DeliveryResultRejectsUnknownDispatchPolicyInitMutation"`
 Expected: FAIL because the current `init` mutation bypasses `ValidateDispatchPolicy`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Change `EventDeliveryResult.DispatchPolicy` to a validating backing field:
 
@@ -112,12 +112,12 @@ public EventDispatchPolicy DispatchPolicy
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `dotnet test tests/AtomUI.City.EventBus.Tests/AtomUI.City.EventBus.Tests.csproj --filter "FullyQualifiedName~DeliveryResultRejectsUnknownDispatchPolicyInitMutation"`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit message: `fix(EventBus): validate delivery dispatch init`
 

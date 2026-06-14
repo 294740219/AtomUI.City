@@ -54,7 +54,13 @@ public sealed record EventDeliveryResult(
         init => _subscriptionId = ValidateSubscriptionId(value);
     }
 
-    public EventDispatchPolicy DispatchPolicy { get; init; } = ValidateDispatchPolicy(DispatchPolicy);
+    private EventDispatchPolicy _dispatchPolicy = ValidateDispatchPolicy(DispatchPolicy);
+
+    public EventDispatchPolicy DispatchPolicy
+    {
+        get => _dispatchPolicy;
+        init => _dispatchPolicy = ValidateDispatchPolicy(value);
+    }
 
     public bool Succeeded { get; init; } = ValidateSucceeded(Succeeded, Canceled, ErrorMessage);
 
