@@ -5,8 +5,8 @@
 ## 当前结论
 
 - 1.0 发布状态：不可发布。
-- 全局进度：37/118。
-- 模块 Feature 合同：37/109。
+- 全局进度：38/118。
+- 模块 Feature 合同：38/109。
 - 最终发布门禁：0/9。
 - 最近校准日期：2026-06-14。
 
@@ -37,7 +37,7 @@
 | Testing | 9 | 0 | 9 | 已完成 |
 | Build | 7 | 0 | 7 | 已完成 |
 | Generators | 8 | 0 | 8 | 已完成 |
-| Routing | 6 | 2 | 8 | 产品化进行中 |
+| Routing | 7 | 1 | 8 | 产品化进行中 |
 | Presentation | 0 | 8 | 8 | 未完成 |
 | MVVM | 0 | 6 | 6 | 未完成 |
 | State | 0 | 8 | 8 | 产品化进行中 |
@@ -101,7 +101,7 @@
 - [x] AUC-ROUTING-004 Navigation Transaction。验收重点：失败不改变 current snapshot、取消不提交、重复 dispose 幂等、并发策略稳定。
 - [x] AUC-ROUTING-005 Guard and Redirect Pipeline。验收重点：enter/leave 顺序、deny、redirect、loop detection、异常映射和取消。
 - [x] AUC-ROUTING-006 ViewModel Target Resolution。验收重点：target descriptor 内容完整、Routing 不依赖 Presentation、失败不创建 ViewModel。
-- [ ] AUC-ROUTING-007 Plugin Route Contribution。验收重点：插件贡献、冲突隔离、卸载撤销、旧 snapshot 只读。
+- [x] AUC-ROUTING-007 Plugin Route Contribution。验收重点：插件贡献、冲突隔离、卸载撤销、旧 snapshot 只读。
 - [ ] AUC-ROUTING-008 Navigation Journal and Reuse。验收重点：push/replace/back/forward、容量裁剪、失败不写历史和 reuse key。
 
 ## Presentation

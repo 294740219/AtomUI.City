@@ -130,6 +130,31 @@ public sealed class RouteGraphSnapshot
             version ?? Version + 1);
     }
 
+    public RouteGraphSnapshot WithContribution(
+        string contributionId,
+        IReadOnlyList<RouteDescriptor> routes,
+        long? version = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(contributionId);
+        ArgumentNullException.ThrowIfNull(routes);
+
+        foreach (var route in routes)
+        {
+            if (!string.Equals(route.ContributionId, contributionId, StringComparison.Ordinal))
+            {
+                throw new RouteGraphException(
+                    RouteGraphError.InvalidContribution,
+                    $"Route '{route.RouteId}' does not belong to contribution '{contributionId}'.");
+            }
+        }
+
+        return Create(
+            Routes
+                .Concat(routes)
+                .ToArray(),
+            version ?? Version + 1);
+    }
+
     internal string GetFullTemplate(RouteDescriptor route)
     {
         var segments = new Stack<string>();

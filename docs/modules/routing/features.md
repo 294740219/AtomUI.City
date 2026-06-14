@@ -12,7 +12,7 @@
 | AUC-ROUTING-004 | Navigation Transaction | 已实现并通过产品合同测试 | IRouter, NavigationScope, NavigationResult | NavigationScopeTests |
 | AUC-ROUTING-005 | Guard and Redirect Pipeline | 已实现并通过产品合同测试 | IRouteEnterGuard, IRouteLeaveGuard, RouteGuardResult | RouteGuardTests |
 | AUC-ROUTING-006 | ViewModel Target Resolution | 已实现并通过产品合同测试 | NavigationTarget, ViewModelTargetDescriptor | RouteGraphAndMatcherTests; RoutingAssemblyTests |
-| AUC-ROUTING-007 | Plugin Route Contribution | Ready to Start Product Implementation | RouteExtensionPoint, RouteExtensionPointAttribute, RouteGraphSnapshot | RouteGraphAndMatcherTests |
+| AUC-ROUTING-007 | Plugin Route Contribution | 已实现并通过产品合同测试 | RouteExtensionPoint, RouteExtensionPointAttribute, RouteGraphSnapshot | RouteGraphAndMatcherTests |
 | AUC-ROUTING-008 | Navigation Journal and Reuse | Ready to Start Product Implementation | NavigationSnapshot, NavigationHistoryBehavior, NavigationOptions | NavigationScopeTests |
 
 ## Feature 硬门禁
@@ -119,11 +119,11 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-ROUTING-007 Plugin Route Contribution
 
 Feature ID: `AUC-ROUTING-007`
-Status: Ready to Start Product Implementation
+Status: 已实现并通过产品合同测试
 Goal: 支持插件贡献和撤销 route，同时保护 Host route graph。
 Public Contract: RouteExtensionPoint, RouteExtensionPointAttribute, RouteGraphSnapshot
-Runtime / Build Behavior: 插件 route 必须绑定 plugin owner；load 发布新 snapshot，unload 移除贡献并发布新 snapshot。
-Failure Behavior: 插件 route 冲突只拒绝该插件贡献；Host graph 不得被污染。
+Runtime / Build Behavior: 插件 route 必须绑定 contribution owner；load 通过 `RouteGraphSnapshot.WithContribution` 发布新 snapshot，unload 通过 `WithoutContribution` 撤销贡献。
+Failure Behavior: 插件 route 冲突只拒绝该插件贡献；Host snapshot 不得被污染。
 Threading / Cancellation: 插件 load/unload 与导航并发时，当前导航使用启动时 snapshot，后续导航使用新 snapshot。
 Diagnostics: plugin route diagnostics 必须包含 plugin id、contribution id、extension point 和 graph version。
 Tests: `RouteGraphAndMatcherTests`

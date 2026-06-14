@@ -19,6 +19,7 @@
 | RouteTemplate.TryMatch | 对单个模板匹配 path。 | path 不得为 null。 | bool 和只读参数字典。 | constraint 拒绝或 segment 不匹配返回 false。 | 纯 CPU，无 token。 | 无共享状态，可并发。 |
 | RouteGraphSnapshot.Create | 从 descriptors 发布 graph。 | descriptors 稳定排序且 owner 明确。 | RouteGraphSnapshot。 | 重复 id、同级模板冲突、缺失 parent 返回 RouteGraphError。 | 批量 build 应观察 token。 | 发布后不可变；旧 snapshot 继续可读。 |
 | RouteGraphSnapshot.WithoutContribution | 按 contribution 发布撤销后的新 graph。 | contributionId 必须非空；version 可显式指定。 | 新 RouteGraphSnapshot。 | 撤销后剩余 route graph 非法时返回 RouteGraphError。 | 纯 CPU，无 token。 | 旧 snapshot 不变；新 snapshot 版本单调递增。 |
+| RouteGraphSnapshot.WithContribution | 按 contribution 发布添加后的新 graph。 | contributionId 必须非空；route 必须声明同一 contributionId。 | 新 RouteGraphSnapshot。 | 冲突或 contribution mismatch 返回 RouteGraphException；旧 snapshot 不变。 | 纯 CPU，无 token。 | 旧 snapshot 不变；新 snapshot 版本单调递增。 |
 | RouteMatcher.Match / MatchAll | 在 immutable snapshot 上匹配 path。 | path 不得为 null。 | RouteMatch 或只读 RouteMatch 列表。 | 无匹配返回 NotFound 或空列表；constraint 拒绝不进入 guard。 | 纯 CPU，无 token。 | 允许多线程并发读取。 |
 | IRouter.NavigateAsync | 执行导航事务。 | target route、parameters、NavigationOptions。 | NavigationResult。 | match/guard/resolver/commit 任一失败都不改变 current snapshot；busy 返回 `CITY-NAVIGATION-BUSY`。 | 取消后返回 Cancelled，不能提交。 | `CancelPrevious` 取消旧事务，`Queue` 排队，`RejectIfBusy` 立即拒绝。 |
 | IRouteEnterGuard.CanEnterAsync | 进入 route 前授权或重定向。 | RouteGuardContext 必须包含 route、parameters、services。 | RouteGuardResult。 | 异常映射为 navigation failed；redirect loop 返回 `CITY-NAVIGATION-REDIRECT-LOOP`。 | 必须观察 token。 | 按 route hierarchy root-to-leaf 执行，遇到非 Allow 立即停止。 |
@@ -79,6 +80,7 @@
 
 - `RouteDescriptor.ContributionId` 为可选来源贡献标识；Host 路由可以为空，插件或动态贡献必须设置。
 - `RouteGraphSnapshot.GetContributionRoutes` 返回只读 contribution route 列表，未知 contribution 返回空集合。
+- `RouteGraphSnapshot.WithContribution` 只发布新 snapshot，不修改旧 snapshot；冲突只拒绝本次 contribution。
 - 同级同 outlet 同 template 默认冲突；带 match policy 的候选允许共存，由导航阶段逐个 policy 过滤。
 
 ## Nullability 和参数规则

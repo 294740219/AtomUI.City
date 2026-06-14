@@ -137,6 +137,55 @@ public sealed class RouteGraphAndMatcherTests
     }
 
     [Fact]
+    public void SnapshotAddsPluginContributionAndCanRevokeItWithoutMutatingOlderSnapshots()
+    {
+        var host = RouteGraphSnapshot.Create(
+            [
+                Route("settings", "settings", typeof(SettingsViewModel)),
+            ],
+            version: 10);
+        var contributed = host.WithContribution(
+            "plugin.profile",
+            [
+                Route("plugin-profile", "plugin/profile", typeof(ProfileViewModel), contributionId: "plugin.profile"),
+            ],
+            version: 11);
+        var revoked = contributed.WithoutContribution("plugin.profile", version: 12);
+
+        Assert.Equal(10, host.Version);
+        Assert.False(host.TryGetRoute("plugin-profile", out _));
+        Assert.Equal(11, contributed.Version);
+        Assert.True(contributed.TryGetRoute("plugin-profile", out _));
+        Assert.Equal(["plugin-profile"], contributed.GetContributionRoutes("plugin.profile").Select(route => route.RouteId));
+        Assert.Equal(12, revoked.Version);
+        Assert.False(revoked.TryGetRoute("plugin-profile", out _));
+        Assert.True(contributed.TryGetRoute("plugin-profile", out _));
+    }
+
+    [Fact]
+    public void SnapshotRejectsConflictingPluginContributionWithoutMutatingHostSnapshot()
+    {
+        var host = RouteGraphSnapshot.Create(
+            [
+                Route("settings", "settings", typeof(SettingsViewModel)),
+            ],
+            version: 10);
+
+        var exception = Assert.Throws<RouteGraphException>(
+            () => host.WithContribution(
+                "plugin.conflict",
+                [
+                    Route("plugin-settings", "settings", typeof(ProfileViewModel), contributionId: "plugin.conflict"),
+                ],
+                version: 11));
+
+        Assert.Equal(RouteGraphError.DuplicateRouteTemplate, exception.Error);
+        Assert.False(host.TryGetRoute("plugin-settings", out _));
+        Assert.Equal(10, host.Version);
+        Assert.Empty(host.GetContributionRoutes("plugin.conflict"));
+    }
+
+    [Fact]
     public void RouteDescriptorStoresLocalizationMetadata()
     {
         var descriptor = new RouteDescriptor(
