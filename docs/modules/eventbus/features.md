@@ -6,7 +6,7 @@
 
 | Feature ID | 名称 | 状态 | 公开合同 | 主测试 |
 | --- | --- | --- | --- | --- |
-| AUC-EVENTBUS-001 | Typed Publish | 产品化进行中 | IEventBus.PublishAsync, IEventBus.PostAsync, EventPublishResult | EventPublicationTests |
+| AUC-EVENTBUS-001 | Typed Publish | Completed | IEventBus.PublishAsync, IEventBus.PostAsync, EventPublishResult | EventPublicationTests |
 | AUC-EVENTBUS-002 | Subscription Lifecycle | 产品化进行中 | IEventSubscription, EventSubscriptionOptions | EventSubscriptionTests |
 | AUC-EVENTBUS-003 | Contract Registry | 产品化进行中 | IEventContractRegistry, EventContractDescriptor | EventContractRegistryTests |
 | AUC-EVENTBUS-004 | Dispatch Policy | 产品化进行中 | EventDispatchPolicy, EventErrorPolicy, EventSubscriptionOptions | EventDispatchingTests |
@@ -34,15 +34,15 @@
 ## AUC-EVENTBUS-001 Typed Publish
 
 Feature ID: `AUC-EVENTBUS-001`
-Status: 产品化进行中
+Status: Completed
 Goal: 按事件类型发布并返回 handler 结果。
 Public Contract: IEventBus.PublishAsync, EventPublishResult
-Runtime / Build Behavior: 按事件类型发布并返回 handler 结果。
-Failure Behavior: event 为 null、contract 未登记、handler 失败、取消、disposed bus。
+Runtime / Build Behavior: 按事件类型发布并返回 handler 结果；PostAsync 返回 accepted/rejected 结果并使用同一 event id delivery；publish options 的 correlation、causation 和 depth 进入 handler context。
+Failure Behavior: event 为 null、contract 非法、handler 失败、取消、disposed bus、非法 options 和非法 result 边界。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `EventPublicationTests`。
-Required Assertions: 断言 delivery result、null event、预取消 token、disposed bus、publish options 边界、result immutable/null delivery、error policy、diagnostics。
+Required Assertions: 断言 delivery/post result 边界、null event、预取消 token、disposed bus、publish options 边界、result immutable/null delivery、error policy、diagnostics、correlation/causation propagation。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 ## AUC-EVENTBUS-002 Subscription Lifecycle
 

@@ -289,6 +289,36 @@ public sealed class EventPublicationTests
     }
 
     [Fact]
+    public async Task PublishAsyncPropagatesCorrelationAndCausationIds()
+    {
+        var eventBus = new InMemoryEventBus();
+        EventContext<TestEvent>? observedContext = null;
+
+        eventBus.Subscribe<TestEvent>(context =>
+        {
+            observedContext = context;
+
+            return ValueTask.CompletedTask;
+        });
+
+        var result = await eventBus.PublishAsync(
+            new TestEvent("correlated"),
+            new EventPublishOptions
+            {
+                CorrelationId = "correlation-1",
+                CausationId = "cause-1",
+                PublishDepth = 2,
+            });
+
+        Assert.True(result.Succeeded);
+        Assert.NotNull(observedContext);
+        Assert.Equal("correlation-1", observedContext.CorrelationId);
+        Assert.Equal("cause-1", observedContext.CausationId);
+        Assert.Equal(2, observedContext.PublishDepth);
+        Assert.Equal(result.EventId, observedContext.EventId);
+    }
+
+    [Fact]
     public void PublishResultDeliveriesRejectExternalListMutation()
     {
         var delivery = new EventDeliveryResult(
@@ -417,6 +447,18 @@ public sealed class EventPublicationTests
             ErrorMessage: "should not be present"));
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void DeliveryResultRejectsSuccessfulBlankErrorMessage(string errorMessage)
+    {
+        Assert.Throws<ArgumentException>(() => new EventDeliveryResult(
+            EventSubscriptionId.New(),
+            EventDispatchPolicy.Serialized,
+            Succeeded: true,
+            ErrorMessage: errorMessage));
+    }
+
     [Fact]
     public void DeliveryResultRejectsSuccessfulErrorMessageInitMutation()
     {
@@ -540,6 +582,18 @@ public sealed class EventPublicationTests
             Guid.NewGuid(),
             new EventContractId("atomui.city.tests.event.v1"),
             Accepted: false));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void PostResultRejectsAcceptedBlankRejectionReason(string rejectionReason)
+    {
+        Assert.Throws<ArgumentException>(() => new EventPostResult(
+            Guid.NewGuid(),
+            new EventContractId("atomui.city.tests.event.v1"),
+            Accepted: true,
+            RejectionReason: rejectionReason));
     }
 
     [Fact]

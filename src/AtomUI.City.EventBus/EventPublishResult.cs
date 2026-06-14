@@ -108,7 +108,7 @@ public sealed record EventDeliveryResult(
 
     private static string? ValidateErrorMessage(bool succeeded, string? errorMessage)
     {
-        if (succeeded && !string.IsNullOrWhiteSpace(errorMessage))
+        if (succeeded && errorMessage is not null)
         {
             throw new ArgumentException("Successful event delivery result cannot include an error message.", nameof(ErrorMessage));
         }
@@ -136,7 +136,7 @@ public sealed record EventDeliveryResult(
             throw new ArgumentException("Event delivery result cannot be both succeeded and canceled.", nameof(Succeeded));
         }
 
-        if (succeeded && !string.IsNullOrWhiteSpace(errorMessage))
+        if (succeeded && errorMessage is not null)
         {
             throw new ArgumentException("Successful event delivery result cannot include an error message.", nameof(ErrorMessage));
         }

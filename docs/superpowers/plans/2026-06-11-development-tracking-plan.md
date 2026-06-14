@@ -5,8 +5,8 @@
 ## 当前结论
 
 - 1.0 发布状态：不可发布。
-- 全局进度：61/118。
-- 模块 Feature 合同：61/109。
+- 全局进度：62/118。
+- 模块 Feature 合同：62/109。
 - 最终发布门禁：0/9。
 - 最近校准日期：2026-06-14。
 
@@ -41,7 +41,7 @@
 | Presentation | 8 | 0 | 8 | 已完成 |
 | MVVM | 6 | 0 | 6 | 已完成 |
 | State | 8 | 0 | 8 | 已完成 |
-| EventBus | 0 | 6 | 6 | 产品化进行中 |
+| EventBus | 1 | 5 | 6 | 产品化进行中 |
 | PluginSystem | 0 | 8 | 8 | 未完成 |
 | Data | 0 | 9 | 9 | 未完成 |
 | Localization | 0 | 7 | 7 | 未完成 |
@@ -137,7 +137,7 @@
 
 ## EventBus
 
-- [ ] AUC-EVENTBUS-001 Typed Publish。验收重点：delivery/post result 边界、null event、预取消 token、disposed bus、publish options 边界、result immutable/null delivery、error policy、diagnostics。
+- [x] AUC-EVENTBUS-001 Typed Publish。验收重点：delivery/post result 边界、null event、预取消 token、disposed bus、publish options 边界、result immutable/null delivery、error policy、diagnostics。
 - [ ] AUC-EVENTBUS-002 Subscription Lifecycle。验收重点：dispose 后不再收到事件、StopAsync 移除新发布快照、等待 in-flight handler、owner stop/cancellation 释放、bus dispose 清理 active subscriptions、已 Disposed 后 StopAsync 幂等。
 - [ ] AUC-EVENTBUS-003 Contract Registry。验收重点：shared contract assembly match、重复 contract id、稳定默认映射、plugin-private descriptor default id 拒绝、shared registry 拒绝 plugin-private descriptor。
 - [ ] AUC-EVENTBUS-004 Dispatch Policy。验收重点：顺序、异常聚合、停止策略、未知 error policy 拒绝。
