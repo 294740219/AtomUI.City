@@ -5,8 +5,8 @@
 ## 当前结论
 
 - 1.0 发布状态：不可发布。
-- 全局进度：66/118。
-- 模块 Feature 合同：66/109。
+- 全局进度：67/118。
+- 模块 Feature 合同：67/109。
 - 最终发布门禁：0/9。
 - 最近校准日期：2026-06-14。
 
@@ -41,7 +41,7 @@
 | Presentation | 8 | 0 | 8 | 已完成 |
 | MVVM | 6 | 0 | 6 | 已完成 |
 | State | 8 | 0 | 8 | 已完成 |
-| EventBus | 5 | 1 | 6 | 产品化进行中 |
+| EventBus | 6 | 0 | 6 | 已完成 |
 | PluginSystem | 0 | 8 | 8 | 未完成 |
 | Data | 0 | 9 | 9 | 未完成 |
 | Localization | 0 | 7 | 7 | 未完成 |
@@ -142,7 +142,7 @@
 - [x] AUC-EVENTBUS-003 Contract Registry。验收重点：shared contract assembly match、重复 contract id、稳定默认映射、plugin-private descriptor default id 拒绝、shared registry 拒绝 plugin-private descriptor。
 - [x] AUC-EVENTBUS-004 Dispatch Policy。验收重点：顺序、异常聚合、停止策略、未知 error policy 拒绝。
 - [x] AUC-EVENTBUS-005 Diagnostics。验收重点：EventBus.Event* 现有代码、failure/cancellation 诊断包含 contract id、event id 和 subscription id。
-- [ ] AUC-EVENTBUS-006 DI Registration。验收重点：默认服务、可替换 diagnostics 和 provider dispose 释放 EventBus singleton。
+- [x] AUC-EVENTBUS-006 DI Registration。验收重点：默认服务、可替换 diagnostics 和 provider dispose 释放 EventBus singleton。
 
 ## PluginSystem
 

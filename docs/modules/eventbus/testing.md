@@ -27,7 +27,7 @@
 | AUC-EVENTBUS-003 | Unit | EventContractRegistryTests | 断言 shared contract assembly match、重复 contract id、重复 descriptor、稳定默认映射、plugin-private descriptor default id 拒绝、shared registry 拒绝 plugin-private descriptor。 | 跨插件私有类型拒绝、default contract id、重复 type/id 映射。 | Completed |
 | AUC-EVENTBUS-004 | Unit | EventDispatchingTests | 断言默认 Serialized、dispatch/error enum 稳定值、异常聚合、停止策略、FailPublisher 传播、未知 error policy 拒绝。 | handler 异常、取消、继续或停止、未知 error policy。 | Completed |
 | AUC-EVENTBUS-005 | Unit | EventDiagnosticsTests | 断言 EventBus.Event* 现有代码、failure/cancellation 诊断包含 contract id、event id 和 subscription id，并覆盖 posted FailPublisher 后台失败诊断。 | diagnostics collector 缺失不影响 publish。 | Completed |
-| AUC-EVENTBUS-006 | Unit | EventBusRegistrationTests | 断言默认服务、可替换 diagnostics 和 provider dispose 释放 EventBus singleton。 | 重复注册、override 行为、DI lifecycle。 | Required |
+| AUC-EVENTBUS-006 | Unit | EventBusRegistrationTests | 断言默认 services、默认 diagnostics、可替换 diagnostics 和 provider dispose 释放 EventBus singleton。 | 重复注册、override 行为、DI lifecycle。 | Completed |
 
 ## 缺口处理
 

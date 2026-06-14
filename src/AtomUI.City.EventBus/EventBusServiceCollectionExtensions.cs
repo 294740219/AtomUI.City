@@ -10,6 +10,7 @@ public static class EventBusServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
+        services.TryAddSingleton<IHostDiagnostics, InMemoryHostDiagnostics>();
         services.TryAddSingleton<IEventContractRegistry>(serviceProvider =>
         {
             var registry = new InMemoryEventContractRegistry();
@@ -23,7 +24,7 @@ public static class EventBusServiceCollectionExtensions
         });
         services.TryAddSingleton(serviceProvider => new InMemoryEventBus(
             serviceProvider.GetRequiredService<IEventContractRegistry>(),
-            serviceProvider.GetService<IHostDiagnostics>()));
+            serviceProvider.GetRequiredService<IHostDiagnostics>()));
         services.TryAddSingleton<IEventBus>(
             serviceProvider => serviceProvider.GetRequiredService<InMemoryEventBus>());
         services.TryAddSingleton<IEventPublisher>(

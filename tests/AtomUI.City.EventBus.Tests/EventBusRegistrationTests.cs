@@ -1,3 +1,4 @@
+using AtomUI.City.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace AtomUI.City.EventBus.Tests;
@@ -21,6 +22,38 @@ public sealed class EventBusRegistrationTests
         Assert.Same(eventBus, subscriber);
         Assert.IsType<InMemoryEventBus>(eventBus);
         Assert.IsType<InMemoryEventContractRegistry>(registry);
+    }
+
+    [Fact]
+    public async Task ServiceCollectionRegistersDefaultDiagnosticsCollector()
+    {
+        var services = new ServiceCollection();
+
+        services.AddEventBus();
+
+        await using var serviceProvider = services.BuildServiceProvider();
+        var diagnostics = serviceProvider.GetRequiredService<IHostDiagnostics>();
+
+        Assert.IsType<InMemoryHostDiagnostics>(diagnostics);
+    }
+
+    [Fact]
+    public async Task ServiceCollectionUsesRegisteredDiagnosticsCollector()
+    {
+        var diagnostics = new InMemoryHostDiagnostics();
+        var services = new ServiceCollection();
+
+        services.AddSingleton<IHostDiagnostics>(diagnostics);
+        services.AddEventBus();
+
+        await using var serviceProvider = services.BuildServiceProvider();
+        var resolvedDiagnostics = serviceProvider.GetRequiredService<IHostDiagnostics>();
+        var eventBus = serviceProvider.GetRequiredService<IEventBus>();
+
+        await eventBus.PublishAsync(new RegisteredEvent("diagnostics"));
+
+        Assert.Same(diagnostics, resolvedDiagnostics);
+        Assert.Contains(diagnostics.Records, record => record.Code == EventDiagnosticIds.EventPublished);
     }
 
     [Fact]

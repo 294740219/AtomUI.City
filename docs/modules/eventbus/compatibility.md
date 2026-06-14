@@ -23,6 +23,7 @@
 - `IEventContractRegistry` 的 shared-only 注册、默认 descriptor 映射、重复 contract id/type 拒绝和 plugin-private descriptor 拒绝进入 1.0 兼容承诺。
 - `EventDispatchPolicy` 的 `Current=0`、`UiThread=1`、`Background=2`、`Serialized=3` 和 `EventErrorPolicy` 的 `ContinueAndReport=0`、`StopPublication=1`、`FailPublisher=2` 进入 1.0 兼容承诺。
 - `EventDiagnosticIds` 现有 `EventBus.Event*` 字符串和 delivery failure/cancellation 的 `contractId`、`eventId`、`subscriptionId` 诊断 context 进入 1.0 兼容承诺。
+- `AddEventBus` 默认注册 `IHostDiagnostics`、`IEventContractRegistry`、`IEventBus`、`IEventPublisher` 和 `IEventSubscriber`，并保留调用方预注册 diagnostics 的 override 行为，进入 1.0 兼容承诺。
 
 ## 数据格式兼容
 

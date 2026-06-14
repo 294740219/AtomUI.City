@@ -11,7 +11,7 @@
 | AUC-EVENTBUS-003 | Contract Registry | Completed | IEventContractRegistry, EventContractDescriptor | EventContractRegistryTests |
 | AUC-EVENTBUS-004 | Dispatch Policy | Completed | EventDispatchPolicy, EventErrorPolicy, EventSubscriptionOptions | EventDispatchingTests |
 | AUC-EVENTBUS-005 | Diagnostics | Completed | EventDiagnosticIds | EventDiagnosticsTests |
-| AUC-EVENTBUS-006 | DI Registration | 准备开始产品实现 | EventBusServiceCollectionExtensions | EventBusRegistrationTests |
+| AUC-EVENTBUS-006 | DI Registration | Completed | EventBusServiceCollectionExtensions | EventBusRegistrationTests |
 
 ## Feature 硬门禁
 
@@ -99,13 +99,13 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-EVENTBUS-006 DI Registration
 
 Feature ID: `AUC-EVENTBUS-006`
-Status: 准备开始产品实现
+Status: Completed
 Goal: 注册总线、registry 和 DI 生命周期。
 Public Contract: EventBusServiceCollectionExtensions
-Runtime / Build Behavior: 注册总线、registry 和 DI provider dispose 释放 singleton bus。
-Failure Behavior: 重复注册和 override 行为。
+Runtime / Build Behavior: 注册默认 diagnostics、总线、publisher、subscriber、registry 和 DI provider dispose 释放 singleton bus。
+Failure Behavior: 重复注册保持幂等，调用方预注册 diagnostics 时不被覆盖。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `EventBusRegistrationTests`。
-Required Assertions: 断言默认服务、可替换 diagnostics 和 provider dispose 释放 EventBus singleton。
+Required Assertions: 断言默认 services、默认 diagnostics、可替换 diagnostics 和 provider dispose 释放 EventBus singleton。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
