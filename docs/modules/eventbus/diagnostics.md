@@ -23,7 +23,7 @@
 ## 产品级必须诊断的失败
 
 - 未登记跨边界 contract：拒绝 publish 并诊断。
-- handler 抛异常：记录 eventType、handlerType、operationId。
+- handler 抛异常：记录 contract id、event id、subscription id、eventType、handlerType、operationId。
 - subscription dispose 中 handler 正在执行：等待完成或按 cancellation 策略结束。
 - 重复 dispose：幂等。
 

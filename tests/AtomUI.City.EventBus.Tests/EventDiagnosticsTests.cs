@@ -30,6 +30,23 @@ public sealed class EventDiagnosticsTests
     }
 
     [Fact]
+    public async Task HandlerFailureDiagnosticIncludesStableEventContext()
+    {
+        var diagnostics = new InMemoryHostDiagnostics();
+        var eventBus = new InMemoryEventBus(diagnostics: diagnostics);
+        var subscription = eventBus.Subscribe<TestEvent>(_ => throw new InvalidOperationException("boom"));
+
+        var result = await eventBus.PublishAsync(new TestEvent("failure"));
+
+        var record = Assert.Single(
+            diagnostics.Records,
+            record => record.Code == EventDiagnosticIds.EventDeliveryFailed);
+        Assert.Contains(result.ContractId.Value, record.Message, StringComparison.Ordinal);
+        Assert.Contains(result.EventId.ToString("D"), record.Message, StringComparison.Ordinal);
+        Assert.Contains(subscription.Id.ToString(), record.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task StopPublicationErrorPolicySkipsLaterHandlers()
     {
         var diagnostics = new InMemoryHostDiagnostics();

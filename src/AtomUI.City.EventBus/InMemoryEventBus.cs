@@ -622,7 +622,7 @@ public sealed class InMemoryEventBus : IEventBus
                 _diagnostics?.Write(
                     new HostDiagnosticRecord(
                         EventDiagnosticIds.EventDeliveryFailed,
-                        $"Event handler '{Id}' failed: {exception.Message}",
+                        $"Event handler '{Id}' failed for contract '{descriptor.ContractId.Value}' event '{eventId:D}' subscription '{Id}': {exception.Message}",
                         HostDiagnosticSeverity.Error));
 
                 if (Options.ErrorPolicy == EventErrorPolicy.FailPublisher)
