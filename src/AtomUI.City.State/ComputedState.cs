@@ -37,8 +37,24 @@ public sealed class ComputedState<T> : IComputedState<T>, IDisposable
             {
                 throw new ArgumentException("Computed state dependencies must not contain null.", nameof(dependencies));
             }
+        }
 
-            _dependencySubscriptions.Add(dependency.OnChange(_ => InvalidateAndNotify()));
+        try
+        {
+            foreach (var dependency in dependencies)
+            {
+                _dependencySubscriptions.Add(dependency.OnChange(_ => InvalidateAndNotify()));
+            }
+        }
+        catch
+        {
+            foreach (var subscription in _dependencySubscriptions)
+            {
+                DisposeSubscription(subscription);
+            }
+
+            _dependencySubscriptions.Clear();
+            throw;
         }
     }
 

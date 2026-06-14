@@ -19,6 +19,7 @@
 - 新增 API 可以 minor 版本发布，但必须有文档、测试和迁移说明。
 - `WritableState<T>` 的 optional `stateName`、`access` 构造参数、ReadOnly 写拒绝、`AUCSTA004` 诊断、原子提交后通知、相等值不通知和 Dispose 后 mutation 拒绝进入 1.0 兼容承诺。
 - `ApplicationStateRegistry` 的显式注册、未注册诊断、重复注册诊断、读写入口分离、ReadOnly 写拒绝、Update null updater 优先拒绝和 `StateDefinition<T>` enum/schema 边界进入 1.0 兼容承诺。
+- `ComputedState<T>` 的 lazy invalidation、缓存、依赖变更通知、compute 失败诊断、Dispose 后读取拒绝、null dependency 先校验后订阅和依赖订阅释放进入 1.0 兼容承诺。
 
 ## 数据格式兼容
 

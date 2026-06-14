@@ -63,6 +63,17 @@ public sealed class ComputedStateTests
     }
 
     [Fact]
+    public void ComputedStateRejectsNullDependencyBeforeSubscribing()
+    {
+        var dependency = new TestReadOnlyState(new TestSubscription(() => { }));
+        IReadOnlyState[] dependencies = [dependency, null!];
+
+        Assert.Throws<ArgumentException>(() => new ComputedState<int>(() => 1, dependencies));
+
+        Assert.Equal(0, dependency.SubscriptionCount);
+    }
+
+    [Fact]
     public void ComputedStateNotifiesWhenComputedValueChanges()
     {
         var source = new WritableState<int>(1);
@@ -199,12 +210,15 @@ public sealed class ComputedStateTests
 
         object? IReadOnlyState.Value => Value;
 
+        public int SubscriptionCount { get; private set; }
+
         public long Version => 0;
 
         public Type ValueType => typeof(int);
 
         public IStateSubscription OnChange(Action<StateChangedEventArgs<int>> handler)
         {
+            SubscriptionCount++;
             return _subscription;
         }
 
@@ -212,11 +226,13 @@ public sealed class ComputedStateTests
             Action<StateChangedEventArgs<int>> handler,
             StateSubscriptionOptions options)
         {
+            SubscriptionCount++;
             return _subscription;
         }
 
         IStateSubscription IReadOnlyState.OnChange(Action<StateChangedEventArgs> handler)
         {
+            SubscriptionCount++;
             return _subscription;
         }
 
@@ -224,6 +240,7 @@ public sealed class ComputedStateTests
             Action<StateChangedEventArgs> handler,
             StateSubscriptionOptions options)
         {
+            SubscriptionCount++;
             return _subscription;
         }
     }

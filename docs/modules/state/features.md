@@ -8,7 +8,7 @@
 | --- | --- | --- | --- | --- |
 | AUC-STATE-001 | Writable State | Completed | IWritableState<T>, WritableState<T> | WritableStateTests |
 | AUC-STATE-002 | Application State | Completed | IApplicationState, ApplicationStateRegistry, StateDefinition<T> | ApplicationStateTests; StateDefinitionTests |
-| AUC-STATE-003 | Computed State | 产品化进行中 | IComputedState<T>, ComputedState<T> | ComputedStateTests |
+| AUC-STATE-003 | Computed State | Completed | IComputedState<T>, ComputedState<T> | ComputedStateTests |
 | AUC-STATE-004 | State Subscription | 产品化进行中 | IStateSubscription, IStateReaction, StateSubscriptionOptions | StateScopeTests; StateThreadingTests |
 | AUC-STATE-005 | State Snapshot | 产品化进行中 | StateSnapshot, StateSnapshotEntry | StateSnapshotTests |
 | AUC-STATE-006 | Collection State | 产品化进行中 | StateCollection<TKey,TItem> | StateCollectionTests |
@@ -62,11 +62,11 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-STATE-003 Computed State
 
 Feature ID: `AUC-STATE-003`
-Status: 产品化进行中
+Status: Completed
 Goal: 依赖状态变更后重新计算。
 Public Contract: IComputedState<T>, ComputedState<T>
-Runtime / Build Behavior: 依赖状态变更后重新计算。
-Failure Behavior: compute 异常、循环依赖、dispose、null dependency。
+Runtime / Build Behavior: 依赖状态变更后 lazy invalidation、缓存和按需重新计算。
+Failure Behavior: compute 异常、dispose、null dependency、订阅阶段部分失败清理。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `ComputedStateTests`。
