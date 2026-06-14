@@ -35,7 +35,7 @@
 
 ## 诊断缺口处理
 
-- 如果当前源码没有对应诊断码，implementation plan 必须记录为 product gap。
+- 如果当前源码没有对应诊断码，必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中标记为 product gap。
 - 新增诊断码必须同时更新源码、本文档、测试矩阵和 compatibility。
 - 已存在诊断码不能因为重构改变语义。
 

@@ -29,7 +29,7 @@
 - Feature 必须定义非法输入、生命周期状态非法、取消、重复调用和释放后的行为。
 - Feature 必须定义诊断码或明确说明由上层诊断承接。
 - Feature 必须至少有 Unit 或 Contract 测试；涉及生命周期、插件、线程、UI、连接、build 或 generator 的功能必须增加专项测试。
-- Feature 完成状态必须能从 [implementation-plan.md](implementation-plan.md) 追踪。
+- Feature 完成状态必须能从 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 追踪。
 
 ## AUC-EVENTBUS-001 Typed Publish
 
@@ -40,7 +40,7 @@ Public Contract: IEventBus.PublishAsync, EventPublishResult
 Runtime / Build Behavior: 按事件类型发布并返回 handler 结果。
 Failure Behavior: event 为 null、contract 未登记、handler 失败、取消、disposed bus。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
-Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 implementation plan 中追踪。
+Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `EventPublicationTests`。
 Required Assertions: 断言 delivery result、null event、预取消 token、disposed bus、publish options 边界、result immutable/null delivery、error policy、diagnostics。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
@@ -53,7 +53,7 @@ Public Contract: IEventBus, IEventSubscription, EventSubscriptionOptions
 Runtime / Build Behavior: 订阅 Active/Disposed、owner 释放和 bus dispose 清理。
 Failure Behavior: 重复释放、owner dispose、bus dispose、插件 unload、已 Disposed 后 stop with canceled token。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
-Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 implementation plan 中追踪。
+Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `EventSubscriptionTests`。
 Required Assertions: 断言 dispose 后不再收到事件、StopAsync 移除新发布快照、等待 in-flight handler、owner stop/cancellation 释放、bus dispose 清理 active subscriptions、已 Disposed 后 StopAsync 幂等。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
@@ -66,7 +66,7 @@ Public Contract: IEventContractRegistry, EventContractDescriptor
 Runtime / Build Behavior: 登记事件 contract 和 plane。
 Failure Behavior: 跨插件私有类型拒绝、default contract id 拒绝。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
-Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 implementation plan 中追踪。
+Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `EventContractRegistryTests`。
 Required Assertions: 断言 shared contract assembly match、重复 contract id、稳定默认映射、plugin-private descriptor default id 拒绝、shared registry 拒绝 plugin-private descriptor。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
@@ -79,7 +79,7 @@ Public Contract: EventDispatchPolicy, EventErrorPolicy
 Runtime / Build Behavior: 顺序派发和错误策略。
 Failure Behavior: handler 异常、取消、继续或停止、未知 error policy。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
-Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 implementation plan 中追踪。
+Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `EventDispatchingTests`。
 Required Assertions: 断言顺序、异常聚合、停止策略、未知 error policy 拒绝。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
@@ -92,7 +92,7 @@ Public Contract: EventDiagnosticIds
 Runtime / Build Behavior: 发布、拒绝、delivery 失败和订阅诊断。
 Failure Behavior: diagnostics collector 缺失不影响 publish。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
-Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 implementation plan 中追踪。
+Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `EventDiagnosticsTests`。
 Required Assertions: 断言 EventBus.Event* 现有代码、failure/cancellation 诊断包含 contract id、event id 和 subscription id。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
@@ -105,7 +105,7 @@ Public Contract: EventBusServiceCollectionExtensions
 Runtime / Build Behavior: 注册总线、registry 和 DI provider dispose 释放 singleton bus。
 Failure Behavior: 重复注册和 override 行为。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
-Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 implementation plan 中追踪。
+Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `EventBusRegistrationTests`。
 Required Assertions: 断言默认服务、可替换 diagnostics 和 provider dispose 释放 EventBus singleton。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。

@@ -34,6 +34,6 @@ AtomUI.City 采用文档先行研发规则。
 - [文档先行治理规范](engineering/documentation-governance.md)
 - [公共 API Review 门禁](engineering/public-api-review.md)
 - [产品级 Vertical Slice 验收规格](engineering/product-vertical-slice.md)
-- [实现路线图](engineering/implementation-roadmap.md)
+- [实现顺序治理规范](engineering/implementation-roadmap.md)
 - [模块文档索引](modules/overview.md)
 - [架构决策记录](decisions/overview.md)

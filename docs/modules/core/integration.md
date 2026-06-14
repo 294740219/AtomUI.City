@@ -23,4 +23,4 @@
 
 ## 集成变更规则
 
-新增跨模块集成时，必须同时更新 features、api-contracts、testing、compatibility 和 implementation-plan。
+新增跨模块集成时，必须同时更新 features、api-contracts、testing、compatibility，并在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中同步完成度。

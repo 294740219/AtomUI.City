@@ -32,7 +32,7 @@
 - Feature 必须定义非法输入、生命周期状态非法、取消、重复调用和释放后的行为。
 - Feature 必须定义诊断码或明确说明由上层诊断承接。
 - Feature 必须至少有 Unit 或 Contract 测试；涉及生命周期、插件、线程、UI、连接、build 或 generator 的功能必须增加专项测试。
-- Feature 完成状态必须能从 [implementation-plan.md](implementation-plan.md) 追踪。
+- Feature 完成状态必须能从 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 追踪。
 
 ## AUC-PLUGIN-001 Plugin Metadata
 
@@ -43,7 +43,7 @@ Public Contract: PluginAttribute, PluginManifest, PluginDescriptor
 Runtime / Build Behavior: 从 attribute 和 manifest 建立插件身份。
 Failure Behavior: id 缺失、id mismatch、schema 不支持。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
-Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 implementation plan 中追踪。
+Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `PluginDeclarationAttributeTests; PluginManifestTests`。
 Required Assertions: 断言 id、version、mainAssembly、schema 和 required fields。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
@@ -56,7 +56,7 @@ Public Contract: PluginDependencyValidator, PluginSemanticVersion
 Runtime / Build Behavior: 校验插件依赖、版本范围和循环。
 Failure Behavior: 缺失、循环、版本不满足。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
-Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 implementation plan 中追踪。
+Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `PluginDependencyTests`。
 Required Assertions: 断言 missing、cycle、version mismatch diagnostics。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
@@ -69,7 +69,7 @@ Public Contract: PluginPackageInstaller, PluginInstallationReader, PluginPackage
 Runtime / Build Behavior: 安装包布局、staging、installed、rollback。
 Failure Behavior: 路径穿越、包布局缺失、重复安装、取消。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
-Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 implementation plan 中追踪。
+Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `PluginPackageTests`。
 Required Assertions: 断言 staging cleanup、installed record、path normalization。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
@@ -82,7 +82,7 @@ Public Contract: PluginDiscoveryScanner
 Runtime / Build Behavior: 扫描安装目录并产生 PluginInstallation。
 Failure Behavior: 缺少 install record、非法 record、目录无效。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
-Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 implementation plan 中追踪。
+Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `PluginLoadingTests`。
 Required Assertions: 断言 invalid install record diagnostics 且继续扫描其他插件。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
@@ -95,7 +95,7 @@ Public Contract: PluginLoader, PluginLoadResult
 Runtime / Build Behavior: 加载插件 manifest 和主 assembly。
 Failure Behavior: 主程序集缺失、manifest invalid、id mismatch。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
-Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 implementation plan 中追踪。
+Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `PluginLoadingTests`。
 Required Assertions: 断言 Loaded/Failed 状态和 diagnostics。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
@@ -108,7 +108,7 @@ Public Contract: PluginMsBuildContract
 Runtime / Build Behavior: 插件包属性、manifest 输出和 package layout。
 Failure Behavior: 属性缺失、layout 不合法、manifest 未生成。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
-Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 implementation plan 中追踪。
+Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `PluginMsBuildContractTests`。
 Required Assertions: 断言 MSBuild property、output path、package content。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
@@ -121,7 +121,7 @@ Public Contract: PluginDiagnosticIds, PluginDiagnostic
 Runtime / Build Behavior: 插件安装、发现、加载和依赖诊断。
 Failure Behavior: 诊断码不能复用，context 必须有 pluginId/path。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
-Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 implementation plan 中追踪。
+Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `PluginResultTests`。
 Required Assertions: 断言 AUCPLG0000-0021 关键路径。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
@@ -134,7 +134,7 @@ Public Contract: PluginRuntime, Contribution lease
 Runtime / Build Behavior: 撤销贡献并释放插件运行时。
 Failure Behavior: active contribution、未释放 view/subscription/connection。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
-Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 implementation plan 中追踪。
+Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `PluginLoadingTests`。
 Required Assertions: 断言 Disable -> Unloading -> Unloaded/UnloadPending。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。

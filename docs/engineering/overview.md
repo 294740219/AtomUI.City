@@ -5,7 +5,7 @@
 强制规范：
 
 - [documentation-governance.md](documentation-governance.md)：文档先行治理规范。所有模块必须有完善文档后才能开始写代码，任何改动必须先完成文档对齐并确认。
-- [implementation-roadmap.md](implementation-roadmap.md)：实现路线图。约束从设计文档进入代码实现的阶段顺序、验收标准、测试门禁和暂停条件。
+- [implementation-roadmap.md](implementation-roadmap.md)：实现顺序治理规范。约束从设计文档进入代码实现的阶段顺序、验收标准、测试门禁和暂停条件，不记录完成度。
 
 工程规范：
 

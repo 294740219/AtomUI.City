@@ -142,7 +142,7 @@ atomui city new app SalesDesk
 
 ## 9. 实施顺序
 
-该规格不改变全局实现路线图。
+该规格不改变实现顺序治理规范，也不改变 [全局 1.0 进度](../superpowers/plans/2026-06-11-development-tracking-plan.md) 的完成度口径。
 
 实施顺序仍然是：
 

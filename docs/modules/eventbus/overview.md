@@ -65,10 +65,10 @@ AtomUI.City.EventBus 作为 Host 服务或模块贡献接入 Core 生命周期�
 | [testing.md](testing.md) | 具体测试矩阵、必须断言的行为、测试类型和缺口处理。 |
 | [compatibility.md](compatibility.md) | public API、配置、manifest、snapshot、generated output、CLI envelope 和包布局兼容。 |
 | [integration.md](integration.md) | 跨模块依赖方向、生命周期、线程和失败行为。 |
-| [implementation-plan.md](implementation-plan.md) | Feature 到现有基线、缺口、必补测试和实现工作的追踪。 |
+| [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) | Feature 到现有基线、缺口、必补测试和实现工作的追踪。 |
 
 ## 当前成熟度状态
 
 Partially Implemented
 
-该状态表示模块已有实现基线，但还需要按产品级合同补齐实现和测试。单个功能点状态以 [implementation-plan.md](implementation-plan.md) 为准。
+该状态表示模块已有实现基线，但还需要按产品级合同补齐实现和测试。单个功能点状态以 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 为准。

@@ -31,7 +31,7 @@
 - Feature 必须定义非法输入、生命周期状态非法、取消、重复调用和释放后的行为。
 - Feature 必须定义诊断码或明确说明由上层诊断承接。
 - Feature 必须至少有 Unit 或 Contract 测试；涉及生命周期、插件、线程、UI、连接、build 或 generator 的功能必须增加专项测试。
-- Feature 完成状态必须能从 [implementation-plan.md](implementation-plan.md) 追踪。
+- Feature 完成状态必须能从 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 追踪。
 
 ## AUC-STATE-001 Writable State
 
@@ -42,7 +42,7 @@ Public Contract: IWritableState<T>, WritableState<T>
 Runtime / Build Behavior: 线程安全读写、变更通知和 access policy。
 Failure Behavior: updater 拒绝或失败、handler 失败、disposed state。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
-Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 implementation plan 中追踪。
+Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `WritableStateTests`。
 Required Assertions: 断言原子更新、version、提交后通知、相等值不通知、订阅 dispose、disposed mutation rejection、updater 异常诊断和写拒绝/access policy。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
@@ -55,7 +55,7 @@ Public Contract: IApplicationState, ApplicationStateRegistry
 Runtime / Build Behavior: 通过 DI 访问应用级共享状态。
 Failure Behavior: 未注册、重复注册、写入拒绝。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
-Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 implementation plan 中追踪。
+Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `ApplicationStateTests`。
 Required Assertions: 断言注册、读取、writer、not registered、StateDefinition enum 和 schema version 边界。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
@@ -68,7 +68,7 @@ Public Contract: IComputedState<T>, ComputedState<T>
 Runtime / Build Behavior: 依赖状态变更后重新计算。
 Failure Behavior: compute 异常、循环依赖、dispose、null dependency。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
-Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 implementation plan 中追踪。
+Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `ComputedStateTests`。
 Required Assertions: 断言 lazy invalidation、依赖失效、缓存、异常诊断、null dependency 拒绝。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
@@ -81,7 +81,7 @@ Public Contract: IStateSubscription, IStateReaction
 Runtime / Build Behavior: 生命周期绑定订阅和释放。
 Failure Behavior: 重复释放、owner dispose、callback 失败；Background handler 失败进入 diagnostics。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
-Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 implementation plan 中追踪。
+Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `StateScopeTests; StateThreadingTests`。
 Required Assertions: 断言 dispose 后不通知、Background 不阻塞状态提交、Background handler 失败诊断。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
@@ -94,7 +94,7 @@ Public Contract: StateSnapshot, StateSnapshotEntry
 Runtime / Build Behavior: 捕获和恢复状态条目。
 Failure Behavior: 版本不兼容、policy 拒绝、restore 失败。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
-Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 implementation plan 中追踪。
+Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `StateSnapshotTests`。
 Required Assertions: 断言不可变、过滤、restore diagnostics、entry version/schema 边界、entries 不含 null。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
@@ -107,7 +107,7 @@ Public Contract: IStateCollection<TKey,TItem>, StateCollection<TKey,TItem>
 Runtime / Build Behavior: 集合变更、快照、事件和 dispose 生命周期。
 Failure Behavior: 重复 key、missing key、clear、disposed collection；集合快照和变更记录拒绝 null key、null 条目、未知 change kind 和负 version。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
-Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 implementation plan 中追踪。
+Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `StateCollectionTests`。
 Required Assertions: 断言 change kind、item version、collection version、快照不可变、非法构造参数、dispose 幂等、dispose 后读 API 可用、mutation/restore/subscription API 拒绝。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
@@ -120,7 +120,7 @@ Public Contract: StateDiagnosticIds
 Runtime / Build Behavior: 未注册、访问拒绝、订阅失败诊断。
 Failure Behavior: diagnostics collector 缺失。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
-Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 implementation plan 中追踪。
+Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `StateDiagnosticsTests`。
 Required Assertions: 断言 AUCSTA001-010。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
@@ -133,7 +133,7 @@ Public Contract: StateDispatchPolicy
 Runtime / Build Behavior: 多线程更新和派发策略。
 Failure Behavior: 并发写、调度器不可用。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
-Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 implementation plan 中追踪。
+Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `StateThreadingTests`。
 Required Assertions: 断言不隐式 UI。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。

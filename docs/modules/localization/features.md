@@ -29,7 +29,7 @@
 - Feature 必须定义非法输入、生命周期状态非法、取消、重复调用和释放后的行为。
 - Feature 必须定义诊断码或明确说明由上层诊断承接。
 - Feature 必须至少有 Unit 或 Contract 测试；涉及生命周期、插件、线程、UI、连接、build 或 generator 的功能必须增加专项测试。
-- Feature 完成状态必须能从 [implementation-plan.md](implementation-plan.md) 追踪。
+- Feature 完成状态必须能从 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 追踪。
 
 ## AUC-LOCALIZATION-001 Culture State and Fallback
 

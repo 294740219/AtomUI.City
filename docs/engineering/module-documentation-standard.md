@@ -293,7 +293,7 @@ Acceptance Criteria:
 - 没有 public contract 或 internal contract，不允许实现。
 - 没有失败行为，不允许实现。
 - 没有测试条目，不允许标记完成。
-- Feature 状态必须与 implementation-plan 或开发进度表一致。
+- Feature 状态必须与全局 1.0 进度文档一致。
 
 ## 8. api-contracts.md 要求
 
@@ -586,14 +586,18 @@ Tests:
 
 集成文档必须说明依赖方向，不能只说明“集成某模块”。
 
-## 16. implementation-plan.md 要求
+## 16. 全局进度跟踪要求
 
-模块实现路线必须能追踪 Feature ID。
+模块实现路线必须能追踪 Feature ID，但 1.0 发布完成状态只能在 [全局 1.0 进度](../superpowers/plans/2026-06-11-development-tracking-plan.md) 中维护。
 
-推荐表格：
+全局进度文档必须覆盖：
 
-| Feature ID | Documented | API Designed | Tests Designed | Implemented | Unit Tested | Integration Tested | Docs Verified | Status |
-|---|---|---|---|---|---|---|---|---|
+- 每个模块的 Feature ID。
+- 每个 Feature ID 的 1.0 完成 checkbox。
+- 任务完成所需的测试、文档、诊断、兼容性和发布门禁证据。
+- 最终 Release Gate。
+
+模块文档可以说明设计、API contract、测试矩阵和实现证据，但不能作为完成度来源。模块目录不再维护独立 `implementation-plan.md`。
 
 状态固定为：
 
@@ -607,9 +611,6 @@ Verified
 Blocked
 Deprecated
 ```
-
-如果仓库已有全局开发计划，模块可以不单独维护 `implementation-plan.md`，但必须在全局计划中能追踪到 Feature ID。
-
 
 ## 17. 产品级实现合同硬性标准
 

@@ -18,7 +18,7 @@ Feature 状态必须区分“可开工”和“产品级完成”。
 | --- | --- |
 | `Not Started` | 尚未完成设计或没有进入实现队列。 |
 | `In Design` | 正在补齐文档合同，不能写代码。 |
-| `Ready to Start Product Implementation` | 文档足以开始实现，但仍可能有 `implementation-plan.md` 中标记的实现和测试缺口。 |
+| `Ready to Start Product Implementation` | 文档足以开始实现，但仍可能有 [全局 1.0 进度](../superpowers/plans/2026-06-11-development-tracking-plan.md) 中标记的实现和测试缺口。 |
 | `In Implementation` | 正在实现或补测试。 |
 | `Implemented` | 实现完成，但尚未通过完整产品门禁。 |
 | `Verified` | 文档、实现、单元测试、诊断断言、生命周期/线程/插件专项测试和公共 API review 均通过。 |
@@ -29,23 +29,23 @@ Feature 状态必须区分“可开工”和“产品级完成”。
 
 ## 模块索引
 
-| 模块 | 等级 | 执行边界 | Overview | Features | Implementation Plan |
-| --- | --- | --- | --- | --- | --- |
-| Core | Level 3 | Host runtime kernel | [core/overview.md](core/overview.md) | [core/features.md](core/features.md) | [core/implementation-plan.md](core/implementation-plan.md) |
-| PluginSystem | Level 3 | Host runtime plugin boundary | [plugins/overview.md](plugins/overview.md) | [plugins/features.md](plugins/features.md) | [plugins/implementation-plan.md](plugins/implementation-plan.md) |
-| EventBus | Level 3 | Host runtime service | [eventbus/overview.md](eventbus/overview.md) | [eventbus/features.md](eventbus/features.md) | [eventbus/implementation-plan.md](eventbus/implementation-plan.md) |
-| State | Level 3 | Host runtime state manager | [state/overview.md](state/overview.md) | [state/features.md](state/features.md) | [state/implementation-plan.md](state/implementation-plan.md) |
-| Data | Level 3 | Host runtime data pipeline | [data/overview.md](data/overview.md) | [data/features.md](data/features.md) | [data/implementation-plan.md](data/implementation-plan.md) |
-| Routing | Level 3 | Host runtime navigation graph | [routing/overview.md](routing/overview.md) | [routing/features.md](routing/features.md) | [routing/implementation-plan.md](routing/implementation-plan.md) |
-| Presentation | Level 3 | Avalonia/AtomUI runtime bridge | [presentation/overview.md](presentation/overview.md) | [presentation/features.md](presentation/features.md) | [presentation/implementation-plan.md](presentation/implementation-plan.md) |
-| Mvvm | Level 2 | ViewModel programming model | [mvvm/overview.md](mvvm/overview.md) | [mvvm/features.md](mvvm/features.md) | [mvvm/implementation-plan.md](mvvm/implementation-plan.md) |
-| Localization | Level 3 | Host runtime localization service | [localization/overview.md](localization/overview.md) | [localization/features.md](localization/features.md) | [localization/implementation-plan.md](localization/implementation-plan.md) |
-| Security | Level 2 | Host runtime security service | [security/overview.md](security/overview.md) | [security/features.md](security/features.md) | [security/implementation-plan.md](security/implementation-plan.md) |
-| Build | Level 3 | MSBuild and repository engineering boundary | [build/overview.md](build/overview.md) | [build/features.md](build/features.md) | [build/implementation-plan.md](build/implementation-plan.md) |
-| Generators | Level 3 | Roslyn compile-time analyzer boundary | [generators/overview.md](generators/overview.md) | [generators/features.md](generators/features.md) | [generators/implementation-plan.md](generators/implementation-plan.md) |
-| Cli | Level 2 | Command process boundary | [cli/overview.md](cli/overview.md) | [cli/features.md](cli/features.md) | [cli/implementation-plan.md](cli/implementation-plan.md) |
-| Templates | Level 2 | Template render and package boundary | [templates/overview.md](templates/overview.md) | [templates/features.md](templates/features.md) | [templates/implementation-plan.md](templates/implementation-plan.md) |
-| Testing | Level 3 | Test-only framework boundary | [testing/overview.md](testing/overview.md) | [testing/features.md](testing/features.md) | [testing/implementation-plan.md](testing/implementation-plan.md) |
+| 模块 | 等级 | 执行边界 | Overview | Features |
+| --- | --- | --- | --- | --- |
+| Core | Level 3 | Host runtime kernel | [core/overview.md](core/overview.md) | [core/features.md](core/features.md) |
+| PluginSystem | Level 3 | Host runtime plugin boundary | [plugins/overview.md](plugins/overview.md) | [plugins/features.md](plugins/features.md) |
+| EventBus | Level 3 | Host runtime service | [eventbus/overview.md](eventbus/overview.md) | [eventbus/features.md](eventbus/features.md) |
+| State | Level 3 | Host runtime state manager | [state/overview.md](state/overview.md) | [state/features.md](state/features.md) |
+| Data | Level 3 | Host runtime data pipeline | [data/overview.md](data/overview.md) | [data/features.md](data/features.md) |
+| Routing | Level 3 | Host runtime navigation graph | [routing/overview.md](routing/overview.md) | [routing/features.md](routing/features.md) |
+| Presentation | Level 3 | Avalonia/AtomUI runtime bridge | [presentation/overview.md](presentation/overview.md) | [presentation/features.md](presentation/features.md) |
+| Mvvm | Level 2 | ViewModel programming model | [mvvm/overview.md](mvvm/overview.md) | [mvvm/features.md](mvvm/features.md) |
+| Localization | Level 3 | Host runtime localization service | [localization/overview.md](localization/overview.md) | [localization/features.md](localization/features.md) |
+| Security | Level 2 | Host runtime security service | [security/overview.md](security/overview.md) | [security/features.md](security/features.md) |
+| Build | Level 3 | MSBuild and repository engineering boundary | [build/overview.md](build/overview.md) | [build/features.md](build/features.md) |
+| Generators | Level 3 | Roslyn compile-time analyzer boundary | [generators/overview.md](generators/overview.md) | [generators/features.md](generators/features.md) |
+| Cli | Level 2 | Command process boundary | [cli/overview.md](cli/overview.md) | [cli/features.md](cli/features.md) |
+| Templates | Level 2 | Template render and package boundary | [templates/overview.md](templates/overview.md) | [templates/features.md](templates/features.md) |
+| Testing | Level 3 | Test-only framework boundary | [testing/overview.md](testing/overview.md) | [testing/features.md](testing/features.md) |
 
 ## 文档完成判断
 

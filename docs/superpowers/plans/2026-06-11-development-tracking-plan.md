@@ -1,644 +1,224 @@
-# AtomUI.City Development Tracking Plan
+# AtomUI.City 1.0 Release Tracking Plan
 
-**目标：** 用可精确跟踪的阶段计划推进 AtomUI.City 从当前骨架到可发布的第一版框架内核。
+本文件是 AtomUI.City 1.0 是否可以发布的唯一进度跟踪文档。仓库中的模块文档、API contract、测试矩阵、设计说明和历史提交只作为实现证据，不作为完成度口径。
 
-## 项目完成判定规则
+## 当前结论
 
-- 本文件是 AtomUI.City 1.0 项目完成状态的唯一任务跟踪来源。
-- 只有本文件中的 `- [x]` / `- [ ]` 任务计入全局完成度。
-- 模块文档、专题设计、API contract、测试矩阵和临时执行计划只作为实现说明或证据，不作为项目完成度口径。
-- `docs/superpowers/plans/` 目录只保留本全局跟踪文件；历史批次计划完成后不得继续作为独立任务跟踪保留。
+- 1.0 发布状态：不可发布。
+- 全局进度：16/118。
+- 模块 Feature 合同：16/109。
+- 最终发布门禁：0/9。
+- 最近校准日期：2026-06-14。
 
-**当前基线：**
+## 统计规则
 
-- 分支：`develop`
-- 当前提交：`42822bd fix(Build): harden release package gates`
-- 当前测试：`dotnet test tests/AtomUI.City.Build.Tests/AtomUI.City.Build.Tests.csproj --no-restore --filter PackScriptTreatsWarningsAsErrors` 通过；`dotnet test tests/AtomUI.City.Build.Tests/AtomUI.City.Build.Tests.csproj --no-restore` 通过，38 tests passed；`bash engineering/pack.sh --configuration Debug --no-build` 通过；`bash engineering/validate-packages.sh --configuration Debug` 通过
-- 当前状态：已完成 Build pack warning-as-error release gate
+- 只有本文档中的 `- [x]` 和 `- [ ]` 任务计入全局完成度。
+- `- [x]` 表示该任务已有实现、产品合同测试、文档同步和必要门禁证据。
+- `- [ ]` 表示该任务尚未达到 1.0 发布完成标准；即使已有部分实现或局部测试，也不能计为完成。
+- 任何任务完成时，必须在同一个提交中更新本文档。
+- `docs/superpowers/plans/` 目录只保留本文档，不再保留批次计划或局部任务跟踪。
+- 模块级进度不再维护独立 `implementation-plan.md`；Feature ID 的发布状态以本文档为准。
 
-**最新实现检查点：**
+## 完成标准
 
-- [x] Build pack warning-as-error release gate
-- [x] Build release package script and analyzer package warning hardening
-- [x] PluginSystem package install pre-extraction cancellation guard
-- [x] PluginSystem discovery installed package layout validation
-- [x] PluginSystem invalid install record path value diagnostics
-- [x] PluginSystem install record runtime path boundary diagnostics
-- [x] PluginSystem invalid install record required field diagnostics
-- [x] PluginSystem discovery missing install record diagnostic
-- [x] PluginSystem discovery manifest validation diagnostics
-- [x] PluginSystem discovery install record package id mismatch diagnostic
-- [x] PluginSystem discovery invalid manifest JSON diagnostic
-- [x] PluginSystem discovery install record version mismatch diagnostic
-- [x] PluginSystem discovery invalid install record diagnostic
-- [x] PluginSystem discovery missing installed manifest diagnostic
-- [x] PluginSystem installed plugin discovery scanner
-- [x] PluginSystem install record reader
-- [x] PluginSystem prerelease dependency version range support
-- [x] PluginSystem invalid plugin version manifest validation
-- [x] PluginSystem dependency version range mismatch diagnostic
-- [x] PluginSystem duplicate PluginId dependency validation diagnostic
-- [x] Security command authorization source
-- [x] Security command authorization refresh on authentication / permission / descriptor changes
-- [x] Security command authorization cancellation does not allow execution
-- [x] Data access token credential provider
-- [x] Data credential provider DI registration
-- [x] Data bearer request fails gracefully when full Security registration is absent
-- [x] Localization message key formatting
-- [x] Localization message format failure diagnostics
-- [x] Localization service DI registration
-- [x] Data error localizable message metadata
-- [x] Security authorization localizable message metadata
-- [x] MVVM validation localizable message metadata
-- [x] Localization culture-aware text handle
-- [x] Localization text refresh on culture switch
-- [x] Localization text refresh diagnostics
-- [x] Presentation localized text target binding
-- [x] Presentation localized text refresh through UI dispatcher
-- [x] Presentation localized text binding disposal through ActivationScope
-- [x] Presentation command text descriptor
-- [x] Presentation command text localization binding
-- [x] Presentation command text culture refresh
-- [x] Presentation interaction text descriptor
-- [x] Presentation interaction text localization binding
-- [x] Presentation interaction text culture refresh
-- [x] Localization localized message text handle
-- [x] Localization localized message text culture refresh
-- [x] Presentation validation message localization binding
-- [x] Presentation validation message literal fallback
-- [x] Presentation validation message culture refresh
-- [x] Presentation validation message disposal through ActivationScope
-- [x] Presentation generic error message descriptor
-- [x] Presentation error message localization binding
-- [x] Presentation Security authorization error message binding
-- [x] Presentation error message culture refresh
-- [x] Presentation error message disposal through ActivationScope
-- [x] Routing route localization metadata descriptor
-- [x] Routing route attributes carry localization keys
-- [x] Generator route metadata carries localization keys into manifests
-- [x] Presentation route text localization binding
-- [x] Presentation route title and breadcrumb culture refresh
-- [x] Presentation route text disposal through ActivationScope
-- [x] Presentation window text descriptor
-- [x] Presentation window title localization binding
-- [x] Presentation window title literal fallback
-- [x] Presentation window title culture refresh
-- [x] Presentation window title disposal through ActivationScope
-- [x] Presentation notification text descriptor
-- [x] Presentation notification text localization binding
-- [x] Presentation notification text literal fallback
-- [x] Presentation notification text culture refresh
-- [x] Presentation notification text disposal through ActivationScope
-- [x] Presentation localization bridge applier pipeline
-- [x] Presentation localization bridge UI dispatcher dispatch
-- [x] Presentation localization bridge DI registration
-- [x] Presentation current thread culture applier
-- [x] Presentation default culture applier DI registration
-- [x] Presentation culture flow direction applier
-- [x] Presentation flow direction target DI registration
-- [x] Presentation resource dictionary applier
-- [x] Presentation resource dictionary target DI registration
-- [x] Presentation plugin resource dictionary revoker
-- [x] Presentation plugin resource dictionary revoke UI dispatcher dispatch
-- [x] Presentation Avalonia UI dispatcher adapter
-- [x] Presentation Avalonia UI dispatcher DI registration
-- [x] Presentation Avalonia UI dispatcher cancellation handling
-- [x] Presentation runtime state contract
-- [x] Presentation runtime PresentationScope creation
-- [x] Presentation runtime WindowScope creation
-- [x] Presentation runtime stopping rejects new windows
-- [x] Presentation runtime DI registration
-- [x] Presentation runtime ready diagnostics
-- [x] Presentation runtime stopping diagnostics
-- [x] Presentation runtime diagnostics DI integration
-- [x] Presentation dispatcher runtime not-ready gate
-- [x] Presentation dispatcher runtime stopping gate
-- [x] Presentation dispatcher runtime DI integration
-- [x] Presentation dispatcher rejected operation diagnostics
-- [x] Presentation dispatcher callback failure diagnostics
-- [x] Presentation dispatcher diagnostics DI integration
-- [x] Presentation ViewLocator matched diagnostics
-- [x] Presentation ViewLocator failure diagnostics
-- [x] Presentation ViewFactory created diagnostics
-- [x] Presentation ViewFactory creation failure diagnostics
-- [x] Presentation ViewBinder binding diagnostics
-- [x] Presentation ViewBinder binding failure diagnostics
-- [x] Presentation RouteOutlet commit plan diagnostics
-- [x] Presentation RouteOutlet commit result diagnostics
-- [x] Presentation visual lifecycle adapter execution diagnostics
-- [x] Presentation visual lifecycle adapter failure diagnostics
-- [x] Presentation resource dictionary revoke diagnostics
-- [x] Presentation resource dictionary revoke failure diagnostics
-- [x] Presentation resource dictionary apply diagnostics
-- [x] Presentation resource dictionary apply failure diagnostics
-- [x] Presentation interaction handler registry
-- [x] Presentation interaction handler DI registration
-- [x] Presentation interaction handler UI dispatcher execution
-- [x] Presentation interaction handled diagnostics
-- [x] Presentation interaction missing handler diagnostics
-- [x] Presentation interaction handler failure diagnostics
-- [x] Presentation interaction handler activation-scope cancellation
-- [x] Presentation plugin interaction handler registration metadata
-- [x] Presentation plugin interaction handler revoke by PluginId
-- [x] Presentation plugin interaction handler revoke by ContributionId
-- [x] Presentation plugin interaction handler revocation cancels pending requests
-- [x] Presentation plugin interaction handler revoke diagnostics
-- [x] Presentation validation visual state target contract
-- [x] Presentation validation visual state snapshot
-- [x] Presentation validation visual state UI dispatcher application
-- [x] Presentation validation visual state diagnostics
-- [x] Presentation validation visual state failure diagnostics
-- [x] Presentation command source target contract
-- [x] Presentation command binding initial CanExecute state
-- [x] Presentation command binding CanExecute refresh
-- [x] Presentation command binding execution request
-- [x] Presentation command binding async executing state
-- [x] Presentation command binding disposal through ActivationScope
-- [x] Presentation command binding diagnostics
-- [x] Presentation resource contribution registry DI registration
-- [x] Presentation resource contribution lease registration
-- [x] Presentation resource contribution lease disposal
-- [x] Presentation resource contribution revoke by PluginId
-- [x] Presentation resource contribution revoke by ContributionId
-- [x] Presentation resource contribution revoke failure diagnostics
-- [x] Presentation active plugin view registry DI registration
-- [x] Presentation active plugin view lease tracking
-- [x] Presentation active plugin view close by PluginId
-- [x] Presentation active plugin view close by ContributionId
-- [x] Presentation active plugin view stale outlet protection
-- [x] Presentation active plugin view close failure diagnostics
-- [x] Presentation plugin unload cleanup coordinator DI registration
-- [x] Presentation plugin unload cleanup closes active plugin views before revocation
-- [x] Presentation plugin unload cleanup by ContributionId
-- [x] Presentation plugin unload cleanup stops when active views remain
-- [x] Presentation plugin unload cleanup records resource dictionary failure
-- [x] Presentation plugin unload cleanup diagnostics
-- [x] Generator Presentation ViewFor metadata reader
-- [x] Generator Presentation view manifest model
-- [x] Generator Presentation view manifest deterministic ordering
-- [x] Generator Presentation duplicate ViewModel/ViewKey diagnostics
-- [x] Generator Presentation view contribution metadata
-- [x] Presentation ViewDescriptor PluginId metadata
-- [x] Presentation ViewForAttribute PluginId metadata
-- [x] Presentation ViewRegistry revoke by PluginId
-- [x] Generator Presentation view PluginId metadata
-- [x] Generator Presentation plugin view requires PluginId and ContributionId pair
-- [x] Presentation ViewRegistry DI registration
-- [x] Presentation plugin unload cleanup revokes View descriptors
-- [x] Presentation plugin unload cleanup records View descriptor revoke failure
-- [x] Generator Presentation view registrar source builder
-- [x] Generator Presentation view registrar incremental output
-- [x] Generator Presentation manifest diagnostics reporting
-- [x] Generator Presentation generated registrar compile verification
-- [x] Generator Presentation diagnostics source location
-- [x] Presentation ViewFactory service provider context
-- [x] Generator Presentation view constructor dependency factory
-- [x] State subscription diagnostics
-- [x] State application registry diagnostics
-- [x] State computed failure diagnostics
-- [x] State writable update failure diagnostics
-- [x] State snapshot restore failure diagnostics
-- [x] State duplicate registration diagnostics
-- [x] State background subscription option
-- [x] State queued subscription option
-- [x] State scope dispose failure diagnostics
-- [x] State disposed scope subscription diagnostics
-- [x] State computed dispose lifecycle guard
-- [x] State computed failure retry guard
-- [x] State computed dispose failure diagnostics
-- [x] State snapshot restore unchanged value guard
-- [x] State collection add or update change records
-- [x] State collection remove change records
-- [x] State collection clear change records
-- [x] State collection batch add or update notifications
-- [x] State collection item version query
-- [x] State collection snapshot creation
-- [x] State collection snapshot restore
-- [x] State collection empty snapshot restore
-- [x] State collection unchanged snapshot restore guard
-- [x] State collection snapshot defensive copy
-- [x] State collection changed event args defensive copy
-- [x] State collection no-op update coverage
-- [x] State collection batch failure atomicity coverage
-- [x] EventBus subscription error policy configuration
-- [x] EventBus stop publication error policy
-- [x] EventBus fail publisher error policy
-- [x] EventBus PostAsync canceled publication rejection
-- [x] EventBus PostAsync accepted diagnostic
-- [x] EventBus PostAsync rejected diagnostic
-- [x] EventBus subscription in-flight drain
-- [x] EventBus typed handler subscription overload
-- [x] EventBus owned typed handler subscription overload
-- [x] EventBus DI registration
-- [x] EventBus contract DI registration
-- [x] EventBus default contract descriptor registration
-- [x] Data request completed diagnostic
-- [x] Data request failed diagnostic
-- [x] Data credential failure diagnostic
-- [x] Data request cache contract
-- [x] Data request cache hit
-- [x] Data request cache write
-- [x] Data cache read failure diagnostic
-- [x] Data cache write failure diagnostic
-- [x] Data in-memory request cache
-- [x] Data request cache DI registration
-- [x] Data cache hit diagnostic
-- [x] Data cache miss diagnostic
-- [x] Data request cache key invalidation
-- [x] Data request cache invalidation diagnostic
-- [x] Data request cache nullable value hit
-- [x] Data connection registered diagnostic
-- [x] Data connection stopped diagnostic
-- [x] Data connection manager DI registration
-- [x] Data typed client unregister
-- [x] Data missing client diagnostic
-- [x] Data HTTP 503 service unavailable mapping
-- [x] Data HTTP 429 rate limit mapping
-- [x] Data connection stop failure diagnostic
-- [x] Data connection start failure diagnostic
-- [x] Data connection started diagnostic
-- [x] Data connection registration rejection diagnostic
-- [x] Data client registration diagnostic
-- [x] Data client unregistration diagnostic
-- [x] Data client unregistration missing diagnostic
-- [x] Data request retry diagnostic metadata
-- [x] Data request retry diagnostic error kind
-- [x] Data stale suppression diagnostic
-- [x] Data gRPC transport cancellation mapping
-- [x] Data HTTP transport cancellation mapping
-- [x] Data HTTP response mapper serialization error mapping
-- [x] Data gRPC invoker transport error mapping
-- [x] Data HTTP send transport error mapping
-- [x] Data request cancellation diagnostic
-- [x] Data gRPC cancelled status mapping
-- [x] Data HTTP transport timeout mapping
-- [x] Data SignalR invoke timeout mapping
-- [x] Data pipeline timeout cancellation result mapping
-- [x] Data credential timeout cancellation result mapping
-- [x] Data cache read timeout cancellation result mapping
-- [x] Data request token late cancellation guard
-- [x] Data credential late cancellation guard
-- [x] Data cache read late cancellation guard
-- [x] Data credential late timeout guard
-- [x] Data cache read late timeout guard
-- [x] Data transport late timeout guard
-- [x] State application state type mismatch diagnostic
-- [x] State snapshot plugin mismatch restore diagnostic
-- [x] State snapshot owner module mismatch restore diagnostic
-- [x] State snapshot value type mismatch restore diagnostic
-- [x] State snapshot missing state restore diagnostic
-- [x] State snapshot deterministic entry ordering
-- [x] State snapshot null value restore
-- [x] State snapshot readonly entries
-- [x] State collection snapshot readonly items
-- [x] State collection changed event readonly changes
-- [x] EventBus publish result readonly deliveries
-- [x] EventBus delivery cancellation accounting
-- [x] PluginSystem result diagnostics readonly
-- [x] PluginManifest readonly top-level collections
-- [x] PluginManifest readonly nested collections
-- [x] Routing descriptor and graph readonly collections
-- [x] Routing template readonly collections
-- [x] Security policy requirements readonly collection
-- [x] CLI envelope diagnostics readonly collection
-- [x] Template plan readonly collections
-- [x] Template render diagnostics readonly collection
-- [x] Presentation plugin unload result readonly errors
-- [x] Localization culture state readonly collections
-- [x] Core module descriptor readonly dependencies
-- [x] Core host diagnostics readonly records
-- [x] Core lifecycle scope readonly children
-- [x] Core module registry readonly modules
-- [x] Core application context readonly startup arguments
-- [x] Data diagnostics readonly records
-- [x] Localization diagnostics readonly records
-- [x] Presentation validation visual state readonly snapshot
-- [x] MVVM validation scope readonly collections
-- [x] Testing source generation test case readonly collections
-- [x] Testing diagnostics readonly entries
-- [x] Testing routing test host readonly routes
-- [x] Testing module test host readonly modules
-- [x] Generator diagnostics readonly definitions
-- [x] CLI dotnet invocation readonly arguments
-- [x] Generator localization readonly collections
-- [x] Generator routing readonly collections
-- [x] Generator modularity readonly collections
-- [x] Generator dependency injection readonly collections
-- [x] Generator presentation readonly collections
-- [x] Generator plugin system readonly collections
-- [x] Security authorization result message arguments readonly collection
-- [x] MVVM validation message arguments readonly collection
-- [x] Presentation text descriptor message arguments readonly collections
-- [x] Data error message arguments readonly collection
-- [x] Routing parameter dictionaries readonly collections
-- [x] MVVM activation context readonly properties
-- [x] Testing route test match readonly parameters
-- [x] PluginSystem capability attribute scope defensive copy
-- [x] Core service type attribute defensive copy
-- [x] Routing route reference readonly bound parameters
-- [x] Routing matcher readonly match collection
-- [x] Security registry/provider readonly collections
-- [x] CLI envelope readonly data snapshot
-- [x] DataError init readonly message arguments
-- [x] Testing plugin host readonly records snapshot
-- [x] Presentation registry readonly snapshots
-- [x] Testing AOT diagnostics readonly result
-- [x] CLI envelope nested readonly data
-- [x] Generator presentation reader readonly result
-- [x] CLI envelope nested value-type collection data
-- [x] CLI envelope value-type dictionary data
-- [x] PluginSystem manifest plugin id path validation
-- [x] PluginSystem manifest version path validation
-- [x] PluginSystem manifest contribution path validation
-- [x] PluginSystem manifest target framework path validation
-- [x] PluginSystem package extraction failure staging cleanup
-- [x] PluginSystem directory install cancellation staging cleanup
-- [x] PluginSystem layout invalid contribution path probe guard
-- [x] PluginSystem layout invalid target framework probe guard
+一个 1.0 任务只有同时满足以下条件才能勾选：
 
-## 状态定义
+- Public API 或内部 contract 已稳定，失败行为、取消、生命周期和线程边界明确。
+- 产品合同测试覆盖必要断言和失败路径。
+- 相关模块文档、诊断说明、测试矩阵和兼容性说明已同步。
+- `dotnet build AtomUICity.slnx`、相关测试、文档检查和 public API 检查在对应提交前通过。
+- 如任务影响发布包、模板、CLI、source generator 或平台集成，必须通过对应专项门禁。
 
-- `[x]` 已完成
-- `[ ]` 未完成
-- `Blocked` 表示被外部条件阻塞
-- `Review` 表示需要文档或设计 review 后才能继续
-- `Parallel` 表示可以与其他 phase 并行推进
+## 模块汇总
 
-## 文档门禁
+| 模块 | 完成 | 未完成 | 总数 | 当前状态 |
+| --- | ---: | ---: | ---: | --- |
+| Core | 7 | 0 | 7 | 已完成 |
+| Testing | 9 | 0 | 9 | 已完成 |
+| Build | 0 | 7 | 7 | 未完成 |
+| Generators | 0 | 8 | 8 | 未完成 |
+| Routing | 0 | 8 | 8 | 未完成 |
+| Presentation | 0 | 8 | 8 | 未完成 |
+| MVVM | 0 | 6 | 6 | 未完成 |
+| State | 0 | 8 | 8 | 产品化进行中 |
+| EventBus | 0 | 6 | 6 | 产品化进行中 |
+| PluginSystem | 0 | 8 | 8 | 未完成 |
+| Data | 0 | 9 | 9 | 未完成 |
+| Localization | 0 | 7 | 7 | 未完成 |
+| Security | 0 | 7 | 7 | 未完成 |
+| CLI | 0 | 6 | 6 | 未完成 |
+| Templates | 0 | 5 | 5 | 未完成 |
+| Release Gates | 0 | 9 | 9 | 未完成 |
 
-- [x] 全局架构文档完成
-- [x] Lifecycle 设计文档完成
-- [x] Hosting 设计文档完成
-- [x] Module 设计文档完成
-- [x] Routing 设计文档完成
-- [x] Presentation 设计文档完成
-- [x] MVVM 设计文档完成
-- [x] State 设计文档完成
-- [x] EventBus 设计文档完成
-- [x] PluginSystem 设计文档完成
-- [x] Data Access 设计文档完成
-- [x] Localization 设计文档完成
-- [x] Testing 设计文档完成
-- [x] CLI / Templates 设计文档完成
-- [x] Roadmap 文档完成
-- [x] 开发计划文档确认并落盘
+## Core
 
-## Phase 0: 工程基线
+- [x] AUC-CORE-001 Application Host Builder。验收重点：Build 后 services 冻结、HostBuilt 诊断、根 scope 创建。
+- [x] AUC-CORE-002 Lifecycle Pipeline。验收重点：stage 顺序、同 stage 顺序、异常路径、Stop 不重复执行、Stopped 后再次 Start 被拒绝。
+- [x] AUC-CORE-003 Lifecycle Scope Tree。验收重点：leaf-first、parent-child 状态、dispose 后 mutating API 失败。
+- [x] AUC-CORE-004 Module Contract。验收重点：依赖排序、默认 id、显式 id、模块来源、PreConfigure 顺序、配置阶段禁止解析运行时服务、配置阶段结束后拒绝继续修改服务注册。
+- [x] AUC-CORE-005 DI Registration Markers。验收重点：lifetime、exposed services、AOT metadata 可读。
+- [x] AUC-CORE-006 Host Diagnostics。验收重点：现有 AUCHOST001/002/003 和目标失败诊断上下文。
+- [x] AUC-CORE-007 UI Dispatcher Contract。验收重点：不可用 dispatcher 返回失败且 Core 不引用 Avalonia。
 
-目标：先把工程约束固定住，避免后续代码风格、许可证、构建产物、测试约束返工。
+## Testing
 
-- [x] `AtomUICity.slnx` 创建完成
-- [x] 核心项目骨架创建完成
-- [x] 测试项目骨架创建完成
-- [x] 输出目录统一到 `output`
-- [x] 基础测试可运行
-- [x] 项目清单测试：验证 solution 中必须包含的项目
-- [x] 项目依赖边界测试：验证禁止的反向依赖
-- [x] 输出目录测试：验证构建产物进入 `output`
-- [x] CI 工作流：restore / build / test / format / docs check
-- [x] format 检查：统一 `.editorconfig` 与格式化命令
-- [x] license header 检查：LGPL v3 头部或集中式许可证策略
-- [x] NuGet metadata 检查：license、repository、package id、description
-- [x] Phase 0 验收
+- [x] AUC-TESTING-001 Test Host。验收重点：service、diagnostics、dispose、records。
+- [x] AUC-TESTING-002 Fake Dispatcher。验收重点：queue、UI 线程识别、异常、pending count。
+- [x] AUC-TESTING-003 Deterministic Scheduler。验收重点：虚拟时间推进、任务顺序、异常记录。
+- [x] AUC-TESTING-004 Module Test Host。验收重点：module graph、lifecycle、diagnostics。
+- [x] AUC-TESTING-005 Plugin Test Host。验收重点：load/unload、contribution、owner revoke。
+- [x] AUC-TESTING-006 Routing Test Host。验收重点：route build、match、navigation helper。
+- [x] AUC-TESTING-007 Source Generation Kit。验收重点：generated source snapshot、diagnostics、references。
+- [x] AUC-TESTING-008 AOT Check。验收重点：反射扫描、dynamic code、trimming 风险诊断。
+- [x] AUC-TESTING-009 Test Layers。验收重点：Unit/Contract/Integration/Platform/Dogfood 分层标记。
 
-## Phase 1: Testing Platform
+## Build
 
-目标：提前建立测试基础设施，后续每个功能点都必须能被单元测试和必要的集成测试覆盖。
+- [ ] AUC-BUILD-001 Output Layout。验收重点：artifacts、packages、logs、test-results 都在 output 下。
+- [ ] AUC-BUILD-002 Package Metadata。验收重点：LGPL v3、repository、symbol、package id 和 dependency group。
+- [ ] AUC-BUILD-003 Project Inventory。验收重点：src/tests 项目被 inventory 覆盖。
+- [ ] AUC-BUILD-004 Dependency Boundary。验收重点：runtime 不依赖 Testing、Roslyn 或 test packages。
+- [ ] AUC-BUILD-005 Source Generator Packaging。验收重点：generator target、analyzer layout、runtime 不引用 generator。
+- [ ] AUC-BUILD-006 Release Gates。验收重点：docs、format、pack、test gate 可本地执行。
+- [ ] AUC-BUILD-007 Test Naming。验收重点：测试命名和模块对应关系。
 
-- [x] 测试分层规范落地：unit / integration / analyzer / generator / runtime
-- [x] 测试命名规范落地
-- [x] 测试基类与 shared test utilities
-- [x] Host 测试夹具
-- [x] Module 测试夹具
-- [x] Routing 测试夹具
-- [x] UI dispatcher 测试夹具
-- [x] Plugin runtime 测试夹具
-- [x] Source Generator snapshot / compilation test 基础设施
-- [x] AOT 友好检查测试入口
-- [x] CI 中接入测试分类
-- [x] Phase 1 验收
+## Generators
 
-## Phase 2: Source Generator Platform
+- [ ] AUC-GENERATORS-001 Incremental Infrastructure。验收重点：incremental 输入隔离、hint name 稳定、无 runtime 依赖。
+- [ ] AUC-GENERATORS-002 Module Graph。验收重点：DependsOn 图、循环诊断、默认 module id。
+- [ ] AUC-GENERATORS-003 DI Manifest。验收重点：lifetime、ExposeServices、显式注册和冲突诊断。
+- [ ] AUC-GENERATORS-004 Route Manifest。验收重点：route attribute、template、target、排序和诊断。
+- [ ] AUC-GENERATORS-005 Plugin Manifest。验收重点：plugin metadata、capability、dependency、contribution。
+- [ ] AUC-GENERATORS-006 Localization Manifest。验收重点：culture、resource、fallback、重复 key 诊断。
+- [ ] AUC-GENERATORS-007 Presentation View Manifest。验收重点：ViewFor、constructor、registrar source 和诊断。
+- [ ] AUC-GENERATORS-008 Diagnostics。验收重点：diagnostic id、severity、message args 和 source location。
 
-目标：在 Module / Routing 前完成 SG 总体框架，避免后续依赖反射扫描。
+## Routing
 
-- [x] SG 项目结构确认
-- [x] Analyzer / Generator 命名规范
-- [x] 增量生成器基础设施
-- [x] 诊断 ID 规划
-- [x] 生成代码命名规范
-- [x] Module metadata 生成能力
-- [x] Module dependency graph 生成能力
-- [x] Service registration manifest 生成能力
-- [x] Route manifest 生成能力
-- [x] Localization manifest 生成能力
-- [x] Plugin manifest 辅助生成能力
-- [x] 生成器测试覆盖
-- [x] Phase 2 验收
+- [ ] AUC-ROUTING-001 Route Definition Syntax。验收重点：合法模板、非法模板、参数边界、属性默认值和稳定排序。
+- [ ] AUC-ROUTING-002 Route Graph Build and Snapshot。验收重点：graph 不可变、冲突拒绝、plugin route revoke 后旧 snapshot 仍只读可用。
+- [ ] AUC-ROUTING-003 Route Matching and Parameters。验收重点：优先级、参数转换、constraint、并发匹配和非法输入。
+- [ ] AUC-ROUTING-004 Navigation Transaction。验收重点：失败不改变 current snapshot、取消不提交、重复 dispose 幂等、并发策略稳定。
+- [ ] AUC-ROUTING-005 Guard and Redirect Pipeline。验收重点：enter/leave 顺序、deny、redirect、loop detection、异常映射和取消。
+- [ ] AUC-ROUTING-006 ViewModel Target Resolution。验收重点：target descriptor 内容完整、Routing 不依赖 Presentation、失败不创建 ViewModel。
+- [ ] AUC-ROUTING-007 Plugin Route Contribution。验收重点：插件贡献、冲突隔离、卸载撤销、旧 snapshot 只读。
+- [ ] AUC-ROUTING-008 Navigation Journal and Reuse。验收重点：push/replace/back/forward、容量裁剪、失败不写历史和 reuse key。
 
-## Phase 3: Core Host / Lifecycle
+## Presentation
 
-目标：确定应用框架最核心的启动、运行、停止、异常和生命周期扩展模型。
+- [ ] AUC-PRESENTATION-001 UI Dispatcher Bridge。验收重点：UI 线程识别、后台 marshal、取消、异常映射和平台不可用。
+- [ ] AUC-PRESENTATION-002 View Registry and Locator。验收重点：manifest 注册、显式覆盖、重复拒绝、插件撤销和 O(1) lookup 路径。
+- [ ] AUC-PRESENTATION-003 View Factory and Binding。验收重点：构造参数、DataContext、失败回滚、handle dispose 和 lifecycle event。
+- [ ] AUC-PRESENTATION-004 Route Outlet Commit。验收重点：成功替换、失败回滚、取消、重复 commit、旧 view dispose 和结果状态。
+- [ ] AUC-PRESENTATION-005 Visual Lifecycle Feedback。验收重点：attach/detach、focus、visibility、反馈顺序和 handler 失败隔离。
+- [ ] AUC-PRESENTATION-006 Interaction and Validation Bridge。验收重点：handler 注册撤销、无 handler、验证消息变化、控件释放和取消。
+- [ ] AUC-PRESENTATION-007 Localization and Resource Bridge。验收重点：culture 切换、fallback、resource revoke、插件资源卸载和局部失败隔离。
+- [ ] AUC-PRESENTATION-008 Plugin UI Unload Coordination。验收重点：active view lease、卸载撤销、拒绝卸载、资源释放和重复 unload。
 
-- [x] Host builder contract
-- [x] Application host runtime
-- [x] Lifecycle stage model
-- [x] Lifecycle middleware pipeline
-- [x] Application / Module / Plugin / Navigation 生命周期关系
-- [x] UI dispatcher 抽象接入点
-- [x] Host options 与配置入口
-- [x] Host diagnostics
-- [x] Host integration tests
-- [x] Phase 3 验收
+## MVVM
 
-## Phase 4: Modularity
+- [ ] AUC-MVVM-001 ViewModel Base and Notification。验收重点：PropertyChanged、释放幂等、无 UI 依赖和继承扩展点。
+- [ ] AUC-MVVM-002 Activation and Deactivation。验收重点：状态机、拒绝停用、取消、异常映射和资源释放。
+- [ ] AUC-MVVM-003 Command Execution。验收重点：成功、失败、取消、并发拒绝、CanExecute 变化和异常不泄漏到 UI。
+- [ ] AUC-MVVM-004 Interaction Requests。验收重点：有 handler、无 handler、异常、取消、泛型 result 和 handler scope 释放。
+- [ ] AUC-MVVM-005 Validation Model。验收重点：消息增删、状态聚合、重复处理、释放和 Presentation binding 输入。
+- [ ] AUC-MVVM-006 Operation and Cancellation Scope。验收重点：状态转换、取消顺序、重复终态、耗时字段和资源释放。
 
-目标：实现模块声明、模块依赖、模块初始化顺序和模块服务注册。
+## State
 
-- [x] `IModule` / `ModuleBase` 接口完善
-- [x] Module attribute 设计落地
-- [x] 默认模块名规则：未指定时使用模块类型全名
-- [x] 模块依赖声明
-- [x] SG 生成模块依赖图
-- [x] 循环依赖诊断
-- [x] 模块初始化阶段：PreConfigure / Configure / PostConfigure
-- [x] 异步初始化阶段
-- [x] 模块服务注册
-- [x] 模块生命周期测试
-- [x] Phase 4 验收
+- [ ] AUC-STATE-001 Writable State。验收重点：原子更新、version、提交后通知、相等值不通知、订阅 dispose、disposed mutation rejection、updater 异常诊断和写拒绝/access policy。
+- [ ] AUC-STATE-002 Application State。验收重点：注册、读取、writer、not registered、StateDefinition enum 和 schema version 边界。
+- [ ] AUC-STATE-003 Computed State。验收重点：lazy invalidation、依赖失效、缓存、异常诊断、null dependency 拒绝。
+- [ ] AUC-STATE-004 State Subscription。验收重点：dispose 后不通知、Background 不阻塞状态提交、Background handler 失败诊断。
+- [ ] AUC-STATE-005 State Snapshot。验收重点：不可变、过滤、restore diagnostics、entry version/schema 边界、entries 不含 null。
+- [ ] AUC-STATE-006 Collection State。验收重点：change kind、item version、collection version、快照不可变、非法构造参数、dispose 幂等、dispose 后读 API 可用、mutation/restore/subscription API 拒绝。
+- [ ] AUC-STATE-007 Diagnostics。验收重点：AUCSTA001-010。
+- [ ] AUC-STATE-008 Threading。验收重点：不隐式 UI。
 
-## Phase 5: Routing
+## EventBus
 
-目标：实现 Route -> ViewModel Target 的稳定链路，并保证路由表 AOT 友好。
+- [ ] AUC-EVENTBUS-001 Typed Publish。验收重点：delivery/post result 边界、null event、预取消 token、disposed bus、publish options 边界、result immutable/null delivery、error policy、diagnostics。
+- [ ] AUC-EVENTBUS-002 Subscription Lifecycle。验收重点：dispose 后不再收到事件、StopAsync 移除新发布快照、等待 in-flight handler、owner stop/cancellation 释放、bus dispose 清理 active subscriptions、已 Disposed 后 StopAsync 幂等。
+- [ ] AUC-EVENTBUS-003 Contract Registry。验收重点：shared contract assembly match、重复 contract id、稳定默认映射、plugin-private descriptor default id 拒绝、shared registry 拒绝 plugin-private descriptor。
+- [ ] AUC-EVENTBUS-004 Dispatch Policy。验收重点：顺序、异常聚合、停止策略、未知 error policy 拒绝。
+- [ ] AUC-EVENTBUS-005 Diagnostics。验收重点：EventBus.Event* 现有代码、failure/cancellation 诊断包含 contract id、event id 和 subscription id。
+- [ ] AUC-EVENTBUS-006 DI Registration。验收重点：默认服务、可替换 diagnostics 和 provider dispose 释放 EventBus singleton。
 
-- [x] 路由语法实现
-- [x] 路由模板解析
-- [x] 路由参数绑定
-- [x] Route target model
-- [x] Route manifest SG
-- [x] Route matcher
-- [x] Navigation context
-- [x] Route guard / filter
-- [x] Navigation error model
-- [x] Routing tests
-- [x] Phase 5 验收
+## PluginSystem
 
-## Phase 6: Presentation
+- [ ] AUC-PLUGIN-001 Plugin Metadata。验收重点：id、version、mainAssembly、schema 和 required fields。
+- [ ] AUC-PLUGIN-002 Dependency Validation。验收重点：missing、cycle、version mismatch diagnostics。
+- [ ] AUC-PLUGIN-003 Package Installation。验收重点：staging cleanup、installed record、path normalization。
+- [ ] AUC-PLUGIN-004 Discovery。验收重点：invalid install record diagnostics 且继续扫描其他插件。
+- [ ] AUC-PLUGIN-005 Loading。验收重点：Loaded/Failed 状态和 diagnostics。
+- [ ] AUC-PLUGIN-006 MSBuild Contract。验收重点：MSBuild property、output path、package content。
+- [ ] AUC-PLUGIN-007 Diagnostics。验收重点：AUCPLG0000-0021 关键路径。
+- [ ] AUC-PLUGIN-008 Unload Contract。验收重点：Disable -> Unloading -> Unloaded/UnloadPending。
 
-目标：打通 ViewModel -> View -> Outlet -> VisualTree，并定义 UI 状态回流机制。
+## Data
 
-- [x] View locator contract
-- [x] View registration model
-- [x] ViewModel to View resolution
-- [x] Route outlet contract
-- [x] Outlet commit pipeline
-- [x] UI dispatcher integration
-- [x] VisualTree 变化通知
-- [x] UI element state 到 ViewModel 的反馈规范
-- [x] Presentation tests
-- [x] Phase 6 验收
+- [ ] AUC-DATA-001 Request Pipeline。验收重点：执行顺序、取消不写缓存、retry diagnostics。
+- [ ] AUC-DATA-002 HTTP Transport。验收重点：status -> DataErrorKind 映射。
+- [ ] AUC-DATA-003 gRPC Transport。验收重点：GrpcStatusCode 映射。
+- [ ] AUC-DATA-004 SignalR Transport。验收重点：invocation context。
+- [ ] AUC-DATA-005 Connection Lifecycle。验收重点：状态转换、owner 释放。
+- [ ] AUC-DATA-006 Authentication。验收重点：credential before transport。
+- [ ] AUC-DATA-007 Caching。验收重点：key 组成和 hit/miss。
+- [ ] AUC-DATA-008 Error Model。验收重点：result 不混用 success/error。
+- [ ] AUC-DATA-009 DI Registration。验收重点：默认服务。
 
-## Phase 7: MVVM
+## Localization
 
-目标：提供框架自己的 MVVM 编程模型，但不重复底层 UI 框架职责。
+- [ ] AUC-LOCALIZATION-001 Culture State and Fallback。验收重点：默认 culture、fallback 顺序、非法 culture 和重复切换。
+- [ ] AUC-LOCALIZATION-002 Language Package Provider。验收重点：provider 注册、重复拒绝、取消、格式错误和 owner revoke。
+- [ ] AUC-LOCALIZATION-003 Lazy Package Loading。验收重点：按需加载、并发合并、失败 fallback、不同 culture 独立缓存。
+- [ ] AUC-LOCALIZATION-004 Lookup and Missing Key Fallback。验收重点：scope lookup、fallback、缺失 key、参数格式化和订阅更新。
+- [ ] AUC-LOCALIZATION-005 Assembly Language Packages。验收重点：独立 assembly、属性声明、资源读取、缺失资源和 unload owner。
+- [ ] AUC-LOCALIZATION-006 Presentation Refresh Bridge。验收重点：bridge 调用、局部失败、批量刷新和不依赖 Avalonia 类型。
+- [ ] AUC-LOCALIZATION-007 Plugin Package Revocation。验收重点：撤销后不可 lookup、旧 snapshot 稳定、订阅释放和重复 revoke。
 
-- [x] ViewModel activation
-- [x] Activation scope
-- [x] Command contract
-- [x] Async command contract
-- [x] Interaction contract
-- [x] Validation contract
-- [x] Observable / notification 基础约束
-- [x] 与 Presentation 生命周期对齐
-- [x] MVVM tests
-- [x] Phase 7 验收
+## Security
 
-## Phase 8: State
+- [ ] AUC-SECURITY-001 Authentication State Store。验收重点：snapshot 不可变、状态切换、订阅通知、重复设置和 logout。
+- [ ] AUC-SECURITY-002 Current Principal Access。验收重点：authenticated、anonymous、claims 读取和并发 snapshot。
+- [ ] AUC-SECURITY-003 Permission Registry and Checker。验收重点：注册、重复、未注册、插件撤销和 checker result。
+- [ ] AUC-SECURITY-004 Authorization Policy Evaluation。验收重点：成功、拒绝、失败、取消、多 requirement 和 provider 异常。
+- [ ] AUC-SECURITY-005 Route Authorization Guard。验收重点：allow、deny、redirect login、取消和 Routing 无 Security 反向依赖。
+- [ ] AUC-SECURITY-006 Command Authorization。验收重点：状态变化、禁用/隐藏策略、订阅释放和权限撤销。
+- [ ] AUC-SECURITY-007 Access Token Provider。验收重点：成功、失败、不可用、取消、DI 默认 provider 和 Data 集成前置条件。
 
-目标：提供桌面应用可注入、可监听、线程安全、AOT 友好的状态管理能力。
+## CLI
 
-- [x] 全局状态 contract
-- [x] 局部状态 contract
-- [x] 状态容器生命周期
-- [x] 状态监听机制
-- [x] UI 线程调度约束
-- [x] 后台线程写入约束
-- [x] 派生状态
-- [x] 状态快照
-- [x] 状态恢复
-- [x] State tests
-- [x] Phase 8 验收
+- [ ] AUC-CLI-001 Command Model。验收重点：入口名、未知命令、缺参、exit code、usage 输出和 JSON 模式隔离。
+- [ ] AUC-CLI-002 New App Command。验收重点：生成项目、冲突、非法名称、dry-run、JSON artifacts 和取消。
+- [ ] AUC-CLI-003 Build and Test Commands。验收重点：成功、失败、非零 exit code、取消、CI 模式和输出截断。
+- [ ] AUC-CLI-004 Plugin Inspect and Doctor。验收重点：合法插件、manifest 缺失、版本非法、layout 错误和 JSON diagnostics。
+- [ ] AUC-CLI-005 AI-Friendly Envelope。验收重点：schema、纯 JSON、artifact 列表、suggested commands、retryable 语义。
+- [ ] AUC-CLI-006 Non-Interactive and CI Mode。验收重点：CI、non-interactive、stdin unavailable、需要确认时失败。
 
-## Phase 9: EventBus
+## Templates
 
-目标：提供模块和插件之间低耦合、高性能、线程模型清晰的系统级事件机制。
+- [ ] AUC-TEMPLATES-001 Application Template。验收重点：生成、restore/build/test、命名空间、包引用、无绝对路径。
+- [ ] AUC-TEMPLATES-002 Package Layout。验收重点：required files、路径规范化、重复文件、路径逃逸和 package id。
+- [ ] AUC-TEMPLATES-003 Template Variables。验收重点：变量默认值、非法值、命名空间生成和错误消息。
+- [ ] AUC-TEMPLATES-004 Plugin Template。验收重点：单 assembly、NuGet metadata、manifest、msbuild 属性和测试项目。
+- [ ] AUC-TEMPLATES-005 Test Template。验收重点：测试项目 build/test、TestLayer、Testing 引用边界和命名规则。
 
-- [x] 事件 contract 规范
-- [x] 进程内事件总线
-- [x] 同步 / 异步 handler
-- [x] UI dispatcher 投递策略
-- [x] 后台线程投递策略
-- [x] 事件订阅生命周期
-- [x] 跨插件边界 contract assembly 规范
-- [x] 弱引用或显式释放策略
-- [x] 事件诊断能力
-- [x] EventBus tests
-- [x] Phase 9 验收
+## Release Gates
 
-## Phase 10: PluginSystem
+- [ ] AUC-RELEASE-001 Full solution build。通过 `dotnet build AtomUICity.slnx`，且无 warning、无 error。
+- [ ] AUC-RELEASE-002 Full solution tests。通过 `dotnet test AtomUICity.slnx --no-build`。
+- [ ] AUC-RELEASE-003 Documentation gate。通过 `bash engineering/check-docs.sh`。
+- [ ] AUC-RELEASE-004 Public API gate。通过 `bash engineering/check-public-api.sh`，并确认 public API 变化已审阅。
+- [ ] AUC-RELEASE-005 Package generation。通过 `bash engineering/pack.sh --configuration Release`。
+- [ ] AUC-RELEASE-006 Package validation。通过 `bash engineering/validate-packages.sh --configuration Release`。
+- [ ] AUC-RELEASE-007 Template smoke gate。通过 `bash engineering/check-template-smoke.sh`。
+- [ ] AUC-RELEASE-008 CI-equivalent local gate。通过 `bash engineering/test-ci.sh` 和必要的 platform integration gate。
+- [ ] AUC-RELEASE-009 Release notes and versioning。通过 `bash engineering/generate-release-notes.sh`，并完成 1.0 版本号、包元数据和发布说明审阅。
 
-目标：实现运行时可安装、加载、卸载的插件体系，并与 Host / Module / EventBus 生命周期一致。
+## 后续维护规则
 
-- [x] Plugin manifest
-- [x] Plugin assembly loading
-- [x] Plugin module model
-- [x] Plugin install directory 规范
-- [x] Plugin package layout
-- [x] Plugin NuGet packaging
-- [x] Plugin MSBuild properties
-- [x] Plugin MSBuild tasks
-- [x] Plugin unload lifecycle
-- [x] Plugin dependency validation
-- [x] Plugin tests
-- [x] Phase 10 验收
-
-## Phase 11: Data Access
-
-目标：提供统一的数据访问抽象，首批支持 HttpClient、gRPC、SignalR。
-
-- [x] Data client contract
-- [x] HttpClient integration
-- [x] gRPC integration
-- [x] SignalR integration
-- [x] Connection lifecycle
-- [x] Retry / timeout / cancellation
-- [x] Authentication integration point
-- [x] Threading policy
-- [x] Data access tests
-- [x] Phase 11 验收
-
-## Phase 12: Localization
-
-目标：实现强大的桌面端多语言能力，支持按语言包懒加载和 assembly 动态加载。
-
-- [x] Localization contract
-- [x] Resource provider
-- [x] Culture switching
-- [x] Per-language lazy loading
-- [x] Assembly language package loading
-- [x] AtomUI integration point
-- [x] Missing resource diagnostics
-- [x] Localization tests
-- [x] Phase 12 验收
-
-## Phase 13: CLI / Templates
-
-目标：提供 `atomui city ...` 命令体系，支撑创建、开发、插件、模板、诊断和 AI 友好工作流。
-
-- [x] CLI command architecture
-- [x] `atomui city new`
-- [x] `atomui city build`
-- [x] `atomui city test`
-- [x] `atomui city plugin`
-- [x] `atomui city doctor`
-- [x] AI-friendly project inspection output
-- [x] Templates package
-- [x] CLI tests
-- [x] Phase 13 验收
-
-## Phase 14: Packaging / Release
-
-目标：形成可发布、可验证、可维护的第一版包体系。
-
-- [x] Package dependency review
-- [x] Public API review
-- [x] XML docs / API docs check
-- [x] NuGet package generation
-- [x] Symbols package
-- [x] SourceLink
-- [x] License verification
-- [x] Release notes generation
-- [x] Versioning policy
-- [x] Phase 14 验收
-
-## Release Candidate Productization Gate
-
-目标：完成初版发布前产品化验收，确认框架底座可以进入候选发布状态。
-
-- [x] Real dogfood app end-to-end smoke
-- [x] CLI doctor / inspect / build / test dogfood workflow
-- [x] Plugin install / discovery / load / activate / deactivate / unload dogfood workflow
-- [x] Public API review
-- [x] Dependency boundary review
-- [x] Version / release notes / NuGet package strategy review
-- [x] Platform integration test gate
-- [x] Release package validation
-- [x] Remote CI verification
-
-## 推荐立即执行顺序
-
-1. 完成 `Phase 0` 剩余工程基线，特别是 CI、format、license header。
-2. 并行启动 `Phase 1 Testing Platform`，先把测试夹具定下来。
-3. 开始 `Phase 2 Source Generator Platform`，优先 Module metadata、dependency graph、Route manifest。
-4. 再进入 `Phase 3 Host / Lifecycle`。
-5. 随后依次推进 `Modularity`、`Routing`、`Presentation`，保证主链路闭环。
+- 新增、拆分或删除 1.0 任务时，必须同步更新当前结论、模块汇总和对应任务段落。
+- 不允许通过模块局部文档覆盖本文档中的完成状态。
+- 不允许新增其他任务跟踪文件；临时执行计划完成后必须折叠回本文档或删除。
+- 每次工作对齐时，按本文档输出 `已完成数/总数`。
