@@ -17,7 +17,7 @@ public static class PluginDiscoveryScanner
         var plugins = new List<PluginDescriptor>();
         var diagnostics = new List<PluginDiagnostic>();
 
-        foreach (var installRecordPath in EnumerateInstallRecords(installedRoot))
+        foreach (var installRecordPath in EnumerateInstallRecords(installedRoot, diagnostics))
         {
             if (!File.Exists(installRecordPath))
             {
@@ -173,17 +173,72 @@ public static class PluginDiscoveryScanner
         return new PluginDiscoveryResult(plugins, diagnostics);
     }
 
-    private static IEnumerable<string> EnumerateInstallRecords(string installedRoot)
+    private static IEnumerable<string> EnumerateInstallRecords(
+        string installedRoot,
+        List<PluginDiagnostic> diagnostics)
     {
-        foreach (var pluginDirectory in Directory.EnumerateDirectories(installedRoot))
+        foreach (var pluginDirectory in EnumerateDirectoryEntries(
+            installedRoot,
+            diagnostics,
+            "installedDirectory"))
         {
-            foreach (var versionDirectory in Directory.EnumerateDirectories(pluginDirectory))
+            var pluginId = Path.GetFileName(pluginDirectory);
+            if (!Directory.Exists(pluginDirectory))
             {
+                diagnostics.Add(new PluginDiagnostic(
+                    PluginDiagnosticIds.InvalidPluginDirectory,
+                    $"Installed plugin entry '{pluginDirectory}' must be a directory.",
+                    pluginId,
+                    "pluginDirectory",
+                    pluginDirectory));
+                continue;
+            }
+
+            foreach (var versionDirectory in EnumerateDirectoryEntries(
+                pluginDirectory,
+                diagnostics,
+                "pluginDirectory",
+                pluginId))
+            {
+                if (!Directory.Exists(versionDirectory))
+                {
+                    diagnostics.Add(new PluginDiagnostic(
+                        PluginDiagnosticIds.InvalidPluginDirectory,
+                        $"Installed plugin version entry '{versionDirectory}' must be a directory.",
+                        pluginId,
+                        "versionDirectory",
+                        versionDirectory));
+                    continue;
+                }
+
                 var installRecordPath = Path.Combine(
                     versionDirectory,
                     PluginPackagePaths.InstallRecordFileName);
                 yield return installRecordPath;
             }
+        }
+    }
+
+    private static IReadOnlyList<string> EnumerateDirectoryEntries(
+        string directory,
+        List<PluginDiagnostic> diagnostics,
+        string field,
+        string? pluginId = null)
+    {
+        try
+        {
+            return Directory.EnumerateFileSystemEntries(directory).ToArray();
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            diagnostics.Add(new PluginDiagnostic(
+                PluginDiagnosticIds.InvalidPluginDirectory,
+                $"Installed plugin directory '{directory}' could not be read: {exception.Message}",
+                pluginId,
+                field,
+                directory));
+
+            return [];
         }
     }
 

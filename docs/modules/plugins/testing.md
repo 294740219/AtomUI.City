@@ -26,10 +26,10 @@
 | AUC-PLUGIN-001 | PluginLifecycle | PluginDeclarationAttributeTests; PluginManifestTests | 断言 id、version、mainAssembly、schema、targetFramework 和 required fields。 | id 缺失、required field 缺失、id mismatch、schema 不支持。 | Completed |
 | AUC-PLUGIN-002 | PluginLifecycle | PluginDependencyTests | 断言 missing、cycle、version mismatch、duplicate id diagnostics，并断言 cycle 内每个 plugin id 都可定位。 | 缺失、循环、版本不满足、重复 plugin id。 | Completed |
 | AUC-PLUGIN-003 | PluginLifecycle | PluginPackageTests | 断言 staging cleanup、installed record、path normalization、取消和解压失败。 | 路径穿越、包布局缺失、重复安装、取消、解压失败。 | Completed |
-| AUC-PLUGIN-004 | PluginLifecycle | PluginLoadingTests | 断言 invalid install record diagnostics 且继续扫描其他插件。 | 缺少 install record、非法 record、目录无效。 | Required |
+| AUC-PLUGIN-004 | PluginLifecycle | PluginLoadingTests | 断言 invalid install record 和 invalid directory diagnostics 且继续扫描其他插件。 | 缺少 install record、非法 record、目录无效。 | Completed |
 | AUC-PLUGIN-005 | PluginLifecycle | PluginLoadingTests | 断言 Loaded/Failed 状态和 diagnostics。 | 主程序集缺失、manifest invalid、id mismatch。 | Required |
 | AUC-PLUGIN-006 | PluginLifecycle | PluginMsBuildContractTests | 断言 MSBuild property、output path、package content。 | 属性缺失、layout 不合法、manifest 未生成。 | Required |
-| AUC-PLUGIN-007 | PluginLifecycle | PluginResultTests | 断言 AUCPLG0000-0021 关键路径。 | 诊断码不能复用，context 必须有 pluginId/path。 | Required |
+| AUC-PLUGIN-007 | PluginLifecycle | PluginResultTests | 断言 AUCPLG0000-0022 关键路径。 | 诊断码不能复用，context 必须有 pluginId/path。 | Required |
 | AUC-PLUGIN-008 | PluginLifecycle | PluginLoadingTests | 断言 Disable -> Unloading -> Unloaded/UnloadPending。 | active contribution、未释放 view/subscription/connection。 | Required |
 
 ## 缺口处理

@@ -21,6 +21,7 @@
 - `PluginManifest` 的 required fields、schema `1.x` 支持边界、semantic version、mainAssembly 文件名和 targetFramework 非路径校验进入 1.0 兼容承诺。
 - `PluginDependencyValidator` 的 missing dependency、version mismatch、duplicate plugin id 和 cycle diagnostics 进入 1.0 兼容承诺；cycle 中每个 plugin id 必须可定位。
 - `PluginPackageInstaller` 的 staging cleanup、installed version root、install record 和规范化 RootPath/ManifestPath 进入 1.0 兼容承诺。
+- `PluginDiscoveryScanner` 对 invalid install record、invalid manifest 和 invalid installed directory 的诊断与继续扫描行为进入 1.0 兼容承诺。
 
 ## 数据格式兼容
 

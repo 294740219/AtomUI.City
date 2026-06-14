@@ -34,6 +34,7 @@
 | `AUCPLG0019` | InvalidManifest | `src/AtomUI.City.PluginSystem/PluginDiagnosticIds.cs` |
 | `AUCPLG0020` | PluginPackageIdMismatch | `src/AtomUI.City.PluginSystem/PluginDiagnosticIds.cs` |
 | `AUCPLG0021` | MissingInstallRecord | `src/AtomUI.City.PluginSystem/PluginDiagnosticIds.cs` |
+| `AUCPLG0022` | InvalidPluginDirectory | `src/AtomUI.City.PluginSystem/PluginDiagnosticIds.cs` |
 
 ## 产品级必须诊断的失败
 

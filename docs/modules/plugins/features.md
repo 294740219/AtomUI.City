@@ -9,7 +9,7 @@
 | AUC-PLUGIN-001 | Plugin Metadata | Completed | PluginAttribute, PluginManifest, PluginDescriptor | PluginDeclarationAttributeTests; PluginManifestTests |
 | AUC-PLUGIN-002 | Dependency Validation | Completed | PluginDependencyValidator, PluginSemanticVersion | PluginDependencyTests |
 | AUC-PLUGIN-003 | Package Installation | Completed | PluginPackageInstaller, PluginInstallationReader, PluginPackagePaths | PluginPackageTests |
-| AUC-PLUGIN-004 | Discovery | Ready to Start Product Implementation | PluginDiscoveryScanner | PluginLoadingTests |
+| AUC-PLUGIN-004 | Discovery | Completed | PluginDiscoveryScanner | PluginLoadingTests |
 | AUC-PLUGIN-005 | Loading | Ready to Start Product Implementation | PluginLoader, PluginLoadResult | PluginLoadingTests |
 | AUC-PLUGIN-006 | MSBuild Contract | Ready to Start Product Implementation | PluginMsBuildContract | PluginMsBuildContractTests |
 | AUC-PLUGIN-007 | Diagnostics | Ready to Start Product Implementation | PluginDiagnosticIds, PluginDiagnostic | PluginResultTests |
@@ -76,15 +76,15 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-PLUGIN-004 Discovery
 
 Feature ID: `AUC-PLUGIN-004`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 扫描安装目录并产生 PluginInstallation。
 Public Contract: PluginDiscoveryScanner
-Runtime / Build Behavior: 扫描安装目录并产生 PluginInstallation。
-Failure Behavior: 缺少 install record、非法 record、目录无效。
+Runtime / Build Behavior: 扫描安装目录，验证 install record、manifest 和安装目录结构，并产生 PluginDescriptor。
+Failure Behavior: 缺少 install record、非法 record、目录无效、坏 manifest，单个失败不阻止其他插件发现。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `PluginLoadingTests`。
-Required Assertions: 断言 invalid install record diagnostics 且继续扫描其他插件。
+Required Assertions: 断言 invalid install record 和 invalid directory diagnostics 且继续扫描其他插件。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 ## AUC-PLUGIN-005 Loading
 
@@ -123,7 +123,7 @@ Failure Behavior: 诊断码不能复用，context 必须有 pluginId/path。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `PluginResultTests`。
-Required Assertions: 断言 AUCPLG0000-0021 关键路径。
+Required Assertions: 断言 AUCPLG0000-0022 关键路径。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 ## AUC-PLUGIN-008 Unload Contract
 

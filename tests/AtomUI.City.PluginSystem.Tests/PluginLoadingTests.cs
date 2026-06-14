@@ -56,4 +56,31 @@ public sealed class PluginLoadingTests
         Assert.False(result.Succeeded);
         Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == PluginDiagnosticIds.MainAssemblyNotFound);
     }
+
+    [Fact]
+    public async Task DiscoveryScannerReportsInvalidPluginDirectoryEntriesAndContinues()
+    {
+        using var workspace = new PluginTestWorkspace();
+        workspace.WriteStandardManifest();
+        workspace.CopyMainAssembly("Company.Sales.Plugin.dll");
+        var pluginsRoot = workspace.CreateDirectory("plugins");
+        var installer = new PluginPackageInstaller();
+        await installer.InstallFromDirectoryAsync(workspace.Root, pluginsRoot);
+        var invalidPluginDirectory = Path.Combine(
+            pluginsRoot,
+            PluginPackagePaths.InstalledDirectoryName,
+            "com.company.broken");
+        await File.WriteAllTextAsync(invalidPluginDirectory, "not a directory");
+
+        var discovery = PluginDiscoveryScanner.DiscoverInstalled(pluginsRoot);
+
+        Assert.False(discovery.Succeeded);
+        Assert.Single(discovery.Plugins);
+        Assert.Contains(
+            discovery.Diagnostics,
+            diagnostic => diagnostic.Code == PluginDiagnosticIds.InvalidPluginDirectory
+                && diagnostic.PluginId == "com.company.broken"
+                && diagnostic.Field == "pluginDirectory"
+                && diagnostic.Path == invalidPluginDirectory);
+    }
 }

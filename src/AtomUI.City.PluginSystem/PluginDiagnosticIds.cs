@@ -24,4 +24,5 @@ public static class PluginDiagnosticIds
     public const string InvalidManifest = "AUCPLG0019";
     public const string PluginPackageIdMismatch = "AUCPLG0020";
     public const string MissingInstallRecord = "AUCPLG0021";
+    public const string InvalidPluginDirectory = "AUCPLG0022";
 }
