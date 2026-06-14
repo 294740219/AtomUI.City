@@ -8,7 +8,7 @@
 | --- | --- | --- | --- | --- |
 | AUC-BUILD-001 | Output Layout | 已实现并通过产品合同测试 | Directory.Build.props, output path convention | OutputLayoutTests |
 | AUC-BUILD-002 | Package Metadata | 已实现并通过产品合同测试 | csproj package properties, pack target | PackageMetadataTests |
-| AUC-BUILD-003 | Project Inventory | Ready to Start Product Implementation | solution/project inventory conventions | ProjectInventoryTests |
+| AUC-BUILD-003 | Project Inventory | 已实现并通过产品合同测试 | solution/project inventory conventions | ProjectInventoryTests |
 | AUC-BUILD-004 | Dependency Boundary | Ready to Start Product Implementation | project reference and package reference rules | ProjectDependencyBoundaryTests |
 | AUC-BUILD-005 | Source Generator Packaging | Ready to Start Product Implementation | AtomUI.City.Generators package layout | SourceGeneratorProjectStructureTests |
 | AUC-BUILD-006 | Release Gates | Ready to Start Product Implementation | engineering/check-docs.sh, pack/test gates | EngineeringGateTests; PackagingReleaseGateTests |
@@ -62,7 +62,7 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-BUILD-003 Project Inventory
 
 Feature ID: `AUC-BUILD-003`
-Status: Ready to Start Product Implementation
+Status: 已实现并通过产品合同测试
 Goal: 跟踪 src/tests/docs 项目边界。
 Public Contract: solution/project inventory conventions
 Runtime / Build Behavior: 所有项目必须在 solution 和 inventory 规则内被识别。

@@ -23,7 +23,7 @@
 | --- | --- | --- | --- | --- | --- |
 | AUC-BUILD-001 | Build | OutputLayoutTests | 断言 artifacts、packages、logs、test-results 都在 output 下。 | 路径为空、路径逃逸、散落 bin/obj 规则不一致失败。 | Implemented |
 | AUC-BUILD-002 | Build | PackageMetadataTests | 断言 LGPL v3、repository、symbol、package id 和 dependency group。 | metadata 缺失、license 错误、pack warning 返回失败。 | Implemented |
-| AUC-BUILD-003 | Build | ProjectInventoryTests | 断言 src/tests 项目被 inventory 覆盖。 | 新增项目未登记、测试项目缺失、孤儿项目失败。 | Required |
+| AUC-BUILD-003 | Build | ProjectInventoryTests | 断言 src/tests 项目被 inventory 覆盖。 | 新增项目未登记、测试项目缺失、孤儿项目失败。 | Implemented |
 | AUC-BUILD-004 | Build | ProjectDependencyBoundaryTests | 断言 runtime 不依赖 Testing/Roslyn/test packages。 | runtime 引用 Testing、test packages、Roslyn analyzer internals 失败。 | Required |
 | AUC-BUILD-005 | Build | SourceGeneratorProjectStructureTests | 断言 generator target、analyzer layout、runtime 不引用 generator。 | target 错误、analyzer 路径缺失、runtime 依赖失败。 | Required |
 | AUC-BUILD-006 | Build | EngineeringGateTests; PackagingReleaseGateTests | 断言 docs、format、pack、test gate 可本地执行。 | 任一 gate 失败阻止 release。 | Required |

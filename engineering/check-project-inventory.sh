@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd "$script_dir/.." && pwd)"
+cd "$repo_root"
+
+solution_path="AtomUICity.slnx"
+tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/atomuicity-project-inventory.XXXXXX")"
+trap 'rm -rf "$tmp_dir"' EXIT
+
+grep -Eo 'Path="[^"]+\.csproj"' "$solution_path" \
+  | sed -E 's/^Path="//; s/"$//' \
+  | sort > "$tmp_dir/solution-projects.txt"
+
+find src tests -name '*.csproj' -print \
+  | sed -E 's#^\./##' \
+  | sort > "$tmp_dir/repository-projects.txt"
+
+failure_count=0
+
+report_lines() {
+  local prefix="$1"
+  local file="$2"
+
+  while IFS= read -r line; do
+    if [[ -n "$line" ]]; then
+      printf '%s: %s\n' "$prefix" "$line" >&2
+      failure_count=$((failure_count + 1))
+    fi
+  done < "$file"
+}
+
+comm -23 "$tmp_dir/repository-projects.txt" "$tmp_dir/solution-projects.txt" > "$tmp_dir/missing-from-solution.txt"
+comm -13 "$tmp_dir/repository-projects.txt" "$tmp_dir/solution-projects.txt" > "$tmp_dir/unknown-in-solution.txt"
+
+report_lines "project missing from solution" "$tmp_dir/missing-from-solution.txt"
+report_lines "solution references unknown project" "$tmp_dir/unknown-in-solution.txt"
+
+find src -name '*.csproj' -print \
+  | sed -E 's#^src/[^/]+/##; s#\.csproj$##' \
+  | sort > "$tmp_dir/source-project-names.txt"
+
+find tests -name '*.csproj' -print \
+  | sed -E 's#^tests/[^/]+/##; s#\.csproj$##' \
+  | sort > "$tmp_dir/test-project-names.txt"
+
+: > "$tmp_dir/expected-test-project-names.txt"
+while IFS= read -r source_project_name; do
+  if [[ "$source_project_name" == "AtomUI.City.Templates" ]]; then
+    printf '%s\n' "AtomUI.City.TemplateSmokeTests"
+  else
+    printf '%s.Tests\n' "$source_project_name"
+  fi
+done < "$tmp_dir/source-project-names.txt" | sort > "$tmp_dir/expected-test-project-names.txt"
+
+comm -23 "$tmp_dir/expected-test-project-names.txt" "$tmp_dir/test-project-names.txt" > "$tmp_dir/source-without-tests.txt"
+comm -13 "$tmp_dir/expected-test-project-names.txt" "$tmp_dir/test-project-names.txt" > "$tmp_dir/orphan-tests.txt"
+
+report_lines "source project without test project" "$tmp_dir/source-without-tests.txt"
+report_lines "test project without source project" "$tmp_dir/orphan-tests.txt"
+
+if [[ "$failure_count" -gt 0 ]]; then
+  printf 'Project inventory validation failed with %s error(s).\n' "$failure_count" >&2
+  exit 1
+fi
+
+printf 'Project inventory validated against %s.\n' "$solution_path"

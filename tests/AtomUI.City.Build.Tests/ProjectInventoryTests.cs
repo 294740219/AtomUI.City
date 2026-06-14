@@ -47,6 +47,24 @@ public sealed class ProjectInventoryTests
         Assert.DoesNotContain(solutionProjects, project => project.StartsWith(".referenceprojects/", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void ProjectInventoryGateChecksSolutionCoverageAndOrphanTests()
+    {
+        var repositoryRoot = RepositoryPaths.FindRepositoryRoot();
+        var scriptPath = Path.Combine(repositoryRoot, "engineering", "check-project-inventory.sh");
+
+        Assert.True(File.Exists(scriptPath), "Expected project inventory gate at engineering/check-project-inventory.sh.");
+
+        var script = File.ReadAllText(scriptPath);
+
+        Assert.Contains("AtomUICity.slnx", script, StringComparison.Ordinal);
+        Assert.Contains("find src tests -name '*.csproj'", script, StringComparison.Ordinal);
+        Assert.Contains("project missing from solution", script, StringComparison.Ordinal);
+        Assert.Contains("source project without test project", script, StringComparison.Ordinal);
+        Assert.Contains("test project without source project", script, StringComparison.Ordinal);
+        Assert.Contains("AtomUI.City.TemplateSmokeTests", script, StringComparison.Ordinal);
+    }
+
     private static string[] ReadSolutionProjects(string repositoryRoot)
     {
         var solutionPath = Path.Combine(repositoryRoot, "AtomUICity.slnx");
