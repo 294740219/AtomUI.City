@@ -129,6 +129,24 @@ public sealed class EventPublicationTests
             CancellationToken.None));
     }
 
+    [Theory]
+    [InlineData(" trace ")]
+    [InlineData("trace\nid")]
+    public void EventContextRejectsInvalidCorrelationIds(string correlationId)
+    {
+        Assert.Throws<ArgumentException>(() => new EventContext<TestEvent>(
+            new TestEvent("context"),
+            new EventContractId("atomui.city.tests.context.v1"),
+            Guid.NewGuid(),
+            correlationId,
+            causationId: null,
+            DateTimeOffset.UtcNow,
+            publishDepth: 0,
+            EventSubscriptionId.New(),
+            EventDispatchPolicy.Serialized,
+            CancellationToken.None));
+    }
+
     [Fact]
     public async Task PostAsyncRejectsNullEvent()
     {

@@ -20,8 +20,7 @@ public sealed class EventContext<TEvent>
         {
             throw new ArgumentException("Event context id cannot be empty.", nameof(eventId));
         }
-
-        ArgumentException.ThrowIfNullOrWhiteSpace(correlationId);
+        correlationId = EventCorrelationIds.ValidateRequired(correlationId, nameof(correlationId));
 
         Event = eventData;
         ContractId = contractId;

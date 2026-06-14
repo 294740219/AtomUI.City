@@ -2,6 +2,13 @@ namespace AtomUI.City.EventBus;
 
 internal static class EventCorrelationIds
 {
+    public static string ValidateRequired(string value, string paramName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(value, paramName);
+
+        return ValidateOptional(value, paramName)!;
+    }
+
     public static string? ValidateOptional(string? value, string paramName)
     {
         if (value is null)
