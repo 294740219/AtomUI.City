@@ -9,6 +9,7 @@ public sealed class InMemoryEventBus : IEventBus
     private readonly IHostDiagnostics? _diagnostics;
     private readonly Dictionary<Type, List<EventSubscription>> _subscriptions = [];
     private readonly object _syncRoot = new();
+    private bool _disposed;
 
     public InMemoryEventBus(
         IEventContractRegistry? contractRegistry = null,
@@ -250,6 +251,19 @@ public sealed class InMemoryEventBus : IEventBus
                 eventId,
                 descriptor.ContractId,
                 Accepted: true));
+    }
+
+    public void Dispose()
+    {
+        lock (_syncRoot)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+        }
     }
 
     private IEventSubscription SubscribeCore<TEvent>(

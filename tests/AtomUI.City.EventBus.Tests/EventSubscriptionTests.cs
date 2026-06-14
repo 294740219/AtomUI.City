@@ -6,6 +6,15 @@ namespace AtomUI.City.EventBus.Tests;
 public sealed class EventSubscriptionTests
 {
     [Fact]
+    public void DisposeCanBeCalledMoreThanOnce()
+    {
+        var eventBus = new InMemoryEventBus();
+
+        eventBus.Dispose();
+        eventBus.Dispose();
+    }
+
+    [Fact]
     public async Task DisposedSubscriptionNoLongerReceivesEvents()
     {
         var eventBus = new InMemoryEventBus();
