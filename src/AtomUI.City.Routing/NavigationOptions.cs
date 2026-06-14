@@ -17,4 +17,6 @@ public sealed class NavigationOptions
     public bool AllowRedirect { get; init; } = true;
 
     public TimeSpan? Timeout { get; init; }
+
+    public int JournalCapacity { get; init; } = 64;
 }

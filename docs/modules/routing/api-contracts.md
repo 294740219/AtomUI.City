@@ -25,8 +25,11 @@
 | IRouteEnterGuard.CanEnterAsync | 进入 route 前授权或重定向。 | RouteGuardContext 必须包含 route、parameters、services。 | RouteGuardResult。 | 异常映射为 navigation failed；redirect loop 返回 `CITY-NAVIGATION-REDIRECT-LOOP`。 | 必须观察 token。 | 按 route hierarchy root-to-leaf 执行，遇到非 Allow 立即停止。 |
 | IRouteLeaveGuard.CanLeaveAsync | 离开当前 route 前确认。 | RouteGuardContext 使用当前 route 和当前 snapshot 参数。 | RouteGuardResult。 | Reject/Cancel/Failed 不改变 current snapshot。 | 必须观察 token。 | 按 route hierarchy leaf-to-root 执行，遇到非 Allow 立即停止。 |
 | NavigationResult.RedirectTarget | 暴露 redirect 目标。 | 仅 Redirected 结果设置。 | NavigationTarget 或 null。 | 非 redirect 结果为 null。 | 纯数据。 | Result 不可变。 |
+| IRouter.BackAsync / ForwardAsync | 按 NavigationScope journal 导航。 | 当前 scope 必须有可用 back/forward entry。 | NavigationResult。 | 无 entry 返回 `CITY-NAVIGATION-JOURNAL-NOT-AVAILABLE`。 | 观察 token。 | 通过同一个 navigation transaction 提交。 |
+| NavigationSnapshot.ReuseKey | 暴露当前 route 的 reuse key。 | 来自 ViewModelTargetDescriptor。 | string 或 null。 | 无 reuse key 时为 null。 | 纯数据。 | Snapshot 不可变。 |
 | NavigationScope.DisposeAsync | 结束导航作用域并释放临时资源。 | 允许重复调用。 | ValueTask。 | Dispose 后新导航返回 `CITY-NAVIGATION-SCOPE-DISPOSED`。 | 取消运行中导航。 | Dispose 幂等。 |
 | ViewModelTargetDescriptor | 描述 route 的 ViewModel target。 | ViewModelType 必须为稳定类型；parameter bindings 会复制为只读。 | target descriptor。 | 缺失或不可构造 target 在导航提交前失败。 | 纯数据，无 token。 | 不创建 ViewModel；不依赖 Presentation。 |
+| NavigationOptions.JournalCapacity | 限制 journal 容量。 | 小于 1 时视为只保留当前 entry。 | int。 | 容量裁剪移除最旧 back entries。 | 纯数据。 | 不影响 current entry。 |
 
 ## Public 类型覆盖
 

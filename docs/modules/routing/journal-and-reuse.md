@@ -115,7 +115,7 @@ JournalEntry 禁止保存：
 | `Reset` | 清空历史并设置当前 entry。 |
 | `Skip` | 不记录历史。 |
 
-默认普通导航使用 Push。
+默认普通导航使用 Push。`NavigationOptions.JournalCapacity` 限制 back stack 容量；容量裁剪移除最旧 back entries，不移除 current entry。
 
 ### 5. Back / Forward
 
@@ -128,7 +128,7 @@ Read previous JournalEntry
 -> Move current to forward stack
 ```
 
-Forward 类似。
+Forward 类似。Back / Forward 通过同一个 NavigationScope transaction 重新导航到 journal entry。无可用 entry 时返回 `CITY-NAVIGATION-JOURNAL-NOT-AVAILABLE`。
 
 如果 entry 的 route contribution 已撤销：
 
@@ -202,7 +202,7 @@ Presentation 可以拒绝某些 View 保留，Routing 必须按结果降级为�
 
 默认规则：
 
-- RouteId 相同且参数相同：可保留。
+- RouteId 相同且参数相同：可保留。当前 route 的 reuse key 通过 `NavigationSnapshot.ReuseKey` 暴露给后续 Presentation/Mvvm 集成。
 - RouteId 相同但 path 参数变化：重新解析数据。
 - RouteId 不同：按路由树 diff 处理。
 

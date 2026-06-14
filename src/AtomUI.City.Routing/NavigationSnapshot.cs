@@ -5,11 +5,13 @@ public sealed class NavigationSnapshot
     private NavigationSnapshot(
         RouteDescriptor? activeRoute,
         IReadOnlyDictionary<string, string> parameters,
-        long routeGraphVersion)
+        long routeGraphVersion,
+        string? reuseKey)
     {
         ActiveRoute = activeRoute;
         Parameters = RouteParameters.Copy(parameters);
         RouteGraphVersion = routeGraphVersion;
+        ReuseKey = string.IsNullOrWhiteSpace(reuseKey) ? null : reuseKey;
     }
 
     public RouteDescriptor Route => ActiveRoute ?? throw new InvalidOperationException("Navigation snapshot does not have an active route.");
@@ -20,18 +22,22 @@ public sealed class NavigationSnapshot
 
     public long RouteGraphVersion { get; }
 
+    public string? ReuseKey { get; }
+
     public static NavigationSnapshot Empty(long routeGraphVersion)
     {
         return new NavigationSnapshot(
             activeRoute: null,
             RouteParameters.Empty(),
-            routeGraphVersion);
+            routeGraphVersion,
+            reuseKey: null);
     }
 
     public static NavigationSnapshot FromRoute(
         RouteDescriptor activeRoute,
         IReadOnlyDictionary<string, string> parameters,
-        long routeGraphVersion)
+        long routeGraphVersion,
+        string? reuseKey = null)
     {
         ArgumentNullException.ThrowIfNull(activeRoute);
         ArgumentNullException.ThrowIfNull(parameters);
@@ -39,6 +45,7 @@ public sealed class NavigationSnapshot
         return new NavigationSnapshot(
             activeRoute,
             parameters,
-            routeGraphVersion);
+            routeGraphVersion,
+            reuseKey);
     }
 }

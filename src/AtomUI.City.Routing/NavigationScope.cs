@@ -6,8 +6,11 @@ public sealed class NavigationScope : IRouter, IDisposable, IAsyncDisposable
 
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly object _lifecycleGate = new();
+    private readonly List<NavigationJournalEntry> _backStack = [];
+    private readonly List<NavigationJournalEntry> _forwardStack = [];
     private readonly RouteGraphSnapshot _routeGraph;
     private readonly Func<Type, object?> _serviceResolver;
+    private NavigationJournalEntry? _currentJournalEntry;
     private CancellationTokenSource? _runningNavigationCancellation;
     private bool _disposed;
 
@@ -63,28 +66,76 @@ public sealed class NavigationScope : IRouter, IDisposable, IAsyncDisposable
         return NavigateCoreAsync(target, cancellationToken);
     }
 
-    public ValueTask<NavigationResult> BackAsync(CancellationToken cancellationToken = default)
+    public async ValueTask<NavigationResult> BackAsync(CancellationToken cancellationToken = default)
     {
-        var target = NavigationTarget.FromJournal(NavigationOptions.Default);
+        if (_backStack.Count == 0)
+        {
+            var unavailable = NavigationTarget.FromJournal(NavigationOptions.Default);
 
-        return ValueTask.FromResult(
-            NavigationResult.Rejected(
+            return NavigationResult.Rejected(
                 Guid.NewGuid(),
-                target,
+                unavailable,
                 "CITY-NAVIGATION-JOURNAL-NOT-AVAILABLE",
-                "Navigation journal is not available yet."));
+                "Navigation journal is not available yet.");
+        }
+
+        var entry = _backStack[^1];
+        var current = _currentJournalEntry;
+        _backStack.RemoveAt(_backStack.Count - 1);
+
+        var result = await NavigateCoreAsync(CreateJournalTarget(entry), cancellationToken);
+
+        if (IsCompletedNavigation(result))
+        {
+            if (current is not null)
+            {
+                _forwardStack.Add(current);
+            }
+
+            _currentJournalEntry = entry;
+        }
+        else
+        {
+            _backStack.Add(entry);
+        }
+
+        return result;
     }
 
-    public ValueTask<NavigationResult> ForwardAsync(CancellationToken cancellationToken = default)
+    public async ValueTask<NavigationResult> ForwardAsync(CancellationToken cancellationToken = default)
     {
-        var target = NavigationTarget.FromJournal(NavigationOptions.Default);
+        if (_forwardStack.Count == 0)
+        {
+            var unavailable = NavigationTarget.FromJournal(NavigationOptions.Default);
 
-        return ValueTask.FromResult(
-            NavigationResult.Rejected(
+            return NavigationResult.Rejected(
                 Guid.NewGuid(),
-                target,
+                unavailable,
                 "CITY-NAVIGATION-JOURNAL-NOT-AVAILABLE",
-                "Navigation journal is not available yet."));
+                "Navigation journal is not available yet.");
+        }
+
+        var entry = _forwardStack[^1];
+        var current = _currentJournalEntry;
+        _forwardStack.RemoveAt(_forwardStack.Count - 1);
+
+        var result = await NavigateCoreAsync(CreateJournalTarget(entry), cancellationToken);
+
+        if (IsCompletedNavigation(result))
+        {
+            if (current is not null)
+            {
+                _backStack.Add(current);
+            }
+
+            _currentJournalEntry = entry;
+        }
+        else
+        {
+            _forwardStack.Add(entry);
+        }
+
+        return result;
     }
 
     private async ValueTask<NavigationResult> NavigateCoreAsync(
@@ -313,9 +364,83 @@ public sealed class NavigationScope : IRouter, IDisposable, IAsyncDisposable
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        CurrentSnapshot = NavigationSnapshot.FromRoute(route, parameters, _routeGraph.Version);
+        var reuseKey = route.ViewModelTarget?.ReuseKey;
+        CurrentSnapshot = NavigationSnapshot.FromRoute(route, parameters, _routeGraph.Version, reuseKey);
+        RecordJournalEntry(route, parameters, target.Options, reuseKey);
 
         return NavigationResult.Success(navigationId, target, route, parameters);
+    }
+
+    private static NavigationTarget CreateJournalTarget(NavigationJournalEntry entry)
+    {
+        return NavigationTarget.FromRouteReference(
+            entry.RouteId,
+            entry.Parameters,
+            new NavigationOptions
+            {
+                HistoryBehavior = NavigationHistoryBehavior.Skip,
+                RestoreState = true,
+                ConcurrencyPolicy = NavigationConcurrencyPolicy.Queue,
+            });
+    }
+
+    private static bool IsCompletedNavigation(NavigationResult result)
+    {
+        return (result.Status == NavigationResultStatus.Success ||
+                result.Status == NavigationResultStatus.Redirected) &&
+            result.ActiveRoute is not null;
+    }
+
+    private void RecordJournalEntry(
+        RouteDescriptor route,
+        IReadOnlyDictionary<string, string> parameters,
+        NavigationOptions options,
+        string? reuseKey)
+    {
+        if (options.HistoryBehavior == NavigationHistoryBehavior.Skip)
+        {
+            return;
+        }
+
+        var entry = new NavigationJournalEntry(
+            route.RouteId,
+            parameters,
+            _routeGraph.Version,
+            route.ContributionId,
+            reuseKey);
+
+        if (options.Mode == NavigationMode.Reset)
+        {
+            _backStack.Clear();
+            _forwardStack.Clear();
+            _currentJournalEntry = entry;
+            return;
+        }
+
+        if (options.Mode == NavigationMode.Replace ||
+            options.HistoryBehavior == NavigationHistoryBehavior.ReplaceCurrent ||
+            _currentJournalEntry is null)
+        {
+            _currentJournalEntry = entry;
+            _forwardStack.Clear();
+            TrimBackStack(options.JournalCapacity);
+            return;
+        }
+
+        _backStack.Add(_currentJournalEntry);
+        _currentJournalEntry = entry;
+        _forwardStack.Clear();
+        TrimBackStack(options.JournalCapacity);
+    }
+
+    private void TrimBackStack(int capacity)
+    {
+        var maxBackEntries = Math.Max(0, capacity - 1);
+
+        while (_backStack.Count > maxBackEntries)
+        {
+            _backStack.RemoveAt(0);
+        }
     }
 
     private static NavigationResult? ValidateViewModelTarget(
@@ -606,5 +731,35 @@ public sealed class NavigationScope : IRouter, IDisposable, IAsyncDisposable
         Dispose();
 
         return ValueTask.CompletedTask;
+    }
+
+    private sealed class NavigationJournalEntry
+    {
+        public NavigationJournalEntry(
+            string routeId,
+            IReadOnlyDictionary<string, string> parameters,
+            long routeGraphVersion,
+            string? contributionId,
+            string? reuseKey)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(routeId);
+            ArgumentNullException.ThrowIfNull(parameters);
+
+            RouteId = routeId;
+            Parameters = RouteParameters.Copy(parameters);
+            RouteGraphVersion = routeGraphVersion;
+            ContributionId = string.IsNullOrWhiteSpace(contributionId) ? null : contributionId;
+            ReuseKey = string.IsNullOrWhiteSpace(reuseKey) ? null : reuseKey;
+        }
+
+        public string RouteId { get; }
+
+        public IReadOnlyDictionary<string, string> Parameters { get; }
+
+        public long RouteGraphVersion { get; }
+
+        public string? ContributionId { get; }
+
+        public string? ReuseKey { get; }
     }
 }

@@ -13,7 +13,7 @@
 | AUC-ROUTING-005 | Guard and Redirect Pipeline | 已实现并通过产品合同测试 | IRouteEnterGuard, IRouteLeaveGuard, RouteGuardResult | RouteGuardTests |
 | AUC-ROUTING-006 | ViewModel Target Resolution | 已实现并通过产品合同测试 | NavigationTarget, ViewModelTargetDescriptor | RouteGraphAndMatcherTests; RoutingAssemblyTests |
 | AUC-ROUTING-007 | Plugin Route Contribution | 已实现并通过产品合同测试 | RouteExtensionPoint, RouteExtensionPointAttribute, RouteGraphSnapshot | RouteGraphAndMatcherTests |
-| AUC-ROUTING-008 | Navigation Journal and Reuse | Ready to Start Product Implementation | NavigationSnapshot, NavigationHistoryBehavior, NavigationOptions | NavigationScopeTests |
+| AUC-ROUTING-008 | Navigation Journal and Reuse | 已实现并通过产品合同测试 | NavigationSnapshot, NavigationHistoryBehavior, NavigationOptions | NavigationScopeTests |
 
 ## Feature 硬门禁
 
@@ -133,11 +133,11 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-ROUTING-008 Navigation Journal and Reuse
 
 Feature ID: `AUC-ROUTING-008`
-Status: Ready to Start Product Implementation
+Status: 已实现并通过产品合同测试
 Goal: 提供桌面应用需要的 back/forward、replace 和 ViewModel reuse 语义。
 Public Contract: NavigationSnapshot, NavigationHistoryBehavior, NavigationOptions
-Runtime / Build Behavior: Journal 写入必须发生在 commit 后；replace 不增加历史；reuse key 决定是否复用已有 ViewModel target。
-Failure Behavior: journal 容量溢出按策略裁剪；失败导航不得写入历史。
+Runtime / Build Behavior: Journal 写入发生在 commit 后；replace 不增加历史；reuse key 写入 NavigationSnapshot。
+Failure Behavior: journal 容量按 `NavigationOptions.JournalCapacity` 裁剪；失败导航不得写入历史。
 Threading / Cancellation: journal 更新跟随 navigation transaction 串行执行。
 Diagnostics: journal diagnostics 必须包含 behavior、capacity 和 affected route id。
 Tests: `NavigationScopeTests`

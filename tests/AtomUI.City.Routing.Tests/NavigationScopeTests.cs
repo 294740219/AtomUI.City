@@ -249,6 +249,101 @@ public sealed class NavigationScopeTests
         Assert.Null(scope.CurrentSnapshot.ActiveRoute);
     }
 
+    [Fact]
+    public async Task BackAndForwardNavigateThroughRecordedJournal()
+    {
+        var graph = RouteGraphSnapshot.Create(
+            [
+                Route("home", "home", typeof(ShellViewModel)),
+                Route("profile", "profile/{id:int}", typeof(ProfileViewModel)),
+                Route("settings", "settings", typeof(SettingsViewModel)),
+            ]);
+        var scope = new NavigationScope(graph);
+
+        await scope.Router.NavigateByPathAsync("home");
+        await scope.Router.NavigateByPathAsync("profile/42");
+        await scope.Router.NavigateByPathAsync("settings");
+
+        var backToProfile = await scope.Router.BackAsync();
+        var backToHome = await scope.Router.BackAsync();
+        var forwardToProfile = await scope.Router.ForwardAsync();
+
+        Assert.Equal(NavigationResultStatus.Success, backToProfile.Status);
+        Assert.Equal("profile", backToProfile.Route.RouteId);
+        Assert.Equal("42", backToProfile.Parameters["id"]);
+        Assert.Equal(NavigationResultStatus.Success, backToHome.Status);
+        Assert.Equal("home", backToHome.Route.RouteId);
+        Assert.Equal(NavigationResultStatus.Success, forwardToProfile.Status);
+        Assert.Equal("profile", forwardToProfile.Route.RouteId);
+        Assert.Equal("profile", scope.CurrentSnapshot.Route.RouteId);
+    }
+
+    [Fact]
+    public async Task ReplaceCurrentDoesNotAddBackEntry()
+    {
+        var graph = RouteGraphSnapshot.Create(
+            [
+                Route("home", "home", typeof(ShellViewModel)),
+                Route("settings", "settings", typeof(SettingsViewModel)),
+            ]);
+        var scope = new NavigationScope(graph);
+
+        await scope.Router.NavigateByPathAsync("home");
+        var replacement = await scope.Router.NavigateByPathAsync(
+            "settings",
+            new NavigationOptions { Mode = NavigationMode.Replace });
+        var back = await scope.Router.BackAsync();
+
+        Assert.Equal(NavigationResultStatus.Success, replacement.Status);
+        Assert.Equal(NavigationResultStatus.Rejected, back.Status);
+        Assert.Equal("CITY-NAVIGATION-JOURNAL-NOT-AVAILABLE", back.Error?.Code);
+        Assert.Equal("settings", scope.CurrentSnapshot.Route.RouteId);
+    }
+
+    [Fact]
+    public async Task FailedNavigationDoesNotWriteJournal()
+    {
+        var graph = RouteGraphSnapshot.Create(
+            [
+                Route("home", "home", typeof(ShellViewModel)),
+            ]);
+        var scope = new NavigationScope(graph);
+
+        await scope.Router.NavigateByPathAsync("home");
+        var missing = await scope.Router.NavigateByPathAsync("missing");
+        var back = await scope.Router.BackAsync();
+
+        Assert.Equal(NavigationResultStatus.NotFound, missing.Status);
+        Assert.Equal(NavigationResultStatus.Rejected, back.Status);
+        Assert.Equal("home", scope.CurrentSnapshot.Route.RouteId);
+    }
+
+    [Fact]
+    public async Task JournalCapacityTrimsOldEntriesAndSnapshotKeepsReuseKey()
+    {
+        var graph = RouteGraphSnapshot.Create(
+            [
+                Route("home", "home", typeof(ShellViewModel)),
+                Route("profile", "profile/{id:int}", typeof(ProfileViewModel), reuseKey: "profile:{id}"),
+                Route("settings", "settings", typeof(SettingsViewModel)),
+            ]);
+        var scope = new NavigationScope(graph);
+        var options = new NavigationOptions { JournalCapacity = 2 };
+
+        await scope.Router.NavigateByPathAsync("home", options);
+        await scope.Router.NavigateByPathAsync("profile/42", options);
+        Assert.Equal("profile:{id}", scope.CurrentSnapshot.ReuseKey);
+        await scope.Router.NavigateByPathAsync("settings", options);
+
+        var backToProfile = await scope.Router.BackAsync();
+        var trimmedBack = await scope.Router.BackAsync();
+
+        Assert.Equal(NavigationResultStatus.Success, backToProfile.Status);
+        Assert.Equal("profile", backToProfile.Route.RouteId);
+        Assert.Equal(NavigationResultStatus.Rejected, trimmedBack.Status);
+        Assert.Equal("profile", scope.CurrentSnapshot.Route.RouteId);
+    }
+
     private static RouteDescriptor Layout(string id, Type viewModelType)
     {
         return new RouteDescriptor(
@@ -264,13 +359,17 @@ public sealed class NavigationScopeTests
         string template,
         Type viewModelType,
         string? parentRouteId = null,
-        IReadOnlyList<Type>? enterGuardTypes = null)
+        IReadOnlyList<Type>? enterGuardTypes = null,
+        string? reuseKey = null)
     {
         return new RouteDescriptor(
             id,
             RouteDefinitionKind.Route,
             template,
-            new ViewModelTargetDescriptor(viewModelType),
+            new ViewModelTargetDescriptor(
+                viewModelType,
+                parameterBindings: null,
+                reuseKey: reuseKey),
             parentRouteId,
             enterGuardTypes: enterGuardTypes);
     }

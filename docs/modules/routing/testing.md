@@ -28,7 +28,7 @@
 | AUC-ROUTING-005 | RuntimeLifecycle | RouteGuardTests | 断言 enter/leave 顺序、deny、redirect、loop detection、异常映射和取消。 | guard 抛异常、redirect loop、deny。 | Implemented |
 | AUC-ROUTING-006 | RuntimeLifecycle | RouteGraphAndMatcherTests; RoutingAssemblyTests | 断言 target descriptor 内容完整、Routing 不依赖 Presentation、失败不创建 ViewModel。 | 缺失 ViewModel target、target type 不可构造、参数无法绑定。 | Implemented |
 | AUC-ROUTING-007 | RuntimeLifecycle | RouteGraphAndMatcherTests | 断言插件贡献、冲突隔离、卸载撤销、旧 snapshot 只读。 | 插件 route 冲突、插件卸载并发导航。 | Implemented |
-| AUC-ROUTING-008 | RuntimeLifecycle | NavigationScopeTests | 断言 push/replace/back/forward、容量裁剪、失败不写历史和 reuse key。 | journal 容量溢出、失败导航、replace/back 边界。 | Required |
+| AUC-ROUTING-008 | RuntimeLifecycle | NavigationScopeTests | 断言 push/replace/back/forward、容量裁剪、失败不写历史和 reuse key。 | journal 容量溢出、失败导航、replace/back 边界。 | Implemented |
 
 ## 缺口处理
 
