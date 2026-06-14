@@ -217,6 +217,18 @@ public sealed class DataRequestPipeline : IDataRequestPipeline
                         DataErrorKind.TransportError,
                         exception.Message,
                         Exception: exception));
+
+                if (ShouldRetry(request, failedResult, attempt, maxAttempts))
+                {
+                    WriteDiagnostic(
+                        DataDiagnosticIds.RequestRetry,
+                        $"Data operation '{request.OperationName}' retry attempt {attempt}.",
+                        context,
+                        failedResult.Error?.Kind);
+
+                    continue;
+                }
+
                 WriteRequestResultDiagnostic(context, failedResult);
 
                 return failedResult;

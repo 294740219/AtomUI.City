@@ -94,6 +94,7 @@ Data 可以使用 Polly 作为策略实现，但 Data API 不应把 Polly 类型
 - Query 可以按策略 retry。
 - Mutation 默认不自动 retry。
 - 取消不 retry。
+- Transport exception 必须先映射为 `TransportError`，再按 retry policy 判断是否重试。
 - 403 不 retry。
 - 401 refresh 成功后最多按策略重试一次。
 - streaming item handler 不按普通 request retry。

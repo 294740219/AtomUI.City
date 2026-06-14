@@ -6,7 +6,7 @@
 
 | API Family | 关键类型 | 职责 | 硬性行为 |
 | --- | --- | --- | --- |
-| Request Pipeline | IDataRequestPipeline, DataRequest<T>, DataRequestContext | 统一请求执行。 | 认证->缓存->传输->映射顺序稳定。 |
+| Request Pipeline | IDataRequestPipeline, DataRequest<T>, DataRequestContext | 统一请求执行。 | 认证->缓存->传输->映射顺序稳定；transient transport exception 按 retry policy 处理。 |
 | Transports | HttpDataTransport, GrpcDataTransport, SignalRDataTransport | 具体传输适配。 | 只做传输。 |
 | Connection | DataConnectionManager, IDataConnection, DataConnectionOwner | 长连接生命周期。 | owner 必填。 |
 | Caching | IDataRequestCache, DataCacheKey | 请求缓存。 | key 组成稳定。 |
@@ -16,7 +16,7 @@
 
 | Method | Purpose | Parameters | Return | Failure Behavior | Cancellation | Concurrency / Idempotency |
 | --- | --- | --- | --- | --- | --- | --- |
-| IDataRequestPipeline.SendAsync | 执行请求。 | request/token。 | DataResult<T>。 | credential/cache/transport/error mapping 失败。 | 必须观察 token；取消后不写缓存。 | 并发请求独立 operationId。 |
+| IDataRequestPipeline.SendAsync | 执行请求。 | request/token。 | DataResult<T>。 | credential/cache/transport/error mapping 失败；transport exception 映射为 TransportError 并可按策略 retry。 | 必须观察 token；取消后不写缓存。 | 并发请求独立 operationId。 |
 | IRequestResponseTransport.SendAsync | 执行传输。 | context/request。 | DataResult<T>。 | timeout/network/protocol 映射。 | 必须观察 token。 | 实现声明线程安全。 |
 
 ## Public 类型覆盖

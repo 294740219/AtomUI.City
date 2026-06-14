@@ -22,7 +22,7 @@
 
 | Feature ID | Test Type | Test File | Required Assertions | Failure Paths | Status |
 | --- | --- | --- | --- | --- | --- |
-| AUC-DATA-001 | Unit | DataPipelineTests | 断言执行顺序、取消不写缓存、retry diagnostics。 | 取消、credential failed、cache failed、missing transport、timeout。 | Required |
+| AUC-DATA-001 | Unit | DataPipelineTests | 断言执行顺序、取消不写缓存、retry diagnostics 和 transport exception retry。 | 取消、credential failed、cache failed、missing transport、timeout、transport exception。 | Completed |
 | AUC-DATA-002 | Unit | HttpDataTransportTests | 断言 status -> DataErrorKind 映射。 | 非成功状态码、timeout、cancel。 | Required |
 | AUC-DATA-003 | Unit | GrpcDataTransportTests | 断言 GrpcStatusCode 映射。 | status error、deadline、cancel。 | Required |
 | AUC-DATA-004 | Unit | SignalRDataTransportTests | 断言 invocation context。 | connection closed、invoke failed、cancel。 | Required |

@@ -6,7 +6,7 @@
 
 | Feature ID | 名称 | 状态 | Public Contract | 主测试 |
 | --- | --- | --- | --- | --- |
-| AUC-DATA-001 | Request Pipeline | Ready to Start Product Implementation | IDataRequestPipeline, DataRequestPipeline | DataPipelineTests |
+| AUC-DATA-001 | Request Pipeline | Completed | IDataRequestPipeline, DataRequestPipeline | DataPipelineTests |
 | AUC-DATA-002 | HTTP Transport | Ready to Start Product Implementation | HttpDataRequest<T>, HttpDataTransport | HttpDataTransportTests |
 | AUC-DATA-003 | gRPC Transport | Ready to Start Product Implementation | GrpcDataRequest<T>, GrpcDataTransport | GrpcDataTransportTests |
 | AUC-DATA-004 | SignalR Transport | Ready to Start Product Implementation | SignalRDataRequest<T>, SignalRDataTransport | SignalRDataTransportTests |
@@ -37,15 +37,15 @@
 ## AUC-DATA-001 Request Pipeline
 
 Feature ID: `AUC-DATA-001`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 请求上下文、credential、cache、transport、retry 和 result mapping。
 Public Contract: IDataRequestPipeline, DataRequestPipeline
-Runtime / Build Behavior: 请求上下文、credential、cache、transport、retry 和 result mapping。
-Failure Behavior: 取消、credential failed、cache failed、missing transport、timeout。
+Runtime / Build Behavior: 请求上下文、credential、cache、transport、retry 和 result mapping；transport exception 必须映射为 TransportError 后参与 retry policy。
+Failure Behavior: 取消、credential failed、cache failed、missing transport、timeout、transport exception。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `DataPipelineTests`。
-Required Assertions: 断言执行顺序、取消不写缓存、retry diagnostics。
+Required Assertions: 断言执行顺序、取消不写缓存、retry diagnostics 和 transport exception retry。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 ## AUC-DATA-002 HTTP Transport
 
