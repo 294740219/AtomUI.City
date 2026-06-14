@@ -5,8 +5,8 @@
 ## 当前结论
 
 - 1.0 发布状态：不可发布。
-- 全局进度：48/118。
-- 模块 Feature 合同：48/109。
+- 全局进度：49/118。
+- 模块 Feature 合同：49/109。
 - 最终发布门禁：0/9。
 - 最近校准日期：2026-06-14。
 
@@ -39,7 +39,7 @@
 | Generators | 8 | 0 | 8 | 已完成 |
 | Routing | 8 | 0 | 8 | 已完成 |
 | Presentation | 8 | 0 | 8 | 已完成 |
-| MVVM | 1 | 5 | 6 | 产品化进行中 |
+| MVVM | 2 | 4 | 6 | 产品化进行中 |
 | State | 0 | 8 | 8 | 产品化进行中 |
 | EventBus | 0 | 6 | 6 | 产品化进行中 |
 | PluginSystem | 0 | 8 | 8 | 未完成 |
@@ -118,7 +118,7 @@
 ## MVVM
 
 - [x] AUC-MVVM-001 ViewModel Base and Notification。验收重点：PropertyChanged、释放幂等、无 UI 依赖和继承扩展点。
-- [ ] AUC-MVVM-002 Activation and Deactivation。验收重点：状态机、拒绝停用、取消、异常映射和资源释放。
+- [x] AUC-MVVM-002 Activation and Deactivation。验收重点：状态机、拒绝停用、取消、异常映射和资源释放。
 - [ ] AUC-MVVM-003 Command Execution。验收重点：成功、失败、取消、并发拒绝、CanExecute 变化和异常不泄漏到 UI。
 - [ ] AUC-MVVM-004 Interaction Requests。验收重点：有 handler、无 handler、异常、取消、泛型 result 和 handler scope 释放。
 - [ ] AUC-MVVM-005 Validation Model。验收重点：消息增删、状态聚合、重复处理、释放和 Presentation binding 输入。

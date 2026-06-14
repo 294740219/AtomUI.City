@@ -125,6 +125,71 @@ public sealed class ViewModelBaseTests
     }
 
     [Fact]
+    public async Task ActivateAsyncDisposesScopeAndDoesNotEnterActiveWhenActivationFails()
+    {
+        using var scope = new ActivationScope();
+        var binding = new TestDisposable();
+        var exception = new InvalidOperationException("activation failed");
+        var viewModel = new FailingActivationViewModel(exception);
+
+        scope.Add(binding);
+
+        var thrown = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await viewModel.ActivateAsync(new ActivationContext(scope)));
+
+        Assert.Same(exception, thrown);
+        Assert.False(viewModel.IsActive);
+        Assert.Equal(ActivationState.Deactivated, viewModel.ActivationState);
+        Assert.Null(viewModel.CurrentActivationScope);
+        Assert.Null(viewModel.ActivationContext);
+        Assert.True(binding.IsDisposed);
+        Assert.Equal(typeof(FailingActivationViewModel).FullName, thrown.Data["AtomUI.City.Mvvm.ViewModelType"]);
+        Assert.Equal("Activating", thrown.Data["AtomUI.City.Mvvm.ActivationStage"]);
+        Assert.Equal(scope.Id, thrown.Data["AtomUI.City.Mvvm.ScopeId"]);
+    }
+
+    [Fact]
+    public async Task ActivateAsyncWithCanceledTokenDisposesScopeAndDoesNotEnterActive()
+    {
+        using var scope = new ActivationScope();
+        using var cancellation = new CancellationTokenSource();
+        var binding = new TestDisposable();
+        var viewModel = new TestViewModel();
+        await cancellation.CancelAsync();
+
+        scope.Add(binding);
+
+        await Assert.ThrowsAsync<OperationCanceledException>(async () =>
+            await viewModel.ActivateAsync(new ActivationContext(scope), cancellation.Token));
+
+        Assert.False(viewModel.IsActive);
+        Assert.Equal(ActivationState.Deactivated, viewModel.ActivationState);
+        Assert.Null(viewModel.CurrentActivationScope);
+        Assert.True(binding.IsDisposed);
+    }
+
+    [Fact]
+    public async Task DeactivateAsyncWithCanceledTokenKeepsActiveScope()
+    {
+        using var scope = new ActivationScope();
+        using var cancellation = new CancellationTokenSource();
+        var binding = new TestDisposable();
+        var viewModel = new TestViewModel();
+
+        scope.Add(binding);
+        await viewModel.ActivateAsync(new ActivationContext(scope));
+        await cancellation.CancelAsync();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(async () =>
+            await viewModel.DeactivateAsync(cancellation.Token));
+
+        Assert.True(viewModel.IsActive);
+        Assert.Equal(ActivationState.Active, viewModel.ActivationState);
+        Assert.Same(scope, viewModel.CurrentActivationScope);
+        Assert.False(binding.IsDisposed);
+    }
+
+    [Fact]
     public async Task DeactivateDisposesActivationResourcesForPresentationBindings()
     {
         using var scope = new ActivationScope();
@@ -193,7 +258,7 @@ public sealed class ViewModelBaseTests
         Assert.Equal("settings", context.Properties["route"]);
     }
 
-    public sealed class TestViewModel : ViewModelBase
+    public class TestViewModel : ViewModelBase
     {
         private string? _title;
 
@@ -223,6 +288,14 @@ public sealed class ViewModelBaseTests
         {
             DeactivatedCount++;
             return ValueTask.CompletedTask;
+        }
+    }
+
+    public sealed class FailingActivationViewModel(Exception exception) : TestViewModel
+    {
+        protected override ValueTask OnActivatedAsync(IActivationScope scope)
+        {
+            throw exception;
         }
     }
 

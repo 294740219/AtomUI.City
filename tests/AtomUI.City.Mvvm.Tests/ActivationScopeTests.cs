@@ -5,6 +5,15 @@ namespace AtomUI.City.Mvvm.Tests;
 public sealed class ActivationScopeTests
 {
     [Fact]
+    public void ActivationScopeHasStableDiagnosticId()
+    {
+        using var scope = new ActivationScope();
+
+        Assert.NotEqual(Guid.Empty, scope.Id);
+        Assert.Equal(scope.Id, scope.Id);
+    }
+
+    [Fact]
     public void DisposeDisposesRegisteredResourcesAndCancelsToken()
     {
         var disposable = new TestDisposable();
@@ -15,6 +24,20 @@ public sealed class ActivationScopeTests
 
         Assert.True(disposable.IsDisposed);
         Assert.True(scope.CancellationToken.IsCancellationRequested);
+    }
+
+    [Fact]
+    public void DisposeIsIdempotent()
+    {
+        var calls = 0;
+        using var scope = new ActivationScope();
+
+        scope.Add(new TestDisposable(() => calls++));
+        scope.Dispose();
+        scope.Dispose();
+
+        Assert.Equal(1, calls);
+        Assert.True(scope.IsDisposed);
     }
 
     [Fact]

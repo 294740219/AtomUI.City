@@ -7,7 +7,7 @@
 | Feature ID | 名称 | 状态 | Public Contract | 主测试 |
 | --- | --- | --- | --- | --- |
 | AUC-MVVM-001 | ViewModel Base and Notification | Completed | ViewModelBase | ViewModelBaseTests |
-| AUC-MVVM-002 | Activation and Deactivation | Ready to Start Product Implementation | IActivatable, ICanDeactivate, ActivationScope | ActivationScopeTests; DeactivationTests |
+| AUC-MVVM-002 | Activation and Deactivation | Completed | IActivatable, ICanDeactivate, ActivationScope | ActivationScopeTests; DeactivationTests |
 | AUC-MVVM-003 | Command Execution | Ready to Start Product Implementation | CommandFactory, OperationScope, OperationResult | CommandTests |
 | AUC-MVVM-004 | Interaction Requests | Ready to Start Product Implementation | Interaction<TRequest, TResult>, InteractionContext<TRequest> | InteractionTests |
 | AUC-MVVM-005 | Validation Model | Ready to Start Product Implementation | ValidationScope, ValidationMessage, ValidationStatus | ValidationScopeTests |
@@ -47,13 +47,13 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-MVVM-002 Activation and Deactivation
 
 Feature ID: `AUC-MVVM-002`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 统一 ViewModel 激活、停用、关闭确认和导航中断。
 Public Contract: IActivatable, ICanDeactivate, IConfirmDeactivate, ActivationScope
-Runtime / Build Behavior: ActivationScope 管理 Created、Activating、Active、Deactivating、Inactive、Disposed；CanDeactivate 在 Presentation 替换 View 前执行。
-Failure Behavior: CanDeactivate 拒绝时返回 DeactivationResult，不抛业务异常；激活失败不得进入 Active。
-Threading / Cancellation: 激活和停用 API 必须支持 CancellationToken；取消后不得注册新的资源。
-Diagnostics: activation diagnostics 必须包含 ViewModel type、scope id 和 stage。
+Runtime / Build Behavior: ViewModelBase 管理 Constructed、Activating、Active、Deactivating、Deactivated、Disposed；DeactivationGuard 在 Presentation 替换 View 前执行。
+Failure Behavior: CanDeactivate 拒绝时返回 DeactivationResult，不抛业务异常；激活失败不得进入 Active 并释放 ActivationScope；deactivation 异常映射为 Failed result。
+Threading / Cancellation: 激活和停用 API 支持 CancellationToken；取消后不得注册新的资源。
+Diagnostics: activation exception data 包含 ViewModel type、scope id 和 stage。
 Tests: `ActivationScopeTests; DeactivationTests`
 Required Assertions: 断言状态机、拒绝停用、取消、异常映射和资源释放。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。

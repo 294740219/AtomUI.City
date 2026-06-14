@@ -5,4 +5,5 @@ public enum DeactivationStatus
     Allow,
     Reject,
     Cancel,
+    Failed,
 }

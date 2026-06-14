@@ -22,7 +22,7 @@
 | Feature ID | Test Type | Test File | Required Assertions | Failure Paths | Status |
 | --- | --- | --- | --- | --- | --- |
 | AUC-MVVM-001 | Contract | ViewModelBaseTests; MvvmAssemblyTests | 断言 PropertyChanged、释放幂等、无 UI 依赖和继承扩展点。 | Dispose 后 mutating API、重复通知、空 property name。 | Completed |
-| AUC-MVVM-002 | Contract | ActivationScopeTests; DeactivationTests | 断言状态机、拒绝停用、取消、异常映射和资源释放。 | 激活失败、CanDeactivate 拒绝、取消、重复 Dispose。 | Required |
+| AUC-MVVM-002 | Contract | ActivationScopeTests; DeactivationTests; ViewModelBaseTests | 断言状态机、拒绝停用、取消、异常映射和资源释放。 | 激活失败、CanDeactivate 拒绝、取消、重复 Dispose。 | Completed |
 | AUC-MVVM-003 | Contract | CommandTests | 断言成功、失败、取消、并发拒绝、CanExecute 变化和异常不泄漏到 UI。 | execute 异常、并发执行、取消、CanExecute 变更。 | Required |
 | AUC-MVVM-004 | Contract | InteractionTests | 断言有 handler、无 handler、异常、取消、泛型 result 和 handler scope 释放。 | 无 handler、handler 异常、取消后结果。 | Required |
 | AUC-MVVM-005 | Contract | ValidationScopeTests | 断言消息增删、状态聚合、重复处理、释放和 Presentation binding 输入。 | 未知 field、重复 message、Dispose 后更新。 | Required |

@@ -18,7 +18,7 @@ AtomUI.City.Mvvm 的架构目标是把模块职责变成可实现、可测试、
 | 概念 | 职责 | 创建者 | 释放/失效规则 |
 | --- | --- | --- | --- |
 | ViewModelBase | 属性通知、IDisposable 释放入口和 disposed 状态。 | 应用或 DI | Dispose 幂等释放当前 ActivationScope；释放后 mutation 抛 `ObjectDisposedException`。 |
-| ActivationScope | ViewModel 激活边界。 | Presentation/MVVM | Deactivate 或 Dispose。 |
+| ActivationScope | ViewModel 激活边界、取消 token 和诊断 scope id。 | Presentation/MVVM | Deactivate 或 Dispose；重复释放幂等。 |
 | Interaction | ViewModel 请求 UI 交互。 | ViewModel | handler 完成释放。 |
 
 ## 产品级状态机
@@ -36,6 +36,7 @@ AtomUI.City.Mvvm 的架构目标是把模块职责变成可实现、可测试、
 ## 失败矩阵
 
 - CanDeactivate 拒绝：导航或关闭中止。
+- DeactivationGuard 异常：返回 Failed result，不让业务异常泄漏到 UI。
 - Command 抛异常：OperationResult Failed。
 - Interaction 无 handler：返回 Failed。
 

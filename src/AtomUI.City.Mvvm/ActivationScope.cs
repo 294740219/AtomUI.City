@@ -2,6 +2,8 @@ namespace AtomUI.City.Mvvm;
 
 public sealed class ActivationScope : IActivationScope
 {
+    public Guid Id { get; } = Guid.NewGuid();
+
     private readonly CancellationTokenSource _cancellationTokenSource = new();
     private readonly List<IAsyncDisposable> _asyncDisposables = [];
     private readonly List<IDisposable> _disposables = [];
@@ -13,6 +15,8 @@ public sealed class ActivationScope : IActivationScope
     }
 
     public CancellationToken CancellationToken { get; }
+
+    public bool IsDisposed => _isDisposed;
 
     public void Add(IDisposable disposable)
     {

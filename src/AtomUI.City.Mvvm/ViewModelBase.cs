@@ -19,25 +19,69 @@ public abstract class ViewModelBase : ObservableValidator, IActivatable, IDispos
 
     public async ValueTask ActivateAsync(IActivationScope scope)
     {
+        await ActivateAsync(scope, CancellationToken.None).ConfigureAwait(false);
+    }
+
+    public async ValueTask ActivateAsync(IActivationScope scope, CancellationToken cancellationToken)
+    {
         ArgumentNullException.ThrowIfNull(scope);
 
-        await ActivateAsync(new ActivationContext(scope)).ConfigureAwait(false);
+        await ActivateAsync(new ActivationContext(scope), cancellationToken).ConfigureAwait(false);
     }
 
     public async ValueTask ActivateAsync(ActivationContext context)
     {
+        await ActivateAsync(context, CancellationToken.None).ConfigureAwait(false);
+    }
+
+    public async ValueTask ActivateAsync(ActivationContext context, CancellationToken cancellationToken)
+    {
         ArgumentNullException.ThrowIfNull(context);
         ThrowIfDisposed();
+
+        if (ActivationState == ActivationState.Active)
+        {
+            return;
+        }
+
+        if (cancellationToken.IsCancellationRequested)
+        {
+            AbortActivation(context);
+            cancellationToken.ThrowIfCancellationRequested();
+        }
 
         ActivationState = ActivationState.Activating;
         ActivationContext = context;
 
-        await OnActivatedAsync(context).ConfigureAwait(false);
+        try
+        {
+            context.Scope.CancellationToken.ThrowIfCancellationRequested();
 
-        ActivationState = ActivationState.Active;
+            await OnActivatedAsync(context, cancellationToken).ConfigureAwait(false);
+
+            cancellationToken.ThrowIfCancellationRequested();
+            context.Scope.CancellationToken.ThrowIfCancellationRequested();
+            ActivationState = ActivationState.Active;
+        }
+        catch (OperationCanceledException)
+        {
+            AbortActivation(context);
+            throw;
+        }
+        catch (Exception exception)
+        {
+            EnrichActivationException(exception, context, "Activating");
+            AbortActivation(context);
+            throw;
+        }
     }
 
     public async ValueTask DeactivateAsync()
+    {
+        await DeactivateAsync(CancellationToken.None).ConfigureAwait(false);
+    }
+
+    public async ValueTask DeactivateAsync(CancellationToken cancellationToken)
     {
         if (_disposed)
         {
@@ -49,11 +93,13 @@ public abstract class ViewModelBase : ObservableValidator, IActivatable, IDispos
             return;
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
+
         ActivationState = ActivationState.Deactivating;
 
         try
         {
-            await OnDeactivatedAsync().ConfigureAwait(false);
+            await OnDeactivatedAsync(cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -134,9 +180,23 @@ public abstract class ViewModelBase : ObservableValidator, IActivatable, IDispos
 
     protected virtual ValueTask OnActivatedAsync(ActivationContext context) => OnActivatedAsync(context.Scope);
 
+    protected virtual ValueTask OnActivatedAsync(
+        ActivationContext context,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return OnActivatedAsync(context);
+    }
+
     protected virtual ValueTask OnActivatedAsync(IActivationScope scope) => ValueTask.CompletedTask;
 
     protected virtual ValueTask OnDeactivatedAsync() => ValueTask.CompletedTask;
+
+    protected virtual ValueTask OnDeactivatedAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return OnDeactivatedAsync();
+    }
 
     protected virtual void OnDisposed()
     {
@@ -148,5 +208,32 @@ public abstract class ViewModelBase : ObservableValidator, IActivatable, IDispos
         {
             throw new ObjectDisposedException(GetType().FullName);
         }
+    }
+
+    private void AbortActivation(ActivationContext context)
+    {
+        ActivationContext = null;
+        context.Scope.Dispose();
+        ActivationState = ActivationState.Deactivated;
+    }
+
+    private void EnrichActivationException(
+        Exception exception,
+        ActivationContext context,
+        string stage)
+    {
+        AddExceptionData(exception, "AtomUI.City.Mvvm.ViewModelType", GetType().FullName);
+        AddExceptionData(exception, "AtomUI.City.Mvvm.ActivationStage", stage);
+        AddExceptionData(exception, "AtomUI.City.Mvvm.ScopeId", context.Scope.Id);
+    }
+
+    private static void AddExceptionData(Exception exception, string key, object? value)
+    {
+        if (exception.Data.Contains(key))
+        {
+            return;
+        }
+
+        exception.Data[key] = value;
     }
 }
