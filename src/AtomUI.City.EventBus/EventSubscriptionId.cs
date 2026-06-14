@@ -17,4 +17,12 @@ public readonly record struct EventSubscriptionId
     public static EventSubscriptionId New() => new(Guid.NewGuid());
 
     public override string ToString() => Value.ToString("D");
+
+    internal static void ThrowIfDefault(EventSubscriptionId subscriptionId, string? paramName = null)
+    {
+        if (subscriptionId.Value == Guid.Empty)
+        {
+            throw new ArgumentException("Subscription id must be created with a non-empty value.", paramName);
+        }
+    }
 }

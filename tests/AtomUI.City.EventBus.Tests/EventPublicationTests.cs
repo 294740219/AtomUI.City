@@ -163,6 +163,15 @@ public sealed class EventPublicationTests
     }
 
     [Fact]
+    public void DeliveryResultRejectsDefaultSubscriptionId()
+    {
+        Assert.Throws<ArgumentException>(() => new EventDeliveryResult(
+            default,
+            EventDispatchPolicy.Serialized,
+            Succeeded: true));
+    }
+
+    [Fact]
     public async Task PostAsyncReturnsAcceptedEventIdUsedByDelivery()
     {
         var eventBus = new InMemoryEventBus();

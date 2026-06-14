@@ -44,4 +44,14 @@ public sealed record EventDeliveryResult(
     EventDispatchPolicy DispatchPolicy,
     bool Succeeded,
     string? ErrorMessage = null,
-    bool Canceled = false);
+    bool Canceled = false)
+{
+    public EventSubscriptionId SubscriptionId { get; init; } = ValidateSubscriptionId(SubscriptionId);
+
+    private static EventSubscriptionId ValidateSubscriptionId(EventSubscriptionId subscriptionId)
+    {
+        EventSubscriptionId.ThrowIfDefault(subscriptionId, nameof(SubscriptionId));
+
+        return subscriptionId;
+    }
+}

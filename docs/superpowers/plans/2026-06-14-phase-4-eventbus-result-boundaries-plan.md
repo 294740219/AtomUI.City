@@ -127,7 +127,7 @@ Commit message: `fix(EventBus): reject default publish contract ids`
 - Modify: `src/AtomUI.City.EventBus/EventPublishResult.cs`
 - Test: `tests/AtomUI.City.EventBus.Tests/EventPublicationTests.cs`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```csharp
 [Fact]
@@ -140,21 +140,21 @@ public void DeliveryResultRejectsDefaultSubscriptionId()
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `dotnet test tests/AtomUI.City.EventBus.Tests/AtomUI.City.EventBus.Tests.csproj --filter "FullyQualifiedName~DeliveryResultRejectsDefaultSubscriptionId"`
 Expected: FAIL because default `EventSubscriptionId` is accepted.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Add an internal `EventSubscriptionId.ThrowIfDefault` guard and validate the `EventDeliveryResult.SubscriptionId` primary property.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `dotnet test tests/AtomUI.City.EventBus.Tests/AtomUI.City.EventBus.Tests.csproj --filter "FullyQualifiedName~DeliveryResultRejectsDefaultSubscriptionId"`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit message: `fix(EventBus): reject default delivery subscription ids`
 
