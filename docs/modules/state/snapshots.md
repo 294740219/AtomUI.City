@@ -123,6 +123,8 @@ Load snapshot
 
 恢复失败不应阻止应用启动，默认使用初始值并记录诊断。
 
+Transient state 不允许通过 snapshot restore 写回。恢复流程遇到非 Persisted definition 时必须保留当前值和 version，并写入 `AUCSTA007`。
+
 ### 5. 插件快照
 
 插件 state snapshot 必须带 PluginId。
@@ -155,5 +157,6 @@ Generator 负责：
 | 恢复 snapshot | Unit | 值正确恢复。 |
 | schema 不兼容 | Unit | 使用默认值并记录诊断。 |
 | 不持久化状态 | Unit | 不写入持久化 snapshot。 |
+| policy 拒绝 | Unit | Transient state restore 保留当前值并记录诊断。 |
 | 插件 snapshot | Unit | 带 PluginId 和版本信息。 |
 | 反射 serializer | Analyzer/Generator | Strict AOT 下诊断。 |

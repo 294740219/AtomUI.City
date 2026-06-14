@@ -243,6 +243,15 @@ public sealed class ApplicationStateRegistry :
                 return;
             }
 
+            if (Definition.SnapshotPolicy != StateSnapshotPolicy.Persisted)
+            {
+                WriteRestoreFailedDiagnostic(
+                    diagnostics,
+                    entry,
+                    $"snapshot policy '{Definition.SnapshotPolicy}' does not allow restore");
+                return;
+            }
+
             if (entry.ValueType != typeof(T))
             {
                 WriteRestoreFailedDiagnostic(

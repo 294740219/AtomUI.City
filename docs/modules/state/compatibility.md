@@ -21,6 +21,7 @@
 - `ApplicationStateRegistry` 的显式注册、未注册诊断、重复注册诊断、读写入口分离、ReadOnly 写拒绝、Update null updater 优先拒绝和 `StateDefinition<T>` enum/schema 边界进入 1.0 兼容承诺。
 - `ComputedState<T>` 的 lazy invalidation、缓存、依赖变更通知、compute 失败诊断、Dispose 后读取拒绝、null dependency 先校验后订阅和依赖订阅释放进入 1.0 兼容承诺。
 - `StateSubscriptionOptions` 的 Immediate、Dispatcher、Background、Queued 调度语义、subscription Dispose 幂等、延迟回调释放抑制、handler 失败诊断和 StateScope 反向释放进入 1.0 兼容承诺。
+- `StateSnapshot` 和 `StateSnapshotEntry` 的不可变 entries、version/schema 边界、Persisted 过滤、restore 诊断、owner/plugin/type/schema 校验和 Transient restore 拒绝进入 1.0 兼容承诺。
 
 ## 数据格式兼容
 
