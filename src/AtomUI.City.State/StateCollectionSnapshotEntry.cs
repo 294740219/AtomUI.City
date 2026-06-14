@@ -4,6 +4,7 @@ public sealed record StateCollectionSnapshotEntry<TKey, TItem>
     where TKey : notnull
 {
     private TKey _key = default!;
+    private long _itemVersion;
 
     public StateCollectionSnapshotEntry(TKey Key, TItem Item, long ItemVersion)
     {
@@ -35,5 +36,20 @@ public sealed record StateCollectionSnapshotEntry<TKey, TItem>
 
     public TItem Item { get; init; }
 
-    public long ItemVersion { get; init; }
+    public long ItemVersion
+    {
+        get => _itemVersion;
+        init
+        {
+            if (value < 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(value),
+                    value,
+                    "State collection snapshot item version must be greater than or equal to 0.");
+            }
+
+            _itemVersion = value;
+        }
+    }
 }

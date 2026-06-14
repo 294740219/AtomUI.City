@@ -311,7 +311,7 @@ Commit message: `fix(State): validate collection snapshot keys`
 - Modify: `src/AtomUI.City.State/StateCollectionSnapshotEntry.cs`
 - Test: `tests/AtomUI.City.State.Tests/StateCollectionTests.cs`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```csharp
 [Fact]
@@ -323,21 +323,21 @@ public void SnapshotEntryRejectsNegativeItemVersionInit()
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `dotnet test tests/AtomUI.City.State.Tests/AtomUI.City.State.Tests.csproj --filter "FullyQualifiedName~SnapshotEntryRejectsNegativeItemVersionInit"`
 Expected: FAIL because collection snapshot entry `with` init currently accepts negative item versions.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Back `StateCollectionSnapshotEntry<TKey,TItem>.ItemVersion` with an init setter that rejects values below 0. Update `api-contracts.md` to document that constructor and init boundaries share collection snapshot entry validation.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `dotnet test tests/AtomUI.City.State.Tests/AtomUI.City.State.Tests.csproj --filter "FullyQualifiedName~SnapshotEntryRejectsNegativeItemVersionInit"`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit message: `fix(State): validate collection snapshot versions`
 

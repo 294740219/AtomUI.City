@@ -458,6 +458,14 @@ public sealed class StateCollectionTests
     }
 
     [Fact]
+    public void SnapshotEntryRejectsNegativeItemVersionInit()
+    {
+        var entry = new StateCollectionSnapshotEntry<string, int>("settings", 1, ItemVersion: 1);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => entry with { ItemVersion = -1 });
+    }
+
+    [Fact]
     public void ChangedEventArgsCopiesChangesFromConstructorInput()
     {
         var changes = new List<StateCollectionChange<string, int>>
