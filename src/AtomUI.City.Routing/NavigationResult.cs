@@ -8,7 +8,8 @@ public sealed class NavigationResult
         NavigationTarget target,
         RouteDescriptor? route,
         IReadOnlyDictionary<string, string> parameters,
-        NavigationError? error)
+        NavigationError? error,
+        NavigationTarget? redirectTarget)
     {
         NavigationId = navigationId;
         Status = status;
@@ -16,6 +17,7 @@ public sealed class NavigationResult
         ActiveRoute = route;
         Parameters = RouteParameters.Copy(parameters);
         Error = error;
+        RedirectTarget = redirectTarget;
     }
 
     public Guid NavigationId { get; }
@@ -31,6 +33,8 @@ public sealed class NavigationResult
     public IReadOnlyDictionary<string, string> Parameters { get; }
 
     public NavigationError? Error { get; }
+
+    public NavigationTarget? RedirectTarget { get; }
 
     public static NavigationResult Success(
         Guid navigationId,
@@ -48,7 +52,8 @@ public sealed class NavigationResult
             target,
             route,
             parameters,
-            error: null);
+            error: null,
+            redirectTarget: null);
     }
 
     public static NavigationResult NotFound(
@@ -104,7 +109,8 @@ public sealed class NavigationResult
             target,
             route: null,
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
-            new NavigationError(code, message, exception));
+            new NavigationError(code, message, exception),
+            redirectTarget: null);
     }
 
     public static NavigationResult Redirected(
@@ -120,7 +126,29 @@ public sealed class NavigationResult
             target,
             route: null,
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
-            new NavigationError("CITY-NAVIGATION-REDIRECTED", $"Navigation redirected to '{redirectTarget}'."));
+            new NavigationError("CITY-NAVIGATION-REDIRECTED", $"Navigation redirected to '{redirectTarget}'."),
+            redirectTarget);
+    }
+
+    public static NavigationResult Redirected(
+        Guid navigationId,
+        NavigationTarget target,
+        NavigationTarget redirectTarget,
+        RouteDescriptor route,
+        IReadOnlyDictionary<string, string> parameters)
+    {
+        ArgumentNullException.ThrowIfNull(redirectTarget);
+        ArgumentNullException.ThrowIfNull(route);
+        ArgumentNullException.ThrowIfNull(parameters);
+
+        return new NavigationResult(
+            navigationId,
+            NavigationResultStatus.Redirected,
+            target,
+            route,
+            parameters,
+            new NavigationError("CITY-NAVIGATION-REDIRECTED", $"Navigation redirected to '{redirectTarget}'."),
+            redirectTarget);
     }
 
     private static NavigationResult Failure(
@@ -138,6 +166,7 @@ public sealed class NavigationResult
             target,
             route: null,
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
-            new NavigationError(code, message));
+            new NavigationError(code, message),
+            redirectTarget: null);
     }
 }

@@ -2,6 +2,8 @@ namespace AtomUI.City.Routing;
 
 public sealed class NavigationScope : IRouter, IDisposable, IAsyncDisposable
 {
+    private const int MaxRedirectCount = 8;
+
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly object _lifecycleGate = new();
     private readonly RouteGraphSnapshot _routeGraph;
@@ -108,16 +110,74 @@ public sealed class NavigationScope : IRouter, IDisposable, IAsyncDisposable
 
             cancellationToken.ThrowIfCancellationRequested();
 
-            return target.Kind switch
+            var initialTarget = target;
+            NavigationTarget? completedRedirectTarget = null;
+            var visitedTargets = new HashSet<string>(StringComparer.Ordinal);
+
+            for (var redirectCount = 0; ; redirectCount++)
             {
-                NavigationTargetKind.Path => await NavigateByMatchedPathAsync(navigationId, target, cancellationToken),
-                NavigationTargetKind.RouteReference => await NavigateByRouteIdAsync(navigationId, target, cancellationToken),
-                _ => NavigationResult.Rejected(
-                    navigationId,
-                    target,
-                    "CITY-NAVIGATION-TARGET-UNSUPPORTED",
-                    $"Navigation target kind '{target.Kind}' is not supported yet."),
-            };
+                if (!visitedTargets.Add(GetNavigationTargetKey(target)))
+                {
+                    return NavigationResult.Failed(
+                        navigationId,
+                        target,
+                        "CITY-NAVIGATION-REDIRECT-LOOP",
+                        $"Navigation redirect loop detected at '{target}'.");
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var result = target.Kind switch
+                {
+                    NavigationTargetKind.Path => await NavigateByMatchedPathAsync(navigationId, target, cancellationToken),
+                    NavigationTargetKind.RouteReference => await NavigateByRouteIdAsync(navigationId, target, cancellationToken),
+                    _ => NavigationResult.Rejected(
+                        navigationId,
+                        target,
+                        "CITY-NAVIGATION-TARGET-UNSUPPORTED",
+                        $"Navigation target kind '{target.Kind}' is not supported yet."),
+                };
+
+                if (result.Status == NavigationResultStatus.Redirected &&
+                    result.RedirectTarget is not null &&
+                    result.ActiveRoute is null)
+                {
+                    if (!target.Options.AllowRedirect)
+                    {
+                        return NavigationResult.Rejected(
+                            navigationId,
+                            target,
+                            "CITY-NAVIGATION-REDIRECT-DISABLED",
+                            "Navigation redirects are disabled for this navigation target.");
+                    }
+
+                    if (redirectCount >= MaxRedirectCount)
+                    {
+                        return NavigationResult.Failed(
+                            navigationId,
+                            target,
+                            "CITY-NAVIGATION-REDIRECT-LIMIT",
+                            $"Navigation exceeded the redirect limit of {MaxRedirectCount}.");
+                    }
+
+                    completedRedirectTarget = result.RedirectTarget;
+                    target = result.RedirectTarget;
+                    continue;
+                }
+
+                if (completedRedirectTarget is not null &&
+                    result.Status == NavigationResultStatus.Success)
+                {
+                    return NavigationResult.Redirected(
+                        navigationId,
+                        initialTarget,
+                        completedRedirectTarget,
+                        result.Route,
+                        result.Parameters);
+                }
+
+                return result;
+            }
         }
         catch (OperationCanceledException)
         {
@@ -209,10 +269,20 @@ public sealed class NavigationScope : IRouter, IDisposable, IAsyncDisposable
         IReadOnlyDictionary<string, string> parameters,
         CancellationToken cancellationToken)
     {
-        if (CurrentSnapshot.ActiveRoute is not null &&
-            !string.Equals(CurrentSnapshot.ActiveRoute.RouteId, route.RouteId, StringComparison.Ordinal))
+        var currentRouteChain = CurrentSnapshot.ActiveRoute is null
+            ? Array.Empty<RouteDescriptor>()
+            : GetRouteHierarchy(CurrentSnapshot.ActiveRoute);
+        var targetRouteChain = GetRouteHierarchy(route);
+        var sharedRouteCount = GetSharedRoutePrefixLength(currentRouteChain, targetRouteChain);
+
+        foreach (var leavingRoute in currentRouteChain.Skip(sharedRouteCount).Reverse())
         {
-            var leaveResult = await RunLeaveGuardsAsync(navigationId, target, CurrentSnapshot.ActiveRoute, parameters, cancellationToken);
+            var leaveResult = await RunLeaveGuardsAsync(
+                navigationId,
+                target,
+                leavingRoute,
+                CurrentSnapshot.Parameters,
+                cancellationToken);
 
             if (leaveResult.Status != RouteGuardResultStatus.Allow)
             {
@@ -220,11 +290,19 @@ public sealed class NavigationScope : IRouter, IDisposable, IAsyncDisposable
             }
         }
 
-        var enterResult = await RunEnterGuardsAsync(navigationId, target, route, parameters, cancellationToken);
-
-        if (enterResult.Status != RouteGuardResultStatus.Allow)
+        foreach (var enteringRoute in targetRouteChain.Skip(sharedRouteCount))
         {
-            return MapGuardResult(navigationId, target, enterResult);
+            var enterResult = await RunEnterGuardsAsync(
+                navigationId,
+                target,
+                enteringRoute,
+                parameters,
+                cancellationToken);
+
+            if (enterResult.Status != RouteGuardResultStatus.Allow)
+            {
+                return MapGuardResult(navigationId, target, enterResult);
+            }
         }
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -232,6 +310,46 @@ public sealed class NavigationScope : IRouter, IDisposable, IAsyncDisposable
         CurrentSnapshot = NavigationSnapshot.FromRoute(route, parameters, _routeGraph.Version);
 
         return NavigationResult.Success(navigationId, target, route, parameters);
+    }
+
+    private static string GetNavigationTargetKey(NavigationTarget target)
+    {
+        return string.Join(
+            "|",
+            target.Kind.ToString(),
+            target.RouteId ?? string.Empty,
+            target.Path ?? string.Empty);
+    }
+
+    private RouteDescriptor[] GetRouteHierarchy(RouteDescriptor route)
+    {
+        var routes = new Stack<RouteDescriptor>();
+
+        for (var current = route; current is not null; current = current.ParentRouteId is null ? null : _routeGraph.GetRequiredRoute(current.ParentRouteId))
+        {
+            routes.Push(current);
+        }
+
+        return routes.ToArray();
+    }
+
+    private static int GetSharedRoutePrefixLength(
+        IReadOnlyList<RouteDescriptor> currentRouteChain,
+        IReadOnlyList<RouteDescriptor> targetRouteChain)
+    {
+        var sharedRouteCount = 0;
+
+        while (sharedRouteCount < currentRouteChain.Count &&
+            sharedRouteCount < targetRouteChain.Count &&
+            string.Equals(
+                currentRouteChain[sharedRouteCount].RouteId,
+                targetRouteChain[sharedRouteCount].RouteId,
+                StringComparison.Ordinal))
+        {
+            sharedRouteCount++;
+        }
+
+        return sharedRouteCount;
     }
 
     private async ValueTask<NavigationResult?> TryEnterNavigationAsync(

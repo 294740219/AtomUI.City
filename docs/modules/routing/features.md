@@ -10,7 +10,7 @@
 | AUC-ROUTING-002 | Route Graph Build and Snapshot | 已实现并通过产品合同测试 | RouteDescriptor, RouteGraphSnapshot, RouteGraphError | RouteGraphAndMatcherTests |
 | AUC-ROUTING-003 | Route Matching and Parameters | 已实现并通过产品合同测试 | RouteMatcher, RouteMatch, RouteParameters | RouteGraphAndMatcherTests; RoutingParameterBoundaryTests |
 | AUC-ROUTING-004 | Navigation Transaction | 已实现并通过产品合同测试 | IRouter, NavigationScope, NavigationResult | NavigationScopeTests |
-| AUC-ROUTING-005 | Guard and Redirect Pipeline | Ready to Start Product Implementation | IRouteEnterGuard, IRouteLeaveGuard, RouteGuardResult | RouteGuardTests |
+| AUC-ROUTING-005 | Guard and Redirect Pipeline | 已实现并通过产品合同测试 | IRouteEnterGuard, IRouteLeaveGuard, RouteGuardResult | RouteGuardTests |
 | AUC-ROUTING-006 | ViewModel Target Resolution | Ready to Start Product Implementation | NavigationTarget, ViewModelTargetDescriptor | RouteGraphAndMatcherTests |
 | AUC-ROUTING-007 | Plugin Route Contribution | Ready to Start Product Implementation | RouteExtensionPoint, RouteExtensionPointAttribute, RouteGraphSnapshot | RouteGraphAndMatcherTests |
 | AUC-ROUTING-008 | Navigation Journal and Reuse | Ready to Start Product Implementation | NavigationSnapshot, NavigationHistoryBehavior, NavigationOptions | NavigationScopeTests |
@@ -91,13 +91,13 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-ROUTING-005 Guard and Redirect Pipeline
 
 Feature ID: `AUC-ROUTING-005`
-Status: Ready to Start Product Implementation
+Status: 已实现并通过产品合同测试
 Goal: 为进入和离开 route 提供可组合的授权、保存检查和重定向。
 Public Contract: IRouteEnterGuard, IRouteLeaveGuard, RouteGuardResult
-Runtime / Build Behavior: Guard 按 route hierarchy 和注册顺序执行；redirect 产生新的 NavigationTarget，deny 终止事务。
+Runtime / Build Behavior: Guard 按 route hierarchy 和注册顺序执行；redirect 产生新的 NavigationTarget 并重新进入完整导航流程，deny 终止事务。
 Failure Behavior: guard 抛异常映射为 NavigationResult Failed；redirect loop 必须检测并停止。
 Threading / Cancellation: Guard 可以异步；取消后后续 guard 不得执行。
-Diagnostics: guard failure 必须包含 guard type、route id、result status 和 redirect chain。
+Diagnostics: guard failure 必须包含 guard type、route id、result status、redirect target 和稳定错误码。
 Tests: `RouteGuardTests`
 Required Assertions: 断言 enter/leave 顺序、deny、redirect、loop detection、异常映射和取消。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。

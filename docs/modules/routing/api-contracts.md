@@ -21,7 +21,9 @@
 | RouteGraphSnapshot.WithoutContribution | 按 contribution 发布撤销后的新 graph。 | contributionId 必须非空；version 可显式指定。 | 新 RouteGraphSnapshot。 | 撤销后剩余 route graph 非法时返回 RouteGraphError。 | 纯 CPU，无 token。 | 旧 snapshot 不变；新 snapshot 版本单调递增。 |
 | RouteMatcher.Match / MatchAll | 在 immutable snapshot 上匹配 path。 | path 不得为 null。 | RouteMatch 或只读 RouteMatch 列表。 | 无匹配返回 NotFound 或空列表；constraint 拒绝不进入 guard。 | 纯 CPU，无 token。 | 允许多线程并发读取。 |
 | IRouter.NavigateAsync | 执行导航事务。 | target route、parameters、NavigationOptions。 | NavigationResult。 | match/guard/resolver/commit 任一失败都不改变 current snapshot；busy 返回 `CITY-NAVIGATION-BUSY`。 | 取消后返回 Cancelled，不能提交。 | `CancelPrevious` 取消旧事务，`Queue` 排队，`RejectIfBusy` 立即拒绝。 |
-| IRouteEnterGuard.CanEnterAsync | 进入 route 前授权或重定向。 | RouteGuardContext 必须包含 route、parameters、services。 | RouteGuardResult。 | 异常映射为 navigation failed；redirect loop 必须检测。 | 必须观察 token。 | guard 实例并发策略由 DI lifetime 决定，结果无共享可变状态。 |
+| IRouteEnterGuard.CanEnterAsync | 进入 route 前授权或重定向。 | RouteGuardContext 必须包含 route、parameters、services。 | RouteGuardResult。 | 异常映射为 navigation failed；redirect loop 返回 `CITY-NAVIGATION-REDIRECT-LOOP`。 | 必须观察 token。 | 按 route hierarchy root-to-leaf 执行，遇到非 Allow 立即停止。 |
+| IRouteLeaveGuard.CanLeaveAsync | 离开当前 route 前确认。 | RouteGuardContext 使用当前 route 和当前 snapshot 参数。 | RouteGuardResult。 | Reject/Cancel/Failed 不改变 current snapshot。 | 必须观察 token。 | 按 route hierarchy leaf-to-root 执行，遇到非 Allow 立即停止。 |
+| NavigationResult.RedirectTarget | 暴露 redirect 目标。 | 仅 Redirected 结果设置。 | NavigationTarget 或 null。 | 非 redirect 结果为 null。 | 纯数据。 | Result 不可变。 |
 | NavigationScope.DisposeAsync | 结束导航作用域并释放临时资源。 | 允许重复调用。 | ValueTask。 | Dispose 后新导航返回 `CITY-NAVIGATION-SCOPE-DISPOSED`。 | 取消运行中导航。 | Dispose 幂等。 |
 
 ## Public 类型覆盖
