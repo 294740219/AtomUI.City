@@ -15,6 +15,17 @@ public sealed class EventSubscriptionTests
     }
 
     [Fact]
+    public void SubscribeRejectsDisposedBus()
+    {
+        var eventBus = new InMemoryEventBus();
+
+        eventBus.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(
+            () => eventBus.Subscribe<TestEvent>(_ => ValueTask.CompletedTask));
+    }
+
+    [Fact]
     public async Task DisposedSubscriptionNoLongerReceivesEvents()
     {
         var eventBus = new InMemoryEventBus();

@@ -23,6 +23,9 @@ public sealed class InMemoryEventBus : IEventBus
         Func<EventContext<TEvent>, ValueTask> handler,
         EventSubscriptionOptions? options = null)
     {
+        ArgumentNullException.ThrowIfNull(handler);
+        ThrowIfDisposed();
+
         return SubscribeCore(
             owner: null,
             handler,
