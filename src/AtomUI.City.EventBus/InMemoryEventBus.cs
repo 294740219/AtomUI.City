@@ -116,6 +116,7 @@ public sealed class InMemoryEventBus : IEventBus
     {
         ArgumentNullException.ThrowIfNull(eventData);
         cancellationToken.ThrowIfCancellationRequested();
+        ThrowIfDisposed();
 
         return await PublishCoreAsync(
                 eventData,
@@ -371,6 +372,14 @@ public sealed class InMemoryEventBus : IEventBus
         HostDiagnosticSeverity severity)
     {
         _diagnostics?.Write(new HostDiagnosticRecord(code, message, severity));
+    }
+
+    private void ThrowIfDisposed()
+    {
+        if (_disposed)
+        {
+            throw new ObjectDisposedException(GetType().FullName);
+        }
     }
 
     private readonly record struct DeliveryContext(

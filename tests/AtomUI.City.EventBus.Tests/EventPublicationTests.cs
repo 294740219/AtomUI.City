@@ -39,6 +39,17 @@ public sealed class EventPublicationTests
     }
 
     [Fact]
+    public async Task PublishAsyncRejectsDisposedBus()
+    {
+        var eventBus = new InMemoryEventBus();
+
+        eventBus.Dispose();
+
+        await Assert.ThrowsAsync<ObjectDisposedException>(async () =>
+            await eventBus.PublishAsync(new TestEvent("disposed")));
+    }
+
+    [Fact]
     public async Task PublishAsyncObservesAlreadyCanceledTokenWithoutSubscriptions()
     {
         var eventBus = new InMemoryEventBus();
