@@ -181,6 +181,16 @@ public sealed class EventPublicationTests
     }
 
     [Fact]
+    public void DeliveryResultRejectsSuccessfulCancellation()
+    {
+        Assert.Throws<ArgumentException>(() => new EventDeliveryResult(
+            EventSubscriptionId.New(),
+            EventDispatchPolicy.Serialized,
+            Succeeded: true,
+            Canceled: true));
+    }
+
+    [Fact]
     public async Task PostAsyncReturnsAcceptedEventIdUsedByDelivery()
     {
         var eventBus = new InMemoryEventBus();
