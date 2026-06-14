@@ -492,6 +492,20 @@ public sealed class EventPublicationTests
     }
 
     [Fact]
+    public void PostResultRejectsDefaultContractIdInitMutation()
+    {
+        var result = new EventPostResult(
+            Guid.NewGuid(),
+            new EventContractId("atomui.city.tests.post.v1"),
+            Accepted: true);
+
+        Assert.Throws<ArgumentException>(() => result with
+        {
+            ContractId = default,
+        });
+    }
+
+    [Fact]
     public void PostResultEnforcesRejectionReasonConsistency()
     {
         Assert.Throws<ArgumentException>(() => new EventPostResult(

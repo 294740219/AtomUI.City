@@ -14,7 +14,13 @@ public sealed record EventPostResult(
         init => _eventId = ValidateEventId(value);
     }
 
-    public EventContractId ContractId { get; init; } = ValidateContractId(ContractId);
+    private EventContractId _contractId = ValidateContractId(ContractId);
+
+    public EventContractId ContractId
+    {
+        get => _contractId;
+        init => _contractId = ValidateContractId(value);
+    }
 
     public string? RejectionReason { get; init; } = ValidateRejectionReason(Accepted, RejectionReason);
 
