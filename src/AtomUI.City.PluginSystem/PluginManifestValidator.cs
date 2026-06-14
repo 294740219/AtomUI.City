@@ -24,7 +24,13 @@ public static class PluginManifestValidator
                 "pluginId"));
         }
 
-        if (!manifest.SchemaVersion.StartsWith("1.", StringComparison.Ordinal))
+        AddMissingRequiredFieldDiagnostic(diagnostics, manifest, manifest.PackageId, "packageId");
+        AddMissingRequiredFieldDiagnostic(diagnostics, manifest, manifest.DisplayNameKey, "displayNameKey");
+        AddMissingRequiredFieldDiagnostic(diagnostics, manifest, manifest.PluginApiVersion, "pluginApiVersion");
+        AddMissingRequiredFieldDiagnostic(diagnostics, manifest, manifest.MinHostVersion, "minHostVersion");
+
+        if (string.IsNullOrWhiteSpace(manifest.SchemaVersion) ||
+            !manifest.SchemaVersion.StartsWith("1.", StringComparison.Ordinal))
         {
             diagnostics.Add(new PluginDiagnostic(
                 PluginDiagnosticIds.UnsupportedManifestSchema,
@@ -94,7 +100,8 @@ public static class PluginManifestValidator
 
     internal static bool IsInvalidPathSegment(string value)
     {
-        return value is "." or ".." ||
+        return string.IsNullOrWhiteSpace(value) ||
+            value is "." or ".." ||
             value.Contains('/') ||
             value.Contains('\\') ||
             Path.IsPathRooted(value);
@@ -114,4 +121,21 @@ public static class PluginManifestValidator
             .Any(segment => string.IsNullOrWhiteSpace(segment) || segment is "." or "..");
     }
 
+    private static void AddMissingRequiredFieldDiagnostic(
+        List<PluginDiagnostic> diagnostics,
+        PluginManifest manifest,
+        string value,
+        string field)
+    {
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        diagnostics.Add(new PluginDiagnostic(
+            PluginDiagnosticIds.InvalidManifest,
+            $"Plugin manifest field '{field}' is required.",
+            manifest.PluginId,
+            field));
+    }
 }

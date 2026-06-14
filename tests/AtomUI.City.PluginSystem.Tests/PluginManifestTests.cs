@@ -67,6 +67,59 @@ public sealed class PluginManifestTests
         Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == PluginDiagnosticIds.InvalidMainAssembly);
     }
 
+    [Fact]
+    public void ManifestValidatorReportsMissingRequiredMetadataFields()
+    {
+        var manifest = new PluginManifest(
+            schemaVersion: string.Empty,
+            pluginId: string.Empty,
+            packageId: string.Empty,
+            version: string.Empty,
+            displayNameKey: string.Empty,
+            descriptionKey: null,
+            publisher: null,
+            mainAssembly: string.Empty,
+            targetFramework: string.Empty,
+            pluginApiVersion: string.Empty,
+            minHostVersion: string.Empty,
+            maxHostVersion: null,
+            unloadable: true,
+            aotCompatible: false,
+            capabilities: [],
+            contributions: [],
+            dependencies: [],
+            modules: []);
+
+        var result = PluginManifestValidator.Validate(manifest);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == PluginDiagnosticIds.MissingPluginId);
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic is
+        {
+            Code: PluginDiagnosticIds.UnsupportedManifestSchema,
+            Field: "schemaVersion"
+        });
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic is
+        {
+            Code: PluginDiagnosticIds.InvalidPluginVersion,
+            Field: "version"
+        });
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic is
+        {
+            Code: PluginDiagnosticIds.InvalidMainAssembly,
+            Field: "mainAssembly"
+        });
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic is
+        {
+            Code: PluginDiagnosticIds.InvalidTargetFramework,
+            Field: "targetFramework"
+        });
+        AssertMissingRequiredField(result, "packageId");
+        AssertMissingRequiredField(result, "displayNameKey");
+        AssertMissingRequiredField(result, "pluginApiVersion");
+        AssertMissingRequiredField(result, "minHostVersion");
+    }
+
     [Theory]
     [InlineData("../sales")]
     [InlineData("com/company/sales")]
@@ -235,5 +288,16 @@ public sealed class PluginManifestTests
         Assert.Throws<NotSupportedException>(() => moduleDependencies[0] = "OtherModule");
         Assert.Equal("/sales/**", capability.Scope[0]);
         Assert.Equal("IdentityModule", module.Dependencies![0]);
+    }
+
+    private static void AssertMissingRequiredField(
+        PluginValidationResult result,
+        string field)
+    {
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic is
+        {
+            Code: PluginDiagnosticIds.InvalidManifest,
+            Field: var diagnosticField
+        } && diagnosticField == field);
     }
 }

@@ -6,7 +6,7 @@
 
 | API Family | 关键类型 | 职责 | 硬性行为 |
 | --- | --- | --- | --- |
-| Manifest | PluginManifest, PluginManifestReader, PluginManifestValidator | 读取和校验 plugin.json。 | 不执行插件代码；schema 和 required field 稳定。 |
+| Manifest | PluginManifest, PluginManifestReader, PluginManifestValidator | 读取和校验 plugin.json。 | 不执行插件代码；schema、version、mainAssembly、targetFramework 和 required field 稳定。 |
 | Package | PluginPackageInstaller, PluginPackageLayoutValidator, PluginInstallationReader | 安装、布局校验和安装记录。 | staging 原子切换；非法路径拒绝。 |
 | Runtime | PluginLoader, PluginRuntime, PluginRuntimeState, PluginLoadResult | 加载、启用、停用、卸载。 | 状态机显式；失败有 diagnostics。 |
 | Dependencies | PluginDependencyAttribute, PluginDependencyValidator, PluginSemanticVersion | 依赖和版本校验。 | 缺失、循环、版本不满足结构化返回。 |

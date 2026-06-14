@@ -107,6 +107,8 @@
 
 `PackageId` 不应被框架当作运行时身份。包名可以因发布渠道、品牌或迁移发生变化，但 `PluginId` 必须保持稳定。
 
+`PluginManifestValidator` 必须在加载插件程序集前校验 schema、required fields、version、mainAssembly 和 targetFramework。
+
 ### 3. PluginProfile
 
 插件安装目录必须按插件兼容 profile 隔离。

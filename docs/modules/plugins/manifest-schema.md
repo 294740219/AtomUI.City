@@ -123,6 +123,14 @@ v1 根字段固定如下：
 | `settings` | 否 | 配置 schema 和迁移摘要。 |
 | `trust` | 否 | 签名、来源、hash 摘要。 |
 
+1.0 校验规则：
+
+- `schemaVersion` 必须是支持的 `1.x` 版本。
+- `pluginId`、`packageId`、`version`、`displayNameKey`、`mainAssembly`、`targetFramework`、`pluginApiVersion` 和 `minHostVersion` 必须存在且非空白。
+- `version` 必须是 semantic version。
+- `mainAssembly` 必须是文件名，不能包含目录分隔符。
+- `targetFramework` 必须是 framework moniker，不能是路径片段。
+
 ### 4. 示例
 
 ```json

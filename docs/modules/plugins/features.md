@@ -6,7 +6,7 @@
 
 | Feature ID | 名称 | 状态 | Public Contract | 主测试 |
 | --- | --- | --- | --- | --- |
-| AUC-PLUGIN-001 | Plugin Metadata | Ready to Start Product Implementation | PluginAttribute, PluginManifest, PluginDescriptor | PluginDeclarationAttributeTests; PluginManifestTests |
+| AUC-PLUGIN-001 | Plugin Metadata | Completed | PluginAttribute, PluginManifest, PluginDescriptor | PluginDeclarationAttributeTests; PluginManifestTests |
 | AUC-PLUGIN-002 | Dependency Validation | Ready to Start Product Implementation | PluginDependencyValidator, PluginSemanticVersion | PluginDependencyTests |
 | AUC-PLUGIN-003 | Package Installation | Ready to Start Product Implementation | PluginPackageInstaller, PluginInstallationReader, PluginPackagePaths | PluginPackageTests |
 | AUC-PLUGIN-004 | Discovery | Ready to Start Product Implementation | PluginDiscoveryScanner | PluginLoadingTests |
@@ -37,15 +37,15 @@
 ## AUC-PLUGIN-001 Plugin Metadata
 
 Feature ID: `AUC-PLUGIN-001`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 从 attribute 和 manifest 建立插件身份。
 Public Contract: PluginAttribute, PluginManifest, PluginDescriptor
-Runtime / Build Behavior: 从 attribute 和 manifest 建立插件身份。
-Failure Behavior: id 缺失、id mismatch、schema 不支持。
+Runtime / Build Behavior: 从 attribute 和 manifest 建立插件身份；manifest required fields、schema、version、mainAssembly 和 targetFramework 在加载前校验。
+Failure Behavior: id 缺失、required field 缺失、id mismatch、schema 不支持、version/mainAssembly/targetFramework 非法。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `PluginDeclarationAttributeTests; PluginManifestTests`。
-Required Assertions: 断言 id、version、mainAssembly、schema 和 required fields。
+Required Assertions: 断言 id、version、mainAssembly、schema、targetFramework 和 required fields。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 ## AUC-PLUGIN-002 Dependency Validation
 

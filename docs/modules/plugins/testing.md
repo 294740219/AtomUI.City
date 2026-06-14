@@ -23,7 +23,7 @@
 
 | Feature ID | Test Type | Test File | Required Assertions | Failure Paths | Status |
 | --- | --- | --- | --- | --- | --- |
-| AUC-PLUGIN-001 | PluginLifecycle | PluginDeclarationAttributeTests; PluginManifestTests | 断言 id、version、mainAssembly、schema 和 required fields。 | id 缺失、id mismatch、schema 不支持。 | Required |
+| AUC-PLUGIN-001 | PluginLifecycle | PluginDeclarationAttributeTests; PluginManifestTests | 断言 id、version、mainAssembly、schema、targetFramework 和 required fields。 | id 缺失、required field 缺失、id mismatch、schema 不支持。 | Completed |
 | AUC-PLUGIN-002 | PluginLifecycle | PluginDependencyTests | 断言 missing、cycle、version mismatch diagnostics。 | 缺失、循环、版本不满足。 | Required |
 | AUC-PLUGIN-003 | PluginLifecycle | PluginPackageTests | 断言 staging cleanup、installed record、path normalization。 | 路径穿越、包布局缺失、重复安装、取消。 | Required |
 | AUC-PLUGIN-004 | PluginLifecycle | PluginLoadingTests | 断言 invalid install record diagnostics 且继续扫描其他插件。 | 缺少 install record、非法 record、目录无效。 | Required |
