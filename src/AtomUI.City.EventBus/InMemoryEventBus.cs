@@ -228,7 +228,7 @@ public sealed class InMemoryEventBus : IEventBus, IDisposable
 
         WriteDiagnostic(
             EventDiagnosticIds.EventAccepted,
-            $"Posted event '{descriptor.ContractId.Value}' was accepted.",
+            $"Posted event '{descriptor.ContractId.Value}' with id '{eventId:D}' was accepted.",
             HostDiagnosticSeverity.Trace);
 
         _ = Task.Run(

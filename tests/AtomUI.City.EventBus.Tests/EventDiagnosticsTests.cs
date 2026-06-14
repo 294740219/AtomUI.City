@@ -21,6 +21,21 @@ public sealed class EventDiagnosticsTests
     }
 
     [Fact]
+    public async Task EventAcceptedDiagnosticIncludesStableEventContext()
+    {
+        var diagnostics = new InMemoryHostDiagnostics();
+        var eventBus = new InMemoryEventBus(diagnostics: diagnostics);
+
+        var result = await eventBus.PostAsync(new TestEvent("accepted"));
+
+        var record = Assert.Single(
+            diagnostics.Records,
+            record => record.Code == EventDiagnosticIds.EventAccepted);
+        Assert.Contains(result.ContractId.Value, record.Message, StringComparison.Ordinal);
+        Assert.Contains(result.EventId.ToString("D"), record.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task HandlerFailureIsReportedAndDoesNotStopIndependentHandlers()
     {
         var diagnostics = new InMemoryHostDiagnostics();
