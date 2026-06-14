@@ -91,6 +91,9 @@ ViewModelType
 
 - 一个 ViewModel 默认只能有一个默认 View。
 - 多 View 场景必须显式命名，例如 `ViewKey`。
+- generated manifest 通过 `ViewRegistry.RegisterManifest` 原子注册；重复 key 失败时不得产生部分注册。
+- 显式覆盖必须通过 `ViewRegistrationOptions.ReplaceExisting` 表达，默认重复注册继续拒绝。
+- lookup 使用 ViewModel type + ViewKey 精确 dictionary key；不得 fallback 到反射扫描或 assignable type 扫描。
 - ViewLocator 不创建 ViewModel。
 - ViewLocator 不解释 Route。
 - 插件 View 必须记录 PluginId 和 ContributionId。
@@ -115,6 +118,8 @@ Presentation generator 负责：
 |---|---|---|
 | ViewLocator 命中 | Unit | ViewModel 定位到 ViewDescriptor。 |
 | 找不到 View | Unit | 返回 commit failure 诊断。 |
+| Manifest 注册 | Unit | 批量注册成功且失败无部分注册。 |
+| 显式覆盖 | Unit | ReplaceExisting 替换已有 descriptor，默认重复仍拒绝。 |
 | 多默认 View | Analyzer/Generator | 输出重复 View 诊断。 |
 | 命名 View | Unit | ViewKey 能选择对应 View。 |
 | 插件 View 撤销 | Unit | 撤销后不能定位插件 View。 |

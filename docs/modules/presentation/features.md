@@ -7,7 +7,7 @@
 | Feature ID | 名称 | 状态 | Public Contract | 主测试 |
 | --- | --- | --- | --- | --- |
 | AUC-PRESENTATION-001 | UI Dispatcher Bridge | 已实现并通过产品合同测试 | AvaloniaUiDispatcher, IUiDispatcher | AvaloniaUiDispatcherTests; PresentationPlatformIntegrationTests |
-| AUC-PRESENTATION-002 | View Registry and Locator | Ready to Start Product Implementation | ViewRegistry, IViewLocator, ViewForAttribute | ViewLocatorTests |
+| AUC-PRESENTATION-002 | View Registry and Locator | 已实现并通过产品合同测试 | ViewRegistry, IViewLocator, ViewForAttribute | ViewLocatorTests |
 | AUC-PRESENTATION-003 | View Factory and Binding | Ready to Start Product Implementation | ViewFactory, ViewBinder, BoundViewHandle | ViewBindingTests |
 | AUC-PRESENTATION-004 | Route Outlet Commit | Ready to Start Product Implementation | IRouteOutlet, RouteOutlet, RouteOutletCommitResult | RouteOutletTests |
 | AUC-PRESENTATION-005 | Visual Lifecycle Feedback | Ready to Start Product Implementation | VisualLifecycleHub, VisualLifecycleEvent | VisualFeedbackTests |
@@ -49,13 +49,13 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-PRESENTATION-002 View Registry and Locator
 
 Feature ID: `AUC-PRESENTATION-002`
-Status: Ready to Start Product Implementation
+Status: 已实现并通过产品合同测试
 Goal: 建立 ViewModel -> View 的 AOT 友好解析。
-Public Contract: ViewRegistry, IViewLocator, ViewForAttribute
-Runtime / Build Behavior: View 注册来自 generator manifest 或显式注册；lookup 按 ViewModel type、route target 和 owner 查找。
-Failure Behavior: View 未注册、重复注册、插件 owner 已卸载必须返回失败，不 fallback 到反射扫描。
-Threading / Cancellation: registry lookup 可并发读取；注册和撤销串行。
-Diagnostics: view lookup diagnostics 必须包含 ViewModel type、route id 和 owner。
+Public Contract: ViewRegistry, IViewLocator, ViewForAttribute, ViewLookupRequest, ViewRegistrationOptions
+Runtime / Build Behavior: View 注册来自 generator manifest 或显式注册；lookup 按 ViewModel type、view key、route id 和 owner context 查找。
+Failure Behavior: View 未注册、重复注册、插件 owner 已卸载必须返回失败，不 fallback 到反射扫描或 assignable type 扫描。
+Threading / Cancellation: registry lookup 可并发读取；注册、显式覆盖和撤销串行。
+Diagnostics: view lookup diagnostics 包含 ViewModel type、view type、route id、owner、plugin id 和 contribution id。
 Tests: `ViewLocatorTests`
 Required Assertions: 断言 manifest 注册、显式覆盖、重复拒绝、插件撤销和 O(1) lookup 路径。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。

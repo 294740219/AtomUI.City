@@ -18,7 +18,8 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | AvaloniaUiDispatcher.InvokeAsync | 在 UI 线程执行 work。 | delegate 不得为 null。 | work result。 | dispatcher unavailable 映射 `PresentationError.DispatcherUnavailable`；work exception 原样传播并记录诊断。 | 取消后不得执行 work；非用户取消的 dispatcher shutdown 映射为 unavailable。 | UI work 串行，允许后台并发排队。 |
 | AvaloniaUiDispatcher.PostAsync | 投递异步 UI work。 | delegate 不得为 null。 | 投递完成 task。 | dispatcher unavailable 映射 `PresentationError.DispatcherUnavailable`；work exception 原样传播并记录诊断。 | 取消后不得执行 queued work item。 | 后台调用 marshal 到 dispatcher 线程执行。 |
-| IViewLocator.Resolve | 解析 ViewModel 对应 ViewDescriptor。 | ViewModel type、route target、owner。 | ViewDescriptor 或失败结果。 | 未注册、重复、owner revoked 返回失败。 | 同步 lookup 无 token。 | registry 读并发安全。 |
+| ViewRegistry.RegisterManifest | 从 generated manifest 或显式 descriptor list 注册 ViewDescriptor。 | descriptors 不得为 null；同一 manifest 内 key 不得重复。 | void。 | 重复注册抛 `PresentationError.DuplicateView`，失败不产生部分注册；`ViewRegistrationOptions.ReplaceExisting` 可显式覆盖。 | 同步 API 无 token。 | 注册和撤销串行。 |
+| IViewLocator.Locate / TryLocate | 解析 ViewModel 对应 ViewDescriptor。 | ViewModel type、view key；`ViewLookupRequest` 可携带 route id 和 owner。 | ViewDescriptor 或失败结果。 | 未注册、重复、owner revoked 返回失败，不 fallback 到反射扫描或 assignable type 扫描。 | 同步 lookup 无 token。 | registry 读并发安全，lookup 使用精确 dictionary key。 |
 | ViewFactory.Create | 创建 View 并准备 DataContext。 | ViewDescriptor、ViewModel、factory context。 | BoundViewHandle。 | 构造失败释放中间资源。 | UI 创建必须支持取消前检查。 | 每次创建独立 handle。 |
 | IRouteOutlet.CommitAsync | 把 bound view 提交到 outlet。 | RouteOutletCommitPlan。 | RouteOutletCommitResult。 | 失败不替换旧 content；old deactivate 拒绝则中止。 | attach 前可取消；attach 后完成回滚或提交。 | 同一 outlet commit 串行。 |
 | VisualLifecycleHub.Publish | 发布 attach/detach/focus 等 visual 事件。 | VisualLifecycleEvent。 | void 或 result。 | handler 失败被隔离并诊断。 | 按 dispatcher 策略执行。 | 事件顺序按 UI 捕获顺序。 |
@@ -114,8 +115,10 @@
 | `ViewFactory` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `ViewFactoryContext` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `ViewForAttribute` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `ViewLookupRequest` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `ViewRegistry` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `ViewRegistryServiceCollectionExtensions` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `ViewRegistrationOptions` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `VisualLifecycleEvent` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `VisualLifecycleEventKind` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `VisualLifecycleHub` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |

@@ -60,6 +60,55 @@ public sealed class ViewLocatorTests
     }
 
     [Fact]
+    public void RegistryRegistersManifestEntriesAtomically()
+    {
+        var registry = new ViewRegistry();
+        var settingsDescriptor = Descriptor<SettingsViewModel, SettingsView>();
+        var profileDescriptor = Descriptor<ProfileViewModel, ProfileView>();
+
+        registry.RegisterManifest([settingsDescriptor, profileDescriptor]);
+
+        Assert.Same(settingsDescriptor, registry.Locate(typeof(SettingsViewModel)));
+        Assert.Same(profileDescriptor, registry.Locate(typeof(ProfileViewModel)));
+    }
+
+    [Fact]
+    public void ManifestRegistrationRejectsDuplicateEntriesWithoutPartialRegistration()
+    {
+        var registry = new ViewRegistry();
+        var settingsDescriptor = Descriptor<SettingsViewModel, SettingsView>();
+        var duplicateSettingsDescriptor = Descriptor<SettingsViewModel, AlternativeSettingsView>();
+        var profileDescriptor = Descriptor<ProfileViewModel, ProfileView>();
+
+        var exception = Assert.Throws<PresentationException>(
+            () => registry.RegisterManifest(
+                [
+                    settingsDescriptor,
+                    duplicateSettingsDescriptor,
+                    profileDescriptor,
+                ]));
+
+        Assert.Equal(PresentationError.DuplicateView, exception.Error);
+        Assert.False(registry.TryLocate(typeof(SettingsViewModel), out _));
+        Assert.False(registry.TryLocate(typeof(ProfileViewModel), out _));
+    }
+
+    [Fact]
+    public void ExplicitOverrideReplacesExistingDescriptor()
+    {
+        var registry = new ViewRegistry();
+        var manifestDescriptor = Descriptor<SettingsViewModel, SettingsView>();
+        var explicitDescriptor = Descriptor<SettingsViewModel, AlternativeSettingsView>();
+
+        registry.Register(manifestDescriptor);
+        registry.Register(
+            explicitDescriptor,
+            new ViewRegistrationOptions { ReplaceExisting = true });
+
+        Assert.Same(explicitDescriptor, registry.Locate(typeof(SettingsViewModel)));
+    }
+
+    [Fact]
     public void RegistryRejectsDuplicateDefaultViews()
     {
         var registry = new ViewRegistry();
@@ -77,6 +126,18 @@ public sealed class ViewLocatorTests
                     typeof(AlternativeSettingsView),
                     viewKey: null,
                     _ => new AlternativeSettingsView())));
+
+        Assert.Equal(PresentationError.DuplicateView, exception.Error);
+    }
+
+    [Fact]
+    public void RegistryRejectsDuplicateAfterManifestRegistration()
+    {
+        var registry = new ViewRegistry();
+        registry.RegisterManifest([Descriptor<SettingsViewModel, SettingsView>()]);
+
+        var exception = Assert.Throws<PresentationException>(
+            () => registry.Register(Descriptor<SettingsViewModel, AlternativeSettingsView>()));
 
         Assert.Equal(PresentationError.DuplicateView, exception.Error);
     }
@@ -113,7 +174,40 @@ public sealed class ViewLocatorTests
                 record.Code == PresentationDiagnosticIds.ViewLocatorMatched &&
                 record.Severity == HostDiagnosticSeverity.Info &&
                 record.Message.Contains(typeof(SettingsViewModel).FullName!, StringComparison.Ordinal) &&
-                record.Message.Contains(typeof(SettingsView).FullName!, StringComparison.Ordinal));
+                record.Message.Contains(typeof(SettingsView).FullName!, StringComparison.Ordinal) &&
+                record.Context["viewModelType"] == typeof(SettingsViewModel).FullName &&
+                record.Context["viewType"] == typeof(SettingsView).FullName);
+    }
+
+    [Fact]
+    public void LookupDiagnosticsCarryRouteAndOwnerContext()
+    {
+        var diagnostics = new InMemoryHostDiagnostics();
+        var registry = new ViewRegistry(diagnostics);
+        var descriptor = new ViewDescriptor(
+            typeof(SettingsViewModel),
+            typeof(SettingsView),
+            viewKey: "settings",
+            _ => new SettingsView(),
+            pluginId: "com.company.sales",
+            contributionId: "plugin.settings");
+        registry.Register(descriptor);
+
+        var located = registry.Locate(
+            new ViewLookupRequest(
+                typeof(SettingsViewModel),
+                viewKey: "settings",
+                routeId: "routes.settings",
+                ownerId: "com.company.sales"));
+
+        var record = Assert.Single(
+            diagnostics.Records,
+            static record => record.Code == PresentationDiagnosticIds.ViewLocatorMatched);
+
+        Assert.Same(descriptor, located);
+        Assert.Equal("routes.settings", record.Context["routeId"]);
+        Assert.Equal("com.company.sales", record.Context["ownerId"]);
+        Assert.Equal("plugin.settings", record.Context["contributionId"]);
     }
 
     [Fact]
@@ -129,7 +223,34 @@ public sealed class ViewLocatorTests
             record =>
                 record.Code == PresentationDiagnosticIds.ViewLocatorFailed &&
                 record.Severity == HostDiagnosticSeverity.Warning &&
-                record.Message.Contains(typeof(SettingsViewModel).FullName!, StringComparison.Ordinal));
+                record.Message.Contains(typeof(SettingsViewModel).FullName!, StringComparison.Ordinal) &&
+                record.Context["viewModelType"] == typeof(SettingsViewModel).FullName);
+    }
+
+    [Fact]
+    public void LookupUsesExactKeyPathWithoutAssignableFallback()
+    {
+        var registry = new ViewRegistry();
+        registry.Register(Descriptor<BaseViewModel, SettingsView>());
+
+        Assert.False(registry.TryLocate(typeof(DerivedViewModel), out _));
+    }
+
+    [Fact]
+    public void RegistryAllowsConcurrentLookupReads()
+    {
+        var registry = new ViewRegistry();
+        var descriptor = Descriptor<SettingsViewModel, SettingsView>();
+        registry.Register(descriptor);
+
+        Parallel.For(
+            0,
+            256,
+            _ =>
+            {
+                Assert.True(registry.TryLocate(typeof(SettingsViewModel), out var located));
+                Assert.Same(descriptor, located);
+            });
     }
 
     [Fact]
@@ -194,6 +315,20 @@ public sealed class ViewLocatorTests
         Assert.Equal("com.company.sales", attribute.PluginId);
         Assert.Equal("plugin.settings", attribute.ContributionId);
     }
+
+    private static ViewDescriptor Descriptor<TViewModel, TView>(string? viewKey = null)
+        where TView : new()
+    {
+        return new ViewDescriptor(
+            typeof(TViewModel),
+            typeof(TView),
+            viewKey,
+            _ => new TView());
+    }
+
+    private class BaseViewModel;
+
+    private sealed class DerivedViewModel : BaseViewModel;
 
     private sealed class SettingsViewModel;
 

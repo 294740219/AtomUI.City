@@ -5,6 +5,7 @@ namespace AtomUI.City.Presentation;
 public sealed class ViewRegistry : IViewRegistry
 {
     private readonly Dictionary<ViewRegistrationKey, ViewDescriptor> _descriptors = new();
+    private readonly ReaderWriterLockSlim _gate = new();
     private readonly IHostDiagnostics? _diagnostics;
 
     public ViewRegistry()
@@ -20,18 +21,83 @@ public sealed class ViewRegistry : IViewRegistry
 
     public void Register(ViewDescriptor descriptor)
     {
+        Register(descriptor, options: null);
+    }
+
+    public void Register(
+        ViewDescriptor descriptor,
+        ViewRegistrationOptions? options)
+    {
         ArgumentNullException.ThrowIfNull(descriptor);
 
         var key = ViewRegistrationKey.Create(descriptor.ViewModelType, descriptor.ViewKey);
 
-        if (_descriptors.ContainsKey(key))
+        _gate.EnterWriteLock();
+        try
         {
-            throw new PresentationException(
-                PresentationError.DuplicateView,
-                $"View model '{descriptor.ViewModelType.FullName}' already has a view registered for key '{key.ViewKey}'.");
+            RegisterCore(key, descriptor, options);
+        }
+        finally
+        {
+            _gate.ExitWriteLock();
+        }
+    }
+
+    public void RegisterManifest(IEnumerable<ViewDescriptor> descriptors)
+    {
+        RegisterManifest(descriptors, options: null);
+    }
+
+    public void RegisterManifest(
+        IEnumerable<ViewDescriptor> descriptors,
+        ViewRegistrationOptions? options)
+    {
+        ArgumentNullException.ThrowIfNull(descriptors);
+
+        var entries = descriptors
+            .Select(
+                descriptor =>
+                {
+                    ArgumentNullException.ThrowIfNull(descriptor);
+
+                    return new ViewRegistrationEntry(
+                        ViewRegistrationKey.Create(descriptor.ViewModelType, descriptor.ViewKey),
+                        descriptor);
+                })
+            .ToArray();
+
+        var duplicate = entries
+            .GroupBy(static entry => entry.Key)
+            .FirstOrDefault(static group => group.Count() > 1);
+
+        if (duplicate is not null)
+        {
+            throw CreateDuplicateException(duplicate.First().Descriptor, duplicate.Key);
         }
 
-        _descriptors.Add(key, descriptor);
+        _gate.EnterWriteLock();
+        try
+        {
+            if (options?.ReplaceExisting != true)
+            {
+                foreach (var entry in entries)
+                {
+                    if (_descriptors.ContainsKey(entry.Key))
+                    {
+                        throw CreateDuplicateException(entry.Descriptor, entry.Key);
+                    }
+                }
+            }
+
+            foreach (var entry in entries)
+            {
+                RegisterCore(entry.Key, entry.Descriptor, options);
+            }
+        }
+        finally
+        {
+            _gate.ExitWriteLock();
+        }
     }
 
     public int RevokePlugin(string pluginId)
@@ -50,17 +116,25 @@ public sealed class ViewRegistry : IViewRegistry
 
     private int Revoke(Func<ViewDescriptor, bool> predicate)
     {
-        var revokedKeys = _descriptors
-            .Where(item => predicate(item.Value))
-            .Select(item => item.Key)
-            .ToArray();
-
-        foreach (var key in revokedKeys)
+        _gate.EnterWriteLock();
+        try
         {
-            _descriptors.Remove(key);
-        }
+            var revokedKeys = _descriptors
+                .Where(item => predicate(item.Value))
+                .Select(item => item.Key)
+                .ToArray();
 
-        return revokedKeys.Length;
+            foreach (var key in revokedKeys)
+            {
+                _descriptors.Remove(key);
+            }
+
+            return revokedKeys.Length;
+        }
+        finally
+        {
+            _gate.ExitWriteLock();
+        }
     }
 
     public bool TryLocate(Type viewModelType, out ViewDescriptor? descriptor)
@@ -75,17 +149,37 @@ public sealed class ViewRegistry : IViewRegistry
     {
         ArgumentNullException.ThrowIfNull(viewModelType);
 
-        var located = _descriptors.TryGetValue(
-            ViewRegistrationKey.Create(viewModelType, viewKey),
+        return TryLocate(
+            new ViewLookupRequest(viewModelType, viewKey),
             out descriptor);
+    }
+
+    public bool TryLocate(
+        ViewLookupRequest request,
+        out ViewDescriptor? descriptor)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        bool located;
+        _gate.EnterReadLock();
+        try
+        {
+            located = _descriptors.TryGetValue(
+                ViewRegistrationKey.Create(request.ViewModelType, request.ViewKey),
+                out descriptor);
+        }
+        finally
+        {
+            _gate.ExitReadLock();
+        }
 
         if (located && descriptor is not null)
         {
-            WriteMatchedDiagnostic(viewModelType, viewKey, descriptor);
+            WriteMatchedDiagnostic(request, descriptor);
         }
         else
         {
-            WriteFailedDiagnostic(viewModelType, viewKey);
+            WriteFailedDiagnostic(request);
         }
 
         return located;
@@ -93,14 +187,43 @@ public sealed class ViewRegistry : IViewRegistry
 
     public ViewDescriptor Locate(Type viewModelType, string? viewKey = null)
     {
-        if (TryLocate(viewModelType, viewKey, out var descriptor) && descriptor is not null)
+        return Locate(new ViewLookupRequest(viewModelType, viewKey));
+    }
+
+    public ViewDescriptor Locate(ViewLookupRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (TryLocate(request, out var descriptor) && descriptor is not null)
         {
             return descriptor;
         }
 
         throw new PresentationException(
             PresentationError.ViewNotFound,
-            $"No view was registered for view model '{viewModelType.FullName}'.");
+            $"No view was registered for view model '{request.ViewModelType.FullName}'.");
+    }
+
+    private void RegisterCore(
+        ViewRegistrationKey key,
+        ViewDescriptor descriptor,
+        ViewRegistrationOptions? options)
+    {
+        if (_descriptors.ContainsKey(key) && options?.ReplaceExisting != true)
+        {
+            throw CreateDuplicateException(descriptor, key);
+        }
+
+        _descriptors[key] = descriptor;
+    }
+
+    private static PresentationException CreateDuplicateException(
+        ViewDescriptor descriptor,
+        ViewRegistrationKey key)
+    {
+        return new PresentationException(
+            PresentationError.DuplicateView,
+            $"View model '{descriptor.ViewModelType.FullName}' already has a view registered for key '{key.ViewKey}'.");
     }
 
     private readonly record struct ViewRegistrationKey(Type ViewModelType, string ViewKey)
@@ -114,26 +237,51 @@ public sealed class ViewRegistry : IViewRegistry
     }
 
     private void WriteMatchedDiagnostic(
-        Type viewModelType,
-        string? viewKey,
+        ViewLookupRequest request,
         ViewDescriptor descriptor)
     {
         _diagnostics?.Write(new HostDiagnosticRecord(
             PresentationDiagnosticIds.ViewLocatorMatched,
-            $"View locator matched view model '{viewModelType.FullName}' to view '{descriptor.ViewType.FullName}' with key '{NormalizeViewKey(viewKey)}'.",
-            HostDiagnosticSeverity.Info));
+            $"View locator matched view model '{request.ViewModelType.FullName}' to view '{descriptor.ViewType.FullName}' with key '{NormalizeViewKey(request.ViewKey)}'.",
+            HostDiagnosticSeverity.Info)
+        {
+            Context = CreateDiagnosticContext(request, descriptor),
+        });
     }
 
-    private void WriteFailedDiagnostic(Type viewModelType, string? viewKey)
+    private void WriteFailedDiagnostic(ViewLookupRequest request)
     {
         _diagnostics?.Write(new HostDiagnosticRecord(
             PresentationDiagnosticIds.ViewLocatorFailed,
-            $"View locator failed for view model '{viewModelType.FullName}' with key '{NormalizeViewKey(viewKey)}'.",
-            HostDiagnosticSeverity.Warning));
+            $"View locator failed for view model '{request.ViewModelType.FullName}' with key '{NormalizeViewKey(request.ViewKey)}'.",
+            HostDiagnosticSeverity.Warning)
+        {
+            Context = CreateDiagnosticContext(request, descriptor: null),
+        });
+    }
+
+    private static IReadOnlyDictionary<string, string?> CreateDiagnosticContext(
+        ViewLookupRequest request,
+        ViewDescriptor? descriptor)
+    {
+        return new Dictionary<string, string?>(StringComparer.Ordinal)
+        {
+            ["viewModelType"] = request.ViewModelType.FullName,
+            ["viewType"] = descriptor?.ViewType.FullName,
+            ["viewKey"] = NormalizeViewKey(request.ViewKey),
+            ["routeId"] = request.RouteId,
+            ["ownerId"] = request.OwnerId,
+            ["pluginId"] = descriptor?.PluginId,
+            ["contributionId"] = descriptor?.ContributionId,
+        };
     }
 
     private static string NormalizeViewKey(string? viewKey)
     {
         return string.IsNullOrWhiteSpace(viewKey) ? "<default>" : viewKey;
     }
+
+    private readonly record struct ViewRegistrationEntry(
+        ViewRegistrationKey Key,
+        ViewDescriptor Descriptor);
 }
