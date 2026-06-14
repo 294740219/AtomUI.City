@@ -1,3 +1,4 @@
+using AtomUI.City.Diagnostics;
 using AtomUI.City.EventBus;
 using AtomUI.City.Lifecycle;
 
@@ -181,6 +182,24 @@ public sealed class EventSubscriptionTests
 
         Assert.Equal(EventSubscriptionState.Disposed, subscription.State);
         Assert.Equal(0, receivedCount);
+    }
+
+    [Fact]
+    public async Task OwnedSubscribeRejectsStoppedOwner()
+    {
+        var diagnostics = new InMemoryHostDiagnostics();
+        var eventBus = new InMemoryEventBus(diagnostics: diagnostics);
+        var owner = LifecycleScope.CreateRoot(LifecycleScopeKind.Application, "app");
+        await owner.StopAsync();
+
+        Assert.Throws<InvalidOperationException>(
+            () => eventBus.Subscribe<TestEvent>(
+                owner,
+                _ => ValueTask.CompletedTask));
+
+        Assert.DoesNotContain(
+            diagnostics.Records,
+            record => record.Code == EventDiagnosticIds.EventSubscriptionAdded);
     }
 
     private sealed record TestEvent(string Value);

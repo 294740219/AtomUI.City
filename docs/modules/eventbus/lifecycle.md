@@ -16,6 +16,7 @@ AtomUI.City.EventBus 作为 Host 服务或模块贡献接入 Core 生命周期�
 ## 生命周期流程
 
 - Subscribe 验证 contract、记录 owner、创建 subscription id。
+- Owned Subscribe 必须拒绝 stopped owner，避免已经释放的 owner 重新进入 active subscription snapshot。
 - Publish 创建 EventContext，选定 dispatch policy，按稳定顺序调用 handler。
 - handler 失败按 EventErrorPolicy 继续、停止或聚合错误。
 - EventBus Dispose 幂等，释放 active subscriptions，并阻止新的 publish、post 和 subscribe。

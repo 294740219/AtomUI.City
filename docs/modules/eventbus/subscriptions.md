@@ -23,6 +23,7 @@
 - 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
 - Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
 - 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
+- Owned subscription 只能绑定 `Running` owner；stopped owner 必须拒绝创建订阅，且不得写 subscription-added 诊断。
 
 ## 失败行为
 

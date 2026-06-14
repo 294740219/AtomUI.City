@@ -67,6 +67,7 @@ public sealed class InMemoryEventBus : IEventBus, IDisposable
         ArgumentNullException.ThrowIfNull(owner);
         ArgumentNullException.ThrowIfNull(handler);
         ThrowIfDisposed();
+        ThrowIfOwnerNotRunning(owner);
 
         return SubscribeCore(
             owner,
@@ -396,6 +397,14 @@ public sealed class InMemoryEventBus : IEventBus, IDisposable
         if (_disposed)
         {
             throw new ObjectDisposedException(GetType().FullName);
+        }
+    }
+
+    private static void ThrowIfOwnerNotRunning(LifecycleScope owner)
+    {
+        if (owner.State != LifecycleScopeState.Running)
+        {
+            throw new InvalidOperationException("Event subscription owner scope must be running.");
         }
     }
 

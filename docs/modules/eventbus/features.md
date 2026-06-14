@@ -7,7 +7,7 @@
 | Feature ID | 名称 | 状态 | 公开合同 | 主测试 |
 | --- | --- | --- | --- | --- |
 | AUC-EVENTBUS-001 | Typed Publish | Completed | IEventBus.PublishAsync, IEventBus.PostAsync, EventPublishResult | EventPublicationTests |
-| AUC-EVENTBUS-002 | Subscription Lifecycle | 产品化进行中 | IEventSubscription, EventSubscriptionOptions | EventSubscriptionTests |
+| AUC-EVENTBUS-002 | Subscription Lifecycle | Completed | IEventSubscription, EventSubscriptionOptions | EventSubscriptionTests |
 | AUC-EVENTBUS-003 | Contract Registry | 产品化进行中 | IEventContractRegistry, EventContractDescriptor | EventContractRegistryTests |
 | AUC-EVENTBUS-004 | Dispatch Policy | 产品化进行中 | EventDispatchPolicy, EventErrorPolicy, EventSubscriptionOptions | EventDispatchingTests |
 | AUC-EVENTBUS-005 | Diagnostics | 产品化进行中 | EventDiagnosticIds | EventDiagnosticsTests |
@@ -47,15 +47,15 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-EVENTBUS-002 Subscription Lifecycle
 
 Feature ID: `AUC-EVENTBUS-002`
-Status: 产品化进行中
+Status: Completed
 Goal: 订阅 Active/Disposed、owner 释放和 bus dispose 清理。
 Public Contract: IEventBus, IEventSubscription, EventSubscriptionOptions
-Runtime / Build Behavior: 订阅 Active/Disposed、owner 释放和 bus dispose 清理。
-Failure Behavior: 重复释放、owner dispose、bus dispose、插件 unload、已 Disposed 后 stop with canceled token。
+Runtime / Build Behavior: 订阅 Active/Disposed、owner 释放、bus dispose 清理和 in-flight drain。
+Failure Behavior: 重复释放、owner dispose、stopped owner subscribe、bus dispose、插件 unload、已 Disposed 后 stop with canceled token。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `EventSubscriptionTests`。
-Required Assertions: 断言 dispose 后不再收到事件、StopAsync 移除新发布快照、等待 in-flight handler、owner stop/cancellation 释放、bus dispose 清理 active subscriptions、已 Disposed 后 StopAsync 幂等。
+Required Assertions: 断言 dispose 后不再收到事件、StopAsync 移除新发布快照、等待 in-flight handler、owner stop/cancellation 释放、stopped owner 拒绝、bus dispose 清理 active subscriptions、已 Disposed 后 StopAsync 幂等。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 ## AUC-EVENTBUS-003 Contract Registry
 
