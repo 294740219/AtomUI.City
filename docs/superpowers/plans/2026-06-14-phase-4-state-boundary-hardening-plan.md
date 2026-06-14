@@ -348,7 +348,7 @@ Commit message: `fix(State): validate collection snapshot versions`
 - Modify: `docs/modules/state/api-contracts.md`
 - Test: `tests/AtomUI.City.State.Tests/StateCollectionTests.cs`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```csharp
 [Fact]
@@ -384,21 +384,21 @@ public void CollectionChangeRejectsNullKeyInit()
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `dotnet test tests/AtomUI.City.State.Tests/AtomUI.City.State.Tests.csproj --filter "FullyQualifiedName~CollectionChangeRejectsInvalidKindInit|FullyQualifiedName~CollectionChangeRejectsNullKeyInit"`
 Expected: FAIL because collection change `with` init currently accepts invalid kind and null key values.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Back `StateCollectionChange<TKey,TItem>.Kind` and `Key` with init setters that enforce the constructor validation.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `dotnet test tests/AtomUI.City.State.Tests/AtomUI.City.State.Tests.csproj --filter "FullyQualifiedName~CollectionChangeRejectsInvalidKindInit|FullyQualifiedName~CollectionChangeRejectsNullKeyInit"`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit message: `fix(State): validate collection change identity`
 

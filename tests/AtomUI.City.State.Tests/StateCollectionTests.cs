@@ -548,6 +548,38 @@ public sealed class StateCollectionTests
     }
 
     [Fact]
+    public void CollectionChangeRejectsInvalidKindInit()
+    {
+        var change = new StateCollectionChange<string, int>(
+            StateCollectionChangeKind.Added,
+            "settings",
+            HasOldItem: false,
+            OldItem: default,
+            HasNewItem: true,
+            NewItem: 1,
+            CollectionVersion: 1,
+            ItemVersion: 1);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => change with { Kind = (StateCollectionChangeKind)42 });
+    }
+
+    [Fact]
+    public void CollectionChangeRejectsNullKeyInit()
+    {
+        var change = new StateCollectionChange<string, int>(
+            StateCollectionChangeKind.Added,
+            "settings",
+            HasOldItem: false,
+            OldItem: default,
+            HasNewItem: true,
+            NewItem: 1,
+            CollectionVersion: 1,
+            ItemVersion: 1);
+
+        Assert.Throws<ArgumentNullException>(() => change with { Key = null! });
+    }
+
+    [Fact]
     public void CollectionChangeRejectsNegativeCollectionVersion()
     {
         Assert.Throws<ArgumentOutOfRangeException>(

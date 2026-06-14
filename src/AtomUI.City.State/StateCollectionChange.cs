@@ -3,6 +3,9 @@ namespace AtomUI.City.State;
 public sealed record StateCollectionChange<TKey, TItem>
     where TKey : notnull
 {
+    private StateCollectionChangeKind _kind;
+    private TKey _key = default!;
+
     public StateCollectionChange(
         StateCollectionChangeKind Kind,
         TKey Key,
@@ -49,9 +52,33 @@ public sealed record StateCollectionChange<TKey, TItem>
         this.ItemVersion = ItemVersion;
     }
 
-    public StateCollectionChangeKind Kind { get; init; }
+    public StateCollectionChangeKind Kind
+    {
+        get => _kind;
+        init
+        {
+            if (value < StateCollectionChangeKind.Added || value > StateCollectionChangeKind.Reset)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(value),
+                    value,
+                    "State collection change kind is not supported.");
+            }
 
-    public TKey Key { get; init; }
+            _kind = value;
+        }
+    }
+
+    public TKey Key
+    {
+        get => _key;
+        init
+        {
+            ArgumentNullException.ThrowIfNull(value);
+
+            _key = value;
+        }
+    }
 
     public bool HasOldItem { get; init; }
 
