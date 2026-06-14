@@ -28,6 +28,13 @@ public sealed class EventContractRegistryTests
     }
 
     [Fact]
+    public void SharedContractDescriptorRejectsDefaultContractId()
+    {
+        Assert.Throws<ArgumentException>(
+            () => EventContractDescriptor.Shared<TestEvent>(default, typeof(TestEvent).Assembly));
+    }
+
+    [Fact]
     public void ContractRegistryRejectsDuplicateContractId()
     {
         var contractId = new EventContractId("atomui.city.tests.duplicate.v1");

@@ -31,6 +31,7 @@ public sealed class EventContractDescriptor
         EventContractId contractId,
         Assembly sharedAssembly)
     {
+        EventContractId.ThrowIfDefault(contractId, nameof(contractId));
         ArgumentNullException.ThrowIfNull(sharedAssembly);
 
         var eventType = typeof(TEvent);

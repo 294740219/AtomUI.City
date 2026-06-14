@@ -21,4 +21,12 @@ public readonly record struct EventContractId
     public string Value { get; }
 
     public override string ToString() => Value;
+
+    internal static void ThrowIfDefault(EventContractId contractId, string? paramName = null)
+    {
+        if (string.IsNullOrWhiteSpace(contractId.Value))
+        {
+            throw new ArgumentException("Event contract id must be created with a non-empty value.", paramName);
+        }
+    }
 }
