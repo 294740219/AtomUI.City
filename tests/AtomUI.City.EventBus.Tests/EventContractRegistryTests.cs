@@ -11,6 +11,12 @@ public sealed class EventContractRegistryTests
     }
 
     [Fact]
+    public void ContractIdRejectsControlCharacters()
+    {
+        Assert.Throws<ArgumentException>(() => new EventContractId("atomui.city.tests\n.event.v1"));
+    }
+
+    [Fact]
     public void SharedContractDescriptorRequiresSharedAssemblyMatch()
     {
         var contractId = new EventContractId("atomui.city.tests.shared.v1");

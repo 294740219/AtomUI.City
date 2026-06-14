@@ -10,6 +10,11 @@ public readonly record struct EventContractId
             throw new ArgumentException("Event contract id cannot contain surrounding whitespace.", nameof(value));
         }
 
+        if (value.Any(char.IsControl))
+        {
+            throw new ArgumentException("Event contract id cannot contain control characters.", nameof(value));
+        }
+
         Value = value;
     }
 

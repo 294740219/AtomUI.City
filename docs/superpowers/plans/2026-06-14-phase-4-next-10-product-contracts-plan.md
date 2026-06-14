@@ -35,12 +35,12 @@
 - Modify: `docs/modules/eventbus/api-contracts.md`
 - Modify: this plan file
 
-- [ ] **Step 1: Add a failing test that contract ids containing newline characters throw `ArgumentException`.**
-- [ ] **Step 2: Run focused registry tests and verify the new test fails.**
-- [ ] **Step 3: Reject any `char.IsControl` character in contract ids.**
-- [ ] **Step 4: Document the control-character boundary.**
-- [ ] **Step 5: Run focused EventBus tests, docs check, public API check, and `git diff --check`.**
-- [ ] **Step 6: Commit with `fix(EventBus): reject control characters in contract ids`.**
+- [x] **Step 1: Add a failing test that contract ids containing newline characters throw `ArgumentException`.**
+- [x] **Step 2: Run focused registry tests and verify the new test fails.**
+- [x] **Step 3: Reject any `char.IsControl` character in contract ids.**
+- [x] **Step 4: Document the control-character boundary.**
+- [x] **Step 5: Run focused EventBus tests, docs check, public API check, and `git diff --check`.**
+- [x] **Step 6: Commit with `fix(EventBus): reject control characters in contract ids`.**
 
 ### Task 3: PublishAsync rejects negative publish depth
 

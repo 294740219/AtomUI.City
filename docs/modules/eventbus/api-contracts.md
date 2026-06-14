@@ -20,7 +20,7 @@
 | IEventSubscriber.Subscribe | 订阅事件。 | handler 非 null，owner/options 可选。 | IEventSubscription。 | Disposed bus 或非法 contract 失败。 | 无异步取消。 | 不得在锁内调用 handler。 |
 | IEventSubscription.DisposeAsync | 释放订阅。 | 可重复调用。 | Disposed 状态。 | 释放中 handler 失败进入 diagnostics。 | 取消只影响等待。 | 并发 dispose 幂等。 |
 | EventSubscriptionOptions.WithErrorPolicy | 派生错误策略选项。 | errorPolicy 必须是已定义 enum 值。 | EventSubscriptionOptions。 | 未知 error policy 抛 `ArgumentOutOfRangeException`。 | 无。 | 不修改原 options，返回新实例。 |
-| EventContractId constructor | 创建稳定事件 contract id。 | value 非 null、非空白、不得包含首尾空白。 | EventContractId。 | value 为 null、空白或包含首尾空白时抛 `ArgumentException`。 | 无。 | 创建结果不可变。 |
+| EventContractId constructor | 创建稳定事件 contract id。 | value 非 null、非空白、不得包含首尾空白或控制字符。 | EventContractId。 | value 为 null、空白、包含首尾空白或控制字符时抛 `ArgumentException`。 | 无。 | 创建结果不可变。 |
 
 ## Public 类型覆盖
 
