@@ -16,6 +16,11 @@ public sealed class EventContext<TEvent>
     {
         ArgumentNullException.ThrowIfNull(eventData);
         EventContractId.ThrowIfDefault(contractId, nameof(contractId));
+        if (eventId == Guid.Empty)
+        {
+            throw new ArgumentException("Event context id cannot be empty.", nameof(eventId));
+        }
+
         ArgumentException.ThrowIfNullOrWhiteSpace(correlationId);
 
         Event = eventData;
