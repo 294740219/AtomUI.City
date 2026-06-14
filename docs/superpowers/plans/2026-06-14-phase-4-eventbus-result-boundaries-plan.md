@@ -52,7 +52,7 @@ Commit message: `fix(EventBus): reject default contract ids in descriptors`
 - Modify: `src/AtomUI.City.EventBus/EventPublishResult.cs`
 - Test: `tests/AtomUI.City.EventBus.Tests/EventPublicationTests.cs`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```csharp
 [Fact]
@@ -65,21 +65,21 @@ public void PublishResultRejectsEmptyEventId()
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `dotnet test tests/AtomUI.City.EventBus.Tests/AtomUI.City.EventBus.Tests.csproj --filter "FullyQualifiedName~PublishResultRejectsEmptyEventId"`
 Expected: FAIL because `Guid.Empty` is accepted.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Throw `ArgumentException` when `eventId == Guid.Empty`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `dotnet test tests/AtomUI.City.EventBus.Tests/AtomUI.City.EventBus.Tests.csproj --filter "FullyQualifiedName~PublishResultRejectsEmptyEventId"`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit message: `fix(EventBus): reject empty publish result ids`
 

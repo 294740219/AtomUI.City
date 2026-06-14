@@ -7,6 +7,11 @@ public sealed class EventPublishResult
         EventContractId contractId,
         IReadOnlyList<EventDeliveryResult> deliveries)
     {
+        if (eventId == Guid.Empty)
+        {
+            throw new ArgumentException("Event publish result id cannot be empty.", nameof(eventId));
+        }
+
         ArgumentNullException.ThrowIfNull(deliveries);
         if (deliveries.Any(delivery => delivery is null))
         {

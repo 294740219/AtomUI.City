@@ -145,6 +145,15 @@ public sealed class EventPublicationTests
     }
 
     [Fact]
+    public void PublishResultRejectsEmptyEventId()
+    {
+        Assert.Throws<ArgumentException>(() => new EventPublishResult(
+            Guid.Empty,
+            new EventContractId("atomui.city.tests.event.v1"),
+            []));
+    }
+
+    [Fact]
     public async Task PostAsyncReturnsAcceptedEventIdUsedByDelivery()
     {
         var eventBus = new InMemoryEventBus();
