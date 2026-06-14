@@ -102,6 +102,17 @@ public sealed class StateCollectionTests
     }
 
     [Fact]
+    public void RemoveRejectsDisposedCollection()
+    {
+        var collection = new StateCollection<string, int>();
+        collection.AddOrUpdate("settings", 1);
+
+        collection.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(() => collection.Remove("settings"));
+    }
+
+    [Fact]
     public void ClearDeletesItemsAndRaisesClearedChangeRecord()
     {
         var collection = new StateCollection<string, int>();

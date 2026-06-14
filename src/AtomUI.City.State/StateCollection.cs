@@ -303,6 +303,8 @@ public sealed class StateCollection<TKey, TItem> : IStateCollection<TKey, TItem>
 
         lock (_syncRoot)
         {
+            ThrowIfDisposed();
+
             if (!_items.TryGetValue(key, out var currentItem))
             {
                 return false;
