@@ -8,7 +8,7 @@ public sealed class PluginResultTests
     public void DiagnosticIdsExposeStableUniqueCatalog()
     {
         Assert.Equal(
-            Enumerable.Range(0, 23).Select(index => $"AUCPLG{index:0000}"),
+            Enumerable.Range(0, 24).Select(index => $"AUCPLG{index:0000}"),
             PluginDiagnosticIds.All);
         Assert.Equal(
             PluginDiagnosticIds.All.Count,

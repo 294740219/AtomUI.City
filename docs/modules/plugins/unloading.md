@@ -71,6 +71,7 @@
 - 所有插件 Operation 必须取消。
 - 卸载失败进入可诊断的 `UnloadPending`。
 - `UnloadPending` 阻止更新和删除文件。
+- 当前 runtime 通过 `PluginRuntime.RegisterUnloadLease` 登记可撤销贡献或资源 lease。
 
 ### 2. 前置条件
 
@@ -99,6 +100,8 @@ Ensure plugin is inactive
 -> Mark Unloaded or UnloadPending
 ```
 
+当前 `PluginRuntime.UnloadAsync` 返回 `PluginUnloadResult`。成功时 state 为 `Unloaded`；任一 lease revoke 失败时 state 为 `UnloadPending`，并返回 `AUCPLG0023` diagnostics。Lease 按反向登记顺序撤销，已撤销 lease 的重复撤销必须幂等。
+
 ### 4. 引用释放
 
 卸载前必须释放：
@@ -122,6 +125,7 @@ Ensure plugin is inactive
 ### 5. UnloadPending
 
 `UnloadPending` 表示 Host 已请求卸载，但运行时仍无法释放插件加载上下文或相关文件。
+当前进入 `UnloadPending` 的直接条件是 runtime lease revoke 失败或仍存在未撤销 lease。
 
 常见原因：
 

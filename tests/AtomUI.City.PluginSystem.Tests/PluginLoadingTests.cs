@@ -45,6 +45,68 @@ public sealed class PluginLoadingTests
     }
 
     [Fact]
+    public async Task RuntimeUnloadReportsPendingWhenLeaseRevocationFails()
+    {
+        using var workspace = new PluginTestWorkspace();
+        workspace.WriteStandardManifest(mainAssembly: "AtomUI.City.PluginSystem.dll");
+        workspace.CopyMainAssembly("AtomUI.City.PluginSystem.dll");
+        var descriptor = PluginDescriptor.FromManifest(
+            PluginManifestReader.Read(workspace.ManifestPath),
+            workspace.Root);
+        var loader = new PluginLoader();
+        var result = await loader.LoadAsync(descriptor);
+        var runtime = Assert.IsType<PluginRuntime>(result.Runtime);
+        var lease = runtime.RegisterUnloadLease(
+            "routes:main",
+            "route",
+            _ => throw new InvalidOperationException("route still active"));
+
+        var unload = await runtime.UnloadAsync();
+
+        Assert.False(unload.Succeeded);
+        Assert.Equal(PluginRuntimeState.UnloadPending, unload.State);
+        Assert.Equal(PluginRuntimeState.UnloadPending, runtime.State);
+        Assert.Equal(PluginRuntimeLeaseState.RevokeFailed, lease.State);
+        Assert.Contains(
+            unload.Diagnostics,
+            diagnostic => diagnostic.Code == PluginDiagnosticIds.PluginUnloadPending
+                && diagnostic.PluginId == "com.company.sales"
+                && diagnostic.Field == "route"
+                && diagnostic.Path == "routes:main");
+    }
+
+    [Fact]
+    public async Task RuntimeUnloadDeactivatesActiveRuntimeAndRevokesLeases()
+    {
+        using var workspace = new PluginTestWorkspace();
+        workspace.WriteStandardManifest(mainAssembly: "AtomUI.City.PluginSystem.dll");
+        workspace.CopyMainAssembly("AtomUI.City.PluginSystem.dll");
+        var descriptor = PluginDescriptor.FromManifest(
+            PluginManifestReader.Read(workspace.ManifestPath),
+            workspace.Root);
+        var loader = new PluginLoader();
+        var result = await loader.LoadAsync(descriptor);
+        var runtime = Assert.IsType<PluginRuntime>(result.Runtime);
+        var revoked = false;
+        var lease = runtime.RegisterUnloadLease(
+            "command:save",
+            "command",
+            _ =>
+            {
+                revoked = true;
+                return ValueTask.CompletedTask;
+            });
+        runtime.Activate();
+
+        var unload = await runtime.UnloadAsync();
+
+        Assert.True(unload.Succeeded);
+        Assert.True(revoked);
+        Assert.Equal(PluginRuntimeLeaseState.Revoked, lease.State);
+        Assert.Equal(PluginRuntimeState.Unloaded, runtime.State);
+    }
+
+    [Fact]
     public async Task LoaderRejectsMissingMainAssembly()
     {
         using var workspace = new PluginTestWorkspace();

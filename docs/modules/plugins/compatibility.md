@@ -24,7 +24,8 @@
 - `PluginDiscoveryScanner` 对 invalid install record、invalid manifest 和 invalid installed directory 的诊断与继续扫描行为进入 1.0 兼容承诺。
 - `PluginLoadResult.State`、成功时 `Runtime` 非空、失败时 `Runtime` 为空和 `Faulted` state 进入 1.0 兼容承诺。
 - `PluginMsBuildContract` 的 documented properties、manifest output path 和 package content roots 进入 1.0 兼容承诺。
-- `PluginDiagnosticIds.All` 的 AUCPLG0000-0022 顺序 catalog、不可变性和 `PluginDiagnostic` code/message 非空校验进入 1.0 兼容承诺。
+- `PluginDiagnosticIds.All` 的 AUCPLG0000-0023 顺序 catalog、不可变性和 `PluginDiagnostic` code/message 非空校验进入 1.0 兼容承诺。
+- `PluginRuntimeLease`、`PluginUnloadResult`、`AUCPLG0023` 和 lease revoke 失败进入 `UnloadPending` 的行为进入 1.0 兼容承诺。
 
 ## 数据格式兼容
 

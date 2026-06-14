@@ -13,7 +13,7 @@
 | AUC-PLUGIN-005 | Loading | Completed | PluginLoader, PluginLoadResult | PluginLoadingTests |
 | AUC-PLUGIN-006 | MSBuild Contract | Completed | PluginMsBuildContract | PluginMsBuildContractTests |
 | AUC-PLUGIN-007 | Diagnostics | Completed | PluginDiagnosticIds, PluginDiagnostic | PluginResultTests |
-| AUC-PLUGIN-008 | Unload Contract | Ready to Start Product Implementation | PluginRuntime, Contribution lease | PluginLoadingTests |
+| AUC-PLUGIN-008 | Unload Contract | Completed | PluginRuntime, Contribution lease | PluginLoadingTests |
 
 ## Feature 硬门禁
 
@@ -123,18 +123,18 @@ Failure Behavior: 诊断码不能复用，context 必须有 pluginId/path，diag
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `PluginResultTests`。
-Required Assertions: 断言 AUCPLG0000-0022 catalog 唯一、连续、不可变，且 diagnostic code/message 非空。
+Required Assertions: 断言 AUCPLG0000-0023 catalog 唯一、连续、不可变，且 diagnostic code/message 非空。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 ## AUC-PLUGIN-008 Unload Contract
 
 Feature ID: `AUC-PLUGIN-008`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 撤销贡献并释放插件运行时。
 Public Contract: PluginRuntime, Contribution lease
-Runtime / Build Behavior: 撤销贡献并释放插件运行时。
-Failure Behavior: active contribution、未释放 view/subscription/connection。
+Runtime / Build Behavior: 卸载前反向撤销 runtime leases，成功后释放 main assembly 和 load context。
+Failure Behavior: active contribution、未释放 view/subscription/connection 或 lease revoke 失败进入 UnloadPending 并返回 diagnostics。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `PluginLoadingTests`。
-Required Assertions: 断言 Disable -> Unloading -> Unloaded/UnloadPending。
+Required Assertions: 断言 Active -> Unloading -> Unloaded、lease revoke 和 UnloadPending diagnostics。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。

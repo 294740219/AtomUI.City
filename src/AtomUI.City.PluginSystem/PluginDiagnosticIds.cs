@@ -25,6 +25,7 @@ public static class PluginDiagnosticIds
     public const string PluginPackageIdMismatch = "AUCPLG0020";
     public const string MissingInstallRecord = "AUCPLG0021";
     public const string InvalidPluginDirectory = "AUCPLG0022";
+    public const string PluginUnloadPending = "AUCPLG0023";
 
     public static IReadOnlyList<string> All { get; } = Array.AsReadOnly(
     [
@@ -51,5 +52,6 @@ public static class PluginDiagnosticIds
         PluginPackageIdMismatch,
         MissingInstallRecord,
         InvalidPluginDirectory,
+        PluginUnloadPending,
     ]);
 }

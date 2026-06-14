@@ -5,6 +5,7 @@ namespace AtomUI.City.PluginSystem;
 
 public sealed class PluginRuntime
 {
+    private readonly List<PluginRuntimeLease> _leases = [];
     private Assembly? _mainAssembly;
     private AssemblyLoadContext? _loadContext;
 
@@ -25,6 +26,24 @@ public sealed class PluginRuntime
 
     public Assembly MainAssembly => _mainAssembly ??
         throw new InvalidOperationException("Plugin main assembly is not available after unload.");
+
+    public IReadOnlyList<PluginRuntimeLease> Leases => Array.AsReadOnly(_leases.ToArray());
+
+    public PluginRuntimeLease RegisterUnloadLease(
+        string leaseId,
+        string kind,
+        Func<CancellationToken, ValueTask> revokeAsync)
+    {
+        if (State is PluginRuntimeState.Unloading or PluginRuntimeState.Unloaded or PluginRuntimeState.UnloadPending)
+        {
+            throw new InvalidOperationException($"Plugin cannot register unload leases from state '{State}'.");
+        }
+
+        var lease = new PluginRuntimeLease(leaseId, Descriptor.PluginId, kind, revokeAsync);
+        _leases.Add(lease);
+
+        return lease;
+    }
 
     public void Activate()
     {
@@ -49,7 +68,7 @@ public sealed class PluginRuntime
         return ValueTask.CompletedTask;
     }
 
-    public async ValueTask UnloadAsync(CancellationToken cancellationToken = default)
+    public async ValueTask<PluginUnloadResult> UnloadAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -60,10 +79,24 @@ public sealed class PluginRuntime
 
         if (State == PluginRuntimeState.Unloaded)
         {
-            return;
+            return PluginUnloadResult.Success;
         }
 
         State = PluginRuntimeState.Unloading;
+        var diagnostics = new List<PluginDiagnostic>();
+        for (var i = _leases.Count - 1; i >= 0; i--)
+        {
+            diagnostics.AddRange(await _leases[i].RevokeAsync(cancellationToken).ConfigureAwait(false));
+        }
+
+        if (diagnostics.Count > 0 ||
+            _leases.Any(lease => lease.State != PluginRuntimeLeaseState.Revoked))
+        {
+            State = PluginRuntimeState.UnloadPending;
+            return PluginUnloadResult.Pending(diagnostics);
+        }
+
+        _leases.Clear();
         _mainAssembly = null;
         var loadContext = _loadContext;
         _loadContext = null;
@@ -74,5 +107,6 @@ public sealed class PluginRuntime
         GC.Collect();
 
         State = PluginRuntimeState.Unloaded;
+        return PluginUnloadResult.Success;
     }
 }
