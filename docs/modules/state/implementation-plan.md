@@ -13,6 +13,12 @@
 | AUC-STATE-007 | 是 | 是 | StateDiagnosticsTests | 已有基线 | 必需 | 断言 AUCSTA001-010。 | 必需 | 准备开始产品实现 |
 | AUC-STATE-008 | 是 | 是 | StateThreadingTests | 已有基线 | 必需 | 断言不隐式 UI。 | 必需 | 准备开始产品实现 |
 
+## 2026-06-14 边界强化记录
+
+- AUC-STATE-002 已补充 `StateDefinition.Create` 与 application state registry 对 default `StateKey<T>` 的拒绝测试，确保无效 key 不会落入内部 name 或 dictionary 边界。
+- AUC-STATE-005 已补充 `StateSnapshotEntry` constructor/init 边界测试，覆盖 stateName、valueType、version 和 schemaVersion。
+- AUC-STATE-006 已补充 `StateCollectionSnapshotEntry<TKey,TItem>` 与 `StateCollectionChange<TKey,TItem>` constructor/init 边界测试，覆盖 key、kind、collectionVersion 和 itemVersion。
+
 ## 更新规则
 
 - `已有基线` 只表示当前仓库已有实现或测试入口，不表示产品级完成。

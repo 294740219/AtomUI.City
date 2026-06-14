@@ -5,6 +5,8 @@ public sealed record StateCollectionChange<TKey, TItem>
 {
     private StateCollectionChangeKind _kind;
     private TKey _key = default!;
+    private long _collectionVersion;
+    private long _itemVersion;
 
     public StateCollectionChange(
         StateCollectionChangeKind Kind,
@@ -88,7 +90,37 @@ public sealed record StateCollectionChange<TKey, TItem>
 
     public TItem? NewItem { get; init; }
 
-    public long CollectionVersion { get; init; }
+    public long CollectionVersion
+    {
+        get => _collectionVersion;
+        init
+        {
+            if (value < 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(value),
+                    value,
+                    "State collection version must be greater than or equal to 0.");
+            }
 
-    public long ItemVersion { get; init; }
+            _collectionVersion = value;
+        }
+    }
+
+    public long ItemVersion
+    {
+        get => _itemVersion;
+        init
+        {
+            if (value < 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(value),
+                    value,
+                    "State collection item version must be greater than or equal to 0.");
+            }
+
+            _itemVersion = value;
+        }
+    }
 }

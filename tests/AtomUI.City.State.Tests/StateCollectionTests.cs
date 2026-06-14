@@ -610,6 +610,38 @@ public sealed class StateCollectionTests
     }
 
     [Fact]
+    public void CollectionChangeRejectsNegativeCollectionVersionInit()
+    {
+        var change = new StateCollectionChange<string, int>(
+            StateCollectionChangeKind.Added,
+            "settings",
+            HasOldItem: false,
+            OldItem: default,
+            HasNewItem: true,
+            NewItem: 1,
+            CollectionVersion: 1,
+            ItemVersion: 1);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => change with { CollectionVersion = -1 });
+    }
+
+    [Fact]
+    public void CollectionChangeRejectsNegativeItemVersionInit()
+    {
+        var change = new StateCollectionChange<string, int>(
+            StateCollectionChangeKind.Added,
+            "settings",
+            HasOldItem: false,
+            OldItem: default,
+            HasNewItem: true,
+            NewItem: 1,
+            CollectionVersion: 1,
+            ItemVersion: 1);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => change with { ItemVersion = -1 });
+    }
+
+    [Fact]
     public void ChangedEventArgsRejectsInvalidChangeLists()
     {
         Assert.Throws<ArgumentException>(

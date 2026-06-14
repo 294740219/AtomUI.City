@@ -409,7 +409,7 @@ Commit message: `fix(State): validate collection change identity`
 - Modify: `docs/modules/state/implementation-plan.md`
 - Test: `tests/AtomUI.City.State.Tests/StateCollectionTests.cs`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```csharp
 [Fact]
@@ -445,20 +445,20 @@ public void CollectionChangeRejectsNegativeItemVersionInit()
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `dotnet test tests/AtomUI.City.State.Tests/AtomUI.City.State.Tests.csproj --filter "FullyQualifiedName~CollectionChangeRejectsNegativeCollectionVersionInit|FullyQualifiedName~CollectionChangeRejectsNegativeItemVersionInit"`
 Expected: FAIL because collection change `with` init currently accepts negative versions.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Back `StateCollectionChange<TKey,TItem>.CollectionVersion` and `ItemVersion` with init setters that reject values below 0. Update the State implementation matrix to record this boundary-hardening batch.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `dotnet test tests/AtomUI.City.State.Tests/AtomUI.City.State.Tests.csproj --filter "FullyQualifiedName~CollectionChangeRejectsNegativeCollectionVersionInit|FullyQualifiedName~CollectionChangeRejectsNegativeItemVersionInit"`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit message: `fix(State): validate collection change versions`
