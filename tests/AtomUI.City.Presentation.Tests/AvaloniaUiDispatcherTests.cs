@@ -3,6 +3,7 @@ using AtomUI.City.Lifecycle;
 using AtomUI.City.Presentation;
 using AtomUI.City.Threading;
 using Avalonia.Threading;
+using System.Globalization;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace AtomUI.City.Presentation.Tests;
@@ -91,6 +92,59 @@ public sealed class AvaloniaUiDispatcherTests
     }
 
     [Fact]
+    public async Task InvokeAsyncMarshalsBackgroundCallbackToDispatcherThread()
+    {
+        var avaloniaDispatcher = Dispatcher.CurrentDispatcher;
+        var dispatcher = new AvaloniaUiDispatcher(avaloniaDispatcher);
+        var dispatcherThreadId = Environment.CurrentManagedThreadId;
+        var callbackThreadId = -1;
+
+        var operation = Task.Run(
+            () => dispatcher
+                .InvokeAsync(() => callbackThreadId = Environment.CurrentManagedThreadId)
+                .AsTask());
+
+        PumpDispatcherUntilComplete(avaloniaDispatcher, operation);
+        await operation;
+
+        Assert.Equal(dispatcherThreadId, callbackThreadId);
+    }
+
+    [Fact]
+    public async Task PostAsyncHonorsCancellationBeforeQueuedBackgroundCallbackRuns()
+    {
+        var avaloniaDispatcher = Dispatcher.CurrentDispatcher;
+        var dispatcher = new AvaloniaUiDispatcher(avaloniaDispatcher);
+        using var cancellation = new CancellationTokenSource();
+        using var queued = new ManualResetEventSlim();
+        var wasCalled = false;
+
+        var operation = Task.Run(
+            async () =>
+            {
+                var queuedOperation = dispatcher
+                    .PostAsync(
+                        _ =>
+                        {
+                            wasCalled = true;
+                            return ValueTask.CompletedTask;
+                        },
+                        cancellation.Token)
+                    .AsTask();
+
+                queued.Set();
+                await queuedOperation;
+            });
+
+        Assert.True(queued.Wait(TimeSpan.FromSeconds(5)));
+        cancellation.Cancel();
+        PumpDispatcherUntilComplete(avaloniaDispatcher, operation);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => operation);
+        Assert.False(wasCalled);
+    }
+
+    [Fact]
     public async Task OperationsHonorPreCanceledToken()
     {
         var dispatcher = new AvaloniaUiDispatcher(Dispatcher.CurrentDispatcher);
@@ -168,6 +222,18 @@ public sealed class AvaloniaUiDispatcherTests
     }
 
     [Fact]
+    public async Task InvokeAsyncMapsUnavailableAvaloniaDispatcherToPresentationError()
+    {
+        var avaloniaDispatcher = CreateShutdownDispatcher();
+        var dispatcher = new AvaloniaUiDispatcher(avaloniaDispatcher);
+
+        var exception = await Assert.ThrowsAsync<PresentationException>(
+            () => dispatcher.InvokeAsync(() => { }).AsTask());
+
+        Assert.Equal(PresentationError.DispatcherUnavailable, exception.Error);
+    }
+
+    [Fact]
     public async Task RuntimeRejectedOperationsRecordDiagnostics()
     {
         var diagnostics = new InMemoryHostDiagnostics();
@@ -208,6 +274,89 @@ public sealed class AvaloniaUiDispatcherTests
             record =>
                 record.Code == PresentationDiagnosticIds.DispatcherCallbackFailed &&
                 record.Severity == HostDiagnosticSeverity.Error);
+    }
+
+    [Fact]
+    public async Task BackgroundCallbackFailuresRecordDispatcherContext()
+    {
+        var diagnostics = new InMemoryHostDiagnostics();
+        var avaloniaDispatcher = Dispatcher.CurrentDispatcher;
+        var dispatcherThreadId = Environment.CurrentManagedThreadId;
+        var dispatcher = new AvaloniaUiDispatcher(
+            avaloniaDispatcher,
+            runtime: null,
+            diagnostics);
+
+        var operation = Task.Run(
+            () => dispatcher
+                .InvokeAsync(() => throw new InvalidOperationException("background callback failed"))
+                .AsTask());
+
+        PumpDispatcherUntilComplete(avaloniaDispatcher, operation);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => operation);
+
+        var record = Assert.Single(
+            diagnostics.Records,
+            static record => record.Code == PresentationDiagnosticIds.DispatcherCallbackFailed);
+
+        Assert.Equal("InvokeAsync", record.Context["targetAction"]);
+        Assert.False(string.IsNullOrWhiteSpace(record.Context["operationId"]));
+        Assert.Equal(
+            dispatcherThreadId.ToString(CultureInfo.InvariantCulture),
+            record.Context["dispatcherThreadId"]);
+        Assert.NotEqual(record.Context["dispatcherThreadId"], record.Context["callingThreadId"]);
+    }
+
+    private static void PumpDispatcherUntilComplete(
+        Dispatcher dispatcher,
+        Task operation)
+    {
+        var timeout = DateTimeOffset.UtcNow.AddSeconds(5);
+
+        while (!operation.IsCompleted && DateTimeOffset.UtcNow < timeout)
+        {
+            dispatcher.RunJobs(DispatcherPriority.Default);
+            Thread.Sleep(TimeSpan.FromMilliseconds(10));
+        }
+    }
+
+    private static Dispatcher CreateShutdownDispatcher()
+    {
+        Dispatcher? dispatcher = null;
+        Exception? exception = null;
+        using var ready = new ManualResetEventSlim();
+        var thread = new Thread(
+            () =>
+            {
+                try
+                {
+                    dispatcher = Dispatcher.CurrentDispatcher;
+                    dispatcher.InvokeShutdown();
+                }
+                catch (Exception caught)
+                {
+                    exception = caught;
+                }
+                finally
+                {
+                    ready.Set();
+                }
+            })
+        {
+            IsBackground = true,
+            Name = "AtomUI.City.Presentation.Tests.ShutdownDispatcher",
+        };
+
+        thread.Start();
+        Assert.True(ready.Wait(TimeSpan.FromSeconds(5)));
+        thread.Join(TimeSpan.FromSeconds(5));
+
+        if (exception is not null)
+        {
+            throw exception;
+        }
+
+        return dispatcher ?? throw new InvalidOperationException("Shutdown dispatcher was not created.");
     }
 
     private sealed class InlineUiDispatcher : IUiDispatcher

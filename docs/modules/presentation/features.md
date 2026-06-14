@@ -6,7 +6,7 @@
 
 | Feature ID | 名称 | 状态 | Public Contract | 主测试 |
 | --- | --- | --- | --- | --- |
-| AUC-PRESENTATION-001 | UI Dispatcher Bridge | Ready to Start Product Implementation | AvaloniaUiDispatcher, IUiDispatcher | AvaloniaUiDispatcherTests; PresentationPlatformIntegrationTests |
+| AUC-PRESENTATION-001 | UI Dispatcher Bridge | 已实现并通过产品合同测试 | AvaloniaUiDispatcher, IUiDispatcher | AvaloniaUiDispatcherTests; PresentationPlatformIntegrationTests |
 | AUC-PRESENTATION-002 | View Registry and Locator | Ready to Start Product Implementation | ViewRegistry, IViewLocator, ViewForAttribute | ViewLocatorTests |
 | AUC-PRESENTATION-003 | View Factory and Binding | Ready to Start Product Implementation | ViewFactory, ViewBinder, BoundViewHandle | ViewBindingTests |
 | AUC-PRESENTATION-004 | Route Outlet Commit | Ready to Start Product Implementation | IRouteOutlet, RouteOutlet, RouteOutletCommitResult | RouteOutletTests |
@@ -35,13 +35,13 @@
 ## AUC-PRESENTATION-001 UI Dispatcher Bridge
 
 Feature ID: `AUC-PRESENTATION-001`
-Status: Ready to Start Product Implementation
+Status: 已实现并通过产品合同测试
 Goal: 把 Core 的 UI dispatcher 抽象桥接到 Avalonia UI 线程。
 Public Contract: AvaloniaUiDispatcher, IUiDispatcher
 Runtime / Build Behavior: 所有 VisualTree 修改、resource dictionary 修改和 UI-bound notification 都通过 dispatcher 提交。
-Failure Behavior: 非 UI 线程直接提交必须拒绝或 marshal；dispatcher 不可用返回 PresentationError。
+Failure Behavior: 非 UI 线程直接提交会 marshal 到 dispatcher；dispatcher 不可用返回 `PresentationError.DispatcherUnavailable`；work exception 原样传播并记录诊断。
 Threading / Cancellation: InvokeAsync 必须观察 token；取消后不得执行 UI work item。
-Diagnostics: dispatcher diagnostics 必须包含 thread id、operation id 和 target action。
+Diagnostics: dispatcher diagnostics 包含 operation id、calling thread id、dispatcher thread id 和 target action。
 Tests: `AvaloniaUiDispatcherTests; PresentationPlatformIntegrationTests`
 Required Assertions: 断言 UI 线程识别、后台 marshal、取消、异常映射和平台不可用。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。

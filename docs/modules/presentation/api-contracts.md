@@ -16,7 +16,8 @@
 
 | Method | Purpose | Parameters | Return | Failure Behavior | Cancellation | Concurrency / Idempotency |
 | --- | --- | --- | --- | --- | --- | --- |
-| AvaloniaUiDispatcher.InvokeAsync | 在 UI 线程执行 work。 | delegate 不得为 null。 | work result。 | dispatcher unavailable 或 work exception 映射 PresentationError。 | 取消后不得执行 work。 | UI work 串行，允许后台并发排队。 |
+| AvaloniaUiDispatcher.InvokeAsync | 在 UI 线程执行 work。 | delegate 不得为 null。 | work result。 | dispatcher unavailable 映射 `PresentationError.DispatcherUnavailable`；work exception 原样传播并记录诊断。 | 取消后不得执行 work；非用户取消的 dispatcher shutdown 映射为 unavailable。 | UI work 串行，允许后台并发排队。 |
+| AvaloniaUiDispatcher.PostAsync | 投递异步 UI work。 | delegate 不得为 null。 | 投递完成 task。 | dispatcher unavailable 映射 `PresentationError.DispatcherUnavailable`；work exception 原样传播并记录诊断。 | 取消后不得执行 queued work item。 | 后台调用 marshal 到 dispatcher 线程执行。 |
 | IViewLocator.Resolve | 解析 ViewModel 对应 ViewDescriptor。 | ViewModel type、route target、owner。 | ViewDescriptor 或失败结果。 | 未注册、重复、owner revoked 返回失败。 | 同步 lookup 无 token。 | registry 读并发安全。 |
 | ViewFactory.Create | 创建 View 并准备 DataContext。 | ViewDescriptor、ViewModel、factory context。 | BoundViewHandle。 | 构造失败释放中间资源。 | UI 创建必须支持取消前检查。 | 每次创建独立 handle。 |
 | IRouteOutlet.CommitAsync | 把 bound view 提交到 outlet。 | RouteOutletCommitPlan。 | RouteOutletCommitResult。 | 失败不替换旧 content；old deactivate 拒绝则中止。 | attach 前可取消；attach 后完成回滚或提交。 | 同一 outlet commit 串行。 |

@@ -10,4 +10,5 @@ public enum PresentationError
     OutletCommitFailed,
     RuntimeNotReady,
     RuntimeStopping,
+    DispatcherUnavailable,
 }

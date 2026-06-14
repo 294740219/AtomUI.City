@@ -10,18 +10,21 @@
 
 ## 当前源码诊断码
 
-当前源码没有模块专属诊断 ID。产品级实现如果新增诊断，必须先在本文件登记。
+| Code | 名称 | Severity | 场景 | Required Context |
+| --- | --- | --- | --- | --- |
+| `AUCPRS003` | DispatcherOperationRejected | Warning | runtime 未 ready、runtime stopping 或 Avalonia dispatcher unavailable。 | `operationId`, `targetAction`, `callingThreadId`, `dispatcherThreadId`, `error` |
+| `AUCPRS004` | DispatcherCallbackFailed | Error | UI dispatcher work item 抛异常。 | `operationId`, `targetAction`, `callingThreadId`, `dispatcherThreadId`, `error` |
 
 ## 产品级必须诊断的失败
 
 - View 未注册：返回失败并诊断。
-- 非 UI 线程提交：拒绝并诊断。
+- 非 UI 线程提交：marshal 到 dispatcher；dispatcher 不可用或 work 失败必须诊断。
 - View 创建失败：不替换现有 outlet。
 - 插件卸载 active view：detach 并撤销资源。
 
 ## 上下文字段
 
-推荐字段：`operationId`、`scopeId`、`module`、`pluginId`、`routeId`、`stateKey`、`eventType`、`handlerType`、`assembly`、`path`、`featureId`、`threadId`、`attempt`、`transportKind`。
+推荐字段：`operationId`、`scopeId`、`module`、`pluginId`、`routeId`、`stateKey`、`eventType`、`handlerType`、`assembly`、`path`、`featureId`、`threadId`、`callingThreadId`、`dispatcherThreadId`、`targetAction`、`attempt`、`transportKind`。
 
 ## 诊断缺口处理
 

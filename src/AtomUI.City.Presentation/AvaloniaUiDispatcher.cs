@@ -1,3 +1,4 @@
+using System.Globalization;
 using AtomUI.City.Diagnostics;
 using AtomUI.City.Threading;
 using Avalonia.Threading;
@@ -9,6 +10,7 @@ public sealed class AvaloniaUiDispatcher : IUiDispatcher
     private readonly Dispatcher _dispatcher;
     private readonly IPresentationRuntime? _runtime;
     private readonly IHostDiagnostics? _diagnostics;
+    private long _nextOperationId;
 
     public AvaloniaUiDispatcher()
         : this(Dispatcher.UIThread, runtime: null, diagnostics: null)
@@ -50,6 +52,7 @@ public sealed class AvaloniaUiDispatcher : IUiDispatcher
     public ValueTask InvokeAsync(Action callback, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(callback);
+        var context = CreateOperationContext(nameof(InvokeAsync));
 
         if (cancellationToken.IsCancellationRequested)
         {
@@ -59,35 +62,38 @@ public sealed class AvaloniaUiDispatcher : IUiDispatcher
         var runtimeException = CreateRuntimeException();
         if (runtimeException is not null)
         {
-            WriteOperationRejectedDiagnostic(runtimeException);
+            WriteOperationRejectedDiagnostic(runtimeException, context);
 
             return ValueTask.FromException(runtimeException);
         }
 
         if (_dispatcher.CheckAccess())
         {
-            try
-            {
-                callback();
-
-                return ValueTask.CompletedTask;
-            }
-            catch (Exception exception)
-            {
-                WriteCallbackFailedDiagnostic(exception);
-
-                return ValueTask.FromException(exception);
-            }
+            return ExecuteInline(callback, context);
         }
 
-        var operation = _dispatcher.InvokeAsync(callback, DispatcherPriority.Default, cancellationToken);
+        try
+        {
+            var operation = _dispatcher.InvokeAsync(
+                () => ExecuteCallback(callback, context),
+                DispatcherPriority.Default,
+                cancellationToken);
 
-        return new ValueTask(operation.GetTask());
+            return AwaitDispatcherOperationAsync(operation.GetTask(), context, cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            var dispatcherException = CreateDispatcherUnavailableException(exception);
+            WriteOperationRejectedDiagnostic(dispatcherException, context);
+
+            return ValueTask.FromException(dispatcherException);
+        }
     }
 
     public ValueTask<T> InvokeAsync<T>(Func<T> callback, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(callback);
+        var context = CreateOperationContext(nameof(InvokeAsync));
 
         if (cancellationToken.IsCancellationRequested)
         {
@@ -97,28 +103,32 @@ public sealed class AvaloniaUiDispatcher : IUiDispatcher
         var runtimeException = CreateRuntimeException();
         if (runtimeException is not null)
         {
-            WriteOperationRejectedDiagnostic(runtimeException);
+            WriteOperationRejectedDiagnostic(runtimeException, context);
 
             return ValueTask.FromException<T>(runtimeException);
         }
 
         if (_dispatcher.CheckAccess())
         {
-            try
-            {
-                return ValueTask.FromResult(callback());
-            }
-            catch (Exception exception)
-            {
-                WriteCallbackFailedDiagnostic(exception);
-
-                return ValueTask.FromException<T>(exception);
-            }
+            return ExecuteInline(callback, context);
         }
 
-        var operation = _dispatcher.InvokeAsync(callback, DispatcherPriority.Default, cancellationToken);
+        try
+        {
+            var operation = _dispatcher.InvokeAsync(
+                () => ExecuteCallback(callback, context),
+                DispatcherPriority.Default,
+                cancellationToken);
 
-        return new ValueTask<T>(operation.GetTask());
+            return AwaitDispatcherOperationAsync(operation.GetTask(), context, cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            var dispatcherException = CreateDispatcherUnavailableException(exception);
+            WriteOperationRejectedDiagnostic(dispatcherException, context);
+
+            return ValueTask.FromException<T>(dispatcherException);
+        }
     }
 
     public ValueTask PostAsync(
@@ -126,6 +136,7 @@ public sealed class AvaloniaUiDispatcher : IUiDispatcher
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(callback);
+        var context = CreateOperationContext(nameof(PostAsync));
 
         if (cancellationToken.IsCancellationRequested)
         {
@@ -135,23 +146,14 @@ public sealed class AvaloniaUiDispatcher : IUiDispatcher
         var runtimeException = CreateRuntimeException();
         if (runtimeException is not null)
         {
-            WriteOperationRejectedDiagnostic(runtimeException);
+            WriteOperationRejectedDiagnostic(runtimeException, context);
 
             return ValueTask.FromException(runtimeException);
         }
 
         if (_dispatcher.CheckAccess())
         {
-            try
-            {
-                return callback(cancellationToken);
-            }
-            catch (Exception exception)
-            {
-                WriteCallbackFailedDiagnostic(exception);
-
-                return ValueTask.FromException(exception);
-            }
+            return ExecuteInline(callback, cancellationToken, context);
         }
 
         var taskCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -184,7 +186,7 @@ public sealed class AvaloniaUiDispatcher : IUiDispatcher
                     }
                     catch (Exception exception)
                     {
-                        WriteCallbackFailedDiagnostic(exception);
+                        WriteCallbackFailedDiagnostic(exception, context);
                         taskCompletion.TrySetException(exception);
                     }
                     finally
@@ -197,10 +199,176 @@ public sealed class AvaloniaUiDispatcher : IUiDispatcher
         catch (Exception exception)
         {
             cancellationRegistration.Dispose();
-            taskCompletion.TrySetException(exception);
+            var dispatcherException = CreateDispatcherUnavailableException(exception);
+            WriteOperationRejectedDiagnostic(dispatcherException, context);
+            taskCompletion.TrySetException(dispatcherException);
         }
 
         return new ValueTask(taskCompletion.Task);
+    }
+
+    private DispatcherOperationContext CreateOperationContext(string targetAction)
+    {
+        return new DispatcherOperationContext(
+            Interlocked.Increment(ref _nextOperationId),
+            targetAction,
+            Environment.CurrentManagedThreadId);
+    }
+
+    private ValueTask ExecuteInline(Action callback, DispatcherOperationContext context)
+    {
+        try
+        {
+            ExecuteCallback(callback, context);
+
+            return ValueTask.CompletedTask;
+        }
+        catch (Exception exception)
+        {
+            return ValueTask.FromException(exception);
+        }
+    }
+
+    private ValueTask<T> ExecuteInline<T>(Func<T> callback, DispatcherOperationContext context)
+    {
+        try
+        {
+            return ValueTask.FromResult(ExecuteCallback(callback, context));
+        }
+        catch (Exception exception)
+        {
+            return ValueTask.FromException<T>(exception);
+        }
+    }
+
+    private ValueTask ExecuteInline(
+        Func<CancellationToken, ValueTask> callback,
+        CancellationToken cancellationToken,
+        DispatcherOperationContext context)
+    {
+        try
+        {
+            var operation = callback(cancellationToken);
+
+            return operation.IsCompletedSuccessfully
+                ? operation
+                : AwaitInlinePostAsync(operation, context, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return ValueTask.FromCanceled(cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            WriteCallbackFailedDiagnostic(exception, context);
+
+            return ValueTask.FromException(exception);
+        }
+    }
+
+    private async ValueTask AwaitInlinePostAsync(
+        ValueTask operation,
+        DispatcherOperationContext context,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await operation.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            WriteCallbackFailedDiagnostic(exception, context);
+
+            throw;
+        }
+    }
+
+    private ValueTask AwaitDispatcherOperationAsync(
+        Task operation,
+        DispatcherOperationContext context,
+        CancellationToken cancellationToken)
+    {
+        return operation.IsCompletedSuccessfully
+            ? ValueTask.CompletedTask
+            : new ValueTask(AwaitDispatcherOperationSlowAsync(operation, context, cancellationToken));
+    }
+
+    private ValueTask<T> AwaitDispatcherOperationAsync<T>(
+        Task<T> operation,
+        DispatcherOperationContext context,
+        CancellationToken cancellationToken)
+    {
+        return operation.IsCompletedSuccessfully
+            ? ValueTask.FromResult(operation.Result)
+            : new ValueTask<T>(AwaitDispatcherOperationSlowAsync(operation, context, cancellationToken));
+    }
+
+    private async Task AwaitDispatcherOperationSlowAsync(
+        Task operation,
+        DispatcherOperationContext context,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await operation.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            var dispatcherException = CreateDispatcherUnavailableException(exception);
+            WriteOperationRejectedDiagnostic(dispatcherException, context);
+
+            throw dispatcherException;
+        }
+    }
+
+    private async Task<T> AwaitDispatcherOperationSlowAsync<T>(
+        Task<T> operation,
+        DispatcherOperationContext context,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await operation.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            var dispatcherException = CreateDispatcherUnavailableException(exception);
+            WriteOperationRejectedDiagnostic(dispatcherException, context);
+
+            throw dispatcherException;
+        }
+    }
+
+    private void ExecuteCallback(Action callback, DispatcherOperationContext context)
+    {
+        try
+        {
+            callback();
+        }
+        catch (Exception exception)
+        {
+            WriteCallbackFailedDiagnostic(exception, context);
+
+            throw;
+        }
+    }
+
+    private T ExecuteCallback<T>(Func<T> callback, DispatcherOperationContext context)
+    {
+        try
+        {
+            return callback();
+        }
+        catch (Exception exception)
+        {
+            WriteCallbackFailedDiagnostic(exception, context);
+
+            throw;
+        }
     }
 
     private PresentationException? CreateRuntimeException()
@@ -219,21 +387,58 @@ public sealed class AvaloniaUiDispatcher : IUiDispatcher
         };
     }
 
-    private void WriteOperationRejectedDiagnostic(PresentationException exception)
+    private static PresentationException CreateDispatcherUnavailableException(Exception exception)
+    {
+        return new PresentationException(
+            PresentationError.DispatcherUnavailable,
+            "Avalonia UI dispatcher is not available.",
+            exception);
+    }
+
+    private void WriteOperationRejectedDiagnostic(
+        PresentationException exception,
+        DispatcherOperationContext context)
     {
         _diagnostics?.Write(new HostDiagnosticRecord(
             PresentationDiagnosticIds.DispatcherOperationRejected,
             exception.Message,
             HostDiagnosticSeverity.Warning,
-            ScopeId: _runtime?.PresentationScope?.Id));
+            ScopeId: _runtime?.PresentationScope?.Id)
+        {
+            Context = CreateDiagnosticContext(context, exception.Error.ToString()),
+        });
     }
 
-    private void WriteCallbackFailedDiagnostic(Exception exception)
+    private void WriteCallbackFailedDiagnostic(
+        Exception exception,
+        DispatcherOperationContext context)
     {
         _diagnostics?.Write(new HostDiagnosticRecord(
             PresentationDiagnosticIds.DispatcherCallbackFailed,
             exception.Message,
             HostDiagnosticSeverity.Error,
-            ScopeId: _runtime?.PresentationScope?.Id));
+            ScopeId: _runtime?.PresentationScope?.Id)
+        {
+            Context = CreateDiagnosticContext(context, exception.GetType().FullName),
+        });
     }
+
+    private static IReadOnlyDictionary<string, string?> CreateDiagnosticContext(
+        DispatcherOperationContext context,
+        string? error)
+    {
+        return new Dictionary<string, string?>(StringComparer.Ordinal)
+        {
+            ["operationId"] = context.OperationId.ToString(CultureInfo.InvariantCulture),
+            ["targetAction"] = context.TargetAction,
+            ["callingThreadId"] = context.CallingThreadId.ToString(CultureInfo.InvariantCulture),
+            ["dispatcherThreadId"] = Environment.CurrentManagedThreadId.ToString(CultureInfo.InvariantCulture),
+            ["error"] = error,
+        };
+    }
+
+    private sealed record DispatcherOperationContext(
+        long OperationId,
+        string TargetAction,
+        int CallingThreadId);
 }
