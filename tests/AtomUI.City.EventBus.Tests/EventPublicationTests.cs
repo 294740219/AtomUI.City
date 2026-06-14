@@ -98,6 +98,22 @@ public sealed class EventPublicationTests
     }
 
     [Fact]
+    public void EventContextRejectsDefaultContractId()
+    {
+        Assert.Throws<ArgumentException>(() => new EventContext<TestEvent>(
+            new TestEvent("context"),
+            default,
+            Guid.NewGuid(),
+            "correlation",
+            causationId: null,
+            DateTimeOffset.UtcNow,
+            publishDepth: 0,
+            EventSubscriptionId.New(),
+            EventDispatchPolicy.Serialized,
+            CancellationToken.None));
+    }
+
+    [Fact]
     public async Task PostAsyncRejectsNullEvent()
     {
         var eventBus = new InMemoryEventBus();

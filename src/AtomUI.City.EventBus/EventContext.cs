@@ -15,6 +15,7 @@ public sealed class EventContext<TEvent>
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(eventData);
+        EventContractId.ThrowIfDefault(contractId, nameof(contractId));
         ArgumentException.ThrowIfNullOrWhiteSpace(correlationId);
 
         Event = eventData;

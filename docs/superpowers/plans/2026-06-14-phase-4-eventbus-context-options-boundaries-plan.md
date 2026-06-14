@@ -139,7 +139,7 @@ Commit message: `fix(EventBus): validate publish causation ids`
 - Modify: `docs/modules/eventbus/api-contracts.md`
 - Test: `tests/AtomUI.City.EventBus.Tests/EventPublicationTests.cs`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```csharp
 [Fact]
@@ -159,21 +159,21 @@ public void EventContextRejectsDefaultContractId()
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `dotnet test tests/AtomUI.City.EventBus.Tests/AtomUI.City.EventBus.Tests.csproj --filter "FullyQualifiedName~EventContextRejectsDefaultContractId"`
 Expected: FAIL because `EventContext<TEvent>` currently accepts default contract ids.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Call `EventContractId.ThrowIfDefault(contractId, nameof(contractId))` in the `EventContext<TEvent>` constructor. Add an `EventContext<TEvent> constructor` row to `api-contracts.md`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `dotnet test tests/AtomUI.City.EventBus.Tests/AtomUI.City.EventBus.Tests.csproj --filter "FullyQualifiedName~EventContextRejectsDefaultContractId"`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit message: `fix(EventBus): validate context contract ids`
 
