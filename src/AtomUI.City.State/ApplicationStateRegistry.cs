@@ -32,7 +32,9 @@ public sealed class ApplicationStateRegistry :
                 new WritableState<T>(
                     definition.DefaultValue,
                     definition.Comparer,
-                    _diagnostics)));
+                    _diagnostics,
+                    definition.Key.Name,
+                    definition.Access)));
     }
 
     public IReadOnlyState<T> Get<T>(StateKey<T> key)

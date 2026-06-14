@@ -6,7 +6,7 @@
 
 | Feature ID | 名称 | 状态 | 公开合同 | 主测试 |
 | --- | --- | --- | --- | --- |
-| AUC-STATE-001 | Writable State | 产品化进行中 | IWritableState<T>, WritableState<T> | WritableStateTests |
+| AUC-STATE-001 | Writable State | Completed | IWritableState<T>, WritableState<T> | WritableStateTests |
 | AUC-STATE-002 | Application State | 产品化进行中 | IApplicationState, ApplicationStateRegistry, StateDefinition<T> | ApplicationStateTests; StateDefinitionTests |
 | AUC-STATE-003 | Computed State | 产品化进行中 | IComputedState<T>, ComputedState<T> | ComputedStateTests |
 | AUC-STATE-004 | State Subscription | 产品化进行中 | IStateSubscription, IStateReaction, StateSubscriptionOptions | StateScopeTests; StateThreadingTests |
@@ -36,11 +36,11 @@
 ## AUC-STATE-001 Writable State
 
 Feature ID: `AUC-STATE-001`
-Status: 产品化进行中
+Status: Completed
 Goal: 线程安全读写、变更通知和 access policy。
 Public Contract: IWritableState<T>, WritableState<T>
-Runtime / Build Behavior: 线程安全读写、变更通知和 access policy。
-Failure Behavior: updater 拒绝或失败、handler 失败、disposed state。
+Runtime / Build Behavior: 线程安全读写、变更通知、version 递增和 access policy。
+Failure Behavior: updater 拒绝或失败、handler 失败、disposed state、ReadOnly 写拒绝。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `WritableStateTests`。

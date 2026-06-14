@@ -5,8 +5,8 @@
 ## 当前结论
 
 - 1.0 发布状态：不可发布。
-- 全局进度：53/118。
-- 模块 Feature 合同：53/109。
+- 全局进度：54/118。
+- 模块 Feature 合同：54/109。
 - 最终发布门禁：0/9。
 - 最近校准日期：2026-06-14。
 
@@ -40,7 +40,7 @@
 | Routing | 8 | 0 | 8 | 已完成 |
 | Presentation | 8 | 0 | 8 | 已完成 |
 | MVVM | 6 | 0 | 6 | 已完成 |
-| State | 0 | 8 | 8 | 产品化进行中 |
+| State | 1 | 7 | 8 | 产品化进行中 |
 | EventBus | 0 | 6 | 6 | 产品化进行中 |
 | PluginSystem | 0 | 8 | 8 | 未完成 |
 | Data | 0 | 9 | 9 | 未完成 |
@@ -126,7 +126,7 @@
 
 ## State
 
-- [ ] AUC-STATE-001 Writable State。验收重点：原子更新、version、提交后通知、相等值不通知、订阅 dispose、disposed mutation rejection、updater 异常诊断和写拒绝/access policy。
+- [x] AUC-STATE-001 Writable State。验收重点：原子更新、version、提交后通知、相等值不通知、订阅 dispose、disposed mutation rejection、updater 异常诊断和写拒绝/access policy。
 - [ ] AUC-STATE-002 Application State。验收重点：注册、读取、writer、not registered、StateDefinition enum 和 schema version 边界。
 - [ ] AUC-STATE-003 Computed State。验收重点：lazy invalidation、依赖失效、缓存、异常诊断、null dependency 拒绝。
 - [ ] AUC-STATE-004 State Subscription。验收重点：dispose 后不通知、Background 不阻塞状态提交、Background handler 失败诊断。

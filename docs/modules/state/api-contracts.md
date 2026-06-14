@@ -17,7 +17,7 @@
 
 | Method | Purpose | Parameters | Return | Failure Behavior | Cancellation | Concurrency / Idempotency |
 | --- | --- | --- | --- | --- | --- | --- |
-| IWritableState<T>.Set / SetValue / Update | 写入或转换状态。 | value/updater。 | `Set` 无返回；`SetValue`/`Update` 返回是否提交变更。 | updater 为 null 抛 `ArgumentNullException`；`WritableState<T>` Dispose 后 `Set`、`SetValue`、`Update` 抛 `ObjectDisposedException`；updater 失败保留旧值并写 diagnostics；callback 失败写 diagnostics。 | 同步提交，不隐式切线程。 | 并发写串行化；相等值不递增 version、不通知。 |
+| IWritableState<T>.Set / SetValue / Update | 写入或转换状态。 | value/updater。 | `Set` 无返回；`SetValue`/`Update` 返回是否提交变更。 | updater 为 null 抛 `ArgumentNullException`；`WritableState<T>` Dispose 后 `Set`、`SetValue`、`Update` 抛 `ObjectDisposedException`；ReadOnly access 抛 `StateAccessDeniedException` 并写 diagnostics；updater 失败保留旧值并写 diagnostics；callback 失败写 diagnostics。 | 同步提交，不隐式切线程。 | 并发写串行化；相等值不递增 version、不通知；access 拒绝发生在 updater 执行前。 |
 | IReadOnlyState<T>.OnChange | 订阅状态。 | handler/options。 | IStateSubscription。 | handler/options 为 null 抛 `ArgumentNullException`；`WritableState<T>` Dispose 后抛 `ObjectDisposedException`；handler 失败写 diagnostics。 | 调度由 StateDispatchPolicy；Background 不得阻塞状态提交。 | subscription dispose 后不再通知；重复 dispose 幂等。 |
 | WritableState<T>.Dispose | 结束可写状态生命周期。 | 无。 | 无。 | 重复 Dispose 不抛异常；Dispose 后读属性仍可读取，mutation、subscription 和 restore-style mutation 抛 `ObjectDisposedException`。 | 无。 | 清空现有 subscriptions；不在状态锁内调用 handler。 |
 | IApplicationState.Get / OnChange; IApplicationStateWriter.GetWritable / Set / Update | 读取、订阅或写入注册状态。 | key 必须有效；OnChange handler 和 Update updater 不得为 null。 | IReadOnlyState<T>、IStateSubscription、IWritableState<T> 或提交结果。 | default key 抛 `ArgumentException` 且不写 not registered diagnostics；未注册 key 抛 `StateNotRegisteredException` 并写 diagnostics；handler/updater 为 null 抛 `ArgumentNullException`。 | 同步提交，不隐式切线程。 | 未注册状态不得隐式创建；写入规则由对应 `WritableState<T>` 合同决定。 |
@@ -32,6 +32,7 @@
 | StateCollectionSnapshotEntry<TKey,TItem> constructor / init | 创建集合快照条目并保护 init 边界。 | key 不得为 null；itemVersion 必须大于等于 0。 | StateCollectionSnapshotEntry<TKey,TItem>。 | key 为 null 抛 `ArgumentNullException`；itemVersion 小于 0 抛 `ArgumentOutOfRangeException`。 | 无。 | record init 属性不得绕过集合快照条目边界。 |
 | StateCollectionChange<TKey,TItem> constructor / init | 创建集合变更记录并保护 init 边界。 | kind 必须为已定义枚举；key 不得为 null；collectionVersion/itemVersion 必须大于等于 0。 | StateCollectionChange<TKey,TItem>。 | 未知 kind、负 collectionVersion 或负 itemVersion 抛 `ArgumentOutOfRangeException`；key 为 null 抛 `ArgumentNullException`。 | 无。 | record init 属性不得绕过集合变更边界。 |
 | StateCollectionChangedEventArgs<TKey,TItem> constructor | 创建集合变更事件参数。 | change 不得为 null；changes 不得为 null、空列表或包含 null 项。 | StateCollectionChangedEventArgs<TKey,TItem>。 | changes 为 null 抛 `ArgumentNullException`；空列表或包含 null 项抛 `ArgumentException`。 | 无。 | `Version` 取最后一条 change 的 collection version；changes 创建后不可变。 |
+| WritableState<T> constructor | 创建单值状态。 | initialValue；comparer、diagnostics、stateName 和 access 可选。 | WritableState<T>。 | 未知 access 抛 `ArgumentOutOfRangeException`；空 stateName 使用 value type name 作为诊断名称。 | 无。 | access policy 固定在实例生命周期内；ApplicationStateRegistry 必须把 StateDefinition access 传入 WritableState。 |
 
 ## Public 类型覆盖
 

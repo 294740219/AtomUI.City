@@ -120,6 +120,7 @@ public interface IWritableState<T> : IReadOnlyState<T>
 - 返回 `false` 表示值未变化。
 - 更新必须原子化。
 - 更新失败时保留旧值。
+- 写入策略拒绝时保留旧值和 version。
 - updater 中禁止执行 IO 或长耗时逻辑。
 
 `WritableState<T>` 作为当前具体实现同时实现 `IDisposable`，但不把 `IDisposable` 加到 `IWritableState<T>` 合同上。Dispose 行为：
@@ -128,6 +129,8 @@ public interface IWritableState<T> : IReadOnlyState<T>
 - `Value`、`Version` 和 `ValueType` 在 Dispose 后仍可读取。
 - `Set`、`SetValue`、`Update` 和 `OnChange` 在 Dispose 后抛 `ObjectDisposedException`。
 - 内部 restore-style mutation 在 Dispose 后也必须拒绝。
+- 构造时可绑定 `stateName` 和 `StateAccessPolicy`；`ReadOnly` 状态拒绝 `Set`、`SetValue` 和 `Update`，抛 `StateAccessDeniedException` 并写 `AUCSTA004`。
+- access 拒绝必须发生在 `Update` 的 updater 执行前。
 
 异步请求不直接进入 state。异步请求属于 Data、Command 或 OperationScope，完成后再提交状态更新。
 
@@ -203,6 +206,7 @@ context.States.Add(
 - 不在状态锁内调用订阅者。
 - 订阅者观察到通知时，`Value` 和 `Version` 必须已经是提交后的值。
 - 更新失败不改变当前值。
+- 写入策略拒绝不改变当前值，也不执行 updater。
 - 取消后的 OperationScope 不应继续提交状态更新。
 
 ### 8. AOT 和 Source Generator

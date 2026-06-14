@@ -137,4 +137,53 @@ public sealed class WritableStateTests
         Assert.Equal(HostDiagnosticSeverity.Error, record.Severity);
         Assert.Contains("bad update", record.Message, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void ReadOnlyAccessPolicyRejectsWritableStateMutations()
+    {
+        var state = new WritableState<int>(
+            3,
+            stateName: "AtomUI.City.Tests.ReadOnly",
+            access: StateAccessPolicy.ReadOnly);
+        var updaterCalled = false;
+
+        var setValueException = Assert.Throws<StateAccessDeniedException>(
+            () => state.SetValue(4));
+        var setException = Assert.Throws<StateAccessDeniedException>(
+            () => state.Set(4));
+        var updateException = Assert.Throws<StateAccessDeniedException>(
+            () => state.Update(value =>
+            {
+                updaterCalled = true;
+                return value + 1;
+            }));
+
+        Assert.Equal("AtomUI.City.Tests.ReadOnly", setValueException.StateName);
+        Assert.Equal(setValueException.StateName, setException.StateName);
+        Assert.Equal(setValueException.StateName, updateException.StateName);
+        Assert.False(updaterCalled);
+        Assert.Equal(3, state.Value);
+        Assert.Equal(0, state.Version);
+    }
+
+    [Fact]
+    public void ReadOnlyAccessPolicyRecordsWriteDeniedDiagnostics()
+    {
+        var diagnostics = new InMemoryHostDiagnostics();
+        var state = new WritableState<int>(
+            3,
+            diagnostics: diagnostics,
+            stateName: "AtomUI.City.Tests.ReadOnly",
+            access: StateAccessPolicy.ReadOnly);
+
+        var exception = Assert.Throws<StateAccessDeniedException>(
+            () => state.SetValue(4));
+
+        Assert.Equal("AtomUI.City.Tests.ReadOnly", exception.StateName);
+        var record = Assert.Single(diagnostics.Records);
+        Assert.Equal(StateDiagnosticIds.ApplicationStateWriteDenied, record.Code);
+        Assert.Equal(HostDiagnosticSeverity.Warning, record.Severity);
+        Assert.Contains(exception.StateName, record.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(StateAccessPolicy.ReadOnly), record.Message, StringComparison.Ordinal);
+    }
 }

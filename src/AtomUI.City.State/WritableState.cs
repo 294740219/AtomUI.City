@@ -6,6 +6,8 @@ public sealed class WritableState<T> : IWritableState<T>, IDisposable
 {
     private readonly IEqualityComparer<T> _comparer;
     private readonly IHostDiagnostics? _diagnostics;
+    private readonly string _stateName;
+    private readonly StateAccessPolicy _access;
     private readonly List<StateSubscription> _subscriptions = [];
     private readonly object _syncRoot = new();
     private T _value;
@@ -14,11 +16,22 @@ public sealed class WritableState<T> : IWritableState<T>, IDisposable
     public WritableState(
         T initialValue,
         IEqualityComparer<T>? comparer = null,
-        IHostDiagnostics? diagnostics = null)
+        IHostDiagnostics? diagnostics = null,
+        string? stateName = null,
+        StateAccessPolicy access = StateAccessPolicy.HostWrite)
     {
+        if (!Enum.IsDefined(access))
+        {
+            throw new ArgumentOutOfRangeException(nameof(access), access, "State access policy is not supported.");
+        }
+
         _value = initialValue;
         _comparer = comparer ?? EqualityComparer<T>.Default;
         _diagnostics = diagnostics;
+        _stateName = string.IsNullOrWhiteSpace(stateName)
+            ? typeof(T).FullName ?? typeof(T).Name
+            : stateName;
+        _access = access;
     }
 
     public event EventHandler<StateChangedEventArgs<T>>? Changed;
@@ -53,6 +66,7 @@ public sealed class WritableState<T> : IWritableState<T>, IDisposable
         lock (_syncRoot)
         {
             ThrowIfDisposed();
+            ThrowIfWriteDenied();
 
             if (_comparer.Equals(_value, value))
             {
@@ -81,6 +95,7 @@ public sealed class WritableState<T> : IWritableState<T>, IDisposable
         lock (_syncRoot)
         {
             ThrowIfDisposed();
+            ThrowIfWriteDenied();
 
             T nextValue;
 
@@ -245,11 +260,28 @@ public sealed class WritableState<T> : IWritableState<T>, IDisposable
             HostDiagnosticSeverity.Error));
     }
 
+    private void WriteWriteDeniedDiagnostic()
+    {
+        _diagnostics?.Write(new HostDiagnosticRecord(
+            StateDiagnosticIds.ApplicationStateWriteDenied,
+            $"Writable state '{_stateName}' with value type '{typeof(T).FullName}' rejected write because access policy is '{_access}'.",
+            HostDiagnosticSeverity.Warning));
+    }
+
     private void ThrowIfDisposed()
     {
         if (_disposed)
         {
             throw new ObjectDisposedException(GetType().FullName);
+        }
+    }
+
+    private void ThrowIfWriteDenied()
+    {
+        if (_access == StateAccessPolicy.ReadOnly)
+        {
+            WriteWriteDeniedDiagnostic();
+            throw new StateAccessDeniedException(_stateName);
         }
     }
 
