@@ -372,6 +372,20 @@ public sealed class EventPublicationTests
     }
 
     [Fact]
+    public void DeliveryResultRejectsSuccessfulCancellationInitMutation()
+    {
+        var delivery = new EventDeliveryResult(
+            EventSubscriptionId.New(),
+            EventDispatchPolicy.Serialized,
+            Succeeded: true);
+
+        Assert.Throws<ArgumentException>(() => delivery with
+        {
+            Canceled = true,
+        });
+    }
+
+    [Fact]
     public void DeliveryResultRejectsSuccessfulErrorMessage()
     {
         Assert.Throws<ArgumentException>(() => new EventDeliveryResult(

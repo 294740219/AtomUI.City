@@ -64,6 +64,14 @@ public sealed record EventDeliveryResult(
 
     public bool Succeeded { get; init; } = ValidateSucceeded(Succeeded, Canceled, ErrorMessage);
 
+    private bool _canceled = ValidateCanceled(Succeeded, Canceled);
+
+    public bool Canceled
+    {
+        get => _canceled;
+        init => _canceled = ValidateCanceled(Succeeded, value);
+    }
+
     private static EventSubscriptionId ValidateSubscriptionId(EventSubscriptionId subscriptionId)
     {
         EventSubscriptionId.ThrowIfDefault(subscriptionId, nameof(SubscriptionId));
@@ -82,6 +90,16 @@ public sealed record EventDeliveryResult(
         }
 
         return dispatchPolicy;
+    }
+
+    private static bool ValidateCanceled(bool succeeded, bool canceled)
+    {
+        if (succeeded && canceled)
+        {
+            throw new ArgumentException("Event delivery result cannot be both succeeded and canceled.", nameof(Canceled));
+        }
+
+        return canceled;
     }
 
     private static bool ValidateSucceeded(

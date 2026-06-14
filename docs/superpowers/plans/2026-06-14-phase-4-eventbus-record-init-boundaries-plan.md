@@ -128,7 +128,7 @@ Commit message: `fix(EventBus): validate delivery dispatch init`
 - Test: `tests/AtomUI.City.EventBus.Tests/EventPublicationTests.cs`
 - Modify: this plan file
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```csharp
 [Fact]
@@ -146,12 +146,12 @@ public void DeliveryResultRejectsSuccessfulCancellationInitMutation()
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `dotnet test tests/AtomUI.City.EventBus.Tests/AtomUI.City.EventBus.Tests.csproj --filter "FullyQualifiedName~DeliveryResultRejectsSuccessfulCancellationInitMutation"`
 Expected: FAIL because `Canceled` init mutations do not re-check the success/cancel invariant.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Add a validating `Canceled` backing field:
 
@@ -175,12 +175,12 @@ private static bool ValidateCanceled(bool succeeded, bool canceled)
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `dotnet test tests/AtomUI.City.EventBus.Tests/AtomUI.City.EventBus.Tests.csproj --filter "FullyQualifiedName~DeliveryResultRejectsSuccessfulCancellationInitMutation"`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit message: `fix(EventBus): validate delivery canceled init`
 
