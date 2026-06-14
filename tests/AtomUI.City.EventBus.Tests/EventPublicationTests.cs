@@ -1,3 +1,4 @@
+using AtomUI.City.Diagnostics;
 using AtomUI.City.EventBus;
 
 namespace AtomUI.City.EventBus.Tests;
@@ -167,6 +168,20 @@ public sealed class EventPublicationTests
         Assert.False(result.Accepted);
         Assert.NotEqual(Guid.Empty, result.EventId);
         Assert.False(string.IsNullOrWhiteSpace(result.RejectionReason));
+    }
+
+    [Fact]
+    public async Task PostAsyncRejectsNegativePublishDepthBeforeAcceptance()
+    {
+        var diagnostics = new InMemoryHostDiagnostics();
+        var eventBus = new InMemoryEventBus(diagnostics: diagnostics);
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () =>
+            await eventBus.PostAsync(
+                new TestEvent("negative-depth"),
+                new EventPublishOptions { PublishDepth = -1 }));
+
+        Assert.DoesNotContain(diagnostics.Records, record => record.Code == EventDiagnosticIds.EventAccepted);
     }
 
     private sealed record TestEvent(string Value);

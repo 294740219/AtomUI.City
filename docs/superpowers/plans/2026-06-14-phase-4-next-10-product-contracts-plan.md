@@ -64,11 +64,11 @@
 - Modify: `src/AtomUI.City.EventBus/InMemoryEventBus.cs`
 - Modify: this plan file
 
-- [ ] **Step 1: Add a failing test that `PostAsync` with `new EventPublishOptions { PublishDepth = -1 }` throws `ArgumentOutOfRangeException` and does not accept the event.**
-- [ ] **Step 2: Run focused publication tests and verify the new test fails.**
-- [ ] **Step 3: Apply the existing publish-options validation at the PostAsync acceptance boundary.**
-- [ ] **Step 4: Run focused EventBus tests, docs check, public API check, and `git diff --check`.**
-- [ ] **Step 5: Commit with `fix(EventBus): validate posted publish options`.**
+- [x] **Step 1: Add a failing test that `PostAsync` with `new EventPublishOptions { PublishDepth = -1 }` throws `ArgumentOutOfRangeException` and does not accept the event.**
+- [x] **Step 2: Run focused publication tests and verify the new test fails.**
+- [x] **Step 3: Apply the existing publish-options validation at the PostAsync acceptance boundary.**
+- [x] **Step 4: Run focused EventBus tests, docs check, public API check, and `git diff --check`.**
+- [x] **Step 5: Commit with `fix(EventBus): validate posted publish options`.**
 
 ### Task 5: EventPublishResult rejects null deliveries
 

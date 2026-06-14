@@ -198,6 +198,7 @@ public sealed class InMemoryEventBus : IEventBus
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(eventData);
+        var publishOptions = NormalizeAndValidatePublishOptions(options);
 
         var descriptor = _contractRegistry.GetOrCreate<TEvent>();
         var eventId = Guid.NewGuid();
@@ -229,7 +230,7 @@ public sealed class InMemoryEventBus : IEventBus
                 {
                     await PublishCoreAsync(
                             eventData,
-                            options,
+                            publishOptions,
                             eventId,
                             cancellationToken)
                         .ConfigureAwait(false);
