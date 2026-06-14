@@ -5,6 +5,7 @@ public sealed record StateSnapshotEntry
     private string _stateName = null!;
     private Type _valueType = null!;
     private long _version;
+    private int _schemaVersion;
 
     public StateSnapshotEntry(
         string stateName,
@@ -84,7 +85,22 @@ public sealed record StateSnapshotEntry
         }
     }
 
-    public int SchemaVersion { get; init; }
+    public int SchemaVersion
+    {
+        get => _schemaVersion;
+        init
+        {
+            if (value < 1)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(value),
+                    value,
+                    "State snapshot schema version must be greater than or equal to 1.");
+            }
+
+            _schemaVersion = value;
+        }
+    }
 
     public string? OwnerModule { get; init; }
 

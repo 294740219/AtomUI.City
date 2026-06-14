@@ -152,6 +152,23 @@ public sealed class StateSnapshotTests
             pluginId: null));
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void SnapshotEntryRejectsInvalidSchemaVersionInit(int schemaVersion)
+    {
+        var entry = new StateSnapshotEntry(
+            "AtomUI.City.Tests.Theme",
+            typeof(string),
+            "light",
+            version: 0,
+            schemaVersion: 1,
+            ownerModule: null,
+            pluginId: null);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => entry with { SchemaVersion = schemaVersion });
+    }
+
     [Fact]
     public void SnapshotRejectsNullEntries()
     {

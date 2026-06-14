@@ -229,7 +229,7 @@ Commit message: `fix(State): validate snapshot entry versions`
 - Modify: `src/AtomUI.City.State/StateSnapshotEntry.cs`
 - Test: `tests/AtomUI.City.State.Tests/StateSnapshotTests.cs`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```csharp
 [Theory]
@@ -250,21 +250,21 @@ public void SnapshotEntryRejectsInvalidSchemaVersionInit(int schemaVersion)
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `dotnet test tests/AtomUI.City.State.Tests/AtomUI.City.State.Tests.csproj --filter "FullyQualifiedName~SnapshotEntryRejectsInvalidSchemaVersionInit"`
 Expected: FAIL because `with` init currently accepts invalid schema versions.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Back `StateSnapshotEntry.SchemaVersion` with an init setter that rejects values below 1. Update `api-contracts.md` to document that constructor and init boundaries share the same snapshot entry validation.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `dotnet test tests/AtomUI.City.State.Tests/AtomUI.City.State.Tests.csproj --filter "FullyQualifiedName~SnapshotEntryRejectsInvalidSchemaVersionInit"`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit message: `fix(State): validate snapshot entry schema versions`
 
