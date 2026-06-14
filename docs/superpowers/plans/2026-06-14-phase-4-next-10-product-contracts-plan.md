@@ -141,12 +141,12 @@
 - Modify: `docs/modules/eventbus/diagnostics.md`
 - Modify: this plan file
 
-- [ ] **Step 1: Add a failing test that cancellation diagnostics include the contract id, event id, and subscription id.**
-- [ ] **Step 2: Run focused diagnostics tests and verify the new test fails.**
-- [ ] **Step 3: Include those identifiers in EventDeliveryCancelled messages.**
-- [ ] **Step 4: Document the diagnostic context.**
-- [ ] **Step 5: Run focused EventBus tests, docs check, public API check, and `git diff --check`.**
-- [ ] **Step 6: Commit with `fix(EventBus): enrich cancellation diagnostics`.**
+- [x] **Step 1: Add a failing test that cancellation diagnostics include the contract id, event id, and subscription id.**
+- [x] **Step 2: Run focused diagnostics tests and verify the new test fails.**
+- [x] **Step 3: Include those identifiers in EventDeliveryCancelled messages.**
+- [x] **Step 4: Document the diagnostic context.**
+- [x] **Step 5: Run focused EventBus tests, docs check, public API check, and `git diff --check`.**
+- [x] **Step 6: Commit with `fix(EventBus): enrich cancellation diagnostics`.**
 
 ### Task 10: Sync EventBus productization status
 

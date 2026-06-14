@@ -119,6 +119,33 @@ public sealed class EventDiagnosticsTests
     }
 
     [Fact]
+    public async Task HandlerCancellationDiagnosticIncludesStableEventContext()
+    {
+        var diagnostics = new InMemoryHostDiagnostics();
+        var eventBus = new InMemoryEventBus(diagnostics: diagnostics);
+        using var cancellation = new CancellationTokenSource();
+
+        var subscription = eventBus.Subscribe<TestEvent>(context =>
+        {
+            cancellation.Cancel();
+            context.CancellationToken.ThrowIfCancellationRequested();
+
+            return ValueTask.CompletedTask;
+        });
+
+        var result = await eventBus.PublishAsync(
+            new TestEvent("cancel"),
+            cancellationToken: cancellation.Token);
+
+        var record = Assert.Single(
+            diagnostics.Records,
+            record => record.Code == EventDiagnosticIds.EventDeliveryCancelled);
+        Assert.Contains(result.ContractId.Value, record.Message, StringComparison.Ordinal);
+        Assert.Contains(result.EventId.ToString("D"), record.Message, StringComparison.Ordinal);
+        Assert.Contains(subscription.Id.ToString(), record.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task HandlerCancellationStopsLaterDeliveriesWithoutThrowing()
     {
         var eventBus = new InMemoryEventBus();

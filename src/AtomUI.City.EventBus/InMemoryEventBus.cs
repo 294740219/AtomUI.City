@@ -607,7 +607,7 @@ public sealed class InMemoryEventBus : IEventBus
                 _diagnostics?.Write(
                     new HostDiagnosticRecord(
                         EventDiagnosticIds.EventDeliveryCancelled,
-                        $"Event handler '{Id}' was cancelled: {exception.Message}",
+                        $"Event handler '{Id}' was cancelled for contract '{descriptor.ContractId.Value}' event '{eventId:D}' subscription '{Id}': {exception.Message}",
                         HostDiagnosticSeverity.Trace));
 
                 return new EventDeliveryResult(
