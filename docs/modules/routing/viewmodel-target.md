@@ -39,12 +39,12 @@
 
 | Feature ID | 相关能力 | 测试文件 |
 | --- | --- | --- |
-| AUC-ROUTING-001 | Route Template Syntax | RouteTemplateTests; RoutingParameterBoundaryTests |
-| AUC-ROUTING-002 | Route Definition Attributes | RouteDefinitionAttributeTests |
-| AUC-ROUTING-003 | Route Graph | RouteGraphAndMatcherTests |
-| AUC-ROUTING-004 | Route Matcher | RouteGraphAndMatcherTests |
-| AUC-ROUTING-005 | Navigation Scope | NavigationScopeTests |
-| AUC-ROUTING-006 | Guards | RouteGuardTests |
+| AUC-ROUTING-001 | Route Definition Syntax | RouteTemplateTests; RouteDefinitionAttributeTests |
+| AUC-ROUTING-002 | Route Graph Build and Snapshot | RouteGraphAndMatcherTests |
+| AUC-ROUTING-003 | Route Matching and Parameters | RouteGraphAndMatcherTests; RoutingParameterBoundaryTests |
+| AUC-ROUTING-004 | Navigation Transaction | NavigationScopeTests |
+| AUC-ROUTING-005 | Guard and Redirect Pipeline | RouteGuardTests |
+| AUC-ROUTING-006 | ViewModel Target Resolution | RouteGraphAndMatcherTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 

@@ -1,10 +1,13 @@
 namespace AtomUI.City.Routing;
 
-public sealed class NavigationScope : IRouter
+public sealed class NavigationScope : IRouter, IDisposable, IAsyncDisposable
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly object _lifecycleGate = new();
     private readonly RouteGraphSnapshot _routeGraph;
     private readonly Func<Type, object?> _serviceResolver;
+    private CancellationTokenSource? _runningNavigationCancellation;
+    private bool _disposed;
 
     public NavigationScope(
         RouteGraphSnapshot routeGraph,
@@ -88,11 +91,20 @@ public sealed class NavigationScope : IRouter
     {
         var navigationId = Guid.NewGuid();
         var acquiredGate = false;
+        CancellationTokenSource? navigationCancellation = null;
 
         try
         {
-            await _gate.WaitAsync(cancellationToken);
+            var rejected = await TryEnterNavigationAsync(navigationId, target, cancellationToken);
+
+            if (rejected is not null)
+            {
+                return rejected;
+            }
+
             acquiredGate = true;
+            navigationCancellation = BeginRunningNavigation(cancellationToken);
+            cancellationToken = navigationCancellation.Token;
 
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -122,6 +134,11 @@ public sealed class NavigationScope : IRouter
         }
         finally
         {
+            if (navigationCancellation is not null)
+            {
+                EndRunningNavigation(navigationCancellation);
+            }
+
             if (acquiredGate)
             {
                 _gate.Release();
@@ -210,9 +227,103 @@ public sealed class NavigationScope : IRouter
             return MapGuardResult(navigationId, target, enterResult);
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
+
         CurrentSnapshot = NavigationSnapshot.FromRoute(route, parameters, _routeGraph.Version);
 
         return NavigationResult.Success(navigationId, target, route, parameters);
+    }
+
+    private async ValueTask<NavigationResult?> TryEnterNavigationAsync(
+        Guid navigationId,
+        NavigationTarget target,
+        CancellationToken cancellationToken)
+    {
+        if (IsDisposed)
+        {
+            return NavigationResult.Rejected(
+                navigationId,
+                target,
+                "CITY-NAVIGATION-SCOPE-DISPOSED",
+                "Navigation scope has been disposed.");
+        }
+
+        switch (target.Options.ConcurrencyPolicy)
+        {
+            case NavigationConcurrencyPolicy.RejectIfBusy:
+                if (!_gate.Wait(0))
+                {
+                    return NavigationResult.Rejected(
+                        navigationId,
+                        target,
+                        "CITY-NAVIGATION-BUSY",
+                        "Navigation scope is already running a navigation transaction.");
+                }
+
+                return null;
+            case NavigationConcurrencyPolicy.CancelPrevious:
+                CancelRunningNavigation();
+                await _gate.WaitAsync(cancellationToken);
+                return null;
+            case NavigationConcurrencyPolicy.Queue:
+                await _gate.WaitAsync(cancellationToken);
+                return null;
+            default:
+                return NavigationResult.Rejected(
+                    navigationId,
+                    target,
+                    "CITY-NAVIGATION-CONCURRENCY-POLICY-UNSUPPORTED",
+                    $"Navigation concurrency policy '{target.Options.ConcurrencyPolicy}' is not supported.");
+        }
+    }
+
+    private bool IsDisposed
+    {
+        get
+        {
+            lock (_lifecycleGate)
+            {
+                return _disposed;
+            }
+        }
+    }
+
+    private CancellationTokenSource BeginRunningNavigation(CancellationToken cancellationToken)
+    {
+        var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
+        lock (_lifecycleGate)
+        {
+            if (_disposed)
+            {
+                cancellation.Cancel();
+            }
+
+            _runningNavigationCancellation = cancellation;
+        }
+
+        return cancellation;
+    }
+
+    private void EndRunningNavigation(CancellationTokenSource cancellation)
+    {
+        lock (_lifecycleGate)
+        {
+            if (ReferenceEquals(_runningNavigationCancellation, cancellation))
+            {
+                _runningNavigationCancellation = null;
+            }
+        }
+
+        cancellation.Dispose();
+    }
+
+    private void CancelRunningNavigation()
+    {
+        lock (_lifecycleGate)
+        {
+            _runningNavigationCancellation?.Cancel();
+        }
     }
 
     private async ValueTask<bool> CanMatchAsync(
@@ -321,5 +432,26 @@ public sealed class NavigationScope : IRouter
                 "CITY-NAVIGATION-GUARD-INVALID-RESULT",
                 $"Route guard returned unsupported status '{result.Status}'."),
         };
+    }
+
+    public void Dispose()
+    {
+        lock (_lifecycleGate)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            _runningNavigationCancellation?.Cancel();
+        }
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        Dispose();
+
+        return ValueTask.CompletedTask;
     }
 }

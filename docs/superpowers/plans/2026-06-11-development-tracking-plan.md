@@ -5,8 +5,8 @@
 ## 当前结论
 
 - 1.0 发布状态：不可发布。
-- 全局进度：34/118。
-- 模块 Feature 合同：34/109。
+- 全局进度：35/118。
+- 模块 Feature 合同：35/109。
 - 最终发布门禁：0/9。
 - 最近校准日期：2026-06-14。
 
@@ -37,7 +37,7 @@
 | Testing | 9 | 0 | 9 | 已完成 |
 | Build | 7 | 0 | 7 | 已完成 |
 | Generators | 8 | 0 | 8 | 已完成 |
-| Routing | 3 | 5 | 8 | 产品化进行中 |
+| Routing | 4 | 4 | 8 | 产品化进行中 |
 | Presentation | 0 | 8 | 8 | 未完成 |
 | MVVM | 0 | 6 | 6 | 未完成 |
 | State | 0 | 8 | 8 | 产品化进行中 |
@@ -98,7 +98,7 @@
 - [x] AUC-ROUTING-001 Route Definition Syntax。验收重点：合法模板、非法模板、参数边界、属性默认值和稳定排序。
 - [x] AUC-ROUTING-002 Route Graph Build and Snapshot。验收重点：graph 不可变、冲突拒绝、plugin route revoke 后旧 snapshot 仍只读可用。
 - [x] AUC-ROUTING-003 Route Matching and Parameters。验收重点：优先级、参数转换、constraint、并发匹配和非法输入。
-- [ ] AUC-ROUTING-004 Navigation Transaction。验收重点：失败不改变 current snapshot、取消不提交、重复 dispose 幂等、并发策略稳定。
+- [x] AUC-ROUTING-004 Navigation Transaction。验收重点：失败不改变 current snapshot、取消不提交、重复 dispose 幂等、并发策略稳定。
 - [ ] AUC-ROUTING-005 Guard and Redirect Pipeline。验收重点：enter/leave 顺序、deny、redirect、loop detection、异常映射和取消。
 - [ ] AUC-ROUTING-006 ViewModel Target Resolution。验收重点：target descriptor 内容完整、Routing 不依赖 Presentation、失败不创建 ViewModel。
 - [ ] AUC-ROUTING-007 Plugin Route Contribution。验收重点：插件贡献、冲突隔离、卸载撤销、旧 snapshot 只读。

@@ -24,7 +24,7 @@
 | AUC-ROUTING-001 | RuntimeLifecycle | RouteTemplateTests; RouteDefinitionAttributeTests | 断言合法模板、非法模板、参数边界、属性默认值和稳定排序。 | 语法错误、重复参数名、非法 catch-all 位置、未知 constraint。 | Implemented |
 | AUC-ROUTING-002 | RuntimeLifecycle | RouteGraphAndMatcherTests | 断言 graph 不可变、冲突拒绝、plugin route revoke 后旧 snapshot 仍只读可用。 | 冲突、缺失父 route、重复 route id、插件撤销失败。 | Implemented |
 | AUC-ROUTING-003 | RuntimeLifecycle | RouteGraphAndMatcherTests; RoutingParameterBoundaryTests | 断言优先级、参数转换、constraint、并发匹配和非法输入。 | 参数缺失、格式不匹配、constraint 拒绝。 | Implemented |
-| AUC-ROUTING-004 | RuntimeLifecycle | NavigationScopeTests | 断言失败不改变 current snapshot、取消不提交、重复 dispose 幂等、并发策略稳定。 | 取消、并发策略拒绝、resolver 失败、commit 失败。 | Required |
+| AUC-ROUTING-004 | RuntimeLifecycle | NavigationScopeTests | 断言失败不改变 current snapshot、取消不提交、重复 dispose 幂等、并发策略稳定。 | 取消、并发策略拒绝、resolver 失败、commit 失败。 | Implemented |
 | AUC-ROUTING-005 | RuntimeLifecycle | RouteGuardTests | 断言 enter/leave 顺序、deny、redirect、loop detection、异常映射和取消。 | guard 抛异常、redirect loop、deny。 | Required |
 | AUC-ROUTING-006 | RuntimeLifecycle | RouteGraphAndMatcherTests | 断言 target descriptor 内容完整、Routing 不依赖 Presentation、失败不创建 ViewModel。 | 缺失 ViewModel target、target type 不可构造、参数无法绑定。 | Required |
 | AUC-ROUTING-007 | RuntimeLifecycle | RouteGraphAndMatcherTests | 断言插件贡献、冲突隔离、卸载撤销、旧 snapshot 只读。 | 插件 route 冲突、插件卸载并发导航。 | Required |

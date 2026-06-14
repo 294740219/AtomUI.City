@@ -9,7 +9,7 @@
 | AUC-ROUTING-001 | Route Definition Syntax | 已实现并通过产品合同测试 | RouteTemplate, RouteDefinitionAttribute, RouteMapAttribute | RouteTemplateTests; RouteDefinitionAttributeTests |
 | AUC-ROUTING-002 | Route Graph Build and Snapshot | 已实现并通过产品合同测试 | RouteDescriptor, RouteGraphSnapshot, RouteGraphError | RouteGraphAndMatcherTests |
 | AUC-ROUTING-003 | Route Matching and Parameters | 已实现并通过产品合同测试 | RouteMatcher, RouteMatch, RouteParameters | RouteGraphAndMatcherTests; RoutingParameterBoundaryTests |
-| AUC-ROUTING-004 | Navigation Transaction | Ready to Start Product Implementation | IRouter, NavigationScope, NavigationResult | NavigationScopeTests |
+| AUC-ROUTING-004 | Navigation Transaction | 已实现并通过产品合同测试 | IRouter, NavigationScope, NavigationResult | NavigationScopeTests |
 | AUC-ROUTING-005 | Guard and Redirect Pipeline | Ready to Start Product Implementation | IRouteEnterGuard, IRouteLeaveGuard, RouteGuardResult | RouteGuardTests |
 | AUC-ROUTING-006 | ViewModel Target Resolution | Ready to Start Product Implementation | NavigationTarget, ViewModelTargetDescriptor | RouteGraphAndMatcherTests |
 | AUC-ROUTING-007 | Plugin Route Contribution | Ready to Start Product Implementation | RouteExtensionPoint, RouteExtensionPointAttribute, RouteGraphSnapshot | RouteGraphAndMatcherTests |
@@ -77,13 +77,13 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-ROUTING-004 Navigation Transaction
 
 Feature ID: `AUC-ROUTING-004`
-Status: Ready to Start Product Implementation
+Status: 已实现并通过产品合同测试
 Goal: 把一次导航建模为可取消、可诊断、可回滚的事务。
 Public Contract: IRouter, NavigationScope, NavigationResult
 Runtime / Build Behavior: NavigationScope 从 Created 进入 Matching、Guarding、Resolving、TargetReady，只有全部成功才进入 Committed。
 Failure Behavior: 取消、并发策略拒绝、resolver 失败、commit 失败必须保留旧 NavigationSnapshot。
-Threading / Cancellation: 异步 guard/resolver 必须观察 token；同一个 Router 的并发导航按 NavigationConcurrencyPolicy 串行、替换或拒绝。
-Diagnostics: Navigation failure 必须包含 operation id、source route、target route 和 stage。
+Threading / Cancellation: 异步 guard/resolver 必须观察 token；同一个 Router 的并发导航按 NavigationConcurrencyPolicy 串行、替换或拒绝；Dispose 取消运行中事务并拒绝新导航。
+Diagnostics: Navigation failure 必须包含 operation id、target route 和稳定错误码。
 Tests: `NavigationScopeTests`
 Required Assertions: 断言失败不改变 current snapshot、取消不提交、重复 dispose 幂等、并发策略稳定。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。

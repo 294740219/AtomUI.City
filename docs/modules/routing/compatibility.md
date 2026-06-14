@@ -26,6 +26,7 @@
 - 1.0 起 `RouteDescriptor.ContributionId`、`RouteGraphSnapshot.GetContributionRoutes` 和 `RouteGraphSnapshot.WithoutContribution` 属于 graph contribution 兼容 contract。
 - 同级同 template 路由只有在至少一个候选声明 match policy 时才可共存；改变该冲突规则属于兼容性风险。
 - `RouteTemplate.TryMatch` 和 `RouteMatcher.Match/MatchAll` 的 null path 边界、constraint 拒绝语义和并发读能力属于 1.0 兼容 contract。
+- `NavigationConcurrencyPolicy` 的 `CancelPrevious`、`Queue`、`RejectIfBusy` 语义和 `NavigationScope` Dispose 后拒绝新导航属于 1.0 兼容 contract。
 
 ## 插件兼容
 
