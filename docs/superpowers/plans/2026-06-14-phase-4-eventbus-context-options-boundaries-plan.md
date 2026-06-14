@@ -274,7 +274,7 @@ Commit message: `fix(EventBus): validate context correlation ids`
 - Modify: `src/AtomUI.City.EventBus/EventContext.cs`
 - Test: `tests/AtomUI.City.EventBus.Tests/EventPublicationTests.cs`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```csharp
 [Fact]
@@ -294,21 +294,21 @@ public void EventContextRejectsNegativePublishDepth()
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `dotnet test tests/AtomUI.City.EventBus.Tests/AtomUI.City.EventBus.Tests.csproj --filter "FullyQualifiedName~EventContextRejectsNegativePublishDepth"`
 Expected: FAIL because `EventContext<TEvent>` currently accepts negative publish depth.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Throw `ArgumentOutOfRangeException` when `publishDepth < 0`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `dotnet test tests/AtomUI.City.EventBus.Tests/AtomUI.City.EventBus.Tests.csproj --filter "FullyQualifiedName~EventContextRejectsNegativePublishDepth"`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit message: `fix(EventBus): validate context publish depth`
 

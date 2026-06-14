@@ -21,6 +21,13 @@ public sealed class EventContext<TEvent>
             throw new ArgumentException("Event context id cannot be empty.", nameof(eventId));
         }
         correlationId = EventCorrelationIds.ValidateRequired(correlationId, nameof(correlationId));
+        if (publishDepth < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(publishDepth),
+                publishDepth,
+                "Event context publish depth cannot be negative.");
+        }
 
         Event = eventData;
         ContractId = contractId;
