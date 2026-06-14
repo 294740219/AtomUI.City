@@ -50,6 +50,8 @@ public sealed class EventContractDescriptor
 
     public static EventContractDescriptor PluginPrivate<TEvent>(EventContractId contractId)
     {
+        EventContractId.ThrowIfDefault(contractId, nameof(contractId));
+
         var eventType = typeof(TEvent);
 
         return new EventContractDescriptor(

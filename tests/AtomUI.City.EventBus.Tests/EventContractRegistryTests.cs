@@ -35,6 +35,13 @@ public sealed class EventContractRegistryTests
     }
 
     [Fact]
+    public void PluginPrivateContractDescriptorRejectsDefaultContractId()
+    {
+        Assert.Throws<ArgumentException>(
+            () => EventContractDescriptor.PluginPrivate<TestEvent>(default));
+    }
+
+    [Fact]
     public void ContractRegistryRejectsDuplicateContractId()
     {
         var contractId = new EventContractId("atomui.city.tests.duplicate.v1");
