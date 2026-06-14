@@ -8,6 +8,10 @@ public sealed class EventPublishResult
         IReadOnlyList<EventDeliveryResult> deliveries)
     {
         ArgumentNullException.ThrowIfNull(deliveries);
+        if (deliveries.Any(delivery => delivery is null))
+        {
+            throw new ArgumentException("Event publish result deliveries cannot contain null entries.", nameof(deliveries));
+        }
 
         EventId = eventId;
         ContractId = contractId;

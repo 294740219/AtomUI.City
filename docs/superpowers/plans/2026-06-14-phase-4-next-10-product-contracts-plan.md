@@ -78,12 +78,12 @@
 - Modify: `docs/modules/eventbus/api-contracts.md`
 - Modify: this plan file
 
-- [ ] **Step 1: Add a failing test that `EventPublishResult` rejects a deliveries list containing null.**
-- [ ] **Step 2: Run focused publication tests and verify the new test fails.**
-- [ ] **Step 3: Validate delivery entries before copying the immutable delivery list.**
-- [ ] **Step 4: Document the result delivery-entry boundary.**
-- [ ] **Step 5: Run focused EventBus tests, docs check, public API check, and `git diff --check`.**
-- [ ] **Step 6: Commit with `fix(EventBus): reject null publish deliveries`.**
+- [x] **Step 1: Add a failing test that `EventPublishResult` rejects a deliveries list containing null.**
+- [x] **Step 2: Run focused publication tests and verify the new test fails.**
+- [x] **Step 3: Validate delivery entries before copying the immutable delivery list.**
+- [x] **Step 4: Document the result delivery-entry boundary.**
+- [x] **Step 5: Run focused EventBus tests, docs check, public API check, and `git diff --check`.**
+- [x] **Step 6: Commit with `fix(EventBus): reject null publish deliveries`.**
 
 ### Task 6: Shared contract registry rejects plugin-private descriptors
 
