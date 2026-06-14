@@ -17,6 +17,7 @@
 - 删除、重命名、改变默认行为、异常类型、Result status 或诊断码语义属于 breaking change。
 - 新增 API 可以 minor 版本发布，但必须有文档、测试和迁移说明。
 - `PresentationViewMetadata.HasAmbiguousConstructors` 是 1.0 前新增 metadata 成员；后续不能删除或改为允许 ambiguous registrar generation。
+- generated presentation view registrar 输出 `constructorParameterTypes` 传递属于 1.0 兼容 contract。
 - `GeneratorDiagnostics.CreateRoslynDiagnostic` 是 1.0 前新增 diagnostic factory；category、severity、message formatting 和 location fallback 属于兼容行为。
 
 ## 数据格式兼容

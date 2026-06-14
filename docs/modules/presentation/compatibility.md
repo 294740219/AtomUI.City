@@ -9,6 +9,7 @@
 - 所有 VisualTree 修改必须在 UI dispatcher 上执行。
 - `AvaloniaUiDispatcher` 的后台 marshal、取消、`PresentationError.DispatcherUnavailable` 和 dispatcher 诊断上下文字段属于 1.0 兼容 contract。
 - ViewLocator 默认使用 generated manifest 或显式注册；`ViewLookupRequest`、`ViewRegistrationOptions.ReplaceExisting`、manifest 原子注册、精确 key lookup 和插件撤销属于 1.0 兼容 contract。
+- `ViewDescriptor.ConstructorParameterTypes`、ViewFactory 取消前不创建、ViewBinder binding 失败释放、BoundViewHandle dispose 幂等和 attach/detach lifecycle 属于 1.0 兼容 contract。
 - 插件 View、resource dictionary、localized binding 必须绑定 plugin lease。
 - VisualTree 变化必须反馈到 ViewModel/State。
 

@@ -49,7 +49,8 @@ public sealed class ViewBindingTests
             typeof(SettingsViewModel),
             typeof(SettingsView),
             viewKey: null,
-            _ => new SettingsView());
+            _ => new SettingsView(),
+            constructorParameterTypes: [typeof(ViewDependency)]);
         var factory = new ViewFactory(dispatcher, diagnostics);
 
         await factory.CreateAsync(descriptor);
@@ -60,7 +61,10 @@ public sealed class ViewBindingTests
                 record.Code == PresentationDiagnosticIds.ViewCreated &&
                 record.Severity == HostDiagnosticSeverity.Info &&
                 record.Message.Contains(typeof(SettingsViewModel).FullName!, StringComparison.Ordinal) &&
-                record.Message.Contains(typeof(SettingsView).FullName!, StringComparison.Ordinal));
+                record.Message.Contains(typeof(SettingsView).FullName!, StringComparison.Ordinal) &&
+                record.Context["viewModelType"] == typeof(SettingsViewModel).FullName &&
+                record.Context["viewType"] == typeof(SettingsView).FullName &&
+                record.Context["constructorParameters"] == typeof(ViewDependency).FullName);
     }
 
     [Fact]
@@ -84,7 +88,9 @@ public sealed class ViewBindingTests
                 record.Code == PresentationDiagnosticIds.ViewCreationFailed &&
                 record.Severity == HostDiagnosticSeverity.Error &&
                 record.Message.Contains(typeof(SettingsViewModel).FullName!, StringComparison.Ordinal) &&
-                record.Message.Contains(typeof(SettingsView).FullName!, StringComparison.Ordinal));
+                record.Message.Contains(typeof(SettingsView).FullName!, StringComparison.Ordinal) &&
+                record.Context["viewModelType"] == typeof(SettingsViewModel).FullName &&
+                record.Context["viewType"] == typeof(SettingsView).FullName);
     }
 
     [Fact]
@@ -108,6 +114,30 @@ public sealed class ViewBindingTests
     }
 
     [Fact]
+    public async Task ViewFactoryHonorsPreCanceledTokenBeforeCreatingView()
+    {
+        var dispatcher = new RecordingDispatcher();
+        var wasCalled = false;
+        using var cancellation = new CancellationTokenSource();
+        await cancellation.CancelAsync();
+        var descriptor = new ViewDescriptor(
+            typeof(SettingsViewModel),
+            typeof(SettingsView),
+            viewKey: null,
+            _ =>
+            {
+                wasCalled = true;
+                return new SettingsView();
+            });
+        var factory = new ViewFactory(dispatcher);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            async () => await factory.CreateAsync(descriptor, cancellation.Token));
+
+        Assert.False(wasCalled);
+    }
+
+    [Fact]
     public void ViewBinderSetsDataContextAndClearsItOnDispose()
     {
         var binder = new ViewBinder();
@@ -127,6 +157,72 @@ public sealed class ViewBindingTests
 
         Assert.Null(view.DataContext);
         Assert.True(handle.IsDisposed);
+    }
+
+    [Fact]
+    public void ViewBinderPublishesLifecycleEventsOnBindAndDispose()
+    {
+        var lifecycle = new VisualLifecycleHub();
+        var events = new List<VisualLifecycleEvent>();
+        using var subscription = lifecycle.Subscribe(events.Add);
+        var binder = new ViewBinder(lifecycle);
+        var descriptor = new ViewDescriptor(
+            typeof(SettingsViewModel),
+            typeof(SettingsView),
+            viewKey: null,
+            _ => new SettingsView());
+        var view = new SettingsView();
+        var viewModel = new SettingsViewModel();
+
+        using var handle = binder.Bind(descriptor, view, viewModel);
+
+        handle.Dispose();
+
+        Assert.Collection(
+            events,
+            item =>
+            {
+                Assert.Same(view, item.View);
+                Assert.Equal(VisualLifecycleEventKind.Attached, item.Kind);
+            },
+            item =>
+            {
+                Assert.Same(view, item.View);
+                Assert.Equal(VisualLifecycleEventKind.Detached, item.Kind);
+            });
+    }
+
+    [Fact]
+    public void ViewBinderDisposesCreatedViewWhenBindingFails()
+    {
+        var binder = new ViewBinder();
+        var descriptor = new ViewDescriptor(
+            typeof(SettingsViewModel),
+            typeof(DisposableViewWithoutDataContext),
+            viewKey: null,
+            _ => new DisposableViewWithoutDataContext());
+        var view = new DisposableViewWithoutDataContext();
+
+        Assert.Throws<PresentationException>(
+            () => binder.Bind(descriptor, view, new SettingsViewModel()));
+
+        Assert.True(view.IsDisposed);
+    }
+
+    [Fact]
+    public void BoundViewHandleDisposeIsIdempotent()
+    {
+        var disposeCount = 0;
+        var handle = BoundViewHandle.FromExisting(
+            new object(),
+            new SettingsViewModel(),
+            () => disposeCount++);
+
+        handle.Dispose();
+        handle.Dispose();
+
+        Assert.True(handle.IsDisposed);
+        Assert.Equal(1, disposeCount);
     }
 
     [Fact]
@@ -166,7 +262,9 @@ public sealed class ViewBindingTests
                 record.Code == PresentationDiagnosticIds.ViewBound &&
                 record.Severity == HostDiagnosticSeverity.Info &&
                 record.Message.Contains(typeof(SettingsViewModel).FullName!, StringComparison.Ordinal) &&
-                record.Message.Contains(typeof(SettingsView).FullName!, StringComparison.Ordinal));
+                record.Message.Contains(typeof(SettingsView).FullName!, StringComparison.Ordinal) &&
+                record.Context["viewModelType"] == typeof(SettingsViewModel).FullName &&
+                record.Context["viewType"] == typeof(SettingsView).FullName);
     }
 
     [Fact]
@@ -188,7 +286,8 @@ public sealed class ViewBindingTests
             record =>
                 record.Code == PresentationDiagnosticIds.ViewBindingFailed &&
                 record.Severity == HostDiagnosticSeverity.Error &&
-                record.Message.Contains(typeof(SettingsViewModel).FullName!, StringComparison.Ordinal));
+                record.Message.Contains(typeof(SettingsViewModel).FullName!, StringComparison.Ordinal) &&
+                record.Context["viewModelType"] == typeof(SettingsViewModel).FullName);
     }
 
     private sealed class RecordingDispatcher : IUiDispatcher
@@ -199,6 +298,7 @@ public sealed class ViewBindingTests
 
         public ValueTask InvokeAsync(Action callback, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             InvokeCount++;
             callback();
 
@@ -207,6 +307,7 @@ public sealed class ViewBindingTests
 
         public ValueTask<T> InvokeAsync<T>(Func<T> callback, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             InvokeCount++;
 
             return ValueTask.FromResult(callback());
@@ -230,6 +331,16 @@ public sealed class ViewBindingTests
     private sealed class SettingsViewWithDependency(ViewDependency dependency)
     {
         public ViewDependency Dependency { get; } = dependency;
+    }
+
+    private sealed class DisposableViewWithoutDataContext : IDisposable
+    {
+        public bool IsDisposed { get; private set; }
+
+        public void Dispose()
+        {
+            IsDisposed = true;
+        }
     }
 
     private sealed class ViewDependency;

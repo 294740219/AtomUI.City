@@ -5,8 +5,8 @@
 ## 当前结论
 
 - 1.0 发布状态：不可发布。
-- 全局进度：41/118。
-- 模块 Feature 合同：41/109。
+- 全局进度：42/118。
+- 模块 Feature 合同：42/109。
 - 最终发布门禁：0/9。
 - 最近校准日期：2026-06-14。
 
@@ -38,7 +38,7 @@
 | Build | 7 | 0 | 7 | 已完成 |
 | Generators | 8 | 0 | 8 | 已完成 |
 | Routing | 8 | 0 | 8 | 已完成 |
-| Presentation | 2 | 6 | 8 | 产品化进行中 |
+| Presentation | 3 | 5 | 8 | 产品化进行中 |
 | MVVM | 0 | 6 | 6 | 未完成 |
 | State | 0 | 8 | 8 | 产品化进行中 |
 | EventBus | 0 | 6 | 6 | 产品化进行中 |
@@ -108,7 +108,7 @@
 
 - [x] AUC-PRESENTATION-001 UI Dispatcher Bridge。验收重点：UI 线程识别、后台 marshal、取消、异常映射和平台不可用。
 - [x] AUC-PRESENTATION-002 View Registry and Locator。验收重点：manifest 注册、显式覆盖、重复拒绝、插件撤销和 O(1) lookup 路径。
-- [ ] AUC-PRESENTATION-003 View Factory and Binding。验收重点：构造参数、DataContext、失败回滚、handle dispose 和 lifecycle event。
+- [x] AUC-PRESENTATION-003 View Factory and Binding。验收重点：构造参数、DataContext、失败回滚、handle dispose 和 lifecycle event。
 - [ ] AUC-PRESENTATION-004 Route Outlet Commit。验收重点：成功替换、失败回滚、取消、重复 commit、旧 view dispose 和结果状态。
 - [ ] AUC-PRESENTATION-005 Visual Lifecycle Feedback。验收重点：attach/detach、focus、visibility、反馈顺序和 handler 失败隔离。
 - [ ] AUC-PRESENTATION-006 Interaction and Validation Bridge。验收重点：handler 注册撤销、无 handler、验证消息变化、控件释放和取消。

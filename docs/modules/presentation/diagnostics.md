@@ -16,6 +16,10 @@
 | `AUCPRS004` | DispatcherCallbackFailed | Error | UI dispatcher work item 抛异常。 | `operationId`, `targetAction`, `callingThreadId`, `dispatcherThreadId`, `error` |
 | `AUCPRS005` | ViewLocatorMatched | Info | ViewModel 精确 key lookup 命中 ViewDescriptor。 | `viewModelType`, `viewType`, `viewKey`, `routeId`, `ownerId`, `pluginId`, `contributionId` |
 | `AUCPRS006` | ViewLocatorFailed | Warning | ViewModel 精确 key lookup 未命中。 | `viewModelType`, `viewKey`, `routeId`, `ownerId` |
+| `AUCPRS007` | ViewCreated | Info | ViewFactory 创建 View 成功。 | `viewModelType`, `viewType`, `viewKey`, `constructorParameters`, `elapsedMilliseconds` |
+| `AUCPRS008` | ViewCreationFailed | Error | ViewFactory 创建 View 失败。 | `viewModelType`, `viewType`, `viewKey`, `constructorParameters`, `elapsedMilliseconds`, `error` |
+| `AUCPRS009` | ViewBound | Info | ViewBinder 设置 DataContext 并建立 BoundViewHandle。 | `viewModelType`, `viewType`, `viewKey`, `elapsedMilliseconds` |
+| `AUCPRS010` | ViewBindingFailed | Error | ViewBinder binding 失败并释放已创建 View。 | `viewModelType`, `viewType`, `viewKey`, `elapsedMilliseconds`, `error` |
 
 ## 产品级必须诊断的失败
 
@@ -23,6 +27,7 @@
 - 非 UI 线程提交：marshal 到 dispatcher；dispatcher 不可用或 work 失败必须诊断。
 - View lookup 未注册或 owner 已撤销：返回失败并诊断。
 - View 创建失败：不替换现有 outlet。
+- View binding 失败：释放已创建 View 并诊断。
 - 插件卸载 active view：detach 并撤销资源。
 
 ## 上下文字段

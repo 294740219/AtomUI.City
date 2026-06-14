@@ -8,7 +8,7 @@
 | --- | --- | --- | --- | --- |
 | AUC-PRESENTATION-001 | UI Dispatcher Bridge | 已实现并通过产品合同测试 | AvaloniaUiDispatcher, IUiDispatcher | AvaloniaUiDispatcherTests; PresentationPlatformIntegrationTests |
 | AUC-PRESENTATION-002 | View Registry and Locator | 已实现并通过产品合同测试 | ViewRegistry, IViewLocator, ViewForAttribute | ViewLocatorTests |
-| AUC-PRESENTATION-003 | View Factory and Binding | Ready to Start Product Implementation | ViewFactory, ViewBinder, BoundViewHandle | ViewBindingTests |
+| AUC-PRESENTATION-003 | View Factory and Binding | 已实现并通过产品合同测试 | ViewFactory, ViewBinder, BoundViewHandle | ViewBindingTests |
 | AUC-PRESENTATION-004 | Route Outlet Commit | Ready to Start Product Implementation | IRouteOutlet, RouteOutlet, RouteOutletCommitResult | RouteOutletTests |
 | AUC-PRESENTATION-005 | Visual Lifecycle Feedback | Ready to Start Product Implementation | VisualLifecycleHub, VisualLifecycleEvent | VisualFeedbackTests |
 | AUC-PRESENTATION-006 | Interaction and Validation Bridge | Ready to Start Product Implementation | InteractionHandlerRegistry, ValidationVisualStateBinding | PresentationInteractionHandlerTests; ValidationVisualStateBindingTests |
@@ -63,13 +63,13 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-PRESENTATION-003 View Factory and Binding
 
 Feature ID: `AUC-PRESENTATION-003`
-Status: Ready to Start Product Implementation
+Status: 已实现并通过产品合同测试
 Goal: 创建 View、设置 DataContext、建立 ViewModel 和 visual 的绑定边界。
 Public Contract: ViewFactory, ViewBinder, BoundViewHandle
-Runtime / Build Behavior: ViewFactory 只创建已注册 View；ViewBinder 设置 DataContext 并订阅 visual lifecycle。
-Failure Behavior: 构造失败不污染 outlet；binding 失败必须释放已创建 View。
+Runtime / Build Behavior: ViewFactory 通过 UI dispatcher 创建已注册 View；ViewBinder 设置 DataContext 并发布 attach/detach lifecycle。
+Failure Behavior: 构造失败不污染 outlet；binding 失败释放已创建 View。
 Threading / Cancellation: View 创建和 DataContext 设置在 UI dispatcher；取消后不得返回 bound handle。
-Diagnostics: binding diagnostics 必须包含 view type、ViewModel type 和 constructor parameter。
+Diagnostics: factory/binding diagnostics 包含 view type、ViewModel type、view key、constructor parameters 和耗时。
 Tests: `ViewBindingTests`
 Required Assertions: 断言构造参数、DataContext、失败回滚、handle dispose 和 lifecycle event。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。

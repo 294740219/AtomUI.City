@@ -77,6 +77,10 @@ public sealed class PresentationViewRegistrarSourceBuilderTests
             "context.Services.GetService(typeof(global::Sample.App.SettingsService))",
             source,
             StringComparison.Ordinal);
+        Assert.Contains(
+            "constructorParameterTypes: [typeof(global::Sample.App.SettingsService)]",
+            source,
+            StringComparison.Ordinal);
         Assert.Contains("Required service 'Sample.App.SettingsService' was not registered.", source, StringComparison.Ordinal);
     }
 }

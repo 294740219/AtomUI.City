@@ -10,7 +10,8 @@ public sealed class ViewDescriptor
         string? viewKey,
         Func<ViewFactoryContext, object> viewFactory,
         string? pluginId = null,
-        string? contributionId = null)
+        string? contributionId = null,
+        IReadOnlyList<Type>? constructorParameterTypes = null)
     {
         ArgumentNullException.ThrowIfNull(viewModelType);
         ArgumentNullException.ThrowIfNull(viewType);
@@ -21,6 +22,7 @@ public sealed class ViewDescriptor
         ViewKey = string.IsNullOrWhiteSpace(viewKey) ? null : viewKey;
         PluginId = string.IsNullOrWhiteSpace(pluginId) ? null : pluginId;
         ContributionId = string.IsNullOrWhiteSpace(contributionId) ? null : contributionId;
+        ConstructorParameterTypes = Array.AsReadOnly((constructorParameterTypes ?? []).ToArray());
         _viewFactory = viewFactory;
     }
 
@@ -34,11 +36,20 @@ public sealed class ViewDescriptor
 
     public string? ContributionId { get; }
 
+    public IReadOnlyList<Type> ConstructorParameterTypes { get; }
+
     public object CreateView(ViewFactoryContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
 
         var view = _viewFactory(context);
+
+        if (view is null)
+        {
+            throw new PresentationException(
+                PresentationError.ViewCreationFailed,
+                $"View factory for '{ViewModelType.FullName}' returned null, expected '{ViewType.FullName}'.");
+        }
 
         if (!ViewType.IsInstanceOfType(view))
         {

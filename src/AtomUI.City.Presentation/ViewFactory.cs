@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using AtomUI.City.Diagnostics;
 using AtomUI.City.Threading;
 
@@ -70,7 +71,10 @@ public sealed class ViewFactory
         _diagnostics?.Write(new HostDiagnosticRecord(
             PresentationDiagnosticIds.ViewCreated,
             $"View factory created view '{descriptor.ViewType.FullName}' for view model '{descriptor.ViewModelType.FullName}' in {elapsed.TotalMilliseconds:0.###} ms.",
-            HostDiagnosticSeverity.Info));
+            HostDiagnosticSeverity.Info)
+        {
+            Context = CreateDiagnosticContext(descriptor, elapsed, exception: null),
+        });
     }
 
     private void WriteCreationFailedDiagnostic(
@@ -81,7 +85,35 @@ public sealed class ViewFactory
         _diagnostics?.Write(new HostDiagnosticRecord(
             PresentationDiagnosticIds.ViewCreationFailed,
             $"View factory failed to create view '{descriptor.ViewType.FullName}' for view model '{descriptor.ViewModelType.FullName}' in {elapsed.TotalMilliseconds:0.###} ms: {exception.Message}",
-            HostDiagnosticSeverity.Error));
+            HostDiagnosticSeverity.Error)
+        {
+            Context = CreateDiagnosticContext(descriptor, elapsed, exception),
+        });
+    }
+
+    private static IReadOnlyDictionary<string, string?> CreateDiagnosticContext(
+        ViewDescriptor descriptor,
+        TimeSpan elapsed,
+        Exception? exception)
+    {
+        return new Dictionary<string, string?>(StringComparer.Ordinal)
+        {
+            ["viewModelType"] = descriptor.ViewModelType.FullName,
+            ["viewType"] = descriptor.ViewType.FullName,
+            ["viewKey"] = string.IsNullOrWhiteSpace(descriptor.ViewKey) ? "<default>" : descriptor.ViewKey,
+            ["constructorParameters"] = FormatConstructorParameters(descriptor),
+            ["elapsedMilliseconds"] = elapsed.TotalMilliseconds.ToString("0.###", CultureInfo.InvariantCulture),
+            ["error"] = exception?.GetType().FullName,
+        };
+    }
+
+    private static string FormatConstructorParameters(ViewDescriptor descriptor)
+    {
+        return descriptor.ConstructorParameterTypes.Count == 0
+            ? string.Empty
+            : string.Join(
+                ";",
+                descriptor.ConstructorParameterTypes.Select(static type => type.FullName ?? type.Name));
     }
 
     private sealed class EmptyServiceProvider : IServiceProvider

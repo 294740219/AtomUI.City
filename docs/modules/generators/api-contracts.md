@@ -17,6 +17,7 @@
 - `PresentationViewMetadata.HasAmbiguousConstructors` 表示 View 类型存在多个同最大参数数量的 public constructor。
 - `PresentationViewMetadataReader` 必须用确定性构造签名排序选择参数列表，并保留 ambiguity 标记。
 - `PresentationViewManifestBuilder` 必须拒绝 ambiguity 标记为 true 的 View metadata，输出 stable diagnostic，且不得生成 registrar entry。
+- `PresentationViewRegistrarSourceBuilder` 必须把 constructor parameter metadata 传入 `ViewDescriptor.ConstructorParameterTypes`。
 
 ## 关键方法合同
 

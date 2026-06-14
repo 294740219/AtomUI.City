@@ -83,6 +83,7 @@ ViewModel instance
 - View 构造函数不应启动长期任务。
 - View 不能持有插件服务到 Host 静态对象。
 - 创建失败返回 Presentation commit failure。
+- `ViewDescriptor.ConstructorParameterTypes` 必须保留 generated registrar 的构造参数 metadata，用于诊断和 release review。
 
 Strict AOT 模式下，ViewFactory 应由 Source Generator 生成强类型工厂，避免反射构造。
 
@@ -91,6 +92,7 @@ Strict AOT 模式下，ViewFactory 应由 Source Generator 生成强类型工厂
 - ViewModel 不知道 View 类型。
 - View 不负责导航决策。
 - Binding 必须可释放。
+- Binding 成功发布 `Attached` lifecycle；handle dispose 清理 DataContext 并发布 `Detached` lifecycle。
 - ViewDataContext 变化必须受控，不能被外部任意覆盖。
 - View 和 ViewModel 生命周期不完全等同，但必须有关联释放策略。
 - UI 事件订阅、binding disposable 和 visual adapter 默认挂 ActivationScope。
@@ -112,7 +114,10 @@ Binding 失败时，Presentation 必须释放已创建 View 和 provisional Acti
 | 功能点 | 测试类型 | 断言 |
 |---|---|---|
 | View 创建 | Unit | ViewFactory 在 fake UI dispatcher 上创建 View。 |
+| 构造参数 | Unit/Generator | descriptor 诊断和 generated registrar 都保留 constructor parameter metadata。 |
 | DataContext 设置 | Unit | View 绑定到 ViewModel。 |
-| Binding 释放 | Unit | ActivationScope 停止时释放 binding。 |
+| Binding 释放 | Unit | BoundViewHandle dispose 幂等并清理 DataContext。 |
+| Lifecycle 事件 | Unit | Bind 发布 Attached，Dispose 发布 Detached。 |
 | View 创建失败 | Unit | commit failure，旧内容保留。 |
+| Binding 失败 | Unit | 已创建 View 被释放。 |
 | 插件 View 泄漏 | Analyzer/Generator | 输出稳定诊断。 |

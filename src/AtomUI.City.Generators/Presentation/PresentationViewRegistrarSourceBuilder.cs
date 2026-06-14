@@ -48,7 +48,8 @@ public static class PresentationViewRegistrarSourceBuilder
         builder.Append("                viewKey: ").Append(ToStringLiteral(view.ViewKey)).AppendLine(",");
         AppendViewFactory(builder, view);
         builder.Append("                pluginId: ").Append(ToStringLiteral(view.PluginId)).AppendLine(",");
-        builder.Append("                contributionId: ").Append(ToStringLiteral(view.ContributionId)).AppendLine("));");
+        builder.Append("                contributionId: ").Append(ToStringLiteral(view.ContributionId));
+        AppendConstructorParameterTypes(builder, view);
     }
 
     private static void AppendViewFactory(
@@ -78,6 +79,34 @@ public static class PresentationViewRegistrarSourceBuilder
         }
 
         builder.AppendLine("                ),");
+    }
+
+    private static void AppendConstructorParameterTypes(
+        StringBuilder builder,
+        PresentationViewManifestEntry view)
+    {
+        if (view.ConstructorParameters.Count == 0)
+        {
+            builder.AppendLine("));");
+            return;
+        }
+
+        builder.AppendLine(",");
+        builder.Append("                constructorParameterTypes: [");
+
+        for (var index = 0; index < view.ConstructorParameters.Count; index++)
+        {
+            if (index > 0)
+            {
+                builder.Append(", ");
+            }
+
+            builder.Append("typeof(")
+                .Append(ToGlobalTypeName(view.ConstructorParameters[index].TypeName))
+                .Append(")");
+        }
+
+        builder.AppendLine("]));");
     }
 
     private static string ToRequiredServiceExpression(string typeName)
