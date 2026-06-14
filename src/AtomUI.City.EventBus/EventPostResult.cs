@@ -8,6 +8,8 @@ public sealed record EventPostResult(
 {
     public Guid EventId { get; init; } = ValidateEventId(EventId);
 
+    public EventContractId ContractId { get; init; } = ValidateContractId(ContractId);
+
     private static Guid ValidateEventId(Guid eventId)
     {
         if (eventId == Guid.Empty)
@@ -16,5 +18,12 @@ public sealed record EventPostResult(
         }
 
         return eventId;
+    }
+
+    private static EventContractId ValidateContractId(EventContractId contractId)
+    {
+        EventContractId.ThrowIfDefault(contractId, nameof(ContractId));
+
+        return contractId;
     }
 }

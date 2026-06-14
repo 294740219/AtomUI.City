@@ -245,6 +245,15 @@ public sealed class EventPublicationTests
     }
 
     [Fact]
+    public void PostResultRejectsDefaultContractId()
+    {
+        Assert.Throws<ArgumentException>(() => new EventPostResult(
+            Guid.NewGuid(),
+            default,
+            Accepted: true));
+    }
+
+    [Fact]
     public async Task PostAsyncRejectsNegativePublishDepthBeforeAcceptance()
     {
         var diagnostics = new InMemoryHostDiagnostics();
