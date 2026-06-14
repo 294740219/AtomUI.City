@@ -9,7 +9,7 @@
 | ViewModel Base | ViewModelBase | 属性通知和释放入口。 | 不引用具体 View 或 Avalonia visual。 |
 | Activation | IActivatable, ICanDeactivate, IConfirmDeactivate, ActivationScope, DeactivationGuard | ViewModel 激活和停用。 | 状态机必须可测试，拒绝停用不抛业务异常。 |
 | Command | CommandFactory, OperationScope, OperationResult | 命令执行和操作结果。 | 异常、取消、并发拒绝必须有稳定结果。 |
-| Interaction | Interaction<TRequest, TResult> | ViewModel 到 UI 的请求 contract。 | 无 handler 返回 Failed，不直接依赖 Presentation 类型。 |
+| Interaction | Interaction<TRequest, TResult> | ViewModel 到 UI 的请求 contract。 | 无 handler 返回 NotHandled，不直接依赖 Presentation 类型。 |
 | Validation | ValidationScope, ValidationMessage | 验证状态和消息聚合。 | 消息变化可被 Presentation 绑定。 |
 
 ## 关键方法合同
@@ -23,7 +23,7 @@
 | DeactivationGuard.CanDeactivateAsync | 离开前确认。 | viewModel 不得为 null；可实现 ICanDeactivate 或 IConfirmDeactivate。 | DeactivationResult。 | 拒绝返回 Reject；取消返回 Cancel；异常映射 Failed，不抛业务异常。 | 预取消跳过 viewModel 并返回 Cancel。 | 先执行 ICanDeactivate，Allow 后再执行 IConfirmDeactivate。 |
 | CommandFactory.Create | 创建同步命令。 | execute 不得为 null；canExecute 和 state 可选。 | IRelayCommand。 | execute 异常映射 OperationResult Failed，不外抛到 UI。 | 同步 API 无 token。 | 写入 CommandExecutionState；CanExecuteChanged 可通知 Presentation。 |
 | CommandFactory.CreateAsync | 创建异步命令。 | execute 不得为 null；state 和 activationScope 可选。 | IAsyncRelayCommand。 | execute 异常映射 OperationResult Failed；并发执行映射 Rejected。 | 命令 token 必须传递到 execute，并链接 ActivationScope token。 | 单一 command state 同时只允许一个 running operation。 |
-| Interaction.HandleAsync | 请求 UI interaction。 | request 不得为 null。 | InteractionResult<TResult>。 | 无 handler 或 handler 异常返回 Failed。 | 取消后不提交 handler result。 | 每次调用独立 context。 |
+| Interaction.RequestAsync | 请求 UI interaction。 | request 为 TRequest；handler 通过 ActivationScope 可选绑定。 | InteractionResult<TResult>。 | 无 handler 返回 NotHandled；handler 异常返回 Failed。 | 取消后不提交 handler result。 | 每次调用独立 InteractionContext，包含 request id、request type、handler type 和 scope id。 |
 | ValidationScope.SetMessages | 替换字段验证消息。 | field 可为空表示 global；messages 不得含 null。 | ValidationStatus。 | Dispose 后更新失败。 | 同步 API 无 token。 | 状态更新顺序必须稳定。 |
 
 ## Public 类型覆盖

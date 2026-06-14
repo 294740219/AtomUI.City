@@ -9,7 +9,7 @@
 | AUC-MVVM-001 | ViewModel Base and Notification | Completed | ViewModelBase | ViewModelBaseTests |
 | AUC-MVVM-002 | Activation and Deactivation | Completed | IActivatable, ICanDeactivate, ActivationScope | ActivationScopeTests; DeactivationTests |
 | AUC-MVVM-003 | Command Execution | Completed | CommandFactory, OperationScope, OperationResult | CommandTests |
-| AUC-MVVM-004 | Interaction Requests | Ready to Start Product Implementation | Interaction<TRequest, TResult>, InteractionContext<TRequest> | InteractionTests |
+| AUC-MVVM-004 | Interaction Requests | Completed | Interaction<TRequest, TResult>, InteractionContext<TRequest> | InteractionTests |
 | AUC-MVVM-005 | Validation Model | Ready to Start Product Implementation | ValidationScope, ValidationMessage, ValidationStatus | ValidationScopeTests |
 | AUC-MVVM-006 | Operation and Cancellation Scope | Ready to Start Product Implementation | OperationScope, CommandExecutionState | CommandTests |
 
@@ -75,13 +75,13 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-MVVM-004 Interaction Requests
 
 Feature ID: `AUC-MVVM-004`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 让 ViewModel 声明 UI 交互请求而不依赖具体 UI。
 Public Contract: Interaction<TRequest, TResult>, InteractionContext<TRequest>, InteractionResult<TResult>
 Runtime / Build Behavior: Interaction 发布 request，由 Presentation 注册 handler；结果回到 ViewModel。
-Failure Behavior: 无 handler 返回 Failed；handler 抛异常映射为 Failed；重复处理必须由 handler scope 控制。
+Failure Behavior: 无 handler 返回 NotHandled；handler 抛异常映射为 Failed；重复处理必须由 handler scope 控制。
 Threading / Cancellation: Interaction 可以异步取消；取消后 handler result 不得提交。
-Diagnostics: interaction diagnostics 必须包含 request type、handler type 和 scope id。
+Diagnostics: InteractionContext 包含 request id、request type、handler type 和 scope id。
 Tests: `InteractionTests`
 Required Assertions: 断言有 handler、无 handler、异常、取消、泛型 result 和 handler scope 释放。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。

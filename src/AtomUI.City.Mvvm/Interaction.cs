@@ -45,9 +45,24 @@ public sealed class Interaction<TRequest, TResult>
 
         try
         {
-            var context = new InteractionContext<TRequest>(request);
-            var value = await registration.Handler(context, linkedCancellationTokenSource.Token).ConfigureAwait(false);
+            var context = new InteractionContext<TRequest>(
+                request,
+                Guid.NewGuid(),
+                registration.ActivationScope?.Id,
+                registration.HandlerType);
+            var handlerTask = registration.Handler(context, linkedCancellationTokenSource.Token).AsTask();
+            var cancellationTask = Task.Delay(
+                Timeout.InfiniteTimeSpan,
+                linkedCancellationTokenSource.Token);
 
+            if (await Task.WhenAny(handlerTask, cancellationTask).ConfigureAwait(false) != handlerTask)
+            {
+                ObserveHandlerFault(handlerTask);
+                return InteractionResult<TResult>.Canceled();
+            }
+
+            var value = await handlerTask.ConfigureAwait(false);
+            linkedCancellationTokenSource.Token.ThrowIfCancellationRequested();
             return InteractionResult<TResult>.Completed(value);
         }
         catch (OperationCanceledException)
@@ -69,6 +84,15 @@ public sealed class Interaction<TRequest, TResult>
         }
     }
 
+    private static void ObserveHandlerFault(Task handlerTask)
+    {
+        _ = handlerTask.ContinueWith(
+            task => _ = task.Exception,
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+    }
+
     private sealed class HandlerRegistration : IDisposable
     {
         private readonly Interaction<TRequest, TResult> _interaction;
@@ -82,11 +106,14 @@ public sealed class Interaction<TRequest, TResult>
             _interaction = interaction;
             Handler = handler;
             ActivationScope = activationScope;
+            HandlerType = handler.Target?.GetType() ?? handler.Method.DeclaringType;
         }
 
         public Func<InteractionContext<TRequest>, CancellationToken, ValueTask<TResult>> Handler { get; }
 
         public IActivationScope? ActivationScope { get; }
+
+        public Type? HandlerType { get; }
 
         public void Dispose()
         {

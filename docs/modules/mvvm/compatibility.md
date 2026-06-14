@@ -18,6 +18,7 @@
 - `ViewModelBase` 实现 `IDisposable`、`IsDisposed`、`SetProperty` 释放后拒绝和 `OnDisposed` 继承钩子；这些行为进入 1.0 兼容承诺。
 - `ActivationScope.Id`、`ActivationScope.IsDisposed`、`IActivatable` cancellation overload、`DeactivationGuard` 执行顺序和 `DeactivationStatus.Failed` 进入 1.0 兼容承诺。
 - `CommandExecutionState` 的 command name、owner type、rejected execution 统计、`OperationResult.OperationId` 和 `OperationStatus.Rejected` 进入 1.0 兼容承诺。
+- `InteractionContext` 的 request id、request type、activation scope id、handler type，以及 Interaction 取消后不提交 handler result 的行为进入 1.0 兼容承诺。
 
 ## 数据格式兼容
 

@@ -37,11 +37,11 @@
 | Feature ID | 相关能力 | 测试文件 |
 | --- | --- | --- |
 | AUC-MVVM-001 | ViewModel Base | ViewModelBaseTests |
-| AUC-MVVM-002 | Activation | ActivationScopeTests |
+| AUC-MVVM-002 | Activation and Deactivation | ActivationScopeTests; DeactivationTests; ViewModelBaseTests |
 | AUC-MVVM-003 | Commands | CommandTests |
-| AUC-MVVM-004 | Deactivation | DeactivationTests |
-| AUC-MVVM-005 | Interactions | InteractionTests |
-| AUC-MVVM-006 | Validation | ValidationScopeTests |
+| AUC-MVVM-004 | Interactions | InteractionTests |
+| AUC-MVVM-005 | Validation | ValidationScopeTests |
+| AUC-MVVM-006 | Operation Scope | CommandTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -121,7 +121,7 @@ Interaction 结果必须区分：
 | Failed | handler 执行失败。 |
 | NotHandled | 没有可用 handler。 |
 
-Interaction handler 缺失不应该导致应用崩溃，但必须记录诊断。
+Interaction handler 缺失不应该导致应用崩溃。每次请求的 `InteractionContext` 必须提供 request id、request type、handler type 和 ActivationScope id 作为诊断上下文。
 
 ### 6. 插件边界
 
@@ -154,7 +154,7 @@ Presentation 可以根据平台实现 Dialog、Toast、FilePicker、Window 等�
 |---|---|
 | handler 缺失 | 返回 NotHandled，记录诊断。 |
 | handler 抛异常 | 返回 Failed，记录诊断。 |
-| ActivationScope 停用 | 返回 Canceled。 |
+| ActivationScope 停用 | 返回 Canceled，且不得提交之后完成的 handler result。 |
 | Plugin 停用 | 返回 Canceled。 |
 
 ### 9. AOT / Source Generator
