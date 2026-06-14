@@ -46,7 +46,13 @@ public sealed record EventDeliveryResult(
     string? ErrorMessage = null,
     bool Canceled = false)
 {
-    public EventSubscriptionId SubscriptionId { get; init; } = ValidateSubscriptionId(SubscriptionId);
+    private EventSubscriptionId _subscriptionId = ValidateSubscriptionId(SubscriptionId);
+
+    public EventSubscriptionId SubscriptionId
+    {
+        get => _subscriptionId;
+        init => _subscriptionId = ValidateSubscriptionId(value);
+    }
 
     public EventDispatchPolicy DispatchPolicy { get; init; } = ValidateDispatchPolicy(DispatchPolicy);
 

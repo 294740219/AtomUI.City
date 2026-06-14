@@ -325,6 +325,20 @@ public sealed class EventPublicationTests
     }
 
     [Fact]
+    public void DeliveryResultRejectsDefaultSubscriptionIdInitMutation()
+    {
+        var delivery = new EventDeliveryResult(
+            EventSubscriptionId.New(),
+            EventDispatchPolicy.Serialized,
+            Succeeded: true);
+
+        Assert.Throws<ArgumentException>(() => delivery with
+        {
+            SubscriptionId = default,
+        });
+    }
+
+    [Fact]
     public void DeliveryResultRejectsUnknownDispatchPolicy()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => new EventDeliveryResult(
