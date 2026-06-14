@@ -19,6 +19,7 @@
 | IEventPublisher.PostAsync | 接受异步发布请求。 | event 实例非 null，options 可选。 | EventPostResult。 | event 为 null 抛 `ArgumentNullException`；已取消 token 返回 rejected result。 | 接受前必须观察 token，接受后 delivery 取消进入 diagnostics。 | 返回的 EventId 必须用于后续 delivery。 |
 | IEventSubscriber.Subscribe | 订阅事件。 | handler 非 null，owner/options 可选。 | IEventSubscription。 | Disposed bus 或非法 contract 失败。 | 无异步取消。 | 不得在锁内调用 handler。 |
 | IEventSubscription.DisposeAsync | 释放订阅。 | 可重复调用。 | Disposed 状态。 | 释放中 handler 失败进入 diagnostics。 | 取消只影响等待。 | 并发 dispose 幂等。 |
+| EventPublishOptions | 描述 publish 上下文。 | `PublishDepth` 必须大于等于 0。 | EventPublishOptions。 | publish depth 小于 0 时，发布入口抛 `ArgumentOutOfRangeException`。 | 无。 | 调用内只读取，不回写 options。 |
 | EventSubscriptionOptions.WithErrorPolicy | 派生错误策略选项。 | errorPolicy 必须是已定义 enum 值。 | EventSubscriptionOptions。 | 未知 error policy 抛 `ArgumentOutOfRangeException`。 | 无。 | 不修改原 options，返回新实例。 |
 | EventContractId constructor | 创建稳定事件 contract id。 | value 非 null、非空白、不得包含首尾空白或控制字符。 | EventContractId。 | value 为 null、空白、包含首尾空白或控制字符时抛 `ArgumentException`。 | 无。 | 创建结果不可变。 |
 

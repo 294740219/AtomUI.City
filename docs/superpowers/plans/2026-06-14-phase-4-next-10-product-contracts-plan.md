@@ -50,12 +50,12 @@
 - Modify: `docs/modules/eventbus/api-contracts.md`
 - Modify: this plan file
 
-- [ ] **Step 1: Add a failing test that `PublishAsync` with `new EventPublishOptions { PublishDepth = -1 }` throws `ArgumentOutOfRangeException`.**
-- [ ] **Step 2: Run focused publication tests and verify the new test fails.**
-- [ ] **Step 3: Validate publish options before creating diagnostics or snapshots.**
-- [ ] **Step 4: Document the publish depth boundary.**
-- [ ] **Step 5: Run focused EventBus tests, docs check, public API check, and `git diff --check`.**
-- [ ] **Step 6: Commit with `fix(EventBus): reject negative publish depth`.**
+- [x] **Step 1: Add a failing test that `PublishAsync` with `new EventPublishOptions { PublishDepth = -1 }` throws `ArgumentOutOfRangeException`.**
+- [x] **Step 2: Run focused publication tests and verify the new test fails.**
+- [x] **Step 3: Validate publish options before creating diagnostics or snapshots.**
+- [x] **Step 4: Document the publish depth boundary.**
+- [x] **Step 5: Run focused EventBus tests, docs check, public API check, and `git diff --check`.**
+- [x] **Step 6: Commit with `fix(EventBus): reject negative publish depth`.**
 
 ### Task 4: PostAsync rejects negative publish depth
 

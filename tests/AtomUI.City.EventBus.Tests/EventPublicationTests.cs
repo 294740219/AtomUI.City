@@ -51,6 +51,17 @@ public sealed class EventPublicationTests
     }
 
     [Fact]
+    public async Task PublishAsyncRejectsNegativePublishDepth()
+    {
+        var eventBus = new InMemoryEventBus();
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () =>
+            await eventBus.PublishAsync(
+                new TestEvent("negative-depth"),
+                new EventPublishOptions { PublishDepth = -1 }));
+    }
+
+    [Fact]
     public async Task PostAsyncRejectsNullEvent()
     {
         var eventBus = new InMemoryEventBus();

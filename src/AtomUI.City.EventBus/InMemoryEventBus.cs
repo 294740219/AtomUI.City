@@ -130,8 +130,8 @@ public sealed class InMemoryEventBus : IEventBus
         Guid eventId,
         CancellationToken cancellationToken)
     {
+        var publishOptions = NormalizeAndValidatePublishOptions(options);
         var descriptor = _contractRegistry.GetOrCreate<TEvent>();
-        var publishOptions = options ?? EventPublishOptions.Default;
         var publishedAt = DateTimeOffset.UtcNow;
         var correlationId = string.IsNullOrWhiteSpace(publishOptions.CorrelationId)
             ? eventId.ToString("D")
@@ -300,6 +300,20 @@ public sealed class InMemoryEventBus : IEventBus
             HostDiagnosticSeverity.Trace);
 
         return subscription;
+    }
+
+    private static EventPublishOptions NormalizeAndValidatePublishOptions(EventPublishOptions? options)
+    {
+        var publishOptions = options ?? EventPublishOptions.Default;
+        if (publishOptions.PublishDepth < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(EventPublishOptions.PublishDepth),
+                publishOptions.PublishDepth,
+                "Event publish depth cannot be negative.");
+        }
+
+        return publishOptions;
     }
 
     private EventSubscription[] GetSnapshot(Type eventType)
