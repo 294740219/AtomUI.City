@@ -11,7 +11,7 @@
 | AUC-PLUGIN-003 | Package Installation | Completed | PluginPackageInstaller, PluginInstallationReader, PluginPackagePaths | PluginPackageTests |
 | AUC-PLUGIN-004 | Discovery | Completed | PluginDiscoveryScanner | PluginLoadingTests |
 | AUC-PLUGIN-005 | Loading | Completed | PluginLoader, PluginLoadResult | PluginLoadingTests |
-| AUC-PLUGIN-006 | MSBuild Contract | Ready to Start Product Implementation | PluginMsBuildContract | PluginMsBuildContractTests |
+| AUC-PLUGIN-006 | MSBuild Contract | Completed | PluginMsBuildContract | PluginMsBuildContractTests |
 | AUC-PLUGIN-007 | Diagnostics | Ready to Start Product Implementation | PluginDiagnosticIds, PluginDiagnostic | PluginResultTests |
 | AUC-PLUGIN-008 | Unload Contract | Ready to Start Product Implementation | PluginRuntime, Contribution lease | PluginLoadingTests |
 
@@ -102,15 +102,15 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-PLUGIN-006 MSBuild Contract
 
 Feature ID: `AUC-PLUGIN-006`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 插件包属性、manifest 输出和 package layout。
 Public Contract: PluginMsBuildContract
-Runtime / Build Behavior: 插件包属性、manifest 输出和 package layout。
-Failure Behavior: 属性缺失、layout 不合法、manifest 未生成。
+Runtime / Build Behavior: 插件包属性、manifest 输出路径和 package content roots 均由稳定 contract 声明。
+Failure Behavior: 属性缺失、layout 不合法、manifest 未生成、输出路径不稳定。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `PluginMsBuildContractTests`。
-Required Assertions: 断言 MSBuild property、output path、package content。
+Required Assertions: 断言 MSBuild property、output path、package content roots。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 ## AUC-PLUGIN-007 Diagnostics
 

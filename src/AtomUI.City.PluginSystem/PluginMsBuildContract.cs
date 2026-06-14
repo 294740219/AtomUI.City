@@ -16,7 +16,10 @@ public static class PluginMsBuildContract
         "AtomUICityPluginUnloadable",
         "AtomUICityPluginNativeAotCompatible",
         "AtomUICityPluginResourceMode",
+        "AtomUICityPluginGenerateManifest",
+        "AtomUICityPluginValidateManifest",
         "AtomUICityPackageAsPlugin",
+        "AtomUICityPluginDevelopmentMode",
     ];
 
     public static IReadOnlyList<string> Items { get; } =
@@ -40,4 +43,26 @@ public static class PluginMsBuildContract
         "InstallAtomUICityPluginToLocalCache",
         "CleanAtomUICityPluginArtifacts",
     ];
+
+    public static IReadOnlyList<string> PackageContentRoots { get; } =
+    [
+        "lib/",
+        PluginPackagePaths.ManifestRelativePath,
+        "atomui-city/manifests/",
+        "atomui-city/locales/",
+        "atomui-city/assets/",
+        "runtimes/",
+    ];
+
+    public static string GetManifestOutputPath(string intermediateOutputPath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(intermediateOutputPath);
+
+        return Path.Combine(
+            Path.GetFullPath(intermediateOutputPath),
+            "AtomUI.City",
+            "plugin",
+            "atomui-city",
+            "plugin.json");
+    }
 }

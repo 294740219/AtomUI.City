@@ -177,7 +177,28 @@ Source generators
 -> atomui-city/manifests/*.json
 ```
 
-### 7. 诊断代码
+### 7. 输出路径和包内容
+
+构建期 manifest 输出路径由 `PluginMsBuildContract.GetManifestOutputPath` 计算，必须位于规范化后的 intermediate output path 下：
+
+```text
+<IntermediateOutputPath>/AtomUI.City/plugin/atomui-city/plugin.json
+```
+
+插件包内容根由 `PluginMsBuildContract.PackageContentRoots` 声明：
+
+| Root | 说明 |
+|---|---|
+| `lib/` | 主程序集和私有依赖。 |
+| `atomui-city/plugin.json` | 插件清单。 |
+| `atomui-city/manifests/` | 构建期贡献清单。 |
+| `atomui-city/locales/` | 本地化程序集和 locpack。 |
+| `atomui-city/assets/` | 图标、样式和其他插件资产。 |
+| `runtimes/` | RID native assets。 |
+
+这些字符串是 package layout 和 MSBuild target 的稳定边界，修改必须进入 compatibility。
+
+### 8. 诊断代码
 
 建议诊断：
 
@@ -191,7 +212,7 @@ Source generators
 | `AUCPLG1301` | AOT 兼容声明与使用能力冲突。 |
 | `AUCPLG1401` | required contribution manifest 未生成。 |
 
-### 8. 开发体验
+### 9. 开发体验
 
 开发期本地安装流程：
 
@@ -209,7 +230,7 @@ dotnet pack
 - 开发期插件可以来自项目输出目录，但必须显式开启。
 - 开发期路径必须进入诊断。
 
-### 9. 测试要求
+### 10. 测试要求
 
 必须覆盖：
 

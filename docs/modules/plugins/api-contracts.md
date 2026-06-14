@@ -19,6 +19,7 @@
 | PluginManifestReader.Read | 读取 manifest。 | path 必须规范化且在包根下。 | 返回 manifest 或 diagnostics。 | 缺失、schema 不兼容、JSON 无效返回诊断。 | 可取消用于 IO。 | 无共享可变状态。 |
 | PluginPackageInstaller.InstallAsync | 安装插件包。 | package path、install root、cancellation。 | 成功返回 PluginInstallation。 | 失败清理 staging。 | 必须观察取消并清理临时目录。 | 并发安装同一 plugin/version 必须串行或拒绝。 |
 | PluginLoader.LoadAsync | 加载插件运行时。 | manifest、root path、owner。 | PluginLoadResult；成功时 State 为 Loaded 且 Runtime 非空，失败时 State 为 Faulted 且 Runtime 为空。 | 主程序集缺失、id mismatch、依赖失败进入 diagnostics。 | 可取消。 | 不得污染 Host root provider。 |
+| PluginMsBuildContract.GetManifestOutputPath | 计算构建期 plugin.json 输出路径。 | intermediate output path。 | 规范化后的 manifest 输出路径。 | 空路径抛标准参数异常。 | MSBuild 进程级取消。 | 同一输入必须稳定返回同一路径。 |
 | PluginRuntime.DisableAsync | 停用插件。 | 只能 Enabled 状态。 | Disabled 或失败结果。 | 贡献撤销失败仍继续其他撤销。 | 取消后仍执行最小清理。 | 并发 Disable/Unload 串行化。 |
 
 ## Public 类型覆盖
