@@ -59,6 +59,18 @@ require_entry_pattern() {
   fi
 }
 
+reject_entry_pattern() {
+  local package="$1"
+  local entries="$2"
+  local pattern="$3"
+  local message="$4"
+
+  if grep -Eq "$pattern" <<< "$entries"; then
+    printf 'Package %s has forbidden entry pattern: %s (%s)\n' "$package" "$pattern" "$message" >&2
+    exit 1
+  fi
+}
+
 require_nuspec_metadata() {
   local package="$1"
   local nuspec="$2"
@@ -111,6 +123,7 @@ while IFS= read -r project; do
       require_file "$snupkg"
       require_entry "$nupkg" "$entries" "analyzers/dotnet/cs/$project_name.dll"
       require_entry "$nupkg" "$entries" "analyzers/dotnet/cs/$project_name.pdb"
+      reject_entry_pattern "$nupkg" "$entries" "^lib/" "Generator package contains runtime lib asset"
       ;;
     AtomUI.City.Templates)
       require_entry "$nupkg" "$entries" "content/templates/atomui-city-app/.template.config/template.json"

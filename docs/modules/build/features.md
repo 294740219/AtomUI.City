@@ -10,7 +10,7 @@
 | AUC-BUILD-002 | Package Metadata | 已实现并通过产品合同测试 | csproj package properties, pack target | PackageMetadataTests |
 | AUC-BUILD-003 | Project Inventory | 已实现并通过产品合同测试 | solution/project inventory conventions | ProjectInventoryTests |
 | AUC-BUILD-004 | Dependency Boundary | 已实现并通过产品合同测试 | project reference and package reference rules | ProjectDependencyBoundaryTests |
-| AUC-BUILD-005 | Source Generator Packaging | Ready to Start Product Implementation | AtomUI.City.Generators package layout | SourceGeneratorProjectStructureTests |
+| AUC-BUILD-005 | Source Generator Packaging | 已实现并通过产品合同测试 | AtomUI.City.Generators package layout | SourceGeneratorProjectStructureTests |
 | AUC-BUILD-006 | Release Gates | Ready to Start Product Implementation | engineering/check-docs.sh, pack/test gates | EngineeringGateTests; PackagingReleaseGateTests |
 | AUC-BUILD-007 | Test Naming | Ready to Start Product Implementation | test project and test file naming convention | TestNamingConventionTests |
 
@@ -90,7 +90,7 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-BUILD-005 Source Generator Packaging
 
 Feature ID: `AUC-BUILD-005`
-Status: Ready to Start Product Implementation
+Status: 已实现并通过产品合同测试
 Goal: 约束 generator analyzer 分发。
 Public Contract: AtomUI.City.Generators package layout
 Runtime / Build Behavior: Generator target 为 netstandard2.0，nupkg 包含 analyzers/dotnet/cs，不进入 runtime lib。
