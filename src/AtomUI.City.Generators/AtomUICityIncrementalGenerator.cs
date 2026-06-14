@@ -67,15 +67,10 @@ public sealed class AtomUICityIncrementalGenerator : IIncrementalGenerator
         GeneratorDiagnostic diagnostic,
         IReadOnlyList<PresentationViewMetadata> views)
     {
-        var descriptor = new DiagnosticDescriptor(
-            diagnostic.Id,
-            diagnostic.Title,
-            diagnostic.Message,
-            $"AtomUI.City.Generators.{GeneratorFeatureNames.GetName(feature)}",
-            ToDiagnosticSeverity(diagnostic.Severity),
-            isEnabledByDefault: true);
-
-        return Diagnostic.Create(descriptor, FindDiagnosticLocation(diagnostic, views) ?? Location.None);
+        return GeneratorDiagnostics.CreateRoslynDiagnostic(
+            feature,
+            diagnostic,
+            FindDiagnosticLocation(diagnostic, views));
     }
 
     private static Location? FindDiagnosticLocation(
@@ -94,18 +89,4 @@ public sealed class AtomUICityIncrementalGenerator : IIncrementalGenerator
             ?.Location;
     }
 
-    private static DiagnosticSeverity ToDiagnosticSeverity(GeneratorDiagnosticSeverity severity)
-    {
-        switch (severity)
-        {
-            case GeneratorDiagnosticSeverity.Info:
-                return DiagnosticSeverity.Info;
-            case GeneratorDiagnosticSeverity.Warning:
-                return DiagnosticSeverity.Warning;
-            case GeneratorDiagnosticSeverity.Error:
-                return DiagnosticSeverity.Error;
-            default:
-                throw new ArgumentOutOfRangeException(nameof(severity), severity, "Unknown generator diagnostic severity.");
-        }
-    }
 }

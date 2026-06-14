@@ -38,3 +38,4 @@
 ## 测试门禁
 
 `tests/AtomUI.City.Generators.Tests` 必须断言当前源码诊断码；产品级目标诊断补齐后必须增加对应测试。
+`GeneratorDiagnostics.CreateRoslynDiagnostic` 必须断言 severity、category、message args 和 source location。

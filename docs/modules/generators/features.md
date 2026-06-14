@@ -13,7 +13,7 @@
 | AUC-GENERATORS-005 | Plugin Manifest | 已实现并通过产品合同测试 | PluginMetadataReader, PluginManifestBuilder | PluginManifestBuilderTests; PluginMetadataReaderTests |
 | AUC-GENERATORS-006 | Localization Manifest | 已实现并通过产品合同测试 | LocalizationMetadataReader, LocalizationManifestBuilder | LocalizationManifestBuilderTests; LocalizationMetadataReaderTests |
 | AUC-GENERATORS-007 | Presentation View Manifest | 已实现并通过产品合同测试 | PresentationViewMetadataReader, PresentationViewManifestBuilder | PresentationViewManifestBuilderTests; PresentationViewRegistrarSourceBuilderTests |
-| AUC-GENERATORS-008 | Diagnostics | Ready to Start Product Implementation | GeneratorDiagnosticIds, GeneratorDiagnostics | GeneratorDiagnosticTests |
+| AUC-GENERATORS-008 | Diagnostics | 已实现并通过产品合同测试 | GeneratorDiagnosticIds, GeneratorDiagnostics | GeneratorDiagnosticTests |
 
 ## Feature 硬门禁
 
@@ -133,7 +133,7 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-GENERATORS-008 Diagnostics
 
 Feature ID: `AUC-GENERATORS-008`
-Status: Ready to Start Product Implementation
+Status: 已实现并通过产品合同测试
 Goal: 统一 generator diagnostic 定义和输出。
 Public Contract: GeneratorDiagnosticIds, GeneratorDiagnostics
 Runtime / Build Behavior: 每个 diagnostic 有 stable id、severity、message args 和 category。

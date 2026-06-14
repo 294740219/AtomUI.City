@@ -26,7 +26,7 @@
 | MetadataReader.Read | 从声明读取 metadata。 | syntax node、semantic model、cancellation token。 | metadata 或 diagnostic result。 | symbol 缺失、attribute 参数非法、类型不可访问输出 diagnostic。 | 必须传递 Roslyn token。 | reader 必须无共享 mutable cache。 |
 | ManifestBuilder.Build | 校验 metadata 并生成 manifest。 | metadata collection。 | manifest result。 | 冲突、重复、循环、缺失依赖返回 failed result 和 diagnostics。 | 纯 CPU，批量 build 应观察 token。 | 同一输入输出 byte-stable。 |
 | PresentationViewRegistrarSourceBuilder.Build | 生成 view registrar source。 | PresentationViewManifest。 | Generated source text 和 hint name。 | manifest failed 时不得生成 registrar source。 | 纯 CPU。 | hint name 和 source ordering 稳定。 |
-| GeneratorDiagnostics.Create | 创建 Roslyn diagnostic。 | diagnostic definition、location、message args。 | Diagnostic。 | 参数数量不匹配必须由测试覆盖并稳定失败。 | 同步 API 无 token。 | diagnostic definition 不可变，可并发读取。 |
+| GeneratorDiagnostics.CreateRoslynDiagnostic | 创建 Roslyn diagnostic。 | feature、generator diagnostic、location、message args。 | Diagnostic。 | 参数数量不匹配按 Roslyn Diagnostic 格式化规则稳定失败。 | 同步 API 无 token。 | diagnostic definition 不可变，可并发读取。 |
 
 ## Public 类型覆盖
 

@@ -1,3 +1,6 @@
+using AtomUI.City.Generators.Common;
+using Microsoft.CodeAnalysis;
+
 namespace AtomUI.City.Generators.Diagnostics;
 
 public static class GeneratorDiagnostics
@@ -47,4 +50,44 @@ public static class GeneratorDiagnostics
         InvalidManifestInput,
         DuplicatePresentationView,
     });
+
+    public static Diagnostic CreateRoslynDiagnostic(
+        GeneratorFeature feature,
+        GeneratorDiagnostic diagnostic,
+        Location? location = null,
+        params object?[] messageArgs)
+    {
+        if (diagnostic is null)
+        {
+            throw new ArgumentNullException(nameof(diagnostic));
+        }
+
+        var descriptor = new DiagnosticDescriptor(
+            diagnostic.Id,
+            diagnostic.Title,
+            diagnostic.Message,
+            $"AtomUI.City.Generators.{GeneratorFeatureNames.GetName(feature)}",
+            ToDiagnosticSeverity(diagnostic.Severity),
+            isEnabledByDefault: true);
+
+        return Diagnostic.Create(
+            descriptor,
+            location ?? Location.None,
+            messageArgs ?? Array.Empty<object?>());
+    }
+
+    private static DiagnosticSeverity ToDiagnosticSeverity(GeneratorDiagnosticSeverity severity)
+    {
+        switch (severity)
+        {
+            case GeneratorDiagnosticSeverity.Info:
+                return DiagnosticSeverity.Info;
+            case GeneratorDiagnosticSeverity.Warning:
+                return DiagnosticSeverity.Warning;
+            case GeneratorDiagnosticSeverity.Error:
+                return DiagnosticSeverity.Error;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(severity), severity, "Unknown generator diagnostic severity.");
+        }
+    }
 }

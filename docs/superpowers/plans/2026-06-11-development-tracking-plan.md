@@ -5,8 +5,8 @@
 ## 当前结论
 
 - 1.0 发布状态：不可发布。
-- 全局进度：30/118。
-- 模块 Feature 合同：30/109。
+- 全局进度：31/118。
+- 模块 Feature 合同：31/109。
 - 最终发布门禁：0/9。
 - 最近校准日期：2026-06-14。
 
@@ -36,7 +36,7 @@
 | Core | 7 | 0 | 7 | 已完成 |
 | Testing | 9 | 0 | 9 | 已完成 |
 | Build | 7 | 0 | 7 | 已完成 |
-| Generators | 7 | 1 | 8 | 产品化进行中 |
+| Generators | 8 | 0 | 8 | 已完成 |
 | Routing | 0 | 8 | 8 | 未完成 |
 | Presentation | 0 | 8 | 8 | 未完成 |
 | MVVM | 0 | 6 | 6 | 未完成 |
@@ -91,7 +91,7 @@
 - [x] AUC-GENERATORS-005 Plugin Manifest。验收重点：plugin metadata、capability、dependency、contribution。
 - [x] AUC-GENERATORS-006 Localization Manifest。验收重点：culture、resource、fallback、重复 key 诊断。
 - [x] AUC-GENERATORS-007 Presentation View Manifest。验收重点：ViewFor、constructor、registrar source 和诊断。
-- [ ] AUC-GENERATORS-008 Diagnostics。验收重点：diagnostic id、severity、message args 和 source location。
+- [x] AUC-GENERATORS-008 Diagnostics。验收重点：diagnostic id、severity、message args 和 source location。
 
 ## Routing
 
