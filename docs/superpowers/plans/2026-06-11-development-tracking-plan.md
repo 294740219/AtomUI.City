@@ -5,8 +5,8 @@
 ## 当前结论
 
 - 1.0 发布状态：不可发布。
-- 全局进度：100/118。
-- 模块 Feature 合同：100/109。
+- 全局进度：101/118。
+- 模块 Feature 合同：101/109。
 - 最终发布门禁：0/9。
 - 最近校准日期：2026-06-15。
 
@@ -46,7 +46,7 @@
 | Data | 9 | 0 | 9 | 已完成 |
 | Localization | 7 | 0 | 7 | 已完成 |
 | Security | 7 | 0 | 7 | 已完成 |
-| CLI | 2 | 4 | 6 | 产品化进行中 |
+| CLI | 3 | 3 | 6 | 产品化进行中 |
 | Templates | 0 | 5 | 5 | 未完成 |
 | Release Gates | 0 | 9 | 9 | 未完成 |
 
@@ -191,7 +191,7 @@
 
 - [x] AUC-CLI-001 Command Model。验收重点：入口名、未知命令、缺参、exit code、usage 输出和 JSON 模式隔离。
 - [x] AUC-CLI-002 New App Command。验收重点：生成项目、冲突、非法名称、dry-run、JSON artifacts 和取消。
-- [ ] AUC-CLI-003 Build and Test Commands。验收重点：成功、失败、非零 exit code、取消、CI 模式和输出截断。
+- [x] AUC-CLI-003 Build and Test Commands。验收重点：成功、失败、非零 exit code、取消、CI 模式和输出截断。
 - [ ] AUC-CLI-004 Plugin Inspect and Doctor。验收重点：合法插件、manifest 缺失、版本非法、layout 错误和 JSON diagnostics。
 - [ ] AUC-CLI-005 AI-Friendly Envelope。验收重点：schema、纯 JSON、artifact 列表、suggested commands、retryable 语义。
 - [ ] AUC-CLI-006 Non-Interactive and CI Mode。验收重点：CI、non-interactive、stdin unavailable、需要确认时失败。

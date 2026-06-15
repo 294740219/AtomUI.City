@@ -99,9 +99,11 @@ Inspect workspace
 
 - 不绕过 MSBuild target。
 - 默认遵守 `output/` 布局。
-- Build diagnostic code 原样透传。
+- Build diagnostic code 原样透传；CLI 命令级失败使用 `AUCCLI0201` 到 `AUCCLI0203`。
 - CLI 可以补充命令级诊断，但不能改写 Build 错误语义。
-- `--json` 输出包含 Build diagnostics。
+- `--json` 输出包含 invocation、exitCode、stdout/stderr 摘要、durationMs 和 Build diagnostics。
+- `--ci` 会在 invocation 中记录 CI mode，并向子进程设置 CI 环境。
+- stdout/stderr 摘要必须截断，防止 agent 或 CI 读取无限日志。
 
 ### 6. Pack
 

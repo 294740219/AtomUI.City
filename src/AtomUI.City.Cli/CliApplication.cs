@@ -7,6 +7,9 @@ namespace AtomUI.City.Cli;
 
 public static class CliApplication
 {
+    private const int ProcessOutputSummaryLimit = 4096;
+    private const string ProcessOutputTruncationSuffix = "\n[truncated]";
+
     private static readonly string[] UsageLines =
     [
         "atomui city doctor",
@@ -27,9 +30,21 @@ public static class CliApplication
         CliExecutionEnvironment? environment = null,
         CancellationToken cancellationToken = default)
     {
+        return await RunAsync(args, output, error, environment, cancellationToken, ProcessRunner.RunAsync).ConfigureAwait(false);
+    }
+
+    internal static async ValueTask<int> RunAsync(
+        string[] args,
+        TextWriter output,
+        TextWriter error,
+        CliExecutionEnvironment? environment,
+        CancellationToken cancellationToken,
+        Func<DotnetInvocation, CancellationToken, ValueTask<ProcessRunResult>> processRunner)
+    {
         ArgumentNullException.ThrowIfNull(args);
         ArgumentNullException.ThrowIfNull(output);
         ArgumentNullException.ThrowIfNull(error);
+        ArgumentNullException.ThrowIfNull(processRunner);
 
         var commandLine = CliCommandLine.Parse(args);
         var baseEnvironment = environment ?? new CliExecutionEnvironment(Directory.GetCurrentDirectory());
@@ -88,14 +103,15 @@ public static class CliApplication
                 .ConfigureAwait(false);
         }
 
-        return await DispatchAsync(commandLine, executionEnvironment, output, cancellationToken).ConfigureAwait(false);
+        return await DispatchAsync(commandLine, executionEnvironment, output, cancellationToken, processRunner).ConfigureAwait(false);
     }
 
     private static async ValueTask<int> DispatchAsync(
         CliCommandLine commandLine,
         CliExecutionEnvironment environment,
         TextWriter output,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Func<DotnetInvocation, CancellationToken, ValueTask<ProcessRunResult>> processRunner)
     {
         var positionals = commandLine.Positionals;
         var command = positionals.Count > 1 ? positionals[1] : "doctor";
@@ -104,7 +120,7 @@ public static class CliApplication
         {
             "doctor" => await DoctorAsync(commandLine, environment, output).ConfigureAwait(false),
             "new" => await NewAsync(commandLine, environment, output, cancellationToken).ConfigureAwait(false),
-            "build" or "test" or "pack" or "publish" => await DotnetCommandAsync(command, commandLine, output, cancellationToken).ConfigureAwait(false),
+            "build" or "test" or "pack" or "publish" => await DotnetCommandAsync(command, commandLine, environment, output, cancellationToken, processRunner).ConfigureAwait(false),
             "inspect" => await InspectAsync(commandLine, environment, output).ConfigureAwait(false),
             "plugin" => await PluginAsync(commandLine, environment, output, cancellationToken).ConfigureAwait(false),
             "docs" when positionals.Count > 2 && positionals[2] == "check" => await GateCheckAsync("docs", commandLine, environment, output).ConfigureAwait(false),
@@ -302,32 +318,118 @@ public static class CliApplication
     private static async ValueTask<int> DotnetCommandAsync(
         string command,
         CliCommandLine commandLine,
+        CliExecutionEnvironment environment,
         TextWriter output,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Func<DotnetInvocation, CancellationToken, ValueTask<ProcessRunResult>> processRunner)
     {
-        var invocation = DotnetInvocation.Create(command, commandLine);
+        var invocation = DotnetInvocation.Create(command, commandLine, environment.WorkingDirectory);
+        var cliCommand = "atomui city " + command;
 
-        if (!commandLine.HasOption("--dry-run"))
+        if (!Directory.Exists(environment.WorkingDirectory))
         {
-            var result = await ProcessRunner.RunAsync(invocation, cancellationToken).ConfigureAwait(false);
             return await WriteAsync(
                     output,
                     commandLine,
-                    "atomui city " + command,
-                    result.ExitCode == 0
-                        ? CliEnvelope.Succeeded("atomui city " + command, new Dictionary<string, object?> { ["invocation"] = invocation, ["exitCode"] = result.ExitCode })
-                        : CliEnvelope.Failed("atomui city " + command, result.ExitCode, CliDiagnostic.Error("AUCCLI0201", result.Error)))
+                    cliCommand,
+                    CliEnvelope.FailedWithData(
+                        cliCommand,
+                        CliExitCodes.Failure,
+                        new Dictionary<string, object?>
+                        {
+                            ["invocation"] = invocation,
+                            ["workingDirectory"] = environment.WorkingDirectory,
+                        },
+                        CliDiagnostic.Error(
+                            "AUCCLI0203",
+                            $"Working directory does not exist: '{environment.WorkingDirectory}'.",
+                            environment.WorkingDirectory)))
                 .ConfigureAwait(false);
+        }
+
+        if (!commandLine.HasOption("--dry-run"))
+        {
+            try
+            {
+                var result = await processRunner(invocation, cancellationToken).ConfigureAwait(false);
+                var data = CreateProcessData(invocation, result);
+                return await WriteAsync(
+                        output,
+                        commandLine,
+                        cliCommand,
+                        result.ExitCode == 0
+                            ? CliEnvelope.Succeeded(cliCommand, data)
+                            : CliEnvelope.FailedWithData(
+                                cliCommand,
+                                result.ExitCode,
+                                data,
+                                CliDiagnostic.Error(
+                                    "AUCCLI0201",
+                                    CreateProcessFailureMessage(command, result),
+                                    invocation.WorkingDirectory)))
+                    .ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                return await WriteAsync(
+                        output,
+                        commandLine,
+                        cliCommand,
+                        CliEnvelope.FailedWithData(
+                            cliCommand,
+                            CliExitCodes.Failure,
+                            new Dictionary<string, object?>
+                            {
+                                ["invocation"] = invocation,
+                            },
+                            CliDiagnostic.Error(
+                                "AUCCLI0202",
+                                $"dotnet {command} was cancelled.",
+                                invocation.WorkingDirectory)))
+                    .ConfigureAwait(false);
+            }
         }
 
         return await WriteAsync(
                 output,
                 commandLine,
-                "atomui city " + command,
+                cliCommand,
                 CliEnvelope.Succeeded(
-                    "atomui city " + command,
+                    cliCommand,
                     new Dictionary<string, object?> { ["invocation"] = invocation }))
             .ConfigureAwait(false);
+    }
+
+    private static Dictionary<string, object?> CreateProcessData(
+        DotnetInvocation invocation,
+        ProcessRunResult result)
+    {
+        return new Dictionary<string, object?>
+        {
+            ["invocation"] = invocation,
+            ["exitCode"] = result.ExitCode,
+            ["stdout"] = SummarizeProcessOutput(result.Output),
+            ["stderr"] = SummarizeProcessOutput(result.Error),
+            ["durationMs"] = result.DurationMs,
+        };
+    }
+
+    private static string CreateProcessFailureMessage(string command, ProcessRunResult result)
+    {
+        var error = SummarizeProcessOutput(result.Error);
+        return string.IsNullOrWhiteSpace(error)
+            ? $"dotnet {command} exited with code {result.ExitCode}."
+            : error;
+    }
+
+    private static string SummarizeProcessOutput(string value)
+    {
+        if (value.Length <= ProcessOutputSummaryLimit)
+        {
+            return value;
+        }
+
+        return value[..ProcessOutputSummaryLimit] + ProcessOutputTruncationSuffix;
     }
 
     private static async ValueTask<int> InspectAsync(

@@ -24,6 +24,8 @@
 | `AUCCLI0105` | TargetAlreadyExists | `src/AtomUI.City.Cli/CliApplication.cs` |
 | `AUCCLI0106` | NewAppCancelled | `src/AtomUI.City.Cli/CliApplication.cs` |
 | `AUCCLI0201` | DotnetCommandFailed | `src/AtomUI.City.Cli/CliApplication.cs` |
+| `AUCCLI0202` | DotnetCommandCancelled | `src/AtomUI.City.Cli/CliApplication.cs` |
+| `AUCCLI0203` | DotnetWorkingDirectoryMissing | `src/AtomUI.City.Cli/CliApplication.cs` |
 | `AUCCLI0301` | PluginPackagePathRequired | `src/AtomUI.City.Cli/CliApplication.cs` |
 
 ## 产品级必须诊断的失败

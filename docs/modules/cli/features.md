@@ -8,7 +8,7 @@
 | --- | --- | --- | --- | --- |
 | AUC-CLI-001 | Command Model | Completed | CliApplication, CliCommandLine, CliExitCodes | CliCommandArchitectureTests |
 | AUC-CLI-002 | New App Command | Completed | CliApplication, ApplicationTemplateRenderer, CliEnvelope | CliNewAppTests |
-| AUC-CLI-003 | Build and Test Commands | Ready to Start Product Implementation | DotnetInvocation, ProcessRunner, CliEnvelope | CliBuildAndTestCommandTests |
+| AUC-CLI-003 | Build and Test Commands | Completed | DotnetInvocation, ProcessRunner, CliEnvelope | CliBuildAndTestCommandTests |
 | AUC-CLI-004 | Plugin Inspect and Doctor | Ready to Start Product Implementation | CliApplication, PluginManifestReader, PluginDiagnostic | CliInspectDoctorPluginTests |
 | AUC-CLI-005 | AI-Friendly Envelope | Ready to Start Product Implementation | CliEnvelope, CliDiagnostic, CliExecutionEnvironment | CliCommandArchitectureTests |
 | AUC-CLI-006 | Non-Interactive and CI Mode | Ready to Start Product Implementation | CliExecutionEnvironment, CliExitCodes | CliCommandArchitectureTests |
@@ -61,13 +61,13 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-CLI-003 Build and Test Commands
 
 Feature ID: `AUC-CLI-003`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 通过 CLI 统一调用 `dotnet build/test` 和工程门禁。
 Public Contract: DotnetInvocation, ProcessRunner, CliEnvelope
-Runtime / Build Behavior: 命令构造 dotnet invocation，捕获 stdout/stderr、exit code、duration 和 artifact path。
-Failure Behavior: dotnet 非零退出、超时、工作目录不存在返回失败 envelope。
-Threading / Cancellation: 取消必须停止子进程或停止等待；stdout/stderr buffer 有上限。
-Diagnostics: diagnostic 必须包含 invocation、working directory、exit code 和 stderr 摘要。
+Runtime / Build Behavior: 命令构造 dotnet invocation，记录 working directory、CI mode、stdout/stderr summary、exit code 和 duration；dry-run 只输出 invocation。
+Failure Behavior: dotnet 非零退出返回原始 exit code 和 `AUCCLI0201`；取消返回 `AUCCLI0202`；工作目录不存在返回 `AUCCLI0203` 且不启动进程。
+Threading / Cancellation: 取消会停止等待并尝试终止子进程；stdout/stderr 捕获和 envelope 输出都有上限。
+Diagnostics: diagnostic 包含 invocation working directory、exit code 和 stderr 摘要；CI mode 通过 invocation 进入 process environment。
 Tests: `CliBuildAndTestCommandTests`
 Required Assertions: 断言成功、失败、非零 exit code、取消、CI 模式和输出截断。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
