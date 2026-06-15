@@ -5,8 +5,8 @@
 ## 当前结论
 
 - 1.0 发布状态：不可发布。
-- 全局进度：96/118。
-- 模块 Feature 合同：96/109。
+- 全局进度：97/118。
+- 模块 Feature 合同：97/109。
 - 最终发布门禁：0/9。
 - 最近校准日期：2026-06-15。
 
@@ -45,7 +45,7 @@
 | PluginSystem | 8 | 0 | 8 | 已完成 |
 | Data | 9 | 0 | 9 | 已完成 |
 | Localization | 7 | 0 | 7 | 已完成 |
-| Security | 5 | 2 | 7 | 产品化进行中 |
+| Security | 6 | 1 | 7 | 产品化进行中 |
 | CLI | 0 | 6 | 6 | 未完成 |
 | Templates | 0 | 5 | 5 | 未完成 |
 | Release Gates | 0 | 9 | 9 | 未完成 |
@@ -184,7 +184,7 @@
 - [x] AUC-SECURITY-003 Permission Registry and Checker。验收重点：注册、重复、未注册、插件撤销和 checker result。
 - [x] AUC-SECURITY-004 Authorization Policy Evaluation。验收重点：成功、拒绝、失败、取消、多 requirement 和 provider 异常。
 - [x] AUC-SECURITY-005 Route Authorization Guard。验收重点：allow、deny、redirect login、取消和 Routing 无 Security 反向依赖。
-- [ ] AUC-SECURITY-006 Command Authorization。验收重点：状态变化、禁用/隐藏策略、订阅释放和权限撤销。
+- [x] AUC-SECURITY-006 Command Authorization。验收重点：状态变化、禁用/隐藏策略、订阅释放和权限撤销。
 - [ ] AUC-SECURITY-007 Access Token Provider。验收重点：成功、失败、不可用、取消、DI 默认 provider 和 Data 集成前置条件。
 
 ## CLI

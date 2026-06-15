@@ -22,6 +22,7 @@
 - `PermissionChecker` 对未注册或已撤销权限返回 `AuthorizationResultStatus.Failed` 和 `SecurityFailureKind.PermissionNotFound`，不执行 UI、导航或权限外副作用。
 - `IAuthorizationEvaluator.EvaluateAsync` 顺序评估 requirement；`EvaluatePolicyAsync` 通过 `IAuthorizationPolicyProvider` 读取 named policy，policy 缺失返回 `PolicyNotFound`，provider 异常返回 `EvaluatorFailed`，预取消不调用 provider。
 - `SecurityRouteGuard` 无 policy 时允许导航，Challenge 默认返回 `authentication-required` reject，配置 `SecurityRouteGuardOptions.LoginRouteId` 后返回 redirect；Forbidden 返回 `authorization-forbidden` reject，provider/evaluator 异常返回 `authorization-failed` failed result。
+- `CommandAuthorizationSource` 无 descriptor 时允许命令；未授权时按 descriptor 返回 disable/hide 状态；权限 registry、descriptor 和 authentication state 变化发布 `AuthorizationChanged`；provider/evaluator 异常返回 `Failed/EvaluatorFailed`；Dispose 后释放订阅。
 
 ## 数据格式兼容
 

@@ -160,6 +160,68 @@ public sealed class CommandAuthorizationSourceTests
     }
 
     [Fact]
+    public async Task PermissionContributionRevokeRaisesChangeAndDisablesCommand()
+    {
+        var store = new AuthenticationStateStore();
+        store.SetAuthenticated(CreatePrincipal(permissions: ["plugin.sales.export"]));
+        var permissions = new PermissionRegistry();
+        permissions.Add(new PermissionDescriptor("plugin.sales.export", contributionId: "SalesPlugin"));
+        var source = CreateSource(
+            provider =>
+            {
+                provider.Add(new CommandAuthorizationDescriptor(
+                    "sales.export",
+                    AuthorizationPolicy.RequirePermission("CanExportSales", "plugin.sales.export"),
+                    contributionId: "SalesPlugin"));
+            },
+            store,
+            permissions);
+        CommandAuthorizationChangedEventArgs? observed = null;
+        source.AuthorizationChanged += (_, args) => observed = args;
+
+        permissions.RemoveByContribution("SalesPlugin");
+        var state = await source.GetStateAsync(new CommandAuthorizationContext("sales.export"));
+
+        Assert.NotNull(observed);
+        Assert.Equal(CommandAuthorizationChangeReason.PermissionChanged, observed.Reason);
+        Assert.False(state.CanExecute);
+        Assert.True(state.IsVisible);
+        Assert.Equal(AuthorizationResultStatus.Failed, state.Authorization.Status);
+        Assert.Equal(SecurityFailureKind.PermissionNotFound, state.Authorization.FailureKind);
+    }
+
+    [Fact]
+    public async Task GetStateAsyncMapsDescriptorProviderExceptionToDisabledFailedState()
+    {
+        var exception = new InvalidOperationException("Descriptor provider failed.");
+        var source = CreateSource(provider: new ThrowingCommandAuthorizationDescriptorProvider(exception));
+
+        var state = await source.GetStateAsync(new CommandAuthorizationContext("settings.save"));
+
+        Assert.False(state.CanExecute);
+        Assert.True(state.IsVisible);
+        Assert.Equal(CommandUnauthorizedBehavior.Disable, state.UnauthorizedBehavior);
+        Assert.Equal(AuthorizationResultStatus.Failed, state.Authorization.Status);
+        Assert.Equal(SecurityFailureKind.EvaluatorFailed, state.Authorization.FailureKind);
+        Assert.Equal("settings.save", state.Authorization.FailedRequirement);
+        Assert.Same(exception, state.Authorization.Exception);
+    }
+
+    [Fact]
+    public async Task CheckExecutionAsyncMapsDescriptorProviderExceptionToFailedResult()
+    {
+        var exception = new InvalidOperationException("Descriptor provider failed.");
+        var source = CreateSource(provider: new ThrowingCommandAuthorizationDescriptorProvider(exception));
+
+        var result = await source.CheckExecutionAsync(new CommandAuthorizationContext("settings.save"));
+
+        Assert.Equal(AuthorizationResultStatus.Failed, result.Status);
+        Assert.Equal(SecurityFailureKind.EvaluatorFailed, result.FailureKind);
+        Assert.Equal("settings.save", result.FailedRequirement);
+        Assert.Same(exception, result.Exception);
+    }
+
+    [Fact]
     public async Task GetStateAsyncDoesNotAllowCommandWhenAuthorizationIsCancelled()
     {
         var source = CreateSource(provider =>
@@ -198,14 +260,42 @@ public sealed class CommandAuthorizationSourceTests
         Assert.Equal(AuthorizationResultStatus.Cancelled, result.Status);
     }
 
+    [Fact]
+    public void DisposeReleasesAuthorizationSubscriptions()
+    {
+        var store = new AuthenticationStateStore();
+        var permissions = new PermissionRegistry();
+        var provider = new InMemoryCommandAuthorizationDescriptorProvider();
+        var source = CreateSource(
+            authenticationStateProvider: store,
+            permissions: permissions,
+            provider: provider);
+        var changeCount = 0;
+        source.AuthorizationChanged += (_, _) => changeCount++;
+
+        source.Dispose();
+        store.SetAuthenticated(CreatePrincipal(permissions: []));
+        permissions.Add(new PermissionDescriptor("settings.write"));
+        provider.Add(new CommandAuthorizationDescriptor(
+            "settings.save",
+            AuthorizationPolicy.RequireAuthenticated("SignedIn")));
+
+        Assert.Equal(0, changeCount);
+    }
+
     private static CommandAuthorizationSource CreateSource(
         Action<InMemoryCommandAuthorizationDescriptorProvider>? configureProvider = null,
         AuthenticationStateStore? authenticationStateProvider = null,
         PermissionRegistry? permissions = null,
-        InMemoryCommandAuthorizationDescriptorProvider? provider = null)
+        ICommandAuthorizationDescriptorProvider? provider = null)
     {
-        provider ??= new InMemoryCommandAuthorizationDescriptorProvider();
-        configureProvider?.Invoke(provider);
+        if (provider is null)
+        {
+            var inMemoryProvider = new InMemoryCommandAuthorizationDescriptorProvider();
+            configureProvider?.Invoke(inMemoryProvider);
+            provider = inMemoryProvider;
+        }
+
         authenticationStateProvider ??= new AuthenticationStateStore();
         permissions ??= new PermissionRegistry();
 
@@ -226,5 +316,28 @@ public sealed class CommandAuthorizationSourceTests
         }
 
         return new ClaimsPrincipal(identity);
+    }
+
+    private sealed class ThrowingCommandAuthorizationDescriptorProvider : ICommandAuthorizationDescriptorProvider
+    {
+        private readonly Exception _exception;
+
+        public ThrowingCommandAuthorizationDescriptorProvider(Exception exception)
+        {
+            _exception = exception;
+        }
+
+        public event EventHandler<CommandAuthorizationChangedEventArgs>? DescriptorChanged
+        {
+            add { }
+            remove { }
+        }
+
+        public ValueTask<CommandAuthorizationDescriptor?> GetDescriptorAsync(
+            CommandAuthorizationContext context,
+            CancellationToken cancellationToken = default)
+        {
+            throw _exception;
+        }
     }
 }

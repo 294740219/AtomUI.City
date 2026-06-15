@@ -26,7 +26,7 @@
 | AUC-SECURITY-003 | Contract | PermissionRegistryTests; PermissionCheckerTests | 断言注册、重复、未注册、插件撤销和 checker result。 | 未注册权限、重复权限、contribution revoked 后重新注册。 | Completed |
 | AUC-SECURITY-004 | Contract | AuthorizationEvaluatorTests; AuthorizationPolicyTests | 断言成功、拒绝、失败、取消、多 requirement 和 provider 异常。 | policy 缺失、requirement 失败、provider 抛异常、预取消。 | Completed |
 | AUC-SECURITY-005 | Contract | RouteAuthorizationGuardTests | 断言 allow、deny、redirect login、取消和 Routing 无 Security 反向依赖。 | 无权限、需要登录、provider 异常、取消。 | Completed |
-| AUC-SECURITY-006 | Contract | CommandAuthorizationSourceTests | 断言状态变化、禁用/隐藏策略、订阅释放和权限撤销。 | descriptor 缺失、权限撤销、用户状态变化。 | Required |
+| AUC-SECURITY-006 | Contract | CommandAuthorizationSourceTests | 断言状态变化、禁用/隐藏策略、订阅释放和权限撤销。 | descriptor 缺失、权限撤销、用户状态变化、provider 异常、取消。 | Completed |
 | AUC-SECURITY-007 | Contract | SecurityRegistrationTests | 断言成功、失败、不可用、取消、DI 默认 provider 和 Data 集成前置条件。 | token 缺失、刷新失败、取消。 | Required |
 
 ## 缺口处理

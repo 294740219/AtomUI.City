@@ -53,38 +53,51 @@ public sealed class CommandAuthorizationSource : ICommandAuthorizationSource, ID
             return CreateCancelledState(context);
         }
 
-        var descriptor = await _descriptorProvider.GetDescriptorAsync(context, cancellationToken)
-            .ConfigureAwait(false);
+        CommandAuthorizationDescriptor? descriptor = null;
 
-        if (cancellationToken.IsCancellationRequested)
+        try
+        {
+            descriptor = await _descriptorProvider.GetDescriptorAsync(context, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return CreateCancelledState(context);
+            }
+
+            if (descriptor is null)
+            {
+                return new CommandAuthorizationState(
+                    context.CommandId,
+                    canExecute: true,
+                    isVisible: true,
+                    CommandUnauthorizedBehavior.Disable,
+                    AuthorizationResult.Allowed(),
+                    _revision);
+            }
+
+            var result = await EvaluateDescriptorAsync(context, descriptor, cancellationToken)
+                .ConfigureAwait(false);
+            var canExecute = result.Succeeded;
+            var isVisible = result.Succeeded || descriptor.UnauthorizedBehavior != CommandUnauthorizedBehavior.Hide;
+
+            return new CommandAuthorizationState(
+                context.CommandId,
+                canExecute,
+                isVisible,
+                descriptor.UnauthorizedBehavior,
+                result,
+                _revision,
+                descriptor.DeniedMessageKey);
+        }
+        catch (OperationCanceledException)
         {
             return CreateCancelledState(context);
         }
-
-        if (descriptor is null)
+        catch (Exception exception)
         {
-            return new CommandAuthorizationState(
-                context.CommandId,
-                canExecute: true,
-                isVisible: true,
-                CommandUnauthorizedBehavior.Disable,
-                AuthorizationResult.Allowed(),
-                _revision);
+            return CreateFailedState(context, descriptor, exception);
         }
-
-        var result = await EvaluateDescriptorAsync(context, descriptor, cancellationToken)
-            .ConfigureAwait(false);
-        var canExecute = result.Succeeded;
-        var isVisible = result.Succeeded || descriptor.UnauthorizedBehavior != CommandUnauthorizedBehavior.Hide;
-
-        return new CommandAuthorizationState(
-            context.CommandId,
-            canExecute,
-            isVisible,
-            descriptor.UnauthorizedBehavior,
-            result,
-            _revision,
-            descriptor.DeniedMessageKey);
     }
 
     public async ValueTask<AuthorizationResult> CheckExecutionAsync(
@@ -98,18 +111,29 @@ public sealed class CommandAuthorizationSource : ICommandAuthorizationSource, ID
             return AuthorizationResult.Cancelled();
         }
 
-        var descriptor = await _descriptorProvider.GetDescriptorAsync(context, cancellationToken)
-            .ConfigureAwait(false);
+        try
+        {
+            var descriptor = await _descriptorProvider.GetDescriptorAsync(context, cancellationToken)
+                .ConfigureAwait(false);
 
-        if (cancellationToken.IsCancellationRequested)
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return AuthorizationResult.Cancelled();
+            }
+
+            return descriptor is null
+                ? AuthorizationResult.Allowed()
+                : await EvaluateDescriptorAsync(context, descriptor, cancellationToken)
+                    .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
         {
             return AuthorizationResult.Cancelled();
         }
-
-        return descriptor is null
-            ? AuthorizationResult.Allowed()
-            : await EvaluateDescriptorAsync(context, descriptor, cancellationToken)
-                .ConfigureAwait(false);
+        catch (Exception exception)
+        {
+            return CreateFailedResult(context, exception);
+        }
     }
 
     public void Dispose()
@@ -157,6 +181,33 @@ public sealed class CommandAuthorizationSource : ICommandAuthorizationSource, ID
             CommandUnauthorizedBehavior.Disable,
             AuthorizationResult.Cancelled(),
             _revision);
+    }
+
+    private CommandAuthorizationState CreateFailedState(
+        CommandAuthorizationContext context,
+        CommandAuthorizationDescriptor? descriptor,
+        Exception exception)
+    {
+        var unauthorizedBehavior = descriptor?.UnauthorizedBehavior ?? CommandUnauthorizedBehavior.Disable;
+        return new CommandAuthorizationState(
+            context.CommandId,
+            canExecute: false,
+            isVisible: unauthorizedBehavior != CommandUnauthorizedBehavior.Hide,
+            unauthorizedBehavior,
+            CreateFailedResult(context, exception),
+            _revision,
+            descriptor?.DeniedMessageKey);
+    }
+
+    private static AuthorizationResult CreateFailedResult(
+        CommandAuthorizationContext context,
+        Exception exception)
+    {
+        return AuthorizationResult.Failed(
+            SecurityFailureKind.EvaluatorFailed,
+            context.CommandId,
+            exception.Message,
+            exception: exception);
     }
 
     private void OnAuthenticationStateChanged(

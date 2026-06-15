@@ -37,11 +37,12 @@
 | Feature ID | 相关能力 | 测试文件 |
 | --- | --- | --- |
 | AUC-SECURITY-001 | Authentication State | AuthenticationStateTests |
-| AUC-SECURITY-002 | Permission Registry | PermissionRegistryTests |
-| AUC-SECURITY-003 | Permission Checker | PermissionCheckerTests |
+| AUC-SECURITY-002 | Current Principal | AuthenticationStateTests |
+| AUC-SECURITY-003 | Permission Registry and Checker | PermissionRegistryTests; PermissionCheckerTests |
 | AUC-SECURITY-004 | Authorization Policy | AuthorizationPolicyTests; AuthorizationEvaluatorTests |
 | AUC-SECURITY-005 | Route Guard | RouteAuthorizationGuardTests |
 | AUC-SECURITY-006 | Command Authorization | CommandAuthorizationSourceTests |
+| AUC-SECURITY-007 | Access Token Provider | SecurityRegistrationTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -139,7 +140,7 @@ Presentation 不读取权限存储，不解释 Policy，只消费 Command 状态
 | 场景 | 默认处理 |
 |---|---|
 | 授权未通过 | `CanExecute = false`，执行时返回 authorization failure。 |
-| Policy 抛异常 | `CanExecute = false`，记录诊断。 |
+| Policy 或 descriptor provider 抛异常 | `CanExecute = false`，返回 Failed/EvaluatorFailed，记录诊断。 |
 | 插件 command 权限撤销 | Command contribution disabled 或 removed。 |
 | 登录态未知 | 默认不可执行，除非 command 标记匿名可执行。 |
 
@@ -152,4 +153,5 @@ Presentation 不读取权限存储，不解释 Policy，只消费 Command 状态
 - 执行前二次授权。
 - CompositeCommand 子命令授权变化。
 - 插件 command 撤销。
+- Dispose 后释放认证、descriptor 和权限 registry 订阅。
 - Presentation 不直接参与授权判断。

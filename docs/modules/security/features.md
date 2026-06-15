@@ -11,7 +11,7 @@
 | AUC-SECURITY-003 | Permission Registry and Checker | Completed | PermissionRegistry, IPermissionChecker | PermissionRegistryTests; PermissionCheckerTests |
 | AUC-SECURITY-004 | Authorization Policy Evaluation | Completed | AuthorizationEvaluator, AuthorizationPolicy | AuthorizationEvaluatorTests; AuthorizationPolicyTests |
 | AUC-SECURITY-005 | Route Authorization Guard | Completed | SecurityRouteGuard, IRouteAuthorizationPolicyProvider | RouteAuthorizationGuardTests |
-| AUC-SECURITY-006 | Command Authorization | Ready to Start Product Implementation | CommandAuthorizationSource, CommandAuthorizationDescriptor | CommandAuthorizationSourceTests |
+| AUC-SECURITY-006 | Command Authorization | Completed | CommandAuthorizationSource, CommandAuthorizationDescriptor | CommandAuthorizationSourceTests |
 | AUC-SECURITY-007 | Access Token Provider | Ready to Start Product Implementation | IAccessTokenProvider, AccessTokenResult | SecurityRegistrationTests |
 
 ## Feature 硬门禁
@@ -104,12 +104,12 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-SECURITY-006 Command Authorization
 
 Feature ID: `AUC-SECURITY-006`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 把权限变化映射到命令可用性和未授权行为。
 Public Contract: CommandAuthorizationSource, CommandAuthorizationDescriptor
-Runtime / Build Behavior: 命令声明 policy/permission；Security 发布 authorization state，Presentation/MVVM 决定禁用或隐藏。
-Failure Behavior: descriptor 缺失、权限撤销、用户状态变化必须触发 CommandAuthorizationChanged。
-Threading / Cancellation: 状态变更可来自后台；UI 更新由 Presentation dispatcher 处理。
+Runtime / Build Behavior: 命令声明 policy/permission；Security 发布 CommandAuthorizationState，Presentation/MVVM 只消费禁用或隐藏状态。
+Failure Behavior: descriptor 缺失允许命令；权限撤销和用户状态变化触发 CommandAuthorizationChanged；descriptor provider 或 evaluator 异常返回 Failed/EvaluatorFailed，不向 UI 冒泡。
+Threading / Cancellation: 状态变更可来自后台；取消返回 Cancelled；UI 更新由 Presentation dispatcher 处理；Dispose 后释放订阅。
 Diagnostics: command auth diagnostics 必须包含 command id、policy 和 change reason。
 Tests: `CommandAuthorizationSourceTests`
 Required Assertions: 断言状态变化、禁用/隐藏策略、订阅释放和权限撤销。
