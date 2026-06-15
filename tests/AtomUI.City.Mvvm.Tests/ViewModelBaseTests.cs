@@ -1,6 +1,6 @@
+using System.Reflection;
 using AtomUI.City.Mvvm;
 using CommunityToolkit.Mvvm.ComponentModel;
-using System.Reflection;
 
 namespace AtomUI.City.Mvvm.Tests;
 

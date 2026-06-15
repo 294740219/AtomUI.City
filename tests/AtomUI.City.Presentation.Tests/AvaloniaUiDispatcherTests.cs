@@ -1,9 +1,9 @@
+using System.Globalization;
 using AtomUI.City.Diagnostics;
 using AtomUI.City.Lifecycle;
 using AtomUI.City.Presentation;
 using AtomUI.City.Threading;
 using Avalonia.Threading;
-using System.Globalization;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace AtomUI.City.Presentation.Tests;

@@ -25,9 +25,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="AtomUI.City.Build" Version="0.1.0" PrivateAssets="all" />
-    <PackageReference Include="AtomUI.City.Core" Version="0.1.0" />
-    <PackageReference Include="AtomUI.City.PluginSystem" Version="0.1.0" />
+    <PackageReference Include="AtomUI.City.Build" Version="1.0.0" PrivateAssets="all" />
+    <PackageReference Include="AtomUI.City.Core" Version="1.0.0" />
+    <PackageReference Include="AtomUI.City.PluginSystem" Version="1.0.0" />
   </ItemGroup>
 
 </Project>

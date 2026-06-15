@@ -44,10 +44,10 @@ run_gate "project-inventory" bash engineering/check-project-inventory.sh
 run_gate "dependency-boundaries" bash engineering/check-dependency-boundaries.sh
 run_gate "test-naming" bash engineering/check-test-naming.sh
 run_gate "public-api" bash engineering/check-public-api.sh
-run_gate "test" bash engineering/test-ci.sh
 run_gate "release-notes" bash engineering/generate-release-notes.sh
 run_gate "pack" bash engineering/pack.sh --configuration "$configuration" --no-build
 run_gate "package-validation" bash engineering/validate-packages.sh --configuration "$configuration"
+run_gate "test" bash engineering/test-ci.sh
 run_gate "template-smoke" bash engineering/check-template-smoke.sh
 
 printf 'Release gates completed for %s configuration.\n' "$configuration"

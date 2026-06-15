@@ -2,7 +2,7 @@ namespace AtomUI.City.Templates;
 
 public sealed class ApplicationTemplateRenderer
 {
-    private const string AtomUICityPackageVersion = "0.1.0";
+    private const string AtomUICityPackageVersion = "1.0.0";
     private const string MicrosoftNetTestSdkVersion = "17.14.1";
     private const string XUnitVersion = "2.9.3";
     private const string XUnitRunnerVisualStudioVersion = "3.1.4";
@@ -177,7 +177,7 @@ public sealed class ApplicationTemplateRenderer
         var rootNamespace = options.EffectiveRootNamespace;
         var dynamicPlugins = options.UseDynamicPlugins
             ? """
-                <PackageReference Include="AtomUI.City.PluginSystem" Version="0.1.0" />
+                <PackageReference Include="AtomUI.City.PluginSystem" Version="{{AtomUICityPackageVersion}}" />
             """
             : string.Empty;
 

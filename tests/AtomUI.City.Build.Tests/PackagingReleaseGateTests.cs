@@ -90,7 +90,7 @@ public sealed class PackagingReleaseGateTests
         var versionProps = XDocument.Load(Path.Combine(repositoryRoot, "build", "Version.props"));
         var properties = ReadProperties(versionProps);
 
-        Assert.Equal("0.1.0", properties["AtomUICityVersion"]);
+        Assert.Equal("1.0.0", properties["AtomUICityVersion"]);
         Assert.Equal("$(AtomUICityVersion)", properties["AtomUICityTemplatesVersion"]);
 
         var sourceProjectsWithLiteralVersions = RepositoryPaths
@@ -99,6 +99,19 @@ public sealed class PackagingReleaseGateTests
             .ToArray();
 
         Assert.Empty(sourceProjectsWithLiteralVersions);
+    }
+
+    [Fact]
+    public void ReleaseNotesDescribeStableOneDotZeroPackageLine()
+    {
+        var repositoryRoot = RepositoryPaths.FindRepositoryRoot();
+        var releaseNotes = File.ReadAllText(Path.Combine(repositoryRoot, "RELEASE_NOTES.md"));
+
+        Assert.Contains("## 1.0.0", releaseNotes, StringComparison.Ordinal);
+        Assert.Contains("Plugin API compatibility", releaseNotes, StringComparison.Ordinal);
+        Assert.Contains("Plugin API compatibility starts at `1.0`", releaseNotes, StringComparison.Ordinal);
+        Assert.DoesNotContain("pre-1.0", releaseNotes, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("may change before the first stable release", releaseNotes, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -211,6 +224,16 @@ public sealed class PackagingReleaseGateTests
         Assert.Contains("bash engineering/validate-packages.sh --configuration \"$configuration\"", releaseGate, StringComparison.Ordinal);
         Assert.Contains("bash engineering/check-template-smoke.sh", releaseGate, StringComparison.Ordinal);
         Assert.Contains("bash engineering/generate-release-notes.sh", releaseGate, StringComparison.Ordinal);
+
+        var packIndex = releaseGate.IndexOf("run_gate \"pack\"", StringComparison.Ordinal);
+        var testIndex = releaseGate.IndexOf("run_gate \"test\"", StringComparison.Ordinal);
+        var templateSmokeIndex = releaseGate.IndexOf("run_gate \"template-smoke\"", StringComparison.Ordinal);
+
+        Assert.True(packIndex >= 0);
+        Assert.True(testIndex >= 0);
+        Assert.True(templateSmokeIndex >= 0);
+        Assert.True(packIndex < testIndex, "Package generation must run before tests that restore generated template projects.");
+        Assert.True(packIndex < templateSmokeIndex, "Package generation must run before template smoke.");
     }
 
     private static IReadOnlyDictionary<string, string> ReadProperties(XDocument document)

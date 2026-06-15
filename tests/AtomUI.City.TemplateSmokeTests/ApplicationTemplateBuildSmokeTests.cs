@@ -61,8 +61,8 @@ public sealed class ApplicationTemplateBuildSmokeTests
         var appProject = File.ReadAllText(appProjectPath);
         Assert.Contains("<ImplicitUsings>enable</ImplicitUsings>", appProject, StringComparison.Ordinal);
         Assert.Contains("<Nullable>enable</Nullable>", appProject, StringComparison.Ordinal);
-        Assert.Contains("""<PackageReference Include="AtomUI.City.Core" Version="0.1.0" />""", appProject, StringComparison.Ordinal);
-        Assert.Contains("""<PackageReference Include="AtomUI.City.Build" Version="0.1.0" PrivateAssets="all" />""", appProject, StringComparison.Ordinal);
+        Assert.Contains("""<PackageReference Include="AtomUI.City.Core" Version="1.0.0" />""", appProject, StringComparison.Ordinal);
+        Assert.Contains("""<PackageReference Include="AtomUI.City.Build" Version="1.0.0" PrivateAssets="all" />""", appProject, StringComparison.Ordinal);
 
         var testProject = File.ReadAllText(testProjectPath);
         Assert.Contains("""<PackageReference Include="Microsoft.NET.Test.Sdk" Version=""", testProject, StringComparison.Ordinal);
