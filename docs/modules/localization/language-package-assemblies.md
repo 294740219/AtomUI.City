@@ -41,9 +41,9 @@
 | --- | --- | --- |
 | AUC-LOCALIZATION-001 | Culture State | CultureStateTests |
 | AUC-LOCALIZATION-002 | Language Package Providers | LanguagePackageProviderTests |
-| AUC-LOCALIZATION-003 | Resource Declarations | LocalizationDeclarationAttributeTests |
+| AUC-LOCALIZATION-003 | Lazy Loading | LocalizationServiceTests |
 | AUC-LOCALIZATION-004 | Lookup and Fallback | LocalizationServiceTests |
-| AUC-LOCALIZATION-005 | Lazy Loading | LocalizationServiceTests |
+| AUC-LOCALIZATION-005 | Assembly Language Packages | LanguagePackageProviderTests; LocalizationDeclarationAttributeTests |
 | AUC-LOCALIZATION-006 | Presentation Bridge | LocalizationServiceTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。

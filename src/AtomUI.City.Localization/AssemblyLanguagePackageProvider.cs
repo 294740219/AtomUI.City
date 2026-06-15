@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Reflection;
 
 namespace AtomUI.City.Localization;
@@ -5,6 +6,16 @@ namespace AtomUI.City.Localization;
 public sealed class AssemblyLanguagePackageProvider : ILanguagePackageProvider
 {
     public LanguagePackageProviderKind Kind => LanguagePackageProviderKind.Assembly;
+
+    public IReadOnlyList<LanguagePackageDescriptor> Discover(Assembly assembly)
+    {
+        ArgumentNullException.ThrowIfNull(assembly);
+
+        return Array.AsReadOnly(assembly
+            .GetCustomAttributes<LanguagePackageAttribute>()
+            .Select(attribute => CreateDescriptor(assembly, attribute))
+            .ToArray());
+    }
 
     public ValueTask<LanguagePackageLoadResult> LoadAsync(
         LanguagePackageDescriptor descriptor,
@@ -77,6 +88,27 @@ public sealed class AssemblyLanguagePackageProvider : ILanguagePackageProvider
                         exception.Message,
                         Exception: exception)));
         }
+    }
+
+    private static LanguagePackageDescriptor CreateDescriptor(
+        Assembly assembly,
+        LanguagePackageAttribute attribute)
+    {
+        return new LanguagePackageDescriptor(
+            attribute.PackageId,
+            CultureInfo.GetCultureInfo(attribute.Culture),
+            attribute.Scope)
+        {
+            ProviderKind = LanguagePackageProviderKind.Assembly,
+            FallbackCulture = string.IsNullOrWhiteSpace(attribute.FallbackCulture)
+                ? null
+                : CultureInfo.GetCultureInfo(attribute.FallbackCulture),
+            Location = string.IsNullOrWhiteSpace(assembly.Location) ? null : assembly.Location,
+            ResourceBaseName = attribute.ResourceBaseName,
+            Version = attribute.Version,
+            Checksum = attribute.Checksum,
+            ContributionId = attribute.ContributionId,
+        };
     }
 
     private static string? ResolveResourceName(Assembly assembly, string resourceBaseName)

@@ -10,7 +10,7 @@
 | AUC-LOCALIZATION-002 | Language Package Provider | Completed | ILanguagePackageProvider, LanguagePackageDescriptor, LanguagePackageRegistry | LanguagePackageProviderTests |
 | AUC-LOCALIZATION-003 | Lazy Package Loading | Completed | LocalizationService, LanguagePackageLoadResult | LocalizationServiceTests |
 | AUC-LOCALIZATION-004 | Lookup and Missing Key Fallback | Completed | LocalizedString, LocalizedText, LocalizationResult | LocalizationServiceTests |
-| AUC-LOCALIZATION-005 | Assembly Language Packages | Ready to Start Product Implementation | AssemblyLanguagePackageProvider, LanguagePackageAttribute | LanguagePackageProviderTests; LocalizationDeclarationAttributeTests |
+| AUC-LOCALIZATION-005 | Assembly Language Packages | Completed | AssemblyLanguagePackageProvider, LanguagePackageAttribute | LanguagePackageProviderTests; LocalizationDeclarationAttributeTests |
 | AUC-LOCALIZATION-006 | Presentation Refresh Bridge | Ready to Start Product Implementation | IPresentationLocalizationBridge, LocalizedTextChangedEventArgs | LocalizationServiceTests |
 | AUC-LOCALIZATION-007 | Plugin Package Revocation | Ready to Start Product Implementation | ResourceScope, LanguagePackageProviderKind | LanguagePackageProviderTests |
 
@@ -90,11 +90,11 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-LOCALIZATION-005 Assembly Language Packages
 
 Feature ID: `AUC-LOCALIZATION-005`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 支持语言包放在独立 assembly 并运行时加载。
 Public Contract: AssemblyLanguagePackageProvider, LanguagePackageAttribute, LocalizedResourceAttribute
-Runtime / Build Behavior: assembly provider 读取属性或 generated manifest，按 culture 加载嵌入资源或 locpack。
-Failure Behavior: assembly load 失败、manifest 缺失、资源缺失只影响该 package。
+Runtime / Build Behavior: assembly provider 通过 `Discover(Assembly)` 读取 `LanguagePackageAttribute` 并生成 assembly descriptor；descriptor 记录 assembly path、resource base name、fallback culture、version、checksum 和 contribution id，随后按 culture 加载 embedded locpack。
+Failure Behavior: assembly load 失败、资源缺失和 locpack 格式错误只影响该 package；owner revoke 后相同 owner 不可重新注册已发现 descriptor。
 Threading / Cancellation: assembly load 可以在后台线程；加载完成后通过 service 发布。
 Diagnostics: assembly package diagnostics 必须包含 assembly name、resource name 和 culture。
 Tests: `LanguagePackageProviderTests; LocalizationDeclarationAttributeTests`

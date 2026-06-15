@@ -25,4 +25,6 @@ public sealed class LanguagePackageAttribute : Attribute
     public string? Version { get; set; }
 
     public string? Checksum { get; set; }
+
+    public string? ContributionId { get; set; }
 }

@@ -9,7 +9,7 @@
 | Culture | CultureState, LocalizationOptions | 当前 culture 和 fallback 链。 | 状态发布不可变；默认 culture、默认 UI culture 和 fallback chain 可配置；重复设置当前 culture 幂等。 |
 | Package Provider | ILanguagePackageProvider, LanguagePackageDescriptor, LanguagePackageRegistry | 语言包来源。 | provider 必须声明 culture 和 scope；registry 必须绑定 owner、拒绝重复 package，并在 owner revoke 后拒绝新贡献。 |
 | Lookup | ILocalizationService, LocalizedString, LocalizedMessage, LocalizedText | 文本查找、参数格式化和订阅更新。 | descriptor scope priority 稳定；缺失 key 和格式化失败必须诊断。 |
-| Assembly Package | AssemblyLanguagePackageProvider, LanguagePackageAttribute | 独立 assembly 语言包。 | 运行时按 culture 懒加载。 |
+| Assembly Package | AssemblyLanguagePackageProvider, LanguagePackageAttribute | 独立 assembly 语言包。 | `Discover(Assembly)` 从 assembly 属性声明生成 descriptor；运行时按 culture 懒加载 embedded locpack。 |
 | Presentation Bridge | IPresentationLocalizationBridge | 通知 UI 刷新。 | Localization 不直接操作 VisualTree。 |
 
 ## 关键方法合同
@@ -21,7 +21,7 @@
 | ILocalizationService.GetStringAsync | 查找字符串。 | key、cancellationToken；scope 来自 package descriptor；culture 来自当前 state 和 fallback chain。 | LocalizedString。 | package load 失败继续 fallback；缺失 key 返回 missing marker 并诊断。 | 必须观察 token。 | 基于 culture/package cache 并发安全；同一 scope 内保持注册顺序。 |
 | ILocalizationService.GetMessageAsync | 查找并格式化字符串。 | key、arguments、cancellationToken。 | LocalizedMessage。 | 缺失 key 返回 missing marker；格式化失败返回 raw template 并诊断。 | 必须观察 token。 | 格式化使用命中资源的 culture。 |
 | LocalizedText.Subscribe | 订阅 culture change 后的文本更新。 | handler 不得为 null。 | subscription handle。 | handler 失败被隔离并诊断。 | Dispose 后不再发送。 | 通知顺序跟随 culture state revision。 |
-| AssemblyLanguagePackageProvider.Discover | 发现 assembly 内语言包。 | assembly 和 resource filter。 | descriptors。 | manifest 缺失或重复 key 诊断。 | 发现可同步，加载异步。 | descriptor 发布后不可变。 |
+| AssemblyLanguagePackageProvider.Discover | 发现 assembly 内语言包。 | assembly 不得为 null；读取 `LanguagePackageAttribute`。 | descriptor 列表，包含 assembly location、resource base name、fallback culture、version、checksum 和 contribution id。 | invalid culture 由 `CultureInfo` 拒绝；缺失资源在 `LoadAsync` 阶段返回失败 result。 | 发现同步执行，加载异步。 | descriptor 发布后不可变；owner revoke 由 registry 承接。 |
 
 ## Public 类型覆盖
 

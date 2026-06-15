@@ -5,8 +5,8 @@
 ## 当前结论
 
 - 1.0 发布状态：不可发布。
-- 全局进度：88/118。
-- 模块 Feature 合同：88/109。
+- 全局进度：89/118。
+- 模块 Feature 合同：89/109。
 - 最终发布门禁：0/9。
 - 最近校准日期：2026-06-15。
 
@@ -44,7 +44,7 @@
 | EventBus | 6 | 0 | 6 | 已完成 |
 | PluginSystem | 8 | 0 | 8 | 已完成 |
 | Data | 9 | 0 | 9 | 已完成 |
-| Localization | 4 | 3 | 7 | 产品化进行中 |
+| Localization | 5 | 2 | 7 | 产品化进行中 |
 | Security | 0 | 7 | 7 | 未完成 |
 | CLI | 0 | 6 | 6 | 未完成 |
 | Templates | 0 | 5 | 5 | 未完成 |
@@ -173,7 +173,7 @@
 - [x] AUC-LOCALIZATION-002 Language Package Provider。验收重点：provider 注册、重复拒绝、取消、格式错误和 owner revoke。
 - [x] AUC-LOCALIZATION-003 Lazy Package Loading。验收重点：按需加载、并发合并、失败 fallback、不同 culture 独立缓存。
 - [x] AUC-LOCALIZATION-004 Lookup and Missing Key Fallback。验收重点：scope lookup、fallback、缺失 key、参数格式化和订阅更新。
-- [ ] AUC-LOCALIZATION-005 Assembly Language Packages。验收重点：独立 assembly、属性声明、资源读取、缺失资源和 unload owner。
+- [x] AUC-LOCALIZATION-005 Assembly Language Packages。验收重点：独立 assembly、属性声明、资源读取、缺失资源和 unload owner。
 - [ ] AUC-LOCALIZATION-006 Presentation Refresh Bridge。验收重点：bridge 调用、局部失败、批量刷新和不依赖 Avalonia 类型。
 - [ ] AUC-LOCALIZATION-007 Plugin Package Revocation。验收重点：撤销后不可 lookup、旧 snapshot 稳定、订阅释放和重复 revoke。
 
