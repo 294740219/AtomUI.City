@@ -7,7 +7,7 @@
 | API Family | 关键类型 | 职责 | 硬性行为 |
 | --- | --- | --- | --- |
 | Authentication | AuthenticationStateStore, AuthenticationStateSnapshot | 当前用户状态。 | snapshot 不可变，跨线程读取一致。 |
-| Permission | PermissionRegistry, IPermissionChecker | 权限定义和检查。 | 未注册权限稳定失败。 |
+| Permission | PermissionRegistry, IPermissionChecker | 权限定义和检查。 | 未注册权限稳定失败；撤销 contribution 后拒绝同一 contribution 重新注册。 |
 | Authorization | AuthorizationEvaluator, AuthorizationPolicy | 策略评估。 | 不操作 UI 或导航。 |
 | Route/Command Integration | SecurityRouteGuard, CommandAuthorizationSource | 把授权结果暴露给 Routing 和 Presentation/MVVM。 | 只返回 result 或 state，不执行 UI。 |
 | Token | IAccessTokenProvider, AccessTokenResult | 为 Data 等模块提供 token。 | 失败返回 result，不抛随机异常。 |
@@ -18,8 +18,8 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | AuthenticationStateStore.SetAnonymous / SetAuthenticated / SetRefreshing / SetSignedOut / SetFailed | 发布认证状态。 | principal 不得为 null；failure message 不得为空。 | AuthenticationStateSnapshot。 | Failed 和 SignedOut 清除 principal、scheme、expiry；外部 principal mutation 不影响已发布 snapshot。 | 同步提交无 token。 | 等价重复设置幂等，不递增 revision、不重复通知；订阅通知基于 immutable snapshot。 |
 | ICurrentPrincipalAccessor.Principal / SecurityPrincipals.Anonymous | 同步读取当前 principal 与 anonymous principal。 | 无。 | ClaimsPrincipal。 | 未认证状态返回 unauthenticated principal；`SecurityPrincipals.Anonymous` 不返回可污染的 singleton。 | 无 token，同步无阻塞。 | 读取返回当前 snapshot principal；已读取 principal 不随后续状态变化改变。 |
-| IPermissionRegistry.Register | 注册权限。 | PermissionDescriptor 必须有 stable name 和 owner。 | registration handle 或 result。 | 重复 name、owner revoked 返回失败。 | 同步 API 无 token。 | 读并发安全，写串行。 |
-| IPermissionChecker.IsGrantedAsync | 检查权限。 | principal、permission name、resource 可选。 | AuthorizationResult 或 bool result。 | 未注册、provider 异常稳定映射。 | 必须观察 token。 | 无共享 mutable result。 |
+| PermissionRegistry.Add / Remove / RemoveByContribution | 注册、移除或按 contribution 撤销权限。 | PermissionDescriptor 必须有 stable name；插件权限必须携带 contribution id；name 和 contribution id 不得为空白。 | Add/Remove 返回 bool；RemoveByContribution 返回移除数量。 | 重复 name 返回 false；已撤销 contribution 的新注册返回 false；未找到权限或重复撤销返回 false/0。 | 同步 API 无 token。 | 读并发安全，写串行；成功变更递增 revision 并发布 Changed；重复撤销不递增 revision。 |
+| IPermissionChecker.CheckAsync / CheckCurrentAsync | 检查权限。 | principal、permission name；Current 变体依赖 current principal accessor。 | AuthorizationResult。 | 未注册或撤销后权限返回 Failed/PermissionNotFound；未配置 current principal accessor 返回 Failed/EvaluatorFailed。 | 必须观察 token。 | 无共享 mutable result。 |
 | IAuthorizationEvaluator.AuthorizeAsync | 评估 policy。 | AuthorizationRequest 包含 principal、policy、resource。 | AuthorizationResult。 | policy 缺失、requirement failed、异常映射为 Failed/Forbidden。 | 必须观察 token。 | 同一 request 不修改全局状态。 |
 | SecurityRouteGuard.CanEnterAsync | 将 route policy 转成 guard result。 | RouteGuardContext。 | RouteGuardResult。 | 未登录返回 redirect hint 或 deny。 | 必须观察 token。 | 不执行导航。 |
 | IAccessTokenProvider.GetTokenAsync | 获取 access token。 | AccessTokenRequest。 | AccessTokenResult。 | 不可用、刷新失败、取消有独立 status。 | 必须观察 token。 | 并发 refresh 合并或拒绝，行为必须测试。 |

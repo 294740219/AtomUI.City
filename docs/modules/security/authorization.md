@@ -37,11 +37,12 @@
 | Feature ID | 相关能力 | 测试文件 |
 | --- | --- | --- |
 | AUC-SECURITY-001 | Authentication State | AuthenticationStateTests |
-| AUC-SECURITY-002 | Permission Registry | PermissionRegistryTests |
-| AUC-SECURITY-003 | Permission Checker | PermissionCheckerTests |
+| AUC-SECURITY-002 | Current Principal | AuthenticationStateTests |
+| AUC-SECURITY-003 | Permission Registry and Checker | PermissionRegistryTests; PermissionCheckerTests |
 | AUC-SECURITY-004 | Authorization Policy | AuthorizationPolicyTests; AuthorizationEvaluatorTests |
 | AUC-SECURITY-005 | Route Guard | RouteAuthorizationGuardTests |
 | AUC-SECURITY-006 | Command Authorization | CommandAuthorizationSourceTests |
+| AUC-SECURITY-007 | Access Token Provider | SecurityRegistrationTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 

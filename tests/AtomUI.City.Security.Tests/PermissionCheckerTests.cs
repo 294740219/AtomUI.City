@@ -44,6 +44,34 @@ public sealed class PermissionCheckerTests
         Assert.Equal(AuthorizationResultStatus.Allowed, result.Status);
     }
 
+    [Fact]
+    public async Task CheckAsyncFailsForUnregisteredPermission()
+    {
+        var checker = new PermissionChecker(new PermissionRegistry());
+        var principal = CreatePrincipal(["settings.read"]);
+
+        var result = await checker.CheckAsync(principal, "settings.read");
+
+        Assert.Equal(AuthorizationResultStatus.Failed, result.Status);
+        Assert.Equal(SecurityFailureKind.PermissionNotFound, result.FailureKind);
+        Assert.Equal("settings.read", result.FailedRequirement);
+    }
+
+    [Fact]
+    public async Task CheckAsyncFailsAfterPermissionContributionIsRevoked()
+    {
+        var registry = new PermissionRegistry();
+        registry.Add(new PermissionDescriptor("plugin.sales.export", contributionId: "SalesPlugin"));
+        var checker = new PermissionChecker(registry);
+        var principal = CreatePrincipal(["plugin.sales.export"]);
+
+        registry.RemoveByContribution("SalesPlugin");
+        var result = await checker.CheckAsync(principal, "plugin.sales.export");
+
+        Assert.Equal(AuthorizationResultStatus.Failed, result.Status);
+        Assert.Equal(SecurityFailureKind.PermissionNotFound, result.FailureKind);
+    }
+
     private static ClaimsPrincipal CreatePrincipal(IReadOnlyCollection<string> permissions)
     {
         var identity = new ClaimsIdentity(authenticationType: "Test");

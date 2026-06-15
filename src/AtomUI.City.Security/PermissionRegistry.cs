@@ -5,6 +5,7 @@ namespace AtomUI.City.Security;
 public sealed class PermissionRegistry : IPermissionRegistry
 {
     private readonly Dictionary<string, PermissionDescriptor> _permissions = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _revokedContributions = new(StringComparer.Ordinal);
     private readonly object _syncRoot = new();
     private long _revision;
 
@@ -39,6 +40,12 @@ public sealed class PermissionRegistry : IPermissionRegistry
 
         lock (_syncRoot)
         {
+            if (!string.IsNullOrWhiteSpace(descriptor.ContributionId)
+                && _revokedContributions.Contains(descriptor.ContributionId))
+            {
+                return false;
+            }
+
             if (_permissions.ContainsKey(descriptor.Name))
             {
                 return false;
@@ -93,6 +100,7 @@ public sealed class PermissionRegistry : IPermissionRegistry
 
         lock (_syncRoot)
         {
+            _revokedContributions.Add(contributionId);
             var names = _permissions
                 .Where(pair => string.Equals(pair.Value.ContributionId, contributionId, StringComparison.Ordinal))
                 .Select(pair => pair.Key)

@@ -18,6 +18,8 @@
 - 新增 API 可以 minor 版本发布，但必须有文档、测试和迁移说明。
 - `AuthenticationStateStore` 发布 cloned immutable snapshot、等价重复设置幂等、Failed/SignedOut 清除 principal 与 token hint、StateChanged 携带 previous/current snapshot 的行为进入 1.0 兼容承诺。
 - `ICurrentPrincipalAccessor.Principal` 返回当前 snapshot principal、已读取 principal 保持稳定、`SecurityPrincipals.Anonymous` 每次返回独立 unauthenticated principal 的行为进入 1.0 兼容承诺。
+- `PermissionRegistry` 使用大小写敏感权限名、成功变更递增 revision、重复注册返回 false、`RemoveByContribution` 撤销已有权限并阻止同一 contribution id 后续注册、重复撤销返回 0 的行为进入 1.0 兼容承诺。
+- `PermissionChecker` 对未注册或已撤销权限返回 `AuthorizationResultStatus.Failed` 和 `SecurityFailureKind.PermissionNotFound`，不执行 UI、导航或权限外副作用。
 
 ## 数据格式兼容
 

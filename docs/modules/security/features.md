@@ -8,7 +8,7 @@
 | --- | --- | --- | --- | --- |
 | AUC-SECURITY-001 | Authentication State Store | Completed | AuthenticationStateStore, AuthenticationStateSnapshot | AuthenticationStateTests |
 | AUC-SECURITY-002 | Current Principal Access | Completed | ICurrentPrincipalAccessor, SecurityPrincipals | AuthenticationStateTests |
-| AUC-SECURITY-003 | Permission Registry and Checker | Ready to Start Product Implementation | PermissionRegistry, IPermissionChecker | PermissionRegistryTests; PermissionCheckerTests |
+| AUC-SECURITY-003 | Permission Registry and Checker | Completed | PermissionRegistry, IPermissionChecker | PermissionRegistryTests; PermissionCheckerTests |
 | AUC-SECURITY-004 | Authorization Policy Evaluation | Ready to Start Product Implementation | AuthorizationEvaluator, AuthorizationPolicy | AuthorizationEvaluatorTests; AuthorizationPolicyTests |
 | AUC-SECURITY-005 | Route Authorization Guard | Ready to Start Product Implementation | SecurityRouteGuard, IRouteAuthorizationPolicyProvider | RouteAuthorizationGuardTests |
 | AUC-SECURITY-006 | Command Authorization | Ready to Start Product Implementation | CommandAuthorizationSource, CommandAuthorizationDescriptor | CommandAuthorizationSourceTests |
@@ -62,12 +62,12 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-SECURITY-003 Permission Registry and Checker
 
 Feature ID: `AUC-SECURITY-003`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 注册权限定义并提供权限检查。
 Public Contract: PermissionRegistry, IPermissionChecker, PermissionDescriptor
-Runtime / Build Behavior: 权限按 stable name 注册；插件权限带 owner；checker 只返回结果，不执行 UI 或导航。
-Failure Behavior: 未注册权限返回 Failed 或 Forbidden；重复权限按 owner 规则拒绝。
-Threading / Cancellation: registry 读并发安全；插件卸载撤销 owner 权限。
+Runtime / Build Behavior: 权限按 stable name 注册；插件权限带 contribution id；checker 只返回 AuthorizationResult，不执行 UI 或导航。
+Failure Behavior: 未注册权限返回 Failed/PermissionNotFound；重复权限返回注册失败；贡献撤销后，同一 contribution id 的新权限注册必须被拒绝。
+Threading / Cancellation: registry 读并发安全；插件卸载通过 contribution id 撤销权限；checker 必须观察取消 token。
 Diagnostics: permission diagnostics 必须包含 permission name、owner 和 principal id。
 Tests: `PermissionRegistryTests; PermissionCheckerTests`
 Required Assertions: 断言注册、重复、未注册、插件撤销和 checker result。

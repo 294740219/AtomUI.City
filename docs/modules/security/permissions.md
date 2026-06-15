@@ -23,6 +23,7 @@
 - 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
 - Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
 - 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
+- 通过 contribution id 撤销权限后，同一 contribution id 不能在当前 registry 中重新注册权限。
 
 ## 失败行为
 
@@ -37,11 +38,12 @@
 | Feature ID | 相关能力 | 测试文件 |
 | --- | --- | --- |
 | AUC-SECURITY-001 | Authentication State | AuthenticationStateTests |
-| AUC-SECURITY-002 | Permission Registry | PermissionRegistryTests |
-| AUC-SECURITY-003 | Permission Checker | PermissionCheckerTests |
+| AUC-SECURITY-002 | Current Principal | AuthenticationStateTests |
+| AUC-SECURITY-003 | Permission Registry and Checker | PermissionRegistryTests; PermissionCheckerTests |
 | AUC-SECURITY-004 | Authorization Policy | AuthorizationPolicyTests; AuthorizationEvaluatorTests |
 | AUC-SECURITY-005 | Route Guard | RouteAuthorizationGuardTests |
 | AUC-SECURITY-006 | Command Authorization | CommandAuthorizationSourceTests |
+| AUC-SECURITY-007 | Access Token Provider | SecurityRegistrationTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -117,6 +119,7 @@ Module / Plugin
 - 插件权限必须有 ContributionLease。
 - 插件停用时撤销对应权限和 policy metadata。
 - 已撤销权限不能再被 Route、Command 或 Data 使用。
+- 同一 contribution id 撤销后不能继续向 registry 追加新权限。
 - 活动授权缓存必须按 contribution revision 失效。
 
 ### 5. 本地化

@@ -51,6 +51,36 @@ public sealed class PermissionRegistryTests
     }
 
     [Fact]
+    public void RemoveByContributionRejectsFutureRegistrationsForRevokedContribution()
+    {
+        var registry = new PermissionRegistry();
+        registry.Add(new PermissionDescriptor("plugin.sales.export", contributionId: "SalesPlugin"));
+
+        var removed = registry.RemoveByContribution("SalesPlugin");
+        var addedAfterRevoke = registry.Add(new PermissionDescriptor(
+            "plugin.sales.import",
+            contributionId: "SalesPlugin"));
+
+        Assert.Equal(1, removed);
+        Assert.False(addedAfterRevoke);
+        Assert.False(registry.Contains("plugin.sales.import"));
+        Assert.Equal(2, registry.Revision);
+    }
+
+    [Fact]
+    public void RemoveByContributionIsIdempotentAfterContributionWasRevoked()
+    {
+        var registry = new PermissionRegistry();
+        registry.Add(new PermissionDescriptor("plugin.sales.export", contributionId: "SalesPlugin"));
+        registry.RemoveByContribution("SalesPlugin");
+
+        var secondRemove = registry.RemoveByContribution("SalesPlugin");
+
+        Assert.Equal(0, secondRemove);
+        Assert.Equal(2, registry.Revision);
+    }
+
+    [Fact]
     public void PermissionsRejectsExternalListMutation()
     {
         var registry = new PermissionRegistry();
