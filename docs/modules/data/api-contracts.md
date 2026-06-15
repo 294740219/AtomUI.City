@@ -12,6 +12,7 @@
 | Authentication | IDataCredentialProvider, AccessTokenCredentialProvider | 从 Security 获取 credential。 | 匿名请求不取 token；token provider 非取消异常映射为 Unavailable credential result。 |
 | Caching | IDataRequestCache, DataCacheKey | 请求缓存。 | key 组成稳定；required components 拒绝空白值；principal revision 必须隔离缓存。 |
 | Error Model | DataResult<T>, DataError, DataErrorKind | 统一结果和错误模型。 | success result 不携带 error；failed/cancelled/stale result 不携带 value；DataError 拒绝未知 kind 和空白 message。 |
+| DI Registration | DataServiceCollectionExtensions | 默认 Data 服务注册。 | AddData 注册 pipeline、client factory、cache、connection manager、diagnostics 和 HTTP/gRPC/SignalR transports；重复调用不重复默认 transport；pre-registration override 保留优先级。 |
 | Diagnostics | DataDiagnosticIds | 数据访问诊断。 | AUCDATA001-020 稳定。 |
 
 ## 关键方法合同

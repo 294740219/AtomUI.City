@@ -14,7 +14,7 @@
 | AUC-DATA-006 | Authentication | Completed | IDataCredentialProvider, AccessTokenCredentialProvider | AccessTokenCredentialProviderTests |
 | AUC-DATA-007 | Caching | Completed | IDataRequestCache, DataCacheKey | DataRequestCacheTests |
 | AUC-DATA-008 | Error Model | Completed | DataResult<T>, DataError | DataResultTests; DataDiagnosticsTests |
-| AUC-DATA-009 | DI Registration | Ready to Start Product Implementation | DataServiceCollectionExtensions | DataRegistrationTests |
+| AUC-DATA-009 | DI Registration | Completed | DataServiceCollectionExtensions | DataRegistrationTests |
 
 ## Feature 硬门禁
 
@@ -141,13 +141,13 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-DATA-009 DI Registration
 
 Feature ID: `AUC-DATA-009`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 默认 pipeline、factory、transport、diagnostics 注册。
 Public Contract: DataServiceCollectionExtensions
-Runtime / Build Behavior: 默认 pipeline、factory、transport、diagnostics 注册。
-Failure Behavior: 重复注册、override。
+Runtime / Build Behavior: 默认 pipeline、factory、HTTP/gRPC/SignalR transport、diagnostics 注册；重复 AddData 不重复默认 transport。
+Failure Behavior: 重复注册、override、缺失 credential provider。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `DataRegistrationTests`。
-Required Assertions: 断言默认服务。
+Required Assertions: 断言默认服务、重复注册和 pre-registration override。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。

@@ -25,6 +25,7 @@
 - `AccessTokenCredentialProvider` 必须在匿名请求时跳过 token provider，并把 token provider 非取消异常映射为 `Unavailable` credential result。
 - `DataCacheKey` 的 required components、value equality 和 principal revision 隔离进入 1.0 兼容承诺。
 - `DataResult<T>` 的 success/error 互斥语义、cancelled/stale 无 value 语义，以及 `DataError` 对未知 kind 和空白 message 的拒绝行为进入 1.0 兼容承诺。
+- `DataServiceCollectionExtensions.AddData` 的默认服务集合、重复调用幂等行为和 pre-registration override 优先级进入 1.0 兼容承诺。
 
 ## 数据格式兼容
 

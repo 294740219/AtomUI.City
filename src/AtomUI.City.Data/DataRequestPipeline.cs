@@ -26,10 +26,23 @@ public sealed class DataRequestPipeline : IDataRequestPipeline
     {
         ArgumentNullException.ThrowIfNull(transports);
 
-        _transports = transports.ToDictionary(transport => transport.Kind);
+        _transports = CreateTransportMap(transports);
         _credentialProvider = credentialProvider;
         _diagnostics = diagnostics;
         _cache = cache;
+    }
+
+    private static IReadOnlyDictionary<DataTransportKind, IRequestResponseTransport> CreateTransportMap(
+        IEnumerable<IRequestResponseTransport> transports)
+    {
+        var transportMap = new Dictionary<DataTransportKind, IRequestResponseTransport>();
+        foreach (var transport in transports)
+        {
+            ArgumentNullException.ThrowIfNull(transport);
+            transportMap.TryAdd(transport.Kind, transport);
+        }
+
+        return transportMap;
     }
 
     public async ValueTask<DataResult<TResponse>> SendAsync<TResponse>(
