@@ -22,6 +22,7 @@
 - `GrpcStatusCode` 的枚举数值必须匹配 gRPC protocol 标准状态码；`GrpcDataTransport` 的 status -> `DataErrorKind` 映射进入 1.0 兼容承诺。
 - `SignalRDataTransport` 的 invocation context 内容、`SignalRConnectionClosedException` -> `ConnectionClosed` 和 `SignalRReconnectFailedException` -> `ReconnectFailed` 映射进入 1.0 兼容承诺。
 - `DataConnectionManager` 必须拒绝 ownerless 长连接、按 owner stop 连接，并保证已停止连接重复 stop 不重复释放底层资源。
+- `AccessTokenCredentialProvider` 必须在匿名请求时跳过 token provider，并把 token provider 非取消异常映射为 `Unavailable` credential result。
 
 ## 数据格式兼容
 

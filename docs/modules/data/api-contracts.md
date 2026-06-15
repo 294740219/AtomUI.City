@@ -9,6 +9,7 @@
 | Request Pipeline | IDataRequestPipeline, DataRequest<T>, DataRequestContext | 统一请求执行。 | 认证->缓存->传输->映射顺序稳定；transient transport exception 按 retry policy 处理。 |
 | Transports | HttpDataTransport, GrpcDataTransport, SignalRDataTransport | 具体传输适配。 | 只做传输；HTTP 422 映射为 ValidationFailed，504 映射为 Timeout；gRPC status 数值和错误映射必须稳定；SignalR 连接生命周期异常必须映射为稳定 DataErrorKind。 |
 | Connection | DataConnectionManager, IDataConnection, DataConnectionOwner | 长连接生命周期。 | owner 必填；已停止连接重复 stop 必须幂等。 |
+| Authentication | IDataCredentialProvider, AccessTokenCredentialProvider | 从 Security 获取 credential。 | 匿名请求不取 token；token provider 非取消异常映射为 Unavailable credential result。 |
 | Caching | IDataRequestCache, DataCacheKey | 请求缓存。 | key 组成稳定。 |
 | Diagnostics | DataDiagnosticIds | 数据访问诊断。 | AUCDATA001-020 稳定。 |
 

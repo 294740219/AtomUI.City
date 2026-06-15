@@ -11,7 +11,7 @@
 | AUC-DATA-003 | gRPC Transport | Completed | GrpcDataRequest<T>, GrpcDataTransport | GrpcDataTransportTests |
 | AUC-DATA-004 | SignalR Transport | Completed | SignalRDataRequest<T>, SignalRDataTransport | SignalRDataTransportTests |
 | AUC-DATA-005 | Connection Lifecycle | Completed | DataConnectionManager, IDataConnection | DataConnectionLifecycleTests |
-| AUC-DATA-006 | Authentication | Ready to Start Product Implementation | IDataCredentialProvider, AccessTokenCredentialProvider | AccessTokenCredentialProviderTests |
+| AUC-DATA-006 | Authentication | Completed | IDataCredentialProvider, AccessTokenCredentialProvider | AccessTokenCredentialProviderTests |
 | AUC-DATA-007 | Caching | Ready to Start Product Implementation | IDataRequestCache, DataCacheKey | DataRequestCacheTests |
 | AUC-DATA-008 | Error Model | Ready to Start Product Implementation | DataResult<T>, DataError | DataResultTests; DataDiagnosticsTests |
 | AUC-DATA-009 | DI Registration | Ready to Start Product Implementation | DataServiceCollectionExtensions | DataRegistrationTests |
@@ -102,15 +102,15 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-DATA-006 Authentication
 
 Feature ID: `AUC-DATA-006`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 从 Security 获取 token 或 credential。
 Public Contract: IDataCredentialProvider, AccessTokenCredentialProvider
-Runtime / Build Behavior: 从 Security 获取 token 或 credential。
-Failure Behavior: token missing、token failed。
+Runtime / Build Behavior: 从 Security 获取 token 或 credential；token provider 非取消异常必须映射为 Unavailable credential result。
+Failure Behavior: token missing、token failed、token provider exception。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `AccessTokenCredentialProviderTests`。
-Required Assertions: 断言 credential before transport。
+Required Assertions: 断言 credential before transport、status 映射、provider failure 映射。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 ## AUC-DATA-007 Caching
 

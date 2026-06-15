@@ -107,6 +107,22 @@ public sealed class AccessTokenCredentialProviderTests
         Assert.Equal(DataCredentialResultStatus.Cancelled, result.Status);
     }
 
+    [Fact]
+    public async Task AccessTokenProviderFailureMapsToUnavailableCredential()
+    {
+        var provider = new AccessTokenCredentialProvider(
+            new DelegateAccessTokenProvider((_, _) => throw new InvalidOperationException("token store failed")));
+
+        var result = await provider.GetCredentialAsync(
+            new DataAuthenticationContext(
+                "catalog",
+                "secure-items",
+                DataAuthenticationOptions.Bearer()));
+
+        Assert.Equal(DataCredentialResultStatus.Unavailable, result.Status);
+        Assert.Equal("token store failed", result.Message);
+    }
+
     private static AccessTokenResult CreateTokenResult(AccessTokenResultStatus status)
     {
         return status switch

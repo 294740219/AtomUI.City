@@ -86,6 +86,7 @@ Data request
 - credential 获取必须支持取消。
 - Token 不写入日志。
 - 匿名请求不强制获取 token。
+- token provider 非取消异常必须映射为 `Unavailable` credential result，不能泄漏异常到 transport。
 - 插件不能直接读取 Host token。
 
 ### 3. Single-flight Refresh

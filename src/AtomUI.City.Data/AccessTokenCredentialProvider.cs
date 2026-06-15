@@ -24,14 +24,22 @@ public sealed class AccessTokenCredentialProvider : IDataCredentialProvider
             return DataCredentialResult.None();
         }
 
-        var token = await _accessTokenProvider
-            .GetTokenAsync(
-                new AccessTokenRequest(
-                    context.ClientId,
-                    context.Authentication.Scheme,
-                    context.OperationName),
-                cancellationToken)
-            .ConfigureAwait(false);
+        AccessTokenResult token;
+        try
+        {
+            token = await _accessTokenProvider
+                .GetTokenAsync(
+                    new AccessTokenRequest(
+                        context.ClientId,
+                        context.Authentication.Scheme,
+                        context.OperationName),
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            return DataCredentialResult.Unavailable(exception.Message);
+        }
 
         return token.Status switch
         {
