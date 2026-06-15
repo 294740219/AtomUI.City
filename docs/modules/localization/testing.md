@@ -21,7 +21,7 @@
 
 | Feature ID | Test Type | Test File | Required Assertions | Failure Paths | Status |
 | --- | --- | --- | --- | --- | --- |
-| AUC-LOCALIZATION-001 | Contract | CultureStateTests | 断言默认 culture、fallback 顺序、非法 culture 和重复切换。 | 非法 culture、fallback cycle、重复设置。 | Required |
+| AUC-LOCALIZATION-001 | Contract | CultureStateTests | 断言默认 culture、fallback 顺序、非法 culture、fallback cycle 和重复切换。 | 非法 culture、fallback cycle、重复设置。 | Completed |
 | AUC-LOCALIZATION-002 | Contract | LanguagePackageProviderTests | 断言 provider 注册、重复拒绝、取消、格式错误和 owner revoke。 | provider 格式错误、重复 package、owner 已撤销。 | Required |
 | AUC-LOCALIZATION-003 | Contract | LocalizationServiceTests | 断言按需加载、并发合并、失败 fallback、不同 culture 独立缓存。 | load 失败、并发 load、取消污染缓存。 | Required |
 | AUC-LOCALIZATION-004 | Contract | LocalizationServiceTests | 断言 scope lookup、fallback、缺失 key、参数格式化和订阅更新。 | 缺失 key、格式化参数错误。 | Required |

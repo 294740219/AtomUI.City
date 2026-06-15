@@ -16,6 +16,8 @@
 - public 类型、成员、枚举值、attribute 参数和扩展方法默认视为兼容性承诺。
 - 删除、重命名、改变默认行为、异常类型、Result status 或诊断码语义属于 breaking change。
 - 新增 API 可以 minor 版本发布，但必须有文档、测试和迁移说明。
+- `LocalizationOptions.DefaultCulture`、`DefaultUICulture` 和 `FallbackCultures` 的默认值与校验行为进入 1.0 兼容承诺。
+- `LocalizationService.SetCultureAsync` 的 fallback chain 顺序、非法 culture 失败 result、fallback self-cycle 拒绝和重复 culture 幂等行为进入 1.0 兼容承诺。
 
 ## 数据格式兼容
 

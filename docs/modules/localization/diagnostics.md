@@ -10,7 +10,17 @@
 
 ## 当前源码诊断码
 
-当前源码没有模块专属诊断 ID。产品级实现如果新增诊断，必须先在本文件登记。
+| Code | 名称 | 语义 | 关键上下文 |
+| --- | --- | --- | --- |
+| AUCLOC001 | ResourceMissing | 当前 culture 和 fallback chain 均未找到 key。 | cultureName、resourceKey、errorKind。 |
+| AUCLOC002 | FallbackMissing | fallback 查找失败。 | cultureName、fallbackCultureName、resourceKey。 |
+| AUCLOC003 | PackageLoadFailed | 语言包加载失败。 | cultureName、packageId、scope、errorKind。 |
+| AUCLOC004 | AtomUiApplyFailed | Presentation bridge 应用 culture 失败。 | cultureName、errorKind。 |
+| AUCLOC005 | MessageFormatFailed | 本地化消息格式化失败。 | cultureName、resourceKey、errorKind。 |
+| AUCLOC006 | TextRefreshFailed | LocalizedText 刷新失败。 | cultureName、resourceKey、errorKind。 |
+| AUCLOC007 | CultureChanged | culture 切换提交成功。 | cultureName、fallbackCultureName。 |
+| AUCLOC008 | CultureSwitchRejected | culture 切换被拒绝。 | cultureName、fallbackCultureName、errorKind。 |
+| AUCLOC009 | CultureSwitchSkipped | 重复设置当前 culture。 | cultureName、fallbackCultureName。 |
 
 ## 产品级必须诊断的失败
 

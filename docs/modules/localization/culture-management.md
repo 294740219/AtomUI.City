@@ -94,6 +94,8 @@ Culture state 应包含：
 
 Revision 用于让 binding、cache 和 localizer 判断是否需要刷新。
 
+`LocalizationOptions` 提供默认 culture、默认 UI culture 和全局 fallback culture。未配置时默认使用 invariant culture。fallback chain 的顺序是 language package descriptor fallback、全局 fallback、culture parent chain、invariant culture，并去重。
+
 ### 4. 事务式切换
 
 文化切换流程：
@@ -144,6 +146,8 @@ Localization Core 不依赖 Avalonia；Presentation 提供 bridge。
 | 场景 | 默认处理 |
 |---|---|
 | culture 不支持 | 拒绝切换，保留旧 culture。 |
+| fallback 指向当前 culture | 拒绝切换，保留旧 culture。 |
+| 重复设置当前 culture | 返回成功，不重新加载 package，不递增 revision。 |
 | package 加载失败 | rollback。 |
 | fallback 加载失败 | rollback 或 missing marker，按 criticality。 |
 | UI apply 失败 | rollback Presentation resources。 |

@@ -6,7 +6,7 @@
 
 | Feature ID | 名称 | 状态 | Public Contract | 主测试 |
 | --- | --- | --- | --- | --- |
-| AUC-LOCALIZATION-001 | Culture State and Fallback | Ready to Start Product Implementation | CultureState, LocalizationOptions | CultureStateTests |
+| AUC-LOCALIZATION-001 | Culture State and Fallback | Completed | CultureState, LocalizationOptions | CultureStateTests |
 | AUC-LOCALIZATION-002 | Language Package Provider | Ready to Start Product Implementation | ILanguagePackageProvider, LanguagePackageDescriptor | LanguagePackageProviderTests |
 | AUC-LOCALIZATION-003 | Lazy Package Loading | Ready to Start Product Implementation | LocalizationService, LanguagePackageLoadResult | LocalizationServiceTests |
 | AUC-LOCALIZATION-004 | Lookup and Missing Key Fallback | Ready to Start Product Implementation | LocalizedString, LocalizedText, LocalizationResult | LocalizationServiceTests |
@@ -34,15 +34,15 @@
 ## AUC-LOCALIZATION-001 Culture State and Fallback
 
 Feature ID: `AUC-LOCALIZATION-001`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 定义当前 culture、fallback 链和切换事务。
 Public Contract: CultureState, LocalizationOptions
-Runtime / Build Behavior: SetCulture 计算 fallback chain 并发布 immutable state；默认 culture 和 fallback culture 可配置。
+Runtime / Build Behavior: SetCulture 计算 fallback chain 并发布 immutable state；默认 culture、默认 UI culture 和 fallback culture 可配置；重复设置当前 culture 不重新加载 package 或递增 revision。
 Failure Behavior: 非法 culture、fallback cycle、当前 culture 重复设置必须稳定返回。
 Threading / Cancellation: culture 切换可以异步加载包；状态提交必须一次性发布。
-Diagnostics: culture diagnostics 必须包含 requested culture、effective culture 和 fallback chain。
+Diagnostics: culture diagnostics 必须包含 requested/effective culture 和 fallback chain。
 Tests: `CultureStateTests`
-Required Assertions: 断言默认 culture、fallback 顺序、非法 culture 和重复切换。
+Required Assertions: 断言默认 culture、fallback 顺序、非法 culture、fallback cycle 和重复切换。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 
 ## AUC-LOCALIZATION-002 Language Package Provider

@@ -26,7 +26,7 @@ public static class LocalizationServiceCollectionExtensions
             var options = serviceProvider.GetRequiredService<LocalizationOptions>();
 
             return new LocalizationService(
-                options.LanguagePackages.ToArray(),
+                options,
                 serviceProvider.GetServices<ILanguagePackageProvider>(),
                 serviceProvider.GetService<IPresentationLocalizationBridge>(),
                 serviceProvider.GetService<ILocalizationDiagnostics>());

@@ -12,4 +12,5 @@ public enum LocalizationErrorKind
     RefreshFailed,
     Cancelled,
     Unknown,
+    InvalidCulture,
 }
