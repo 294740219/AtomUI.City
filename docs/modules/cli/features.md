@@ -11,7 +11,7 @@
 | AUC-CLI-003 | Build and Test Commands | Completed | DotnetInvocation, ProcessRunner, CliEnvelope | CliBuildAndTestCommandTests |
 | AUC-CLI-004 | Plugin Inspect and Doctor | Completed | CliApplication, PluginManifestReader, PluginDiagnostic | CliInspectDoctorPluginTests |
 | AUC-CLI-005 | AI-Friendly Envelope | Completed | CliEnvelope, CliDiagnostic, CliExecutionEnvironment | CliCommandArchitectureTests |
-| AUC-CLI-006 | Non-Interactive and CI Mode | Ready to Start Product Implementation | CliExecutionEnvironment, CliExitCodes | CliCommandArchitectureTests |
+| AUC-CLI-006 | Non-Interactive and CI Mode | Completed | CliExecutionEnvironment, CliExitCodes | CliCommandArchitectureTests |
 
 ## Feature 硬门禁
 
@@ -103,13 +103,13 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-CLI-006 Non-Interactive and CI Mode
 
 Feature ID: `AUC-CLI-006`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 保证 CI 和 agent 环境不会被交互提示阻塞。
 Public Contract: CliExecutionEnvironment, CliExitCodes
-Runtime / Build Behavior: 检测 CI、stdin availability 和 `--non-interactive`；需要确认的操作必须使用显式 option。
-Failure Behavior: 缺少确认参数直接失败，不能等待 stdin。
-Threading / Cancellation: RunAsync 必须观察 token；子进程继承非交互环境。
-Diagnostics: diagnostic 必须包含 missing confirmation 和 environment mode。
+Runtime / Build Behavior: 检测 CI、stdin availability、`ATOMUI_CITY_NON_INTERACTIVE` 和 `--non-interactive`；`--ci` 或 CI 环境会启用非交互模式并传递给 dotnet invocation。
+Failure Behavior: 非交互模式下需要确认的命令缺少 `--yes` 直接返回 `AUCCLI0401`，不能等待 stdin。
+Threading / Cancellation: RunAsync 必须观察 token；子进程继承 CI 环境。
+Diagnostics: diagnostic 包含 missing confirmation、required option 和 environment mode。
 Tests: `CliCommandArchitectureTests`
 Required Assertions: 断言 CI、non-interactive、stdin unavailable、需要确认时失败。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。

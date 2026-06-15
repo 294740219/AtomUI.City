@@ -48,11 +48,9 @@ public static class CliApplication
         ArgumentNullException.ThrowIfNull(processRunner);
 
         var commandLine = CliCommandLine.Parse(args);
-        var baseEnvironment = environment ?? new CliExecutionEnvironment(Directory.GetCurrentDirectory());
+        var baseEnvironment = environment ?? CreateDefaultEnvironment();
         var workingDirectory = commandLine.GetOptionValue("--working-directory");
-        var executionEnvironment = string.IsNullOrWhiteSpace(workingDirectory)
-            ? baseEnvironment
-            : new CliExecutionEnvironment(Path.GetFullPath(workingDirectory, baseEnvironment.WorkingDirectory));
+        var executionEnvironment = CreateExecutionEnvironment(commandLine, baseEnvironment, workingDirectory);
 
         if (commandLine.Positionals.Count == 0 || commandLine.Positionals[0] != "city")
         {
@@ -128,7 +126,7 @@ public static class CliApplication
             "tests" when positionals.Count > 2 && positionals[2] == "check" => await GateCheckAsync("tests", commandLine, environment, output).ConfigureAwait(false),
             "explain" => await ExplainAsync(commandLine, output).ConfigureAwait(false),
             "plan" => await GenericPlanAsync(commandLine, output).ConfigureAwait(false),
-            "apply" => await ApplyAsync(commandLine, output).ConfigureAwait(false),
+            "apply" => await ApplyAsync(commandLine, environment, output).ConfigureAwait(false),
             "generate" => await GenericPlanAsync(commandLine, output).ConfigureAwait(false),
             _ => await WriteAsync(
                     output,
@@ -324,7 +322,7 @@ public static class CliApplication
         CancellationToken cancellationToken,
         Func<DotnetInvocation, CancellationToken, ValueTask<ProcessRunResult>> processRunner)
     {
-        var invocation = DotnetInvocation.Create(command, commandLine, environment.WorkingDirectory);
+        var invocation = DotnetInvocation.Create(command, commandLine, environment.WorkingDirectory, environment.IsCi);
         var cliCommand = "atomui city " + command;
 
         if (!Directory.Exists(environment.WorkingDirectory))
@@ -516,6 +514,17 @@ public static class CliApplication
                             "atomui city plugin install",
                             CliExitCodes.ArgumentError,
                             CliDiagnostic.Error("AUCCLI0301", "Plugin package path is required.")))
+                    .ConfigureAwait(false);
+            }
+
+            if (!commandLine.HasOption("--dry-run") &&
+                RequiresExplicitConfirmation(commandLine, environment))
+            {
+                return await WriteConfirmationRequiredAsync(
+                        commandLine,
+                        output,
+                        "atomui city plugin install",
+                        environment)
                     .ConfigureAwait(false);
             }
 
@@ -850,13 +859,100 @@ public static class CliApplication
         return value == '_' || char.IsLetterOrDigit(value);
     }
 
-    private static async ValueTask<int> ApplyAsync(CliCommandLine commandLine, TextWriter output)
+    private static async ValueTask<int> ApplyAsync(
+        CliCommandLine commandLine,
+        CliExecutionEnvironment environment,
+        TextWriter output)
     {
         var command = "atomui city apply";
         var planFile = commandLine.Positionals.Count > 2 ? commandLine.Positionals[2] : string.Empty;
+        if (RequiresExplicitConfirmation(commandLine, environment))
+        {
+            return await WriteConfirmationRequiredAsync(commandLine, output, command, environment).ConfigureAwait(false);
+        }
+
         var data = new Dictionary<string, object?> { ["planFile"] = planFile };
 
         return await WriteAsync(output, commandLine, command, CliEnvelope.Succeeded(command, data)).ConfigureAwait(false);
+    }
+
+    private static bool RequiresExplicitConfirmation(
+        CliCommandLine commandLine,
+        CliExecutionEnvironment environment)
+    {
+        return environment.IsNonInteractive && !commandLine.HasOption("--yes");
+    }
+
+    private static async ValueTask<int> WriteConfirmationRequiredAsync(
+        CliCommandLine commandLine,
+        TextWriter output,
+        string command,
+        CliExecutionEnvironment environment)
+    {
+        return await WriteAsync(
+                output,
+                commandLine,
+                command,
+                CliEnvelope.FailedWithData(
+                    command,
+                    CliExitCodes.ArgumentError,
+                    new Dictionary<string, object?>
+                    {
+                        ["environment"] = CreateEnvironmentData(environment),
+                        ["requiredOption"] = "--yes",
+                    },
+                    CliDiagnostic.Error(
+                        "AUCCLI0401",
+                        "Explicit --yes is required in non-interactive mode.",
+                        "--yes")))
+            .ConfigureAwait(false);
+    }
+
+    private static object CreateEnvironmentData(CliExecutionEnvironment environment)
+    {
+        return new
+        {
+            workingDirectory = environment.WorkingDirectory,
+            ci = environment.IsCi,
+            nonInteractive = environment.IsNonInteractive,
+            stdinAvailable = environment.IsStdinAvailable,
+        };
+    }
+
+    private static CliExecutionEnvironment CreateDefaultEnvironment()
+    {
+        var isCi = IsTruthyEnvironmentVariable("CI");
+        var isNonInteractive = IsTruthyEnvironmentVariable("ATOMUI_CITY_NON_INTERACTIVE");
+        return new CliExecutionEnvironment(
+            Directory.GetCurrentDirectory(),
+            isCi,
+            isNonInteractive,
+            isStdinAvailable: !Console.IsInputRedirected);
+    }
+
+    private static CliExecutionEnvironment CreateExecutionEnvironment(
+        CliCommandLine commandLine,
+        CliExecutionEnvironment baseEnvironment,
+        string? workingDirectory)
+    {
+        var resolvedWorkingDirectory = string.IsNullOrWhiteSpace(workingDirectory)
+            ? baseEnvironment.WorkingDirectory
+            : Path.GetFullPath(workingDirectory, baseEnvironment.WorkingDirectory);
+
+        return new CliExecutionEnvironment(
+            resolvedWorkingDirectory,
+            baseEnvironment.IsCi || commandLine.HasOption("--ci"),
+            baseEnvironment.IsNonInteractive || commandLine.HasOption("--non-interactive"),
+            baseEnvironment.IsStdinAvailable);
+    }
+
+    private static bool IsTruthyEnvironmentVariable(string name)
+    {
+        var value = Environment.GetEnvironmentVariable(name);
+        return value is not null &&
+            (value.Equals("1", StringComparison.OrdinalIgnoreCase) ||
+                value.Equals("true", StringComparison.OrdinalIgnoreCase) ||
+                value.Equals("yes", StringComparison.OrdinalIgnoreCase));
     }
 
     private static IReadOnlyList<object> ReadSolutionProjects(string solutionPath, string workingDirectory)

@@ -26,7 +26,7 @@
 | AUC-CLI-003 | Unit | CliBuildAndTestCommandTests | 断言成功、失败、非零 exit code、取消、CI 模式和输出截断。 | dotnet 非零退出返回原始 exit code；取消返回 `AUCCLI0202`；工作目录不存在返回 `AUCCLI0203` 且不启动进程。 | Completed |
 | AUC-CLI-004 | Unit | CliInspectDoctorPluginTests | 断言合法插件、manifest 缺失、版本非法、layout 错误和 JSON diagnostics。 | 缺 path 返回 `AUCCLI0302`；manifest 缺失、版本非法和 layout 错误输出 PluginSystem diagnostics 且不加载插件 assembly。 | Completed |
 | AUC-CLI-005 | Unit | CliCommandArchitectureTests | 断言 schema、纯 JSON、artifact 列表、suggested commands、retryable 语义。 | JSON envelope 缺少 AI 字段、普通日志混入 JSON、artifact 未提升、retryable 语义错误必须失败。 | Completed |
-| AUC-CLI-006 | Unit | CliCommandArchitectureTests | 断言 CI、non-interactive、stdin unavailable、需要确认时失败。 | 缺少确认参数直接失败，不能等待 stdin。 | Required |
+| AUC-CLI-006 | Unit | CliCommandArchitectureTests | 断言 CI、non-interactive、stdin unavailable、需要确认时失败。 | `--non-interactive`、`--ci` 或 stdin unavailable 下需要确认且缺少 `--yes` 返回 `AUCCLI0401`，不能等待 stdin。 | Completed |
 
 ## 缺口处理
 

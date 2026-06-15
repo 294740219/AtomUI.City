@@ -25,6 +25,8 @@
 - `atomui city plugin inspect/doctor --json` 的 `data.packageRoot`、`data.manifestPath`、`data.manifest`、`data.succeeded` 和 `data.pluginDiagnostics` 字段进入 1.0 兼容承诺；PluginSystem `AUCPLG...` diagnostic code 必须原样进入 CLI diagnostics。
 - CLI JSON envelope 顶层 `status`、`artifacts`、`suggestedCommands`、`changedFiles` 和 `retryable` 字段进入 1.0 兼容承诺；`suggestedActions` 保留为兼容 alias。
 - `retryable=false` 用于成功和参数错误，`retryable=true` 用于运行时失败；每个 diagnostic code 必须生成 `atomui city explain <code> --json` suggested command。
+- `AUCCLI0401` 表示非交互或 CI 模式下命令需要显式 `--yes` 确认。
+- `CliExecutionEnvironment` 的 `isCi`、`isNonInteractive` 和 `isStdinAvailable` 语义进入 1.0 兼容承诺；`--ci` 必须启用非交互并传递给 dotnet invocation。
 - `--json` 模式失败时只输出 JSON envelope；非 JSON 解析失败输出 `Usage:` 文本块。
 
 ## 数据格式兼容

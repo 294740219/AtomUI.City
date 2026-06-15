@@ -84,6 +84,8 @@ ATOMUI_CITY_NON_INTERACTIVE=true
 - 缺少必填参数直接失败。
 - 需要确认的操作必须要求 `--yes` 或 apply plan。
 - 错误必须输出诊断。
+- `--ci`、`--non-interactive`、`ATOMUI_CITY_NON_INTERACTIVE=true` 或 stdin unavailable 都进入非交互模式。
+- 非交互模式下缺少 `--yes` 返回 `AUCCLI0401`，不会读取 stdin。
 
 ### 3. CI 模式
 
@@ -101,6 +103,7 @@ atomui city build --json --non-interactive --no-color
 - JSON 输出不混入普通文本。
 - exit code 稳定。
 - 不使用交互选择。
+- CI mode 会传递到 `DotnetInvocation.CiMode`，子进程环境设置 `CI=true` 和 `DOTNET_CLI_TELEMETRY_OPTOUT=1`。
 
 ### 4. Exit Code
 

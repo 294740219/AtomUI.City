@@ -35,6 +35,15 @@ public sealed class DotnetInvocation
         CliCommandLine commandLine,
         string workingDirectory)
     {
+        return Create(command, commandLine, workingDirectory, ciMode: false);
+    }
+
+    internal static DotnetInvocation Create(
+        string command,
+        CliCommandLine commandLine,
+        string workingDirectory,
+        bool ciMode)
+    {
         var arguments = new List<string> { command };
         var project = commandLine.GetOptionValue("--project");
         if (!string.IsNullOrWhiteSpace(project))
@@ -56,6 +65,6 @@ public sealed class DotnetInvocation
             arguments.Add(framework);
         }
 
-        return new DotnetInvocation(arguments, workingDirectory, commandLine.HasOption("--ci"));
+        return new DotnetInvocation(arguments, workingDirectory, ciMode || commandLine.HasOption("--ci"));
     }
 }

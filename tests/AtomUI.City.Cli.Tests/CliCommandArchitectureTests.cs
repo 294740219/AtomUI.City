@@ -114,6 +114,101 @@ public sealed class CliCommandArchitectureTests
     }
 
     [Fact]
+    public async Task NonInteractiveApplyRequiresExplicitYes()
+    {
+        using var host = new CliTestHost();
+
+        var run = await host.RunAsync("city", "apply", "plan.json", "--non-interactive", "--json");
+
+        Assert.Equal(2, run.ExitCode);
+        using var json = run.ReadJson();
+        var root = json.RootElement;
+        Assert.Equal("AUCCLI0401", root.GetProperty("diagnostics")[0].GetProperty("code").GetString());
+        Assert.True(root.GetProperty("data").GetProperty("environment").GetProperty("nonInteractive").GetBoolean());
+        Assert.Equal("--yes", root.GetProperty("data").GetProperty("requiredOption").GetString());
+    }
+
+    [Fact]
+    public async Task NonInteractiveApplyWithYesDoesNotFailConfirmation()
+    {
+        using var host = new CliTestHost();
+
+        var run = await host.RunAsync("city", "apply", "plan.json", "--non-interactive", "--yes", "--json");
+
+        Assert.Equal(0, run.ExitCode);
+        using var json = run.ReadJson();
+        Assert.True(json.RootElement.GetProperty("success").GetBoolean());
+    }
+
+    [Fact]
+    public async Task CiOptionEnablesNonInteractiveMode()
+    {
+        using var host = new CliTestHost();
+
+        var run = await host.RunAsync("city", "apply", "plan.json", "--ci", "--json");
+
+        Assert.Equal(2, run.ExitCode);
+        using var json = run.ReadJson();
+        var environment = json.RootElement.GetProperty("data").GetProperty("environment");
+        Assert.True(environment.GetProperty("ci").GetBoolean());
+        Assert.True(environment.GetProperty("nonInteractive").GetBoolean());
+    }
+
+    [Fact]
+    public async Task UnavailableStdinEnablesNonInteractiveMode()
+    {
+        using var host = new CliTestHost();
+        var output = new StringWriter();
+        var error = new StringWriter();
+
+        var exitCode = await CliApplication.RunAsync(
+            [
+                "city",
+                "apply",
+                "plan.json",
+                "--json",
+            ],
+            output,
+            error,
+            new CliExecutionEnvironment(host.WorkingDirectory, isStdinAvailable: false));
+
+        Assert.Equal(2, exitCode);
+        using var json = JsonDocument.Parse(output.ToString());
+        var environment = json.RootElement.GetProperty("data").GetProperty("environment");
+        Assert.False(environment.GetProperty("stdinAvailable").GetBoolean());
+        Assert.True(environment.GetProperty("nonInteractive").GetBoolean());
+    }
+
+    [Fact]
+    public async Task EnvironmentCiModeFlowsToDotnetInvocation()
+    {
+        using var host = new CliTestHost();
+        DotnetInvocation? captured = null;
+        var output = new StringWriter();
+        var error = new StringWriter();
+
+        var exitCode = await CliApplication.RunAsync(
+            [
+                "city",
+                "build",
+                "--json",
+            ],
+            output,
+            error,
+            new CliExecutionEnvironment(host.WorkingDirectory, isCi: true),
+            CancellationToken.None,
+            (invocation, _) =>
+            {
+                captured = invocation;
+                return ValueTask.FromResult(new ProcessRunResult(0, string.Empty, string.Empty));
+            });
+
+        Assert.Equal(0, exitCode);
+        Assert.NotNull(captured);
+        Assert.True(captured.CiMode);
+    }
+
+    [Fact]
     public async Task MissingCommandReturnsUsageDiagnostic()
     {
         using var host = new CliTestHost();

@@ -9,7 +9,7 @@
 | Command Entry | Program, CliApplication, CliCommandLine | `atomui city` 命令入口和解析。 | 未知命令、非法参数稳定失败。 |
 | Envelope | CliEnvelope, CliDiagnostic, CliExitCodes | 机器可读输出和诊断。 | `--json` 只能输出 JSON envelope。 |
 | Process Invocation | DotnetInvocation, ProcessRunner | 调用 dotnet 子进程。 | 保留 exit code 和 stdout/stderr 摘要。 |
-| Environment | CliExecutionEnvironment | CI、非交互和工作目录。 | 非交互不等待输入。 |
+| Environment | CliExecutionEnvironment | CI、非交互、stdin availability 和工作目录。 | 非交互不等待输入；CI 自动启用非交互。 |
 
 ## 关键方法合同
 
@@ -22,6 +22,7 @@
 | ProcessRunner.RunAsync | 运行 dotnet 或其他子进程。 | DotnetInvocation。 | process result。 | 非零 exit code 保留为 command failure；工作目录不存在由 handler 在启动前拒绝。 | 取消必须终止子进程或停止等待。 | stdout/stderr 捕获和 envelope 摘要必须有上限。 |
 | DotnetInvocation | 表达 `dotnet build/test/pack/publish` 调用。 | command、project、configuration、framework、working directory、CI mode。 | executable、arguments、workingDirectory、ciMode。 | 参数缺失由命令解析层拒绝；未知 option 不生成 invocation。 | 纯数据，无 token。 | arguments 不可被外部 mutation 改写。 |
 | `atomui city plugin inspect/doctor` handler | 读取插件 manifest 和校验 package layout。 | package root 或 `atomui-city/plugin.json` path。 | CliEnvelope，manifest，pluginDiagnostics。 | 缺 path 返回 `AUCCLI0302`；PluginSystem `AUCPLG...` diagnostics 原样映射到 CLI diagnostics。 | 文件读取前观察 token。 | 只读；不得加载插件 assembly。 |
+| Non-interactive confirmation | 防止 CI/agent 被 prompt 阻塞。 | CliExecutionEnvironment、`--ci`、`--non-interactive`、`--yes`。 | CliEnvelope。 | 需要确认且缺少 `--yes` 返回 `AUCCLI0401`，不读取 stdin。 | 纯 CPU，无 token。 | 同一 argv 结果稳定。 |
 
 ## Public 类型覆盖
 
