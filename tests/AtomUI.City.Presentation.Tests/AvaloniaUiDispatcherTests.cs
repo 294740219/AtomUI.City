@@ -92,6 +92,25 @@ public sealed class AvaloniaUiDispatcherTests
     }
 
     [Fact]
+    public void PostAsyncUsesAvaloniaInvokeAsyncForQueuedCallbacks()
+    {
+        var source = File.ReadAllText(
+            Path.Combine(
+                FindRepositoryRoot(),
+                "src",
+                "AtomUI.City.Presentation",
+                "AvaloniaUiDispatcher.cs"));
+        var postAsyncBodyStart = source.IndexOf("public ValueTask PostAsync", StringComparison.Ordinal);
+        var postAsyncBodyEnd = source.IndexOf(
+            "private DispatcherOperationContext CreateOperationContext",
+            StringComparison.Ordinal);
+        var postAsyncBody = source[postAsyncBodyStart..postAsyncBodyEnd];
+
+        Assert.Contains("_dispatcher.InvokeAsync", postAsyncBody);
+        Assert.DoesNotContain("_dispatcher.Post", postAsyncBody);
+    }
+
+    [Fact]
     public async Task InvokeAsyncMarshalsBackgroundCallbackToDispatcherThread()
     {
         var avaloniaDispatcher = Dispatcher.CurrentDispatcher;
@@ -142,6 +161,42 @@ public sealed class AvaloniaUiDispatcherTests
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => operation);
         Assert.False(wasCalled);
+    }
+
+    [Fact]
+    public async Task PostAsyncCompletesCanceledWhenQueuedBackgroundCallbackIsCanceledBeforePump()
+    {
+        var avaloniaDispatcher = Dispatcher.CurrentDispatcher;
+        var dispatcher = new AvaloniaUiDispatcher(avaloniaDispatcher);
+        using var cancellation = new CancellationTokenSource();
+        using var queued = new ManualResetEventSlim();
+        var wasCalled = false;
+
+        var operation = Task.Run(
+            () =>
+            {
+                var queuedOperation = dispatcher
+                    .PostAsync(
+                        _ =>
+                        {
+                            wasCalled = true;
+                            return ValueTask.CompletedTask;
+                        },
+                        cancellation.Token)
+                    .AsTask();
+
+                queued.Set();
+                return queuedOperation;
+            });
+
+        Assert.True(queued.Wait(TimeSpan.FromSeconds(5)));
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => operation.WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.False(wasCalled);
+
+        PumpDispatcherUntilComplete(avaloniaDispatcher, Task.CompletedTask);
     }
 
     [Fact]
@@ -357,6 +412,23 @@ public sealed class AvaloniaUiDispatcherTests
         }
 
         return dispatcher ?? throw new InvalidOperationException("Shutdown dispatcher was not created.");
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null)
+        {
+            if (Directory.Exists(Path.Combine(directory.FullName, "src"))
+                && Directory.Exists(Path.Combine(directory.FullName, "tests")))
+            {
+                return directory.FullName;
+            }
+
+            directory = directory.Parent;
+        }
+
+        throw new InvalidOperationException("Repository root was not found.");
     }
 
     private sealed class InlineUiDispatcher : IUiDispatcher

@@ -156,55 +156,61 @@ public sealed class AvaloniaUiDispatcher : IUiDispatcher
             return ExecuteInline(callback, cancellationToken, context);
         }
 
-        var taskCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var cancellationRegistration = cancellationToken.CanBeCanceled
-            ? cancellationToken.Register(
-                static state => ((TaskCompletionSource)state!).TrySetCanceled(),
-                taskCompletion)
-            : default;
-
         try
         {
-            _dispatcher.Post(
-                async () =>
-                {
-                    if (taskCompletion.Task.IsCompleted)
-                    {
-                        cancellationRegistration.Dispose();
-                        return;
-                    }
+            var operation = _dispatcher.InvokeAsync<Task>(
+                () => ExecutePostedCallbackAsync(callback, cancellationToken, context),
+                DispatcherPriority.Default,
+                cancellationToken);
 
-                    try
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        await callback(cancellationToken).ConfigureAwait(false);
-                        taskCompletion.TrySetResult();
-                    }
-                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                    {
-                        taskCompletion.TrySetCanceled(cancellationToken);
-                    }
-                    catch (Exception exception)
-                    {
-                        WriteCallbackFailedDiagnostic(exception, context);
-                        taskCompletion.TrySetException(exception);
-                    }
-                    finally
-                    {
-                        cancellationRegistration.Dispose();
-                    }
-                },
-                DispatcherPriority.Default);
+            return new ValueTask(AwaitNestedDispatcherOperationAsync(
+                operation.GetTask(),
+                context,
+                cancellationToken));
         }
         catch (Exception exception)
         {
-            cancellationRegistration.Dispose();
             var dispatcherException = CreateDispatcherUnavailableException(exception);
             WriteOperationRejectedDiagnostic(dispatcherException, context);
-            taskCompletion.TrySetException(dispatcherException);
-        }
 
-        return new ValueTask(taskCompletion.Task);
+            return ValueTask.FromException(dispatcherException);
+        }
+    }
+
+    private async Task AwaitNestedDispatcherOperationAsync(
+        Task<Task> operation,
+        DispatcherOperationContext context,
+        CancellationToken cancellationToken)
+    {
+        var callbackTask = await AwaitDispatcherOperationAsync(
+                operation,
+                context,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        await callbackTask.ConfigureAwait(false);
+    }
+
+    private async Task ExecutePostedCallbackAsync(
+        Func<CancellationToken, ValueTask> callback,
+        CancellationToken cancellationToken,
+        DispatcherOperationContext context)
+    {
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await callback(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            WriteCallbackFailedDiagnostic(exception, context);
+
+            throw;
+        }
     }
 
     private DispatcherOperationContext CreateOperationContext(string targetAction)
