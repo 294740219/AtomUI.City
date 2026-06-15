@@ -7,7 +7,7 @@ public sealed class ProjectDependencyBoundaryTests
     private static readonly IReadOnlyDictionary<string, string[]> AllowedSourceProjectReferences = new Dictionary<string, string[]>(StringComparer.Ordinal)
     {
         ["AtomUI.City.Build"] = [],
-        ["AtomUI.City.Cli"] = ["AtomUI.City.Build", "AtomUI.City.Core", "AtomUI.City.Templates"],
+        ["AtomUI.City.Cli"] = ["AtomUI.City.Build", "AtomUI.City.Core", "AtomUI.City.PluginSystem", "AtomUI.City.Templates"],
         ["AtomUI.City.Core"] = [],
         ["AtomUI.City.Data"] = ["AtomUI.City.Core", "AtomUI.City.Security", "AtomUI.City.State"],
         ["AtomUI.City.EventBus"] = ["AtomUI.City.Core"],
@@ -39,8 +39,8 @@ public sealed class ProjectDependencyBoundaryTests
     public void SourceProjectReferencesMatchAllowedDependencyBoundaries()
     {
         var repositoryRoot = RepositoryPaths.FindRepositoryRoot();
-        var sourceProjects = Directory
-            .EnumerateFiles(Path.Combine(repositoryRoot, "src"), "*.csproj", SearchOption.AllDirectories)
+        var sourceProjects = RepositoryPaths
+            .EnumerateSourceProjects(repositoryRoot)
             .Order(StringComparer.Ordinal)
             .ToArray();
 
@@ -71,7 +71,7 @@ public sealed class ProjectDependencyBoundaryTests
     public void SourceProjectsDoNotReferenceTestProjects()
     {
         var repositoryRoot = RepositoryPaths.FindRepositoryRoot();
-        var sourceProjects = Directory.EnumerateFiles(Path.Combine(repositoryRoot, "src"), "*.csproj", SearchOption.AllDirectories);
+        var sourceProjects = RepositoryPaths.EnumerateSourceProjects(repositoryRoot);
 
         foreach (var projectPath in sourceProjects)
         {
@@ -89,8 +89,8 @@ public sealed class ProjectDependencyBoundaryTests
     public void RuntimeProjectsDoNotReferenceBuildCliGeneratorOrTestPackages()
     {
         var repositoryRoot = RepositoryPaths.FindRepositoryRoot();
-        var runtimeProjects = Directory
-            .EnumerateFiles(Path.Combine(repositoryRoot, "src"), "*.csproj", SearchOption.AllDirectories)
+        var runtimeProjects = RepositoryPaths
+            .EnumerateSourceProjects(repositoryRoot)
             .Where(path => IsRuntimeProject(Path.GetFileNameWithoutExtension(path)));
 
         foreach (var projectPath in runtimeProjects)
@@ -121,6 +121,7 @@ public sealed class ProjectDependencyBoundaryTests
         Assert.Contains("Microsoft.CodeAnalysis.CSharp", script, StringComparison.Ordinal);
         Assert.Contains("Microsoft.NET.Test.Sdk", script, StringComparison.Ordinal);
         Assert.Contains("xunit", script, StringComparison.Ordinal);
+        Assert.Contains("src/AtomUI.City.Templates/templates", script, StringComparison.Ordinal);
     }
 
     private static string[] ReadProjectReferences(string projectPath)

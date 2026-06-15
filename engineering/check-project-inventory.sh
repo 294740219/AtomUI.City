@@ -9,11 +9,23 @@ solution_path="AtomUICity.slnx"
 tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/atomuicity-project-inventory.XXXXXX")"
 trap 'rm -rf "$tmp_dir"' EXIT
 
+find_repository_projects() {
+  find src tests -path 'src/AtomUI.City.Templates/templates' -prune -o -name '*.csproj' -print
+}
+
+find_source_projects() {
+  find src -path 'src/AtomUI.City.Templates/templates' -prune -o -name '*.csproj' -print
+}
+
+find_test_projects() {
+  find tests -name '*.csproj' -print
+}
+
 grep -Eo 'Path="[^"]+\.csproj"' "$solution_path" \
   | sed -E 's/^Path="//; s/"$//' \
   | sort > "$tmp_dir/solution-projects.txt"
 
-find src tests -name '*.csproj' -print \
+find_repository_projects \
   | sed -E 's#^\./##' \
   | sort > "$tmp_dir/repository-projects.txt"
 
@@ -37,11 +49,11 @@ comm -13 "$tmp_dir/repository-projects.txt" "$tmp_dir/solution-projects.txt" > "
 report_lines "project missing from solution" "$tmp_dir/missing-from-solution.txt"
 report_lines "solution references unknown project" "$tmp_dir/unknown-in-solution.txt"
 
-find src -name '*.csproj' -print \
+find_source_projects \
   | sed -E 's#^src/[^/]+/##; s#\.csproj$##' \
   | sort > "$tmp_dir/source-project-names.txt"
 
-find tests -name '*.csproj' -print \
+find_test_projects \
   | sed -E 's#^tests/[^/]+/##; s#\.csproj$##' \
   | sort > "$tmp_dir/test-project-names.txt"
 

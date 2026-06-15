@@ -8,8 +8,8 @@
 | --- | --- | --- | --- |
 | Output Layout | Directory.Build.* conventions, output path contract | 约束构建输出位置。 | 所有产物必须落在 output 下。 |
 | Package Contract | project metadata, pack target, nupkg layout | 约束 NuGet 内容和 metadata。 | pack warning 和 metadata 缺失失败。 |
-| Dependency Boundary | project reference rules | 阻止 runtime 依赖 testing/generator internals。 | 边界测试失败阻止发布。 |
-| Release Gate | engineering scripts and tests | 聚合 format/docs/test/pack 验证。 | CI 和本地命令语义一致。 |
+| Dependency Boundary | project reference rules | 阻止 runtime 依赖 testing/generator internals，并显式维护 CLI 到 PluginSystem 的允许依赖。 | 边界测试失败阻止发布。 |
+| Release Gate | engineering scripts and tests | 聚合 format/docs/test/pack 验证，真实 src/tests 项目必须覆盖，模板 payload 项目不进入仓库项目清单。 | CI 和本地命令语义一致。 |
 
 ## 关键方法合同
 
@@ -17,7 +17,7 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | Build target ResolveOutputPath | 计算输出目录。 | Configuration、TargetFramework、PackageId。 | normalized output path。 | 路径逃逸或为空失败。 | MSBuild cancellation 由进程处理。 | 不同 project 输出目录隔离。 |
 | Pack target VerifyPackageMetadata | 校验 NuGet metadata。 | project properties。 | pack success/failure。 | license、repository、symbols、readme policy 不满足失败。 | MSBuild cancellation 由进程处理。 | 重复 pack 输出可覆盖同配置产物。 |
-| DependencyBoundaryTests | 校验项目引用。 | src/tests project graph。 | test pass/fail。 | runtime 引用 Testing/Roslyn test 包失败。 | 测试进程 token。 | 读取项目文件无副作用。 |
+| DependencyBoundaryTests | 校验项目引用。 | 真实 src/tests project graph，排除模板 payload 项目。 | test pass/fail。 | runtime 引用 Testing/Roslyn test 包失败，允许依赖表与真实 source project 不一致失败。 | 测试进程 token。 | 读取项目文件无副作用。 |
 | EngineeringGateTests | 执行仓库规则检查。 | docs、format、scripts、package layout。 | test pass/fail。 | 任一规则失败阻止完成。 | 测试进程 token。 | 门禁结果确定性。 |
 
 ## Public 类型覆盖

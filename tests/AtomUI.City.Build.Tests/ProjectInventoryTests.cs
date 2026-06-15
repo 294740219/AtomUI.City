@@ -9,9 +9,8 @@ public sealed class ProjectInventoryTests
     {
         var repositoryRoot = RepositoryPaths.FindRepositoryRoot();
         var solutionProjects = ReadSolutionProjects(repositoryRoot);
-        var projectFiles = Directory
-            .EnumerateFiles(repositoryRoot, "*.csproj", SearchOption.AllDirectories)
-            .Where(path => IsRepositoryProject(repositoryRoot, path))
+        var projectFiles = RepositoryPaths
+            .EnumerateRepositoryProjects(repositoryRoot)
             .Select(path => RepositoryPaths.ToRepositoryRelativePath(repositoryRoot, path))
             .Order(StringComparer.Ordinal)
             .ToArray();
@@ -23,13 +22,13 @@ public sealed class ProjectInventoryTests
     public void EverySourceProjectHasAMatchingTestProject()
     {
         var repositoryRoot = RepositoryPaths.FindRepositoryRoot();
-        var testProjectNames = Directory
-            .EnumerateFiles(Path.Combine(repositoryRoot, "tests"), "*.csproj", SearchOption.AllDirectories)
+        var testProjectNames = RepositoryPaths
+            .EnumerateTestProjects(repositoryRoot)
             .Select(path => Path.GetFileNameWithoutExtension(path))
             .ToHashSet(StringComparer.Ordinal);
 
-        var expectedTestProjectNames = Directory
-            .EnumerateFiles(Path.Combine(repositoryRoot, "src"), "*.csproj", SearchOption.AllDirectories)
+        var expectedTestProjectNames = RepositoryPaths
+            .EnumerateSourceProjects(repositoryRoot)
             .Select(path => Path.GetFileNameWithoutExtension(path))
             .Select(GetExpectedTestProjectName)
             .Order(StringComparer.Ordinal)
@@ -58,11 +57,14 @@ public sealed class ProjectInventoryTests
         var script = File.ReadAllText(scriptPath);
 
         Assert.Contains("AtomUICity.slnx", script, StringComparison.Ordinal);
-        Assert.Contains("find src tests -name '*.csproj'", script, StringComparison.Ordinal);
+        Assert.Contains("find_repository_projects", script, StringComparison.Ordinal);
+        Assert.Contains("find_source_projects", script, StringComparison.Ordinal);
+        Assert.Contains("find_test_projects", script, StringComparison.Ordinal);
         Assert.Contains("project missing from solution", script, StringComparison.Ordinal);
         Assert.Contains("source project without test project", script, StringComparison.Ordinal);
         Assert.Contains("test project without source project", script, StringComparison.Ordinal);
         Assert.Contains("AtomUI.City.TemplateSmokeTests", script, StringComparison.Ordinal);
+        Assert.Contains("src/AtomUI.City.Templates/templates", script, StringComparison.Ordinal);
     }
 
     private static string[] ReadSolutionProjects(string repositoryRoot)
@@ -77,14 +79,6 @@ public sealed class ProjectInventoryTests
             .Select(path => path!.Replace('\\', '/'))
             .Order(StringComparer.Ordinal)
             .ToArray();
-    }
-
-    private static bool IsRepositoryProject(string repositoryRoot, string projectPath)
-    {
-        var relativePath = RepositoryPaths.ToRepositoryRelativePath(repositoryRoot, projectPath);
-
-        return relativePath.StartsWith("src/", StringComparison.Ordinal) ||
-               relativePath.StartsWith("tests/", StringComparison.Ordinal);
     }
 
     private static string GetExpectedTestProjectName(string sourceProjectName)

@@ -30,6 +30,10 @@ report_failure() {
   failure_count=$((failure_count + 1))
 }
 
+find_source_projects() {
+  find src -path 'src/AtomUI.City.Templates/templates' -prune -o -name '*.csproj' -print | sort
+}
+
 while IFS= read -r project_path; do
   project_name="$(project_name_from_path "$project_path")"
 
@@ -60,7 +64,7 @@ while IFS= read -r project_path; do
       fi
     done < <(grep -Eo '<PackageReference Include="[^"]+"' "$project_path" | sed -E 's/^<PackageReference Include="//')
   fi
-done < <(find src -name '*.csproj' -print | sort)
+done < <(find_source_projects)
 
 if [[ "$failure_count" -gt 0 ]]; then
   printf 'Dependency boundary validation failed with %s error(s).\n' "$failure_count" >&2

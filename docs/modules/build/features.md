@@ -65,8 +65,8 @@ Feature ID: `AUC-BUILD-003`
 Status: 已实现并通过产品合同测试
 Goal: 跟踪 src/tests/docs 项目边界。
 Public Contract: solution/project inventory conventions
-Runtime / Build Behavior: 所有项目必须在 solution 和 inventory 规则内被识别。
-Failure Behavior: 新增项目未登记、测试项目缺失、孤儿项目失败。
+Runtime / Build Behavior: 所有真实 src/tests 项目必须在 solution 和 inventory 规则内被识别；模板 payload 下的 `.csproj` 不计入仓库项目清单。
+Failure Behavior: 新增项目未登记、测试项目缺失、孤儿项目失败；模板 payload 被误计入真实项目时失败。
 Threading / Cancellation: 文件扫描只读。
 Diagnostics: 失败必须指出 project path。
 Tests: `ProjectInventoryTests`
@@ -79,7 +79,7 @@ Feature ID: `AUC-BUILD-004`
 Status: 已实现并通过产品合同测试
 Goal: 阻止 runtime 包带入测试或编译期依赖。
 Public Contract: project reference and package reference rules
-Runtime / Build Behavior: 扫描 project references 和 package references，按 runtime/test/generator 分类校验。
+Runtime / Build Behavior: 扫描真实 source project references 和 package references，按 runtime/test/generator 分类校验；CLI 可引用 PluginSystem 读取插件 manifest 和 package layout contract。
 Failure Behavior: runtime 引用 Testing、test packages、Roslyn analyzer internals 失败。
 Threading / Cancellation: 文件扫描只读。
 Diagnostics: 失败必须指出 source project 和 illegal dependency。

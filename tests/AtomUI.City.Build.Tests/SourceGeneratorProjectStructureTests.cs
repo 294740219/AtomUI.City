@@ -36,8 +36,8 @@ public sealed class SourceGeneratorProjectStructureTests
     public void RuntimeProjectsDoNotReferenceGeneratorsProject()
     {
         var repositoryRoot = RepositoryPaths.FindRepositoryRoot();
-        var runtimeProjects = Directory
-            .EnumerateFiles(Path.Combine(repositoryRoot, "src"), "*.csproj", SearchOption.AllDirectories)
+        var runtimeProjects = RepositoryPaths
+            .EnumerateSourceProjects(repositoryRoot)
             .Where(path => Path.GetFileNameWithoutExtension(path) is not "AtomUI.City.Build"
                 and not "AtomUI.City.Cli"
                 and not "AtomUI.City.Generators"

@@ -93,8 +93,8 @@ public sealed class PackagingReleaseGateTests
         Assert.Equal("0.1.0", properties["AtomUICityVersion"]);
         Assert.Equal("$(AtomUICityVersion)", properties["AtomUICityTemplatesVersion"]);
 
-        var sourceProjectsWithLiteralVersions = Directory
-            .EnumerateFiles(Path.Combine(repositoryRoot, "src"), "*.csproj", SearchOption.AllDirectories)
+        var sourceProjectsWithLiteralVersions = RepositoryPaths
+            .EnumerateSourceProjects(repositoryRoot)
             .SelectMany(projectPath => ReadLiteralVersionProperties(repositoryRoot, projectPath))
             .ToArray();
 

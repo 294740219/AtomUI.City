@@ -10,6 +10,8 @@
 - pack warning 必须失败。
 - 运行时包不得依赖 Testing 或 Roslyn。
 - generator 包输出到 analyzers/dotnet/cs。
+- 仓库项目清单和依赖边界只扫描真实 src/tests 项目；`src/AtomUI.City.Templates/templates` 下的模板 payload `.csproj` 不属于真实项目清单。
+- CLI 到 PluginSystem 的项目引用属于 1.0 允许依赖，用于插件 manifest 和 package layout 检查。
 
 ## API 兼容规则
 

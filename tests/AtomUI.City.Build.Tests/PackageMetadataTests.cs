@@ -52,11 +52,8 @@ public sealed class PackageMetadataTests
     public void ProjectPackageReferencesUseCentralPackageVersions()
     {
         var repositoryRoot = RepositoryPaths.FindRepositoryRoot();
-        var projectFiles = Directory
-            .EnumerateFiles(repositoryRoot, "*.csproj", SearchOption.AllDirectories)
-            .Where(path => RepositoryPaths.ToRepositoryRelativePath(repositoryRoot, path) is var relativePath &&
-                           (relativePath.StartsWith("src/", StringComparison.Ordinal) ||
-                            relativePath.StartsWith("tests/", StringComparison.Ordinal)))
+        var projectFiles = RepositoryPaths
+            .EnumerateRepositoryProjects(repositoryRoot)
             .Order(StringComparer.Ordinal)
             .ToArray();
 
