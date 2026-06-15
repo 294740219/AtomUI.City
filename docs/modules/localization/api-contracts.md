@@ -17,8 +17,8 @@
 | Method | Purpose | Parameters | Return | Failure Behavior | Cancellation | Concurrency / Idempotency |
 | --- | --- | --- | --- | --- | --- | --- |
 | ILocalizationService.SetCultureAsync | 切换当前 culture。 | culture 不得为空；options 可指定 fallback。 | LocalizationResult。 | 非法 culture、fallback cycle、load 部分失败按 result/diagnostics 表达。 | 必须观察 token；取消不提交新 state。 | 串行切换；重复设置当前 culture 不重新加载 package 或递增 revision。 |
-| ILanguagePackageProvider.LoadAsync | 加载指定 culture 的语言包。 | descriptor、cancellationToken。 | LanguagePackageLoadResult。 | 格式错误、资源缺失、取消返回 Failed。 | 取消后不得缓存 partial package。 | 同一 package 并发 load 合并或拒绝。 |
-| ILocalizationService.GetString | 查找字符串。 | key、scope、culture override、arguments。 | LocalizedString 或 LocalizationResult。 | 缺失 key 返回 fallback/key 并诊断。 | 同步读取无 token。 | 基于 immutable provider snapshot 并发安全。 |
+| ILanguagePackageProvider.LoadAsync | 加载指定 culture 的语言包。 | descriptor、cancellationToken。 | LanguagePackageLoadResult。 | 格式错误、资源缺失、取消返回 Failed。 | 取消后不得缓存 partial package。 | 同一 culture/package 并发 load 合并或拒绝。 |
+| ILocalizationService.GetString | 查找字符串。 | key、scope、culture override、arguments。 | LocalizedString 或 LocalizationResult。 | package load 失败继续 fallback；缺失 key 返回 fallback/key 并诊断。 | 同步读取无 token。 | 基于 culture/package cache 并发安全。 |
 | LocalizedText.Subscribe | 订阅 culture change 后的文本更新。 | handler 不得为 null。 | subscription handle。 | handler 失败被隔离并诊断。 | Dispose 后不再发送。 | 通知顺序跟随 culture state version。 |
 | AssemblyLanguagePackageProvider.Discover | 发现 assembly 内语言包。 | assembly 和 resource filter。 | descriptors。 | manifest 缺失或重复 key 诊断。 | 发现可同步，加载异步。 | descriptor 发布后不可变。 |
 

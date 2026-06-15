@@ -8,7 +8,7 @@
 | --- | --- | --- | --- | --- |
 | AUC-LOCALIZATION-001 | Culture State and Fallback | Completed | CultureState, LocalizationOptions | CultureStateTests |
 | AUC-LOCALIZATION-002 | Language Package Provider | Completed | ILanguagePackageProvider, LanguagePackageDescriptor, LanguagePackageRegistry | LanguagePackageProviderTests |
-| AUC-LOCALIZATION-003 | Lazy Package Loading | Ready to Start Product Implementation | LocalizationService, LanguagePackageLoadResult | LocalizationServiceTests |
+| AUC-LOCALIZATION-003 | Lazy Package Loading | Completed | LocalizationService, LanguagePackageLoadResult | LocalizationServiceTests |
 | AUC-LOCALIZATION-004 | Lookup and Missing Key Fallback | Ready to Start Product Implementation | LocalizedString, LocalizedText, LocalizationResult | LocalizationServiceTests |
 | AUC-LOCALIZATION-005 | Assembly Language Packages | Ready to Start Product Implementation | AssemblyLanguagePackageProvider, LanguagePackageAttribute | LanguagePackageProviderTests; LocalizationDeclarationAttributeTests |
 | AUC-LOCALIZATION-006 | Presentation Refresh Bridge | Ready to Start Product Implementation | IPresentationLocalizationBridge, LocalizedTextChangedEventArgs | LocalizationServiceTests |
@@ -62,12 +62,12 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-LOCALIZATION-003 Lazy Package Loading
 
 Feature ID: `AUC-LOCALIZATION-003`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 只按当前 culture 和 fallback chain 懒加载所需语言包。
 Public Contract: LocalizationService, LanguagePackageLoadResult
-Runtime / Build Behavior: 第一次 lookup 或 culture 切换触发 package load；不同 culture 有独立缓存。
+Runtime / Build Behavior: 第一次 lookup 或 culture 切换触发 package load；cache key 包含 culture 和 package id；不同 culture 有独立缓存。
 Failure Behavior: load 失败诊断后跳过该 provider，继续 fallback；不能阻塞整个应用启动。
-Threading / Cancellation: 同一 package 并发 load 合并为一个任务；取消不污染共享缓存。
+Threading / Cancellation: 同一 culture/package 并发 load 合并为一个任务；失败结果不写入共享缓存。
 Diagnostics: lazy-load diagnostics 必须包含 package id、culture、attempt 和 elapsed。
 Tests: `LocalizationServiceTests`
 Required Assertions: 断言按需加载、并发合并、失败 fallback、不同 culture 独立缓存。

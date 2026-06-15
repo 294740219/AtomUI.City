@@ -127,6 +127,9 @@ zh-CN -> zh-Hans -> zh -> invariant
 - 只有当前层缺失 key 时，才加载下一层 fallback package。
 - fallback package 也按 contribution 加载。
 - fallback 加载失败必须记录诊断。
+- 同一 culture/package 的并发 load 必须合并为一个 in-flight task。
+- package cache key 必须同时包含 culture 和 package id，避免同名 package 的不同 culture 互相污染。
+- lookup 阶段 package load 失败时必须记录诊断，跳过该 package，并继续 fallback chain。
 
 ### 6. Active Package Set
 

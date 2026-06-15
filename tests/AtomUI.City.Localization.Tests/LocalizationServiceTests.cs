@@ -53,6 +53,114 @@ public sealed class LocalizationServiceTests
     }
 
     [Fact]
+    public async Task ConcurrentLookupsShareInFlightPackageLoad()
+    {
+        var zh = Package("Host.zh-CN", "zh-CN", ("Settings.Title", "Settings zh"));
+        var provider = new BlockingLanguagePackageProvider(zh);
+        var options = new LocalizationOptions
+        {
+            DefaultCulture = CultureInfo.GetCultureInfo("zh-CN"),
+            DefaultUICulture = CultureInfo.GetCultureInfo("zh-CN"),
+        };
+        options.LanguagePackages.Add(zh.Descriptor);
+        var service = new LocalizationService(options, [provider]);
+
+        var first = service.GetStringAsync("Settings.Title").AsTask();
+        await provider.FirstLoadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var second = service.GetStringAsync("Settings.Title").AsTask();
+
+        await Task.Delay(50);
+        Assert.Equal(1, provider.LoadCount);
+
+        provider.Release();
+        var results = await Task.WhenAll(first, second);
+
+        Assert.All(results, result => Assert.Equal("Settings zh", result.Value));
+        Assert.Equal(1, provider.LoadCount);
+    }
+
+    [Fact]
+    public async Task LookupLoadFailureFallsBackAndWritesDiagnostic()
+    {
+        var zhDescriptor = new LanguagePackageDescriptor(
+            "Host.zh-CN",
+            CultureInfo.GetCultureInfo("zh-CN"),
+            ResourceScope.Host)
+        {
+            FallbackCulture = CultureInfo.GetCultureInfo("en-US"),
+        };
+        var zh = LanguagePackage.Create(zhDescriptor, new Dictionary<string, string>());
+        var en = Package("Host.en-US", "en-US", ("Settings.Title", "Settings"));
+        var provider = new RecordingLanguagePackageProvider(zh, en)
+        {
+            FailingCultureName = "zh-CN",
+        };
+        var diagnostics = new InMemoryLocalizationDiagnostics();
+        var options = new LocalizationOptions
+        {
+            DefaultCulture = CultureInfo.GetCultureInfo("zh-CN"),
+            DefaultUICulture = CultureInfo.GetCultureInfo("zh-CN"),
+        };
+        options.LanguagePackages.Add(zh.Descriptor);
+        options.LanguagePackages.Add(en.Descriptor);
+        var service = new LocalizationService(
+            options,
+            [provider],
+            diagnostics: diagnostics);
+
+        var text = await service.GetStringAsync("Settings.Title");
+
+        Assert.Equal("Settings", text.Value);
+        Assert.True(text.IsFallback);
+        Assert.Equal("en-US", text.Culture.Name);
+        Assert.Contains(
+            diagnostics.Records,
+            record => record.Code == LocalizationDiagnosticIds.PackageLoadFailed
+                && record.PackageId == "Host.zh-CN"
+                && record.CultureName == "zh-CN"
+                && record.ErrorKind == LocalizationErrorKind.PackageLoadFailed);
+    }
+
+    [Fact]
+    public async Task FallbackPackageCacheIsIsolatedByCulture()
+    {
+        var zhDescriptor = new LanguagePackageDescriptor(
+            "Host.Shared",
+            CultureInfo.GetCultureInfo("zh-CN"),
+            ResourceScope.Host)
+        {
+            FallbackCulture = CultureInfo.GetCultureInfo("en-US"),
+        };
+        var enDescriptor = new LanguagePackageDescriptor(
+            "Host.Shared",
+            CultureInfo.GetCultureInfo("en-US"),
+            ResourceScope.Host);
+        var zh = LanguagePackage.Create(zhDescriptor, new Dictionary<string, string>());
+        var en = LanguagePackage.Create(
+            enDescriptor,
+            new Dictionary<string, string>
+            {
+                ["Settings.Title"] = "Settings",
+            });
+        var provider = new CultureKeyedLanguagePackageProvider(zh, en);
+        var options = new LocalizationOptions
+        {
+            DefaultCulture = CultureInfo.GetCultureInfo("zh-CN"),
+            DefaultUICulture = CultureInfo.GetCultureInfo("zh-CN"),
+        };
+        options.LanguagePackages.Add(zh.Descriptor);
+        options.LanguagePackages.Add(en.Descriptor);
+        var service = new LocalizationService(options, [provider]);
+
+        var text = await service.GetStringAsync("Settings.Title");
+
+        Assert.Equal("Settings", text.Value);
+        Assert.True(text.IsFallback);
+        Assert.Equal("en-US", text.Culture.Name);
+        Assert.Equal(["zh-CN", "en-US"], provider.LoadedCultures);
+    }
+
+    [Fact]
     public async Task MissingResourceReturnsMarkerAndDiagnostic()
     {
         var zh = Package("Host.zh-CN", "zh-CN");
@@ -332,5 +440,76 @@ public sealed class LocalizationServiceTests
                 CultureInfo.GetCultureInfo(cultureName),
                 ResourceScope.Host),
             resources.ToDictionary(resource => resource.Key, resource => resource.Value));
+    }
+
+    private sealed class BlockingLanguagePackageProvider : ILanguagePackageProvider
+    {
+        private readonly LanguagePackage _package;
+        private readonly TaskCompletionSource _release =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public BlockingLanguagePackageProvider(LanguagePackage package)
+        {
+            _package = package;
+        }
+
+        public LanguagePackageProviderKind Kind => LanguagePackageProviderKind.InMemory;
+
+        public TaskCompletionSource FirstLoadStarted { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public int LoadCount { get; private set; }
+
+        public void Release()
+        {
+            _release.TrySetResult();
+        }
+
+        public async ValueTask<LanguagePackageLoadResult> LoadAsync(
+            LanguagePackageDescriptor descriptor,
+            CancellationToken cancellationToken = default)
+        {
+            LoadCount++;
+            FirstLoadStarted.TrySetResult();
+            await _release.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+
+            return LanguagePackageLoadResult.Success(_package);
+        }
+    }
+
+    private sealed class CultureKeyedLanguagePackageProvider : ILanguagePackageProvider
+    {
+        private readonly Dictionary<string, LanguagePackage> _packages;
+
+        public CultureKeyedLanguagePackageProvider(params LanguagePackage[] packages)
+        {
+            _packages = packages.ToDictionary(
+                package => GetKey(package.Descriptor),
+                StringComparer.Ordinal);
+        }
+
+        public LanguagePackageProviderKind Kind => LanguagePackageProviderKind.InMemory;
+
+        public List<string> LoadedCultures { get; } = [];
+
+        public ValueTask<LanguagePackageLoadResult> LoadAsync(
+            LanguagePackageDescriptor descriptor,
+            CancellationToken cancellationToken = default)
+        {
+            LoadedCultures.Add(descriptor.Culture.Name);
+
+            return _packages.TryGetValue(GetKey(descriptor), out var package)
+                ? ValueTask.FromResult(LanguagePackageLoadResult.Success(package))
+                : ValueTask.FromResult(
+                    LanguagePackageLoadResult.Failed(
+                        new LocalizationError(
+                            LocalizationErrorKind.PackageNotFound,
+                            "Package was not found.")));
+        }
+
+        private static string GetKey(LanguagePackageDescriptor descriptor)
+        {
+            return $"{descriptor.Culture.Name}|{descriptor.PackageId}";
+        }
     }
 }

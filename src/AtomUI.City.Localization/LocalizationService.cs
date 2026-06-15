@@ -9,8 +9,10 @@ public sealed class LocalizationService : ILocalizationService
     private readonly IReadOnlyList<CultureInfo> _configuredFallbackCultures;
     private readonly IPresentationLocalizationBridge _bridge;
     private readonly ILocalizationDiagnostics? _diagnostics;
-    private readonly Dictionary<string, LanguagePackage> _loadedPackages = [];
+    private readonly Dictionary<(string CultureName, string PackageId), LanguagePackage> _loadedPackages = [];
+    private readonly Dictionary<(string CultureName, string PackageId), Task<LanguagePackageLoadResult>> _packageLoadTasks = [];
     private readonly List<ILocalizedText> _localizedTexts = [];
+    private readonly object _packageLoadGate = new();
     private readonly object _localizedTextGate = new();
     private readonly SemaphoreSlim _switchLock = new(1, 1);
 
@@ -173,7 +175,10 @@ public sealed class LocalizationService : ILocalizationService
 
             foreach (var package in pendingPackages)
             {
-                _loadedPackages[package.Descriptor.PackageId] = package;
+                lock (_packageLoadGate)
+                {
+                    _loadedPackages[CreatePackageCacheKey(package.Descriptor)] = package;
+                }
             }
 
             State = nextState;
@@ -211,6 +216,11 @@ public sealed class LocalizationService : ILocalizationService
             {
                 return LocalizedString.Found(key, value, descriptor.Culture);
             }
+
+            if (!loadResult.Succeeded)
+            {
+                WritePackageLoadFailed(descriptor, loadResult.Error);
+            }
         }
 
         foreach (var fallbackCulture in State.FallbackCultures)
@@ -221,6 +231,11 @@ public sealed class LocalizationService : ILocalizationService
                 if (loadResult.Succeeded && loadResult.Package!.TryGetString(key, out var value))
                 {
                     return LocalizedString.Fallback(key, value, descriptor.Culture);
+                }
+
+                if (!loadResult.Succeeded)
+                {
+                    WritePackageLoadFailed(descriptor, loadResult.Error);
                 }
             }
         }
@@ -346,11 +361,50 @@ public sealed class LocalizationService : ILocalizationService
         bool cache,
         CancellationToken cancellationToken)
     {
-        if (cache && _loadedPackages.TryGetValue(descriptor.PackageId, out var loadedPackage))
+        if (!cache)
         {
-            return LanguagePackageLoadResult.Success(loadedPackage);
+            return await LoadPackageCoreAsync(descriptor, cancellationToken).ConfigureAwait(false);
         }
 
+        var cacheKey = CreatePackageCacheKey(descriptor);
+        Task<LanguagePackageLoadResult> loadTask;
+        lock (_packageLoadGate)
+        {
+            if (_loadedPackages.TryGetValue(cacheKey, out var loadedPackage))
+            {
+                return LanguagePackageLoadResult.Success(loadedPackage);
+            }
+
+            if (!_packageLoadTasks.TryGetValue(cacheKey, out loadTask!))
+            {
+                loadTask = LoadPackageCoreAsync(descriptor, cancellationToken).AsTask();
+                _packageLoadTasks[cacheKey] = loadTask;
+            }
+        }
+
+        var loadResult = await loadTask.ConfigureAwait(false);
+
+        lock (_packageLoadGate)
+        {
+            if (_packageLoadTasks.TryGetValue(cacheKey, out var registeredTask)
+                && ReferenceEquals(registeredTask, loadTask))
+            {
+                _packageLoadTasks.Remove(cacheKey);
+            }
+
+            if (loadResult.Succeeded)
+            {
+                _loadedPackages[cacheKey] = loadResult.Package!;
+            }
+        }
+
+        return loadResult;
+    }
+
+    private async ValueTask<LanguagePackageLoadResult> LoadPackageCoreAsync(
+        LanguagePackageDescriptor descriptor,
+        CancellationToken cancellationToken)
+    {
         if (!_providers.TryGetValue(descriptor.ProviderKind, out var provider))
         {
             return LanguagePackageLoadResult.Failed(
@@ -359,14 +413,13 @@ public sealed class LocalizationService : ILocalizationService
                     $"No language package provider is registered for '{descriptor.ProviderKind}'."));
         }
 
-        var loadResult = await provider.LoadAsync(descriptor, cancellationToken).ConfigureAwait(false);
+        return await provider.LoadAsync(descriptor, cancellationToken).ConfigureAwait(false);
+    }
 
-        if (cache && loadResult.Succeeded)
-        {
-            _loadedPackages[descriptor.PackageId] = loadResult.Package!;
-        }
-
-        return loadResult;
+    private static (string CultureName, string PackageId) CreatePackageCacheKey(
+        LanguagePackageDescriptor descriptor)
+    {
+        return (descriptor.Culture.Name, descriptor.PackageId);
     }
 
     private IEnumerable<LanguagePackageDescriptor> GetDescriptors(CultureInfo culture)
