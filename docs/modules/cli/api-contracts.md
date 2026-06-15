@@ -21,6 +21,7 @@
 | CliEnvelope JSON/Text 输出 | 输出机器可读 envelope 或文本摘要。 | envelope、TextWriter。 | 写入完成。 | JSON 模式只写 JSON envelope；文本失败输出稳定 usage。 | 写入前观察 token。 | JSON 输出不得混入普通日志。 |
 | ProcessRunner.RunAsync | 运行 dotnet 或其他子进程。 | DotnetInvocation。 | process result。 | 非零 exit code 保留为 command failure；工作目录不存在由 handler 在启动前拒绝。 | 取消必须终止子进程或停止等待。 | stdout/stderr 捕获和 envelope 摘要必须有上限。 |
 | DotnetInvocation | 表达 `dotnet build/test/pack/publish` 调用。 | command、project、configuration、framework、working directory、CI mode。 | executable、arguments、workingDirectory、ciMode。 | 参数缺失由命令解析层拒绝；未知 option 不生成 invocation。 | 纯数据，无 token。 | arguments 不可被外部 mutation 改写。 |
+| `atomui city plugin inspect/doctor` handler | 读取插件 manifest 和校验 package layout。 | package root 或 `atomui-city/plugin.json` path。 | CliEnvelope，manifest，pluginDiagnostics。 | 缺 path 返回 `AUCCLI0302`；PluginSystem `AUCPLG...` diagnostics 原样映射到 CLI diagnostics。 | 文件读取前观察 token。 | 只读；不得加载插件 assembly。 |
 
 ## Public 类型覆盖
 

@@ -88,6 +88,10 @@ atomui city plugin doctor <PluginId>
 - 读取 install record。
 - 读取 manifest。
 - 输出 PluginId、version、state、source、capabilities、diagnostics。
+- `plugin inspect <Path>` 接受 package root 或 `atomui-city/plugin.json` path，只校验 manifest metadata。
+- `plugin doctor <Path>` 接受 package root，并执行 package layout validation。
+- manifest 缺失、版本非法、main assembly 缺失和 required contribution 缺失必须原样输出 PluginSystem `AUCPLG...` diagnostics。
+- inspect/doctor 不加载插件 assembly。
 
 ### 4. Install 和 Update
 
@@ -143,6 +147,7 @@ Resolve package
 - capability。
 - unload pending reason。
 - suggested actions。
+- `data.pluginDiagnostics` 保留 PluginSystem diagnostics，CLI 顶层 diagnostics 使用同一 code。
 
 ### 8. 测试矩阵
 

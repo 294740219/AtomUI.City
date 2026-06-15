@@ -27,6 +27,7 @@
 | `AUCCLI0202` | DotnetCommandCancelled | `src/AtomUI.City.Cli/CliApplication.cs` |
 | `AUCCLI0203` | DotnetWorkingDirectoryMissing | `src/AtomUI.City.Cli/CliApplication.cs` |
 | `AUCCLI0301` | PluginPackagePathRequired | `src/AtomUI.City.Cli/CliApplication.cs` |
+| `AUCCLI0302` | PluginInspectPathRequired | `src/AtomUI.City.Cli/CliApplication.cs` |
 
 ## 产品级必须诊断的失败
 

@@ -21,6 +21,8 @@
 - `atomui city new app --json` 成功、dry-run、目标冲突和取消 envelope 的 `data.plan`、`data.artifacts` 字段进入 1.0 兼容承诺；目标冲突还包含 `data.conflict`。
 - `AUCCLI0201` 表示 dotnet 子进程非零退出，`AUCCLI0202` 表示 dotnet 子进程取消，`AUCCLI0203` 表示工作目录不存在。
 - `atomui city build/test/pack/publish --json` 的 `data.invocation`、`data.exitCode`、`data.stdout`、`data.stderr` 和 `data.durationMs` 字段进入 1.0 兼容承诺；`DotnetInvocation` 的 `workingDirectory` 和 `ciMode` 字段进入 1.0 兼容承诺。
+- `AUCCLI0301` 表示 plugin install 缺少 package path，`AUCCLI0302` 表示 plugin inspect/doctor 缺少 package path。
+- `atomui city plugin inspect/doctor --json` 的 `data.packageRoot`、`data.manifestPath`、`data.manifest`、`data.succeeded` 和 `data.pluginDiagnostics` 字段进入 1.0 兼容承诺；PluginSystem `AUCPLG...` diagnostic code 必须原样进入 CLI diagnostics。
 - `--json` 模式失败时只输出 JSON envelope；非 JSON 解析失败输出 `Usage:` 文本块。
 
 ## 数据格式兼容

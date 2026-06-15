@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 using System.Xml.Linq;
+using AtomUI.City.PluginSystem;
 using AtomUI.City.Templates;
 
 namespace AtomUI.City.Cli;
@@ -527,6 +528,11 @@ public static class CliApplication
                 .ConfigureAwait(false);
         }
 
+        if (action is "inspect" or "doctor")
+        {
+            return await PluginInspectOrDoctorAsync(action, commandLine, environment, output, cancellationToken).ConfigureAwait(false);
+        }
+
         return await WriteAsync(
                 output,
                 commandLine,
@@ -535,6 +541,206 @@ public static class CliApplication
                     "atomui city plugin " + action,
                     new Dictionary<string, object?> { ["action"] = action, ["pluginsRoot"] = pluginsRoot }))
             .ConfigureAwait(false);
+    }
+
+    private static async ValueTask<int> PluginInspectOrDoctorAsync(
+        string action,
+        CliCommandLine commandLine,
+        CliExecutionEnvironment environment,
+        TextWriter output,
+        CancellationToken cancellationToken)
+    {
+        var command = "atomui city plugin " + action;
+        var packageInput = commandLine.Positionals.Count > 3 ? commandLine.Positionals[3] : string.Empty;
+        if (string.IsNullOrWhiteSpace(packageInput))
+        {
+            return await WriteAsync(
+                    output,
+                    commandLine,
+                    command,
+                    CliEnvelope.Failed(
+                        command,
+                        CliExitCodes.ArgumentError,
+                        CliDiagnostic.Error("AUCCLI0302", "Plugin package path is required.")))
+                .ConfigureAwait(false);
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var packageRoot = ResolvePluginPackageRoot(packageInput, environment.WorkingDirectory);
+        return action == "doctor"
+            ? await PluginDoctorAsync(commandLine, output, command, packageRoot).ConfigureAwait(false)
+            : await PluginInspectAsync(commandLine, output, command, packageRoot).ConfigureAwait(false);
+    }
+
+    private static async ValueTask<int> PluginInspectAsync(
+        CliCommandLine commandLine,
+        TextWriter output,
+        string command,
+        string packageRoot)
+    {
+        var manifestPath = ResolvePluginManifestPath(packageRoot);
+        if (!File.Exists(manifestPath))
+        {
+            return await WritePluginValidationAsync(
+                    commandLine,
+                    output,
+                    command,
+                    packageRoot,
+                    manifestPath,
+                    null,
+                    [
+                        new PluginDiagnostic(
+                            PluginDiagnosticIds.ManifestNotFound,
+                            "Plugin package must contain atomui-city/plugin.json.",
+                            Path: manifestPath),
+                    ])
+                .ConfigureAwait(false);
+        }
+
+        try
+        {
+            var manifest = PluginManifestReader.Read(manifestPath);
+            var validation = PluginManifestValidator.Validate(manifest);
+            return validation.Succeeded
+                ? await WritePluginValidationSuccessAsync(commandLine, output, command, packageRoot, manifestPath, manifest).ConfigureAwait(false)
+                : await WritePluginValidationAsync(commandLine, output, command, packageRoot, manifestPath, manifest, validation.Diagnostics).ConfigureAwait(false);
+        }
+        catch (JsonException exception)
+        {
+            return await WritePluginValidationAsync(
+                    commandLine,
+                    output,
+                    command,
+                    packageRoot,
+                    manifestPath,
+                    null,
+                    [
+                        new PluginDiagnostic(
+                            PluginDiagnosticIds.InvalidManifest,
+                            exception.Message,
+                            Path: manifestPath),
+                    ])
+                .ConfigureAwait(false);
+        }
+    }
+
+    private static async ValueTask<int> PluginDoctorAsync(
+        CliCommandLine commandLine,
+        TextWriter output,
+        string command,
+        string packageRoot)
+    {
+        var manifestPath = PluginPackagePaths.GetManifestPath(packageRoot);
+        PluginManifest? manifest = null;
+        PluginValidationResult validation;
+
+        try
+        {
+            validation = PluginPackageLayoutValidator.Validate(packageRoot);
+            if (File.Exists(manifestPath))
+            {
+                manifest = PluginManifestReader.Read(manifestPath);
+            }
+        }
+        catch (JsonException exception)
+        {
+            validation = new PluginValidationResult(
+            [
+                new PluginDiagnostic(
+                    PluginDiagnosticIds.InvalidManifest,
+                    exception.Message,
+                    Path: manifestPath),
+            ]);
+        }
+
+        return validation.Succeeded
+            ? await WritePluginValidationSuccessAsync(commandLine, output, command, packageRoot, manifestPath, manifest).ConfigureAwait(false)
+            : await WritePluginValidationAsync(commandLine, output, command, packageRoot, manifestPath, manifest, validation.Diagnostics).ConfigureAwait(false);
+    }
+
+    private static async ValueTask<int> WritePluginValidationSuccessAsync(
+        CliCommandLine commandLine,
+        TextWriter output,
+        string command,
+        string packageRoot,
+        string manifestPath,
+        PluginManifest? manifest)
+    {
+        return await WriteAsync(
+                output,
+                commandLine,
+                command,
+                CliEnvelope.Succeeded(
+                    command,
+                    CreatePluginValidationData(packageRoot, manifestPath, manifest, [])))
+            .ConfigureAwait(false);
+    }
+
+    private static async ValueTask<int> WritePluginValidationAsync(
+        CliCommandLine commandLine,
+        TextWriter output,
+        string command,
+        string packageRoot,
+        string manifestPath,
+        PluginManifest? manifest,
+        IReadOnlyList<PluginDiagnostic> diagnostics)
+    {
+        return await WriteAsync(
+                output,
+                commandLine,
+                command,
+                CliEnvelope.FailedWithData(
+                    command,
+                    CliExitCodes.Failure,
+                    CreatePluginValidationData(packageRoot, manifestPath, manifest, diagnostics),
+                    diagnostics.Select(ToCliDiagnostic).ToArray()))
+            .ConfigureAwait(false);
+    }
+
+    private static Dictionary<string, object?> CreatePluginValidationData(
+        string packageRoot,
+        string manifestPath,
+        PluginManifest? manifest,
+        IReadOnlyList<PluginDiagnostic> diagnostics)
+    {
+        return new Dictionary<string, object?>
+        {
+            ["packageRoot"] = packageRoot,
+            ["manifestPath"] = manifestPath,
+            ["manifest"] = manifest,
+            ["succeeded"] = diagnostics.Count == 0,
+            ["pluginDiagnostics"] = diagnostics,
+        };
+    }
+
+    private static CliDiagnostic ToCliDiagnostic(PluginDiagnostic diagnostic)
+    {
+        return CliDiagnostic.Error(
+            diagnostic.Code,
+            diagnostic.Message,
+            diagnostic.Path ?? diagnostic.Field ?? diagnostic.PluginId);
+    }
+
+    private static string ResolvePluginPackageRoot(string packageInput, string workingDirectory)
+    {
+        var path = Path.GetFullPath(packageInput, workingDirectory);
+        var directory = Path.GetDirectoryName(path);
+        if (Path.GetFileName(path).Equals("plugin.json", StringComparison.Ordinal) &&
+            directory is not null &&
+            Path.GetFileName(directory).Equals("atomui-city", StringComparison.Ordinal))
+        {
+            return Directory.GetParent(directory)!.FullName;
+        }
+
+        return path;
+    }
+
+    private static string ResolvePluginManifestPath(string packageRoot)
+    {
+        return Path.GetFileName(packageRoot).Equals("plugin.json", StringComparison.Ordinal)
+            ? packageRoot
+            : PluginPackagePaths.GetManifestPath(packageRoot);
     }
 
     private static async ValueTask<int> GateCheckAsync(

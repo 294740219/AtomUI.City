@@ -9,7 +9,7 @@
 | AUC-CLI-001 | Command Model | Completed | CliApplication, CliCommandLine, CliExitCodes | CliCommandArchitectureTests |
 | AUC-CLI-002 | New App Command | Completed | CliApplication, ApplicationTemplateRenderer, CliEnvelope | CliNewAppTests |
 | AUC-CLI-003 | Build and Test Commands | Completed | DotnetInvocation, ProcessRunner, CliEnvelope | CliBuildAndTestCommandTests |
-| AUC-CLI-004 | Plugin Inspect and Doctor | Ready to Start Product Implementation | CliApplication, PluginManifestReader, PluginDiagnostic | CliInspectDoctorPluginTests |
+| AUC-CLI-004 | Plugin Inspect and Doctor | Completed | CliApplication, PluginManifestReader, PluginDiagnostic | CliInspectDoctorPluginTests |
 | AUC-CLI-005 | AI-Friendly Envelope | Ready to Start Product Implementation | CliEnvelope, CliDiagnostic, CliExecutionEnvironment | CliCommandArchitectureTests |
 | AUC-CLI-006 | Non-Interactive and CI Mode | Ready to Start Product Implementation | CliExecutionEnvironment, CliExitCodes | CliCommandArchitectureTests |
 
@@ -75,13 +75,13 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-CLI-004 Plugin Inspect and Doctor
 
 Feature ID: `AUC-CLI-004`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 提供插件包检查、manifest 验证和安装前诊断。
 Public Contract: CliApplication, PluginManifestReader, PluginDiagnostic
-Runtime / Build Behavior: 读取插件 nupkg/目录 manifest，验证 metadata、依赖、capability、contribution 和 package layout。
-Failure Behavior: manifest 缺失、版本非法、依赖冲突、layout 错误输出 plugin diagnostics。
-Threading / Cancellation: 文件读取可取消；不加载插件 assembly 执行业务代码。
-Diagnostics: diagnostic 必须包含 plugin id、package path、manifest field。
+Runtime / Build Behavior: `plugin inspect` 读取 package root 或 manifest path 并验证 manifest metadata；`plugin doctor` 验证 package layout、main assembly 和 required contribution。两者都不加载插件 assembly。
+Failure Behavior: 缺少 path 返回 `AUCCLI0302`；manifest 缺失、版本非法和 layout 错误映射 PluginSystem `AUCPLG...` diagnostics，并保留 `data.pluginDiagnostics`。
+Threading / Cancellation: 文件读取前观察 token；命令只读，不执行插件业务代码。
+Diagnostics: diagnostic 包含 plugin id、package path、manifest field 或 layout path；PluginSystem diagnostic code 保持原样。
 Tests: `CliInspectDoctorPluginTests`
 Required Assertions: 断言合法插件、manifest 缺失、版本非法、layout 错误和 JSON diagnostics。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
