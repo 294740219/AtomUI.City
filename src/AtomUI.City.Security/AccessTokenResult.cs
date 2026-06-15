@@ -7,13 +7,15 @@ public sealed class AccessTokenResult
         string? token,
         string? scheme,
         DateTimeOffset? expiresAt,
-        string? message)
+        string? message,
+        Exception? exception)
     {
         Status = status;
         Token = token;
         Scheme = scheme;
         ExpiresAt = expiresAt;
         Message = message;
+        Exception = exception;
     }
 
     public AccessTokenResultStatus Status { get; }
@@ -25,6 +27,8 @@ public sealed class AccessTokenResult
     public DateTimeOffset? ExpiresAt { get; }
 
     public string? Message { get; }
+
+    public Exception? Exception { get; }
 
     public bool Succeeded => Status == AccessTokenResultStatus.Success;
 
@@ -41,7 +45,8 @@ public sealed class AccessTokenResult
             token,
             scheme,
             expiresAt,
-            message: null);
+            message: null,
+            exception: null);
     }
 
     public static AccessTokenResult None()
@@ -51,7 +56,8 @@ public sealed class AccessTokenResult
             token: null,
             scheme: null,
             expiresAt: null,
-            message: null);
+            message: null,
+            exception: null);
     }
 
     public static AccessTokenResult Required(string? message = null)
@@ -61,7 +67,8 @@ public sealed class AccessTokenResult
             token: null,
             scheme: null,
             expiresAt: null,
-            message);
+            message,
+            exception: null);
     }
 
     public static AccessTokenResult Expired(string? message = null)
@@ -71,7 +78,21 @@ public sealed class AccessTokenResult
             token: null,
             scheme: null,
             expiresAt: null,
-            message);
+            message,
+            exception: null);
+    }
+
+    public static AccessTokenResult Failed(
+        string? message = null,
+        Exception? exception = null)
+    {
+        return new AccessTokenResult(
+            AccessTokenResultStatus.Failed,
+            token: null,
+            scheme: null,
+            expiresAt: null,
+            message,
+            exception);
     }
 
     public static AccessTokenResult Unavailable(string? message = null)
@@ -81,7 +102,8 @@ public sealed class AccessTokenResult
             token: null,
             scheme: null,
             expiresAt: null,
-            message);
+            message,
+            exception: null);
     }
 
     public static AccessTokenResult Cancelled(string? message = null)
@@ -91,6 +113,7 @@ public sealed class AccessTokenResult
             token: null,
             scheme: null,
             expiresAt: null,
-            message);
+            message,
+            exception: null);
     }
 }

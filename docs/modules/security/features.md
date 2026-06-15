@@ -12,7 +12,7 @@
 | AUC-SECURITY-004 | Authorization Policy Evaluation | Completed | AuthorizationEvaluator, AuthorizationPolicy | AuthorizationEvaluatorTests; AuthorizationPolicyTests |
 | AUC-SECURITY-005 | Route Authorization Guard | Completed | SecurityRouteGuard, IRouteAuthorizationPolicyProvider | RouteAuthorizationGuardTests |
 | AUC-SECURITY-006 | Command Authorization | Completed | CommandAuthorizationSource, CommandAuthorizationDescriptor | CommandAuthorizationSourceTests |
-| AUC-SECURITY-007 | Access Token Provider | Ready to Start Product Implementation | IAccessTokenProvider, AccessTokenResult | SecurityRegistrationTests |
+| AUC-SECURITY-007 | Access Token Provider | Completed | IAccessTokenProvider, AccessTokenResult | SecurityRegistrationTests; AccessTokenCredentialProviderTests |
 
 ## Feature 硬门禁
 
@@ -118,13 +118,13 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-SECURITY-007 Access Token Provider
 
 Feature ID: `AUC-SECURITY-007`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 为 Data 等模块提供 token 获取合同。
 Public Contract: IAccessTokenProvider, AccessTokenResult, DelegateAccessTokenProvider
-Runtime / Build Behavior: token provider 返回 Success/Unavailable/Failed/Cancelled；Data 在 transport 前调用。
-Failure Behavior: token 缺失或刷新失败返回 AccessTokenResult，不抛未声明异常。
-Threading / Cancellation: 获取 token 必须支持 CancellationToken；并发 refresh 由 provider 合并或明确拒绝。
+Runtime / Build Behavior: token provider 返回 None/Success/Required/Expired/Failed/Unavailable/Cancelled；Data 在 transport 前调用并映射到 DataCredentialResult。
+Failure Behavior: token 缺失或刷新失败返回 AccessTokenResult；DelegateAccessTokenProvider 把未声明异常映射为 Failed，不抛给 Data。
+Threading / Cancellation: 获取 token 必须支持 CancellationToken；预取消不调用 delegate；并发 refresh 由 provider 合并或明确拒绝。
 Diagnostics: token diagnostics 必须包含 request scope、status 和 expiry hint。
-Tests: `SecurityRegistrationTests`
+Tests: `SecurityRegistrationTests; AccessTokenCredentialProviderTests`
 Required Assertions: 断言成功、失败、不可用、取消、DI 默认 provider 和 Data 集成前置条件。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。

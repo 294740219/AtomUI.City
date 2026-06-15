@@ -12,12 +12,29 @@ public sealed class DelegateAccessTokenProvider : IAccessTokenProvider
         _provider = provider;
     }
 
-    public ValueTask<AccessTokenResult> GetTokenAsync(
+    public async ValueTask<AccessTokenResult> GetTokenAsync(
         AccessTokenRequest request,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return _provider(request, cancellationToken);
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return AccessTokenResult.Cancelled();
+        }
+
+        try
+        {
+            return await _provider(request, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return AccessTokenResult.Cancelled();
+        }
+        catch (Exception exception)
+        {
+            return AccessTokenResult.Failed(exception.Message, exception);
+        }
     }
 }

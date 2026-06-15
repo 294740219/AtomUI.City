@@ -56,6 +56,7 @@ public sealed class AccessTokenCredentialProviderTests
     [InlineData(AccessTokenResultStatus.None, DataCredentialResultStatus.None)]
     [InlineData(AccessTokenResultStatus.Required, DataCredentialResultStatus.Required)]
     [InlineData(AccessTokenResultStatus.Expired, DataCredentialResultStatus.Expired)]
+    [InlineData(AccessTokenResultStatus.Failed, DataCredentialResultStatus.Unavailable)]
     [InlineData(AccessTokenResultStatus.Unavailable, DataCredentialResultStatus.Unavailable)]
     [InlineData(AccessTokenResultStatus.Cancelled, DataCredentialResultStatus.Cancelled)]
     public async Task TokenResultStatusMapsToCredentialStatus(
@@ -130,6 +131,7 @@ public sealed class AccessTokenCredentialProviderTests
             AccessTokenResultStatus.None => AccessTokenResult.None(),
             AccessTokenResultStatus.Required => AccessTokenResult.Required("token status"),
             AccessTokenResultStatus.Expired => AccessTokenResult.Expired("token status"),
+            AccessTokenResultStatus.Failed => AccessTokenResult.Failed("token status"),
             AccessTokenResultStatus.Unavailable => AccessTokenResult.Unavailable("token status"),
             AccessTokenResultStatus.Cancelled => AccessTokenResult.Cancelled("token status"),
             _ => throw new ArgumentOutOfRangeException(nameof(status), status, message: null),

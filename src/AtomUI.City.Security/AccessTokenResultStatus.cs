@@ -6,6 +6,7 @@ public enum AccessTokenResultStatus
     Success,
     Required,
     Expired,
+    Failed,
     Unavailable,
     Cancelled,
 }

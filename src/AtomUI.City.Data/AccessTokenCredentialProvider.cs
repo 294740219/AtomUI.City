@@ -48,6 +48,7 @@ public sealed class AccessTokenCredentialProvider : IDataCredentialProvider
                 new DataCredential(token.Scheme!, token.Token!)),
             AccessTokenResultStatus.Required => DataCredentialResult.Required(token.Message),
             AccessTokenResultStatus.Expired => DataCredentialResult.Expired(token.Message),
+            AccessTokenResultStatus.Failed => DataCredentialResult.Unavailable(token.Message),
             AccessTokenResultStatus.Unavailable => DataCredentialResult.Unavailable(token.Message),
             AccessTokenResultStatus.Cancelled => DataCredentialResult.Cancelled(token.Message),
             _ => DataCredentialResult.Unavailable(token.Message),
