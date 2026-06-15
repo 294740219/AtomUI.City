@@ -1,0 +1,16 @@
+<Project>
+  <PropertyGroup>
+    <AtomUICityOutputRoot Condition="'$(AtomUICityOutputRoot)' == ''">$(MSBuildProjectDirectory)/output</AtomUICityOutputRoot>
+    <AtomUICityGenerateManifests Condition="'$(AtomUICityGenerateManifests)' == ''">true</AtomUICityGenerateManifests>
+    <AtomUICityValidateManifests Condition="'$(AtomUICityValidateManifests)' == ''">true</AtomUICityValidateManifests>
+    <AtomUICityEnableAnalyzers Condition="'$(AtomUICityEnableAnalyzers)' == ''">true</AtomUICityEnableAnalyzers>
+    <AtomUICitySourceGenerationMode Condition="'$(AtomUICitySourceGenerationMode)' == ''">Strict</AtomUICitySourceGenerationMode>
+    <AtomUICityAllowDynamicDiscovery Condition="'$(AtomUICityAllowDynamicDiscovery)' == ''">false</AtomUICityAllowDynamicDiscovery>
+    <AtomUICityStrictAot Condition="'$(AtomUICityStrictAot)' == ''">false</AtomUICityStrictAot>
+    <AtomUICityPackagePlugin Condition="'$(AtomUICityPackagePlugin)' == ''">false</AtomUICityPackagePlugin>
+    <AtomUICityPackageApplication Condition="'$(AtomUICityPackageApplication)' == ''">false</AtomUICityPackageApplication>
+    <AtomUICityBuildDiagnosticsLevel Condition="'$(AtomUICityBuildDiagnosticsLevel)' == ''">Normal</AtomUICityBuildDiagnosticsLevel>
+    <AtomUICityManifestIntermediateOutputPath Condition="'$(AtomUICityManifestIntermediateOutputPath)' == ''">$(IntermediateOutputPath)AtomUI.City/manifests/</AtomUICityManifestIntermediateOutputPath>
+    <AtomUICityBuildDiagnosticsOutputPath Condition="'$(AtomUICityBuildDiagnosticsOutputPath)' == ''">$(IntermediateOutputPath)AtomUI.City/diagnostics/</AtomUICityBuildDiagnosticsOutputPath>
+  </PropertyGroup>
+</Project>

@@ -24,6 +24,7 @@ done
 package_output="output/NuGet/$configuration"
 log_output="output/logs/$configuration"
 mkdir -p "$package_output" "$log_output"
+find "$package_output" -maxdepth 1 -type f \( -name 'AtomUI.City.*.nupkg' -o -name 'AtomUI.City.*.snupkg' \) -exec rm -f {} +
 
 while IFS= read -r project; do
   project_name="$(basename "$project" .csproj)"

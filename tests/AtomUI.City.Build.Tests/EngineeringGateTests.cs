@@ -157,6 +157,21 @@ public sealed class EngineeringGateTests
     }
 
     [Fact]
+    public void PackScriptRemovesStaleAtomUICityPackagesBeforePacking()
+    {
+        var repositoryRoot = RepositoryPaths.FindRepositoryRoot();
+        var scriptPath = Path.Combine(repositoryRoot, EngineeringScriptsDirectoryName, "pack.sh");
+
+        Assert.True(File.Exists(scriptPath), "Expected package script at engineering/pack.sh.");
+
+        var script = File.ReadAllText(scriptPath);
+
+        Assert.Contains("AtomUI.City.*.nupkg", script, StringComparison.Ordinal);
+        Assert.Contains("AtomUI.City.*.snupkg", script, StringComparison.Ordinal);
+        Assert.Contains("rm -f", script, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void PublicApiScriptFallsBackWhenRipgrepIsUnavailable()
     {
         var repositoryRoot = RepositoryPaths.FindRepositoryRoot();

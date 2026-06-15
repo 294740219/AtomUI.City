@@ -13,6 +13,7 @@
 | AUC-BUILD-005 | Source Generator Packaging | 已实现并通过产品合同测试 | AtomUI.City.Generators package layout | SourceGeneratorProjectStructureTests |
 | AUC-BUILD-006 | Release Gates | 已实现并通过产品合同测试 | engineering/check-docs.sh, pack/test gates | EngineeringGateTests; PackagingReleaseGateTests |
 | AUC-BUILD-007 | Test Naming | 已实现并通过产品合同测试 | test project and test file naming convention | TestNamingConventionTests |
+| AUC-BUILD-008 | MSBuild Transitive Assets | 已实现并通过产品合同测试 | buildTransitive props/targets, analyzer package assets, BuildMsBuildContract | BuildAssemblyTests; SourceGeneratorProjectStructureTests; ProjectInventoryTests |
 
 ## Feature 硬门禁
 
@@ -22,6 +23,7 @@
 | pack warning 必须失败。 | 必须有实现、测试或工程门禁证据。 |
 | 运行时包不得依赖 Testing 或 Roslyn。 | 必须有实现、测试或工程门禁证据。 |
 | generator 包输出到 `analyzers/dotnet/cs`。 | 必须有实现、测试或工程门禁证据。 |
+| Build 包必须包含 buildTransitive 资产和 generator analyzer。 | 必须有实现、测试和 package validation 门禁证据。 |
 
 ## Feature 实现合同
 
@@ -127,4 +129,18 @@ Threading / Cancellation: 文件扫描只读。
 Diagnostics: 失败必须指出 test file 和 expected module。
 Tests: `TestNamingConventionTests`
 Required Assertions: 断言测试命名和模块对应关系。
+Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
+
+## AUC-BUILD-008 MSBuild Transitive Assets
+
+Feature ID: `AUC-BUILD-008`
+Status: 已实现并通过产品合同测试
+Goal: 保证 `AtomUI.City.Build` 不是空壳包，应用和插件引用后自动获得框架构建资产。
+Public Contract: buildTransitive props/targets, analyzer package assets, BuildMsBuildContract
+Runtime / Build Behavior: `AtomUI.City.Build` 包包含 `buildTransitive/AtomUI.City.Build.props`、`buildTransitive/AtomUI.City.Build.targets`、应用/插件/诊断 targets，并把 `AtomUI.City.Generators.dll` 分发到 `analyzers/dotnet/cs`。
+Failure Behavior: 缺少 build asset、generator analyzer、package entry 或 source project 只有 `.csproj` 时，测试和工程门禁失败。
+Threading / Cancellation: MSBuild 进程处理取消；inventory 和 package validation 只读扫描文件系统。
+Diagnostics: 失败必须指出缺失 package entry、缺失 analyzer path 或空 source project path。
+Tests: `BuildAssemblyTests; SourceGeneratorProjectStructureTests; ProjectInventoryTests`
+Required Assertions: 断言 BuildMsBuildContract、buildTransitive 文件、generator analyzer package entry、package validation 和 project inventory 空项目门禁。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。

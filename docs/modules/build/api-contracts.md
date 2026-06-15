@@ -8,6 +8,7 @@
 | --- | --- | --- | --- |
 | Output Layout | Directory.Build.* conventions, output path contract | 约束构建输出位置。 | 所有产物必须落在 output 下。 |
 | Package Contract | project metadata, pack target, nupkg layout | 约束 NuGet 内容和 metadata。 | pack warning 和 metadata 缺失失败。 |
+| MSBuild Integration | buildTransitive props/targets, analyzer assets, BuildMsBuildContract | 让应用和插件引用 Build 包后自动获得构建约定、generator/analyzer 和稳定合同常量。 | Build 包缺少 buildTransitive 或 analyzer entry 时 package validation 失败。 |
 | Dependency Boundary | project reference rules | 阻止 runtime 依赖 testing/generator internals，并显式维护 CLI 到 PluginSystem 的允许依赖。 | 边界测试失败阻止发布。 |
 | Release Gate | engineering scripts and tests | 聚合 format/docs/test/pack 验证，真实 src/tests 项目必须覆盖，模板 payload 项目不进入仓库项目清单。 | CI 和本地命令语义一致。 |
 
@@ -17,6 +18,7 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | Build target ResolveOutputPath | 计算输出目录。 | Configuration、TargetFramework、PackageId。 | normalized output path。 | 路径逃逸或为空失败。 | MSBuild cancellation 由进程处理。 | 不同 project 输出目录隔离。 |
 | Pack target VerifyPackageMetadata | 校验 NuGet metadata。 | project properties。 | pack success/failure。 | license、repository、symbols、readme policy 不满足失败。 | MSBuild cancellation 由进程处理。 | 重复 pack 输出可覆盖同配置产物。 |
+| BuildMsBuildContract.GetManifestOutputPath | 计算 manifest 输出路径。 | intermediateOutputPath、manifestFileName。 | normalized manifest path。 | null、空白 path 或文件名抛 `ArgumentException`。 | 无 IO，不接收 token。 | 纯函数，重复调用幂等。 |
 | DependencyBoundaryTests | 校验项目引用。 | 真实 src/tests project graph，排除模板 payload 项目。 | test pass/fail。 | runtime 引用 Testing/Roslyn test 包失败，允许依赖表与真实 source project 不一致失败。 | 测试进程 token。 | 读取项目文件无副作用。 |
 | EngineeringGateTests | 执行仓库规则检查。 | docs、format、scripts、package layout。 | test pass/fail。 | 任一规则失败阻止完成。 | 测试进程 token。 | 门禁结果确定性。 |
 
@@ -24,6 +26,7 @@
 
 | Type | 分类 | Review 规则 |
 | --- | --- | --- |
+| BuildMsBuildContract | Public static contract | 新增、删除或重命名 property、item、target、package asset 必须同步 MSBuild assets、features.md、testing.md 和 package validation。 |
 
 ## Nullability 和参数规则
 

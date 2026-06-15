@@ -42,6 +42,7 @@
 | AUC-BUILD-004 | Dependency Boundary | ProjectDependencyBoundaryTests |
 | AUC-BUILD-005 | Source Generator Packaging | SourceGeneratorProjectStructureTests |
 | AUC-BUILD-006 | Release Gates | PackagingReleaseGateTests; EngineeringGateTests |
+| AUC-BUILD-008 | MSBuild Transitive Assets | BuildAssemblyTests; SourceGeneratorProjectStructureTests; ProjectInventoryTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 

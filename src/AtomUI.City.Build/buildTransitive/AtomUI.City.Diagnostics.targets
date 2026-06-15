@@ -1,0 +1,9 @@
+<Project>
+  <Target Name="WriteAtomUICityBuildDiagnostics" AfterTargets="Build" Condition="'$(AtomUICityBuildDiagnosticsLevel)' != 'Off'">
+    <MakeDir Directories="$(AtomUICityBuildDiagnosticsOutputPath)" />
+    <WriteLinesToFile
+      File="$(AtomUICityBuildDiagnosticsOutputPath)build.txt"
+      Lines="Project=$(MSBuildProjectName);SourceGenerationMode=$(AtomUICitySourceGenerationMode);GenerateManifests=$(AtomUICityGenerateManifests)"
+      Overwrite="true" />
+  </Target>
+</Project>

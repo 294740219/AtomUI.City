@@ -1,0 +1,9 @@
+<Project>
+  <PropertyGroup>
+    <AtomUICityApplicationPublishOutputPath Condition="'$(AtomUICityApplicationPublishOutputPath)' == ''">$(AtomUICityOutputRoot)/publish/apps/$(MSBuildProjectName)</AtomUICityApplicationPublishOutputPath>
+  </PropertyGroup>
+
+  <Target Name="PublishAtomUICityApplication" AfterTargets="Publish" Condition="'$(AtomUICityPackageApplication)' == 'true'">
+    <MakeDir Directories="$(AtomUICityApplicationPublishOutputPath)" />
+  </Target>
+</Project>

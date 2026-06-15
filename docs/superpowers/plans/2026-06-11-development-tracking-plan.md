@@ -5,8 +5,8 @@
 ## 当前结论
 
 - 1.0 发布状态：可发布。
-- 全局进度：118/118。
-- 模块 Feature 合同：109/109。
+- 全局进度：119/119。
+- 模块 Feature 合同：110/110。
 - 最终发布门禁：9/9。
 - 最近校准日期：2026-06-15。
 
@@ -35,7 +35,7 @@
 | --- | ---: | ---: | ---: | --- |
 | Core | 7 | 0 | 7 | 已完成 |
 | Testing | 9 | 0 | 9 | 已完成 |
-| Build | 7 | 0 | 7 | 已完成 |
+| Build | 8 | 0 | 8 | 已完成 |
 | Generators | 8 | 0 | 8 | 已完成 |
 | Routing | 8 | 0 | 8 | 已完成 |
 | Presentation | 8 | 0 | 8 | 已完成 |
@@ -81,6 +81,7 @@
 - [x] AUC-BUILD-005 Source Generator Packaging。验收重点：generator target、analyzer layout、runtime 不引用 generator。
 - [x] AUC-BUILD-006 Release Gates。验收重点：docs、format、pack、test gate 可本地执行。
 - [x] AUC-BUILD-007 Test Naming。验收重点：测试命名和模块对应关系。
+- [x] AUC-BUILD-008 MSBuild Transitive Assets。验收重点：Build 包包含 buildTransitive props/targets、自动分发 Generators analyzer、公开 BuildMsBuildContract，project inventory 拒绝空 source project。
 
 ## Generators
 

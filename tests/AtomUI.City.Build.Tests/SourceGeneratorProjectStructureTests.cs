@@ -74,6 +74,68 @@ public sealed class SourceGeneratorProjectStructureTests
         Assert.Contains("Generator package contains runtime lib asset", validatePackagesScript, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void BuildProjectPackagesBuildTransitiveAssetsAndGeneratorAnalyzer()
+    {
+        var repositoryRoot = RepositoryPaths.FindRepositoryRoot();
+        var buildRoot = Path.Combine(repositoryRoot, "src", "AtomUI.City.Build");
+        var buildProject = XDocument.Load(Path.Combine(buildRoot, "AtomUI.City.Build.csproj"));
+
+        Assert.True(File.Exists(Path.Combine(buildRoot, "buildTransitive", "AtomUI.City.Build.props")));
+        Assert.True(File.Exists(Path.Combine(buildRoot, "buildTransitive", "AtomUI.City.Build.targets")));
+        Assert.True(File.Exists(Path.Combine(buildRoot, "buildTransitive", "AtomUI.City.Application.targets")));
+        Assert.True(File.Exists(Path.Combine(buildRoot, "buildTransitive", "AtomUI.City.Plugin.targets")));
+        Assert.True(File.Exists(Path.Combine(buildRoot, "buildTransitive", "AtomUI.City.Diagnostics.targets")));
+
+        var packedItems = buildProject
+            .Descendants("None")
+            .Select(item => new
+            {
+                Include = item.Attribute("Include")?.Value,
+                PackagePath = item.Attribute("PackagePath")?.Value,
+                Pack = item.Attribute("Pack")?.Value,
+            })
+            .ToArray();
+
+        Assert.Contains(
+            packedItems,
+            item => item.Include == "buildTransitive/AtomUI.City.Build.props" &&
+                    item.PackagePath == "buildTransitive/" &&
+                    item.Pack == "true");
+        Assert.Contains(
+            packedItems,
+            item => item.Include == "buildTransitive/AtomUI.City.Build.targets" &&
+                    item.PackagePath == "buildTransitive/" &&
+                    item.Pack == "true");
+        Assert.Contains(
+            packedItems,
+            item => item.Include == "$(AtomUICityGeneratorAnalyzerPath)" &&
+                    item.PackagePath == "analyzers/dotnet/cs" &&
+                    item.Pack == "true");
+
+        var generatorReference = buildProject
+            .Descendants("ProjectReference")
+            .Single(reference => reference.Attribute("Include")?.Value == "../AtomUI.City.Generators/AtomUI.City.Generators.csproj");
+
+        Assert.Equal("false", generatorReference.Attribute("ReferenceOutputAssembly")?.Value);
+        Assert.Equal("all", generatorReference.Attribute("PrivateAssets")?.Value);
+    }
+
+    [Fact]
+    public void PackageValidationRequiresBuildTransitiveAssetsAndGeneratorAnalyzer()
+    {
+        var repositoryRoot = RepositoryPaths.FindRepositoryRoot();
+        var validatePackagesScript = File.ReadAllText(Path.Combine(repositoryRoot, "engineering", "validate-packages.sh"));
+
+        Assert.Contains("AtomUI.City.Build)", validatePackagesScript, StringComparison.Ordinal);
+        Assert.Contains("buildTransitive/AtomUI.City.Build.props", validatePackagesScript, StringComparison.Ordinal);
+        Assert.Contains("buildTransitive/AtomUI.City.Build.targets", validatePackagesScript, StringComparison.Ordinal);
+        Assert.Contains("buildTransitive/AtomUI.City.Application.targets", validatePackagesScript, StringComparison.Ordinal);
+        Assert.Contains("buildTransitive/AtomUI.City.Plugin.targets", validatePackagesScript, StringComparison.Ordinal);
+        Assert.Contains("buildTransitive/AtomUI.City.Diagnostics.targets", validatePackagesScript, StringComparison.Ordinal);
+        Assert.Contains("analyzers/dotnet/cs/AtomUI.City.Generators.dll", validatePackagesScript, StringComparison.Ordinal);
+    }
+
     private static void AssertDirectoryExists(string root, string relativePath)
     {
         Assert.True(Directory.Exists(Path.Combine(root, relativePath)), $"Expected generator directory '{relativePath}'.");

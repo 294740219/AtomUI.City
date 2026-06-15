@@ -67,6 +67,33 @@ public sealed class ProjectInventoryTests
         Assert.Contains("src/AtomUI.City.Templates/templates", script, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void ProjectInventoryGateRejectsPlaceholderSourceProjects()
+    {
+        var repositoryRoot = RepositoryPaths.FindRepositoryRoot();
+        var scriptPath = Path.Combine(repositoryRoot, "engineering", "check-project-inventory.sh");
+
+        Assert.True(File.Exists(scriptPath), "Expected project inventory gate at engineering/check-project-inventory.sh.");
+
+        var script = File.ReadAllText(scriptPath);
+
+        Assert.Contains("source project without implementation files", script, StringComparison.Ordinal);
+        Assert.Contains("has_source_project_implementation", script, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EverySourceProjectContainsImplementationFilesOrPackAssets()
+    {
+        var repositoryRoot = RepositoryPaths.FindRepositoryRoot();
+        var placeholderProjects = RepositoryPaths
+            .EnumerateSourceProjects(repositoryRoot)
+            .Where(projectPath => !HasSourceProjectImplementation(projectPath))
+            .Select(projectPath => RepositoryPaths.ToRepositoryRelativePath(repositoryRoot, projectPath))
+            .ToArray();
+
+        Assert.Empty(placeholderProjects);
+    }
+
     private static string[] ReadSolutionProjects(string repositoryRoot)
     {
         var solutionPath = Path.Combine(repositoryRoot, "AtomUICity.slnx");
@@ -88,5 +115,22 @@ public sealed class ProjectInventoryTests
             "AtomUI.City.Templates" => "AtomUI.City.TemplateSmokeTests",
             _ => $"{sourceProjectName}.Tests",
         };
+    }
+
+    private static bool HasSourceProjectImplementation(string projectPath)
+    {
+        var projectDirectory = Path.GetDirectoryName(projectPath)!;
+        var implementationFiles = Directory
+            .EnumerateFiles(projectDirectory, "*", SearchOption.AllDirectories)
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+            .Where(path =>
+                path.EndsWith(".cs", StringComparison.Ordinal) ||
+                path.EndsWith(".props", StringComparison.Ordinal) ||
+                path.EndsWith(".targets", StringComparison.Ordinal) ||
+                path.EndsWith(".template.config/template.json", StringComparison.Ordinal))
+            .ToArray();
+
+        return implementationFiles.Length > 0;
     }
 }

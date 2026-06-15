@@ -1,0 +1,24 @@
+<Project>
+  <Import Project="$(MSBuildThisFileDirectory)AtomUI.City.Application.targets" Condition="Exists('$(MSBuildThisFileDirectory)AtomUI.City.Application.targets')" />
+  <Import Project="$(MSBuildThisFileDirectory)AtomUI.City.Plugin.targets" Condition="Exists('$(MSBuildThisFileDirectory)AtomUI.City.Plugin.targets')" />
+  <Import Project="$(MSBuildThisFileDirectory)AtomUI.City.Diagnostics.targets" Condition="Exists('$(MSBuildThisFileDirectory)AtomUI.City.Diagnostics.targets')" />
+
+  <ItemGroup Condition="'$(AtomUICityEnableAnalyzers)' != 'true'">
+    <Analyzer Remove="@(Analyzer)" Condition="'%(Filename)%(Extension)' == 'AtomUI.City.Generators.dll'" />
+  </ItemGroup>
+
+  <Target Name="GenerateAtomUICityManifests" AfterTargets="CoreCompile" Condition="'$(AtomUICityGenerateManifests)' == 'true'">
+    <MakeDir Directories="$(AtomUICityManifestIntermediateOutputPath)" />
+    <ItemGroup>
+      <AtomUICityGeneratedManifest Include="$(AtomUICityManifestIntermediateOutputPath)*.json" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="ValidateAtomUICityManifests" AfterTargets="GenerateAtomUICityManifests" Condition="'$(AtomUICityValidateManifests)' == 'true'" />
+
+  <Target Name="ValidateAtomUICityAotCompatibility" AfterTargets="CoreCompile" Condition="'$(AtomUICityStrictAot)' == 'true'" />
+
+  <Target Name="CleanAtomUICityOutput" BeforeTargets="Clean">
+    <RemoveDir Directories="$(AtomUICityManifestIntermediateOutputPath);$(AtomUICityBuildDiagnosticsOutputPath)" />
+  </Target>
+</Project>

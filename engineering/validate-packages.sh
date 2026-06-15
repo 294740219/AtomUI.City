@@ -119,6 +119,20 @@ while IFS= read -r project; do
   require_entry "$nupkg" "$entries" "RELEASE_NOTES.md"
 
   case "$project_name" in
+    AtomUI.City.Build)
+      require_file "$snupkg"
+      require_nuspec_dependency_group "$nupkg" "$nuspec"
+      require_entry_pattern "$nupkg" "$entries" "^lib/.+/$project_name\\.dll$"
+      require_entry_pattern "$nupkg" "$entries" "^lib/.+/$project_name\\.xml$"
+      require_entry "$nupkg" "$entries" "buildTransitive/AtomUI.City.Build.props"
+      require_entry "$nupkg" "$entries" "buildTransitive/AtomUI.City.Build.targets"
+      require_entry "$nupkg" "$entries" "buildTransitive/AtomUI.City.Application.targets"
+      require_entry "$nupkg" "$entries" "buildTransitive/AtomUI.City.Plugin.targets"
+      require_entry "$nupkg" "$entries" "buildTransitive/AtomUI.City.Diagnostics.targets"
+      require_entry "$nupkg" "$entries" "analyzers/dotnet/cs/AtomUI.City.Generators.dll"
+      snupkg_entries="$(unzip -Z1 "$snupkg")"
+      require_entry_pattern "$snupkg" "$snupkg_entries" "^lib/.+/$project_name\\.pdb$"
+      ;;
     AtomUI.City.Generators)
       require_file "$snupkg"
       require_entry "$nupkg" "$entries" "analyzers/dotnet/cs/$project_name.dll"

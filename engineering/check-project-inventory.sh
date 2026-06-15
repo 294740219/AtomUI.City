@@ -21,6 +21,18 @@ find_test_projects() {
   find tests -name '*.csproj' -print
 }
 
+has_source_project_implementation() {
+  local project_path="$1"
+  local project_dir
+
+  project_dir="$(dirname "$project_path")"
+
+  [[ -n "$(find "$project_dir" \
+    \( -path "$project_dir/bin" -o -path "$project_dir/obj" \) -prune -o \
+    \( -name '*.cs' -o -name '*.props' -o -name '*.targets' -o -path '*/.template.config/template.json' \) \
+    -type f -print -quit)" ]]
+}
+
 grep -Eo 'Path="[^"]+\.csproj"' "$solution_path" \
   | sed -E 's/^Path="//; s/"$//' \
   | sort > "$tmp_dir/solution-projects.txt"
@@ -71,6 +83,15 @@ comm -13 "$tmp_dir/expected-test-project-names.txt" "$tmp_dir/test-project-names
 
 report_lines "source project without test project" "$tmp_dir/source-without-tests.txt"
 report_lines "test project without source project" "$tmp_dir/orphan-tests.txt"
+
+: > "$tmp_dir/source-placeholder-projects.txt"
+while IFS= read -r source_project; do
+  if ! has_source_project_implementation "$source_project"; then
+    printf '%s\n' "$source_project" >> "$tmp_dir/source-placeholder-projects.txt"
+  fi
+done < <(find_source_projects | sort)
+
+report_lines "source project without implementation files" "$tmp_dir/source-placeholder-projects.txt"
 
 if [[ "$failure_count" -gt 0 ]]; then
   printf 'Project inventory validation failed with %s error(s).\n' "$failure_count" >&2

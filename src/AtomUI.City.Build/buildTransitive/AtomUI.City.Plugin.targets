@@ -1,0 +1,16 @@
+<Project>
+  <PropertyGroup>
+    <AtomUICityPluginManifestOutputPath Condition="'$(AtomUICityPluginManifestOutputPath)' == ''">$(AtomUICityManifestIntermediateOutputPath)plugin/</AtomUICityPluginManifestOutputPath>
+    <AtomUICityPluginPackageOutputPath Condition="'$(AtomUICityPluginPackageOutputPath)' == ''">$(AtomUICityOutputRoot)/packages/plugins</AtomUICityPluginPackageOutputPath>
+  </PropertyGroup>
+
+  <Target Name="GenerateAtomUICityPluginManifest" AfterTargets="GenerateAtomUICityManifests" Condition="'$(AtomUICityPlugin)' == 'true' or '$(AtomUICityPackageAsPlugin)' == 'true' or '$(AtomUICityPackagePlugin)' == 'true'">
+    <MakeDir Directories="$(AtomUICityPluginManifestOutputPath)" />
+  </Target>
+
+  <Target Name="ValidateAtomUICityPluginPackage" AfterTargets="GenerateAtomUICityPluginManifest" Condition="'$(AtomUICityPackageAsPlugin)' == 'true' or '$(AtomUICityPackagePlugin)' == 'true'" />
+
+  <Target Name="PackAtomUICityPlugin" AfterTargets="ValidateAtomUICityPluginPackage" Condition="'$(AtomUICityPackageAsPlugin)' == 'true' or '$(AtomUICityPackagePlugin)' == 'true'">
+    <MakeDir Directories="$(AtomUICityPluginPackageOutputPath)" />
+  </Target>
+</Project>
