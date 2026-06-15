@@ -21,7 +21,7 @@
 
 | Feature ID | Test Type | Test File | Required Assertions | Failure Paths | Status |
 | --- | --- | --- | --- | --- | --- |
-| AUC-SECURITY-001 | Contract | AuthenticationStateTests | 断言 snapshot 不可变、状态切换、订阅通知、重复设置和 logout。 | provider 失败、半认证状态、退出登录。 | Required |
+| AUC-SECURITY-001 | Contract | AuthenticationStateTests | 断言 snapshot 不可变、状态切换、订阅通知、重复设置和 logout。 | provider 失败、半认证状态、退出登录。 | Completed |
 | AUC-SECURITY-002 | Contract | AuthenticationStateTests | 断言 authenticated、anonymous、claims 读取和并发 snapshot。 | principal 缺失、claims 格式异常。 | Required |
 | AUC-SECURITY-003 | Contract | PermissionRegistryTests; PermissionCheckerTests | 断言注册、重复、未注册、插件撤销和 checker result。 | 未注册权限、重复权限、owner revoked。 | Required |
 | AUC-SECURITY-004 | Contract | AuthorizationEvaluatorTests; AuthorizationPolicyTests | 断言成功、拒绝、失败、取消、多 requirement 和 provider 异常。 | policy 缺失、requirement 失败、provider 抛异常。 | Required |

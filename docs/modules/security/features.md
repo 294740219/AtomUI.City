@@ -6,7 +6,7 @@
 
 | Feature ID | 名称 | 状态 | Public Contract | 主测试 |
 | --- | --- | --- | --- | --- |
-| AUC-SECURITY-001 | Authentication State Store | Ready to Start Product Implementation | AuthenticationStateStore, AuthenticationStateSnapshot | AuthenticationStateTests |
+| AUC-SECURITY-001 | Authentication State Store | Completed | AuthenticationStateStore, AuthenticationStateSnapshot | AuthenticationStateTests |
 | AUC-SECURITY-002 | Current Principal Access | Ready to Start Product Implementation | ICurrentPrincipalAccessor, SecurityPrincipals | AuthenticationStateTests |
 | AUC-SECURITY-003 | Permission Registry and Checker | Ready to Start Product Implementation | PermissionRegistry, IPermissionChecker | PermissionRegistryTests; PermissionCheckerTests |
 | AUC-SECURITY-004 | Authorization Policy Evaluation | Ready to Start Product Implementation | AuthorizationEvaluator, AuthorizationPolicy | AuthorizationEvaluatorTests; AuthorizationPolicyTests |
@@ -34,11 +34,11 @@
 ## AUC-SECURITY-001 Authentication State Store
 
 Feature ID: `AUC-SECURITY-001`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 集中表达当前用户、认证状态和状态变更通知。
 Public Contract: AuthenticationStateStore, AuthenticationStateSnapshot
-Runtime / Build Behavior: 认证状态以 immutable snapshot 发布；Unknown、Anonymous、Authenticated、Refreshing 必须清晰区分。
-Failure Behavior: provider 失败不能产生半认证状态；退出登录必须清除 principal 和 token hint。
+Runtime / Build Behavior: 认证状态以 cloned immutable snapshot 发布；Unknown、Anonymous、Authenticated、Refreshing、SignedOut、Failed 必须清晰区分。
+Failure Behavior: provider 失败不能产生半认证状态；Failed 和 SignedOut 必须清除 principal、scheme 和 expiry token hint。
 Threading / Cancellation: 状态更新可来自后台；订阅通知必须按声明调度策略执行。
 Diagnostics: authentication diagnostics 必须包含 old state、new state 和 reason。
 Tests: `AuthenticationStateTests`

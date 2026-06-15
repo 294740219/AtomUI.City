@@ -96,6 +96,10 @@ Unknown
 
 认证状态变化必须可诊断、可订阅、可测试。
 
+`AuthenticationStateStore` 发布的 `AuthenticationStateSnapshot` 必须克隆传入的 `ClaimsPrincipal`。调用方之后修改原始 identity 或 claims 不得改变已发布 snapshot，也不得改变 `Current` 引用中已发布的 principal。
+
+重复设置等价状态必须幂等：不递增 revision，不重复触发 `StateChanged`。例如已经处于 Anonymous 时再次 `SetAnonymous()` 必须返回当前 snapshot。
+
 ### 3. 当前主体
 
 当前主体使用 `ClaimsPrincipal` 表达。
@@ -127,7 +131,7 @@ ChallengeAsync
 - 所有方法接收 `CancellationToken`。
 - 登录流程不能阻塞 UI Thread。
 - 登录 UI 由 Presentation 或应用提供，Security 只发起 challenge 或返回认证请求。
-- 登出必须取消未完成 refresh，并清理 token 引用。
+- 登出必须取消未完成 refresh，并清理 principal、scheme、expiry 等 token hint。
 - 恢复会话发生在 Application 启动或解锁时。
 
 ### 5. Token 和凭据
@@ -141,6 +145,7 @@ Data 管线通过 `IAccessTokenProvider` 获取认证信息。
 - Token 快过期时可以触发 refresh。
 - Refresh 期间并发请求应共享同一次 refresh，避免重复刷新。
 - Refresh 失败后状态进入 Expired 或 SignedOut。
+- Provider 失败进入 Failed 时必须清理 principal、scheme 和 expiry，不能保留半认证状态。
 - 具体存储方式由应用或平台实现，Security 只定义抽象。
 
 ### 6. 状态通知

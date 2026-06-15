@@ -15,7 +15,7 @@ public sealed class AuthenticationStateSnapshot
         ArgumentNullException.ThrowIfNull(principal);
 
         State = state;
-        Principal = principal;
+        Principal = ClonePrincipal(principal);
         Revision = revision;
         Scheme = scheme;
         ExpiresAt = expiresAt;
@@ -33,4 +33,41 @@ public sealed class AuthenticationStateSnapshot
     public DateTimeOffset? ExpiresAt { get; }
 
     public string? FailureMessage { get; }
+
+    private static ClaimsPrincipal ClonePrincipal(ClaimsPrincipal principal)
+    {
+        return new ClaimsPrincipal(principal.Identities.Select(CloneIdentity));
+    }
+
+    private static ClaimsIdentity CloneIdentity(ClaimsIdentity identity)
+    {
+        var clone = new ClaimsIdentity(
+            identity.Claims.Select(CloneClaim),
+            identity.AuthenticationType,
+            identity.NameClaimType,
+            identity.RoleClaimType)
+        {
+            Label = identity.Label,
+            BootstrapContext = identity.BootstrapContext,
+        };
+
+        return clone;
+    }
+
+    private static Claim CloneClaim(Claim claim)
+    {
+        var clone = new Claim(
+            claim.Type,
+            claim.Value,
+            claim.ValueType,
+            claim.Issuer,
+            claim.OriginalIssuer);
+
+        foreach (var property in claim.Properties)
+        {
+            clone.Properties[property.Key] = property.Value;
+        }
+
+        return clone;
+    }
 }

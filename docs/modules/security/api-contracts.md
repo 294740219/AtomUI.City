@@ -16,7 +16,7 @@
 
 | Method | Purpose | Parameters | Return | Failure Behavior | Cancellation | Concurrency / Idempotency |
 | --- | --- | --- | --- | --- | --- | --- |
-| AuthenticationStateStore.SetState | 发布认证状态。 | snapshot 不得为 null。 | void 或 change result。 | 非法 transition 拒绝。 | 同步提交无 token。 | 订阅通知基于 immutable snapshot。 |
+| AuthenticationStateStore.SetAnonymous / SetAuthenticated / SetRefreshing / SetSignedOut / SetFailed | 发布认证状态。 | principal 不得为 null；failure message 不得为空。 | AuthenticationStateSnapshot。 | Failed 和 SignedOut 清除 principal、scheme、expiry；外部 principal mutation 不影响已发布 snapshot。 | 同步提交无 token。 | 等价重复设置幂等，不递增 revision、不重复通知；订阅通知基于 immutable snapshot。 |
 | IPermissionRegistry.Register | 注册权限。 | PermissionDescriptor 必须有 stable name 和 owner。 | registration handle 或 result。 | 重复 name、owner revoked 返回失败。 | 同步 API 无 token。 | 读并发安全，写串行。 |
 | IPermissionChecker.IsGrantedAsync | 检查权限。 | principal、permission name、resource 可选。 | AuthorizationResult 或 bool result。 | 未注册、provider 异常稳定映射。 | 必须观察 token。 | 无共享 mutable result。 |
 | IAuthorizationEvaluator.AuthorizeAsync | 评估 policy。 | AuthorizationRequest 包含 principal、policy、resource。 | AuthorizationResult。 | policy 缺失、requirement failed、异常映射为 Failed/Forbidden。 | 必须观察 token。 | 同一 request 不修改全局状态。 |
