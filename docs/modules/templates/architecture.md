@@ -12,6 +12,7 @@ AtomUI.City.Templates 提供应用、模块、插件、页面、配置、测试�
 
 - 模板渲染必须先生成 TemplatePlan，再执行文件写入。
 - 文件写入不得越过目标根目录。
+- TemplateChange 路径必须规范化为相对路径，重复 normalized path 必须在 TemplatePlan.Validate 中失败。
 - 已存在文件默认不覆盖，除非显式指定覆盖策略。
 - 模板输出不得包含占位文本或不合法项目引用。
 
@@ -41,6 +42,7 @@ flowchart LR
 | --- | --- | --- |
 | 项目名非法 | 不写文件，返回 validation diagnostic。 | TemplatePackageLayoutTests |
 | 目标目录逃逸 | 拒绝执行。 | TemplatePackageLayoutTests |
+| plan 包含重复 normalized path | 返回 `AUCTPL1002`。 | TemplatePackageLayoutTests |
 | 文件冲突且未允许覆盖 | plan 标记 conflict，render 失败。 | ApplicationTemplateBuildSmokeTests |
 | 模板输出 build 失败 | smoke test 失败。 | ApplicationTemplateBuildSmokeTests |
 | 模板包缺失关键文件 | package layout 测试失败。 | TemplatePackageLayoutTests |

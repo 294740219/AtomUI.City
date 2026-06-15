@@ -39,4 +39,55 @@ public sealed class TemplatePlan
     public IReadOnlyList<string> Risks { get; } = [];
 
     public IReadOnlyList<string> Rollback { get; } = [];
+
+    public IReadOnlyList<TemplateDiagnostic> Validate()
+    {
+        var diagnostics = new List<TemplateDiagnostic>();
+        var normalizedPaths = new Dictionary<string, string>(StringComparer.Ordinal);
+
+        foreach (var change in Changes)
+        {
+            if (!string.Equals(change.Type, "create", StringComparison.Ordinal))
+            {
+                diagnostics.Add(new TemplateDiagnostic(
+                    "AUCTPL1003",
+                    "Template change type is not supported.",
+                    new Dictionary<string, object?>
+                    {
+                        ["type"] = change.Type,
+                        ["path"] = change.Path,
+                    }));
+            }
+
+            if (!TemplateChange.TryNormalizePath(change.Path, out var normalizedPath, out var error))
+            {
+                diagnostics.Add(new TemplateDiagnostic(
+                    "AUCTPL1001",
+                    error,
+                    new Dictionary<string, object?>
+                    {
+                        ["path"] = change.Path,
+                    }));
+                continue;
+            }
+
+            if (normalizedPaths.TryGetValue(normalizedPath, out var firstPath))
+            {
+                diagnostics.Add(new TemplateDiagnostic(
+                    "AUCTPL1002",
+                    "Template plan contains a duplicate output path.",
+                    new Dictionary<string, object?>
+                    {
+                        ["path"] = change.Path,
+                        ["firstPath"] = firstPath,
+                        ["normalizedPath"] = normalizedPath,
+                    }));
+                continue;
+            }
+
+            normalizedPaths.Add(normalizedPath, change.Path);
+        }
+
+        return Array.AsReadOnly(diagnostics.ToArray());
+    }
 }

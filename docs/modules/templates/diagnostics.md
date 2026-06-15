@@ -10,7 +10,11 @@
 
 ## 当前源码诊断码
 
-当前源码没有模块专属诊断 ID。产品级实现如果新增诊断，必须先在本文件登记。
+| Code | Name | Source |
+| --- | --- | --- |
+| `AUCTPL1001` | InvalidTemplatePath | `src/AtomUI.City.Templates/TemplatePlan.cs` |
+| `AUCTPL1002` | DuplicateTemplatePath | `src/AtomUI.City.Templates/TemplatePlan.cs` |
+| `AUCTPL1003` | UnsupportedTemplateChangeType | `src/AtomUI.City.Templates/TemplatePlan.cs` |
 
 ## 产品级必须诊断的失败
 
@@ -20,7 +24,7 @@
 
 ## 上下文字段
 
-推荐字段：`operationId`、`scopeId`、`module`、`pluginId`、`routeId`、`stateKey`、`eventType`、`handlerType`、`assembly`、`path`、`featureId`、`threadId`、`attempt`、`transportKind`。
+推荐字段：`operationId`、`scopeId`、`module`、`pluginId`、`routeId`、`stateKey`、`eventType`、`handlerType`、`assembly`、`path`、`firstPath`、`normalizedPath`、`type`、`featureId`、`threadId`、`attempt`、`transportKind`。
 
 ## 诊断缺口处理
 

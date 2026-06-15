@@ -4,8 +4,71 @@ public sealed record TemplateChange(string Type, string Path)
 {
     public static TemplateChange Create(string path)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        return new TemplateChange("create", NormalizePath(path));
+    }
 
-        return new TemplateChange("create", path);
+    internal static string NormalizePath(string path)
+    {
+        return TryNormalizePath(path, out var normalizedPath, out var error)
+            ? normalizedPath
+            : throw new ArgumentException(error, nameof(path));
+    }
+
+    internal static bool TryNormalizePath(string path, out string normalizedPath, out string error)
+    {
+        normalizedPath = string.Empty;
+        error = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            error = "Template path cannot be empty.";
+            return false;
+        }
+
+        var normalizedSeparators = path.Replace('\\', '/');
+        if (normalizedSeparators.StartsWith("/", StringComparison.Ordinal) ||
+            normalizedSeparators.StartsWith("//", StringComparison.Ordinal) ||
+            IsWindowsRootedPath(normalizedSeparators))
+        {
+            error = "Template path must be relative.";
+            return false;
+        }
+
+        var segments = new List<string>();
+        foreach (var segment in normalizedSeparators.Split('/', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (segment == ".")
+            {
+                continue;
+            }
+
+            if (segment == "..")
+            {
+                error = "Template path cannot escape the package root.";
+                return false;
+            }
+
+            if (segment.Contains('\0', StringComparison.Ordinal))
+            {
+                error = "Template path cannot contain null characters.";
+                return false;
+            }
+
+            segments.Add(segment);
+        }
+
+        if (segments.Count == 0)
+        {
+            error = "Template path cannot be empty.";
+            return false;
+        }
+
+        normalizedPath = string.Join('/', segments);
+        return true;
+    }
+
+    private static bool IsWindowsRootedPath(string path)
+    {
+        return path.Length >= 2 && char.IsLetter(path[0]) && path[1] == ':';
     }
 }

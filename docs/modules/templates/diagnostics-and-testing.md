@@ -86,6 +86,9 @@ Templates 的生成结果必须可构建、可测试、符合 Build 约定，并
 | `AUCTPL0301` | AOT 模式和动态插件配置冲突。 |
 | `AUCTPL0401` | 生成结果缺少测试矩阵。 |
 | `AUCTPL0501` | 生成结果不符合 Build 输出约定。 |
+| `AUCTPL1001` | 模板路径非法或逃逸 package root。 |
+| `AUCTPL1002` | 模板计划包含重复 normalized path。 |
+| `AUCTPL1003` | 模板计划包含不支持的 change type。 |
 
 ### 4. 测试类型
 

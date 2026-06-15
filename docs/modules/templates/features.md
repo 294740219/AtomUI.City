@@ -7,7 +7,7 @@
 | Feature ID | 名称 | 状态 | Public Contract | 主测试 |
 | --- | --- | --- | --- | --- |
 | AUC-TEMPLATES-001 | Application Template | Completed | ApplicationTemplateOptions, ApplicationTemplateRenderer | ApplicationTemplateBuildSmokeTests |
-| AUC-TEMPLATES-002 | Package Layout | Ready to Start Product Implementation | TemplatePlan, TemplateChange | TemplatePackageLayoutTests |
+| AUC-TEMPLATES-002 | Package Layout | Completed | TemplatePlan, TemplateChange | TemplatePackageLayoutTests |
 | AUC-TEMPLATES-003 | Template Variables | Ready to Start Product Implementation | ApplicationTemplateOptions, TemplateRenderResult | TemplatePackageLayoutTests |
 | AUC-TEMPLATES-004 | Plugin Template | Ready to Start Product Implementation | ApplicationTemplateRenderer, Plugin template package | TemplatePackageLayoutTests |
 | AUC-TEMPLATES-005 | Test Template | Ready to Start Product Implementation | ApplicationTemplateRenderer, test project template | ApplicationTemplateBuildSmokeTests |
@@ -46,15 +46,15 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-TEMPLATES-002 Package Layout
 
 Feature ID: `AUC-TEMPLATES-002`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 保证模板包内容完整且路径安全。
 Public Contract: TemplatePlan, TemplateChange
-Runtime / Build Behavior: 模板文件必须位于声明 root，plan 中每个 change 都有 relative path 和 overwrite policy。
-Failure Behavior: 路径逃逸、重复 path、缺失 required file 失败。
+Runtime / Build Behavior: 模板文件必须位于声明 root，plan 中每个 change 都有 normalized relative path；template metadata 必须提供稳定 identity 和 shortName。
+Failure Behavior: 路径逃逸返回 `AUCTPL1001` 或由 `TemplateChange.Create` 拒绝，重复 normalized path 返回 `AUCTPL1002`，非法 change type 返回 `AUCTPL1003`。
 Threading / Cancellation: layout 校验为纯 CPU/文件读取；可观察 token。
-Diagnostics: diagnostic 必须包含 template file 和 normalized path。
+Diagnostics: diagnostic 必须包含 raw path、normalized path 或 change type。
 Tests: `TemplatePackageLayoutTests`
-Required Assertions: 断言 required files、路径规范化、重复文件、路径逃逸和 package id。
+Required Assertions: 已断言 required files、路径规范化、重复文件、路径逃逸和 package id。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 
 ## AUC-TEMPLATES-003 Template Variables

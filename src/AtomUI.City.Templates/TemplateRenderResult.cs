@@ -1,3 +1,5 @@
+using System.Collections.ObjectModel;
+
 namespace AtomUI.City.Templates;
 
 public sealed class TemplateRenderResult
@@ -27,4 +29,31 @@ public sealed class TemplateRenderResult
     }
 }
 
-public sealed record TemplateDiagnostic(string Code, string Message);
+public sealed record TemplateDiagnostic
+{
+    public TemplateDiagnostic(string code, string message)
+        : this(code, message, new Dictionary<string, object?>())
+    {
+    }
+
+    public TemplateDiagnostic(
+        string code,
+        string message,
+        IReadOnlyDictionary<string, object?> context)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(code);
+        ArgumentException.ThrowIfNullOrWhiteSpace(message);
+        ArgumentNullException.ThrowIfNull(context);
+
+        Code = code;
+        Message = message;
+        Context = new ReadOnlyDictionary<string, object?>(
+            new Dictionary<string, object?>(context, StringComparer.Ordinal));
+    }
+
+    public string Code { get; }
+
+    public string Message { get; }
+
+    public IReadOnlyDictionary<string, object?> Context { get; }
+}
