@@ -83,16 +83,18 @@ Lookup and fallback 负责把 resource key 解析为当前 culture 下的显示�
 ### 3. 查找顺序
 
 ```text
-Current feature / plugin
--> owning module
--> application host
--> shared framework
+route resources
+-> window resources
+-> plugin resources
+-> module resources
+-> host resources
+-> presentation framework resources
 -> fallback culture
 -> invariant fallback
 -> missing marker
 ```
 
-同一层级内的优先级由 Contribution order 和 Host policy 决定。
+同一 scope 内保持 Host 注册顺序，作为 contribution order 和 Host policy 的稳定表达。
 
 ### 4. Fallback Culture
 
@@ -108,6 +110,7 @@ zh-CN -> zh-Hans -> zh -> invariant
 - fallback 命中必须记录诊断级别信息。
 - critical resource fallback 失败可以导致 culture switch rollback。
 - 非 critical resource fallback 失败返回 missing marker。
+- 当前 culture 的所有 scope 均未命中后，才进入 fallback culture chain。
 
 ### 5. Missing Marker
 
@@ -135,6 +138,7 @@ zh-CN -> zh-Hans -> zh -> invariant
 - 格式化异常记录 diagnostics。
 - 日期、数字、货币使用 CurrentCulture。
 - UI 文案资源使用 CurrentUICulture。
+- `GetMessageAsync` 使用命中资源的 culture 进行格式化。
 
 ### 7. 资源撤销
 

@@ -9,7 +9,7 @@
 | AUC-LOCALIZATION-001 | Culture State and Fallback | Completed | CultureState, LocalizationOptions | CultureStateTests |
 | AUC-LOCALIZATION-002 | Language Package Provider | Completed | ILanguagePackageProvider, LanguagePackageDescriptor, LanguagePackageRegistry | LanguagePackageProviderTests |
 | AUC-LOCALIZATION-003 | Lazy Package Loading | Completed | LocalizationService, LanguagePackageLoadResult | LocalizationServiceTests |
-| AUC-LOCALIZATION-004 | Lookup and Missing Key Fallback | Ready to Start Product Implementation | LocalizedString, LocalizedText, LocalizationResult | LocalizationServiceTests |
+| AUC-LOCALIZATION-004 | Lookup and Missing Key Fallback | Completed | LocalizedString, LocalizedText, LocalizationResult | LocalizationServiceTests |
 | AUC-LOCALIZATION-005 | Assembly Language Packages | Ready to Start Product Implementation | AssemblyLanguagePackageProvider, LanguagePackageAttribute | LanguagePackageProviderTests; LocalizationDeclarationAttributeTests |
 | AUC-LOCALIZATION-006 | Presentation Refresh Bridge | Ready to Start Product Implementation | IPresentationLocalizationBridge, LocalizedTextChangedEventArgs | LocalizationServiceTests |
 | AUC-LOCALIZATION-007 | Plugin Package Revocation | Ready to Start Product Implementation | ResourceScope, LanguagePackageProviderKind | LanguagePackageProviderTests |
@@ -76,13 +76,13 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-LOCALIZATION-004 Lookup and Missing Key Fallback
 
 Feature ID: `AUC-LOCALIZATION-004`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 提供稳定文本查找、缺失 key 行为和订阅式 LocalizedText。
 Public Contract: LocalizedString, LocalizedText, LocalizationResult
-Runtime / Build Behavior: lookup 按 scope、culture、fallback culture、默认值顺序查找；LocalizedText 在 culture change 后更新。
-Failure Behavior: 缺失 key 返回 fallback 或 key，并记录诊断；格式化参数错误返回失败 result。
-Threading / Cancellation: lookup 允许并发读取；LocalizedText 更新按订阅调度策略发布。
-Diagnostics: missing-key diagnostics 必须包含 key、scope、culture 和 fallback tried。
+Runtime / Build Behavior: lookup 按 descriptor scope priority、current culture、fallback culture、missing marker 顺序查找；同一 scope 内保持 Host 注册顺序；LocalizedText 在 culture change 后更新。
+Failure Behavior: 缺失 key 返回 missing marker 并记录诊断；格式化参数错误返回 raw template 并记录格式化诊断。
+Threading / Cancellation: lookup 允许并发读取；LocalizedText 更新按 culture revision 发布，handler 失败被隔离。
+Diagnostics: missing-key diagnostics 必须包含 key 和 culture；format diagnostics 必须包含 key、culture 和 error kind。
 Tests: `LocalizationServiceTests`
 Required Assertions: 断言 scope lookup、fallback、缺失 key、参数格式化和订阅更新。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。

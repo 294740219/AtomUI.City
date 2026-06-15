@@ -8,7 +8,7 @@
 | --- | --- | --- | --- |
 | Culture | CultureState, LocalizationOptions | 当前 culture 和 fallback 链。 | 状态发布不可变；默认 culture、默认 UI culture 和 fallback chain 可配置；重复设置当前 culture 幂等。 |
 | Package Provider | ILanguagePackageProvider, LanguagePackageDescriptor, LanguagePackageRegistry | 语言包来源。 | provider 必须声明 culture 和 scope；registry 必须绑定 owner、拒绝重复 package，并在 owner revoke 后拒绝新贡献。 |
-| Lookup | ILocalizationService, LocalizedString, LocalizedText | 文本查找和订阅更新。 | 缺失 key 诊断并 fallback。 |
+| Lookup | ILocalizationService, LocalizedString, LocalizedMessage, LocalizedText | 文本查找、参数格式化和订阅更新。 | descriptor scope priority 稳定；缺失 key 和格式化失败必须诊断。 |
 | Assembly Package | AssemblyLanguagePackageProvider, LanguagePackageAttribute | 独立 assembly 语言包。 | 运行时按 culture 懒加载。 |
 | Presentation Bridge | IPresentationLocalizationBridge | 通知 UI 刷新。 | Localization 不直接操作 VisualTree。 |
 
@@ -18,8 +18,9 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | ILocalizationService.SetCultureAsync | 切换当前 culture。 | culture 不得为空；options 可指定 fallback。 | LocalizationResult。 | 非法 culture、fallback cycle、load 部分失败按 result/diagnostics 表达。 | 必须观察 token；取消不提交新 state。 | 串行切换；重复设置当前 culture 不重新加载 package 或递增 revision。 |
 | ILanguagePackageProvider.LoadAsync | 加载指定 culture 的语言包。 | descriptor、cancellationToken。 | LanguagePackageLoadResult。 | 格式错误、资源缺失、取消返回 Failed。 | 取消后不得缓存 partial package。 | 同一 culture/package 并发 load 合并或拒绝。 |
-| ILocalizationService.GetString | 查找字符串。 | key、scope、culture override、arguments。 | LocalizedString 或 LocalizationResult。 | package load 失败继续 fallback；缺失 key 返回 fallback/key 并诊断。 | 同步读取无 token。 | 基于 culture/package cache 并发安全。 |
-| LocalizedText.Subscribe | 订阅 culture change 后的文本更新。 | handler 不得为 null。 | subscription handle。 | handler 失败被隔离并诊断。 | Dispose 后不再发送。 | 通知顺序跟随 culture state version。 |
+| ILocalizationService.GetStringAsync | 查找字符串。 | key、cancellationToken；scope 来自 package descriptor；culture 来自当前 state 和 fallback chain。 | LocalizedString。 | package load 失败继续 fallback；缺失 key 返回 missing marker 并诊断。 | 必须观察 token。 | 基于 culture/package cache 并发安全；同一 scope 内保持注册顺序。 |
+| ILocalizationService.GetMessageAsync | 查找并格式化字符串。 | key、arguments、cancellationToken。 | LocalizedMessage。 | 缺失 key 返回 missing marker；格式化失败返回 raw template 并诊断。 | 必须观察 token。 | 格式化使用命中资源的 culture。 |
+| LocalizedText.Subscribe | 订阅 culture change 后的文本更新。 | handler 不得为 null。 | subscription handle。 | handler 失败被隔离并诊断。 | Dispose 后不再发送。 | 通知顺序跟随 culture state revision。 |
 | AssemblyLanguagePackageProvider.Discover | 发现 assembly 内语言包。 | assembly 和 resource filter。 | descriptors。 | manifest 缺失或重复 key 诊断。 | 发现可同步，加载异步。 | descriptor 发布后不可变。 |
 
 ## Public 类型覆盖

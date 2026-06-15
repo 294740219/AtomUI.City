@@ -21,6 +21,7 @@
 - `LanguagePackageRegistry` 的 owner 绑定、重复 package 拒绝和 owner revoke 后拒绝新注册行为进入 1.0 兼容承诺。
 - `FileLanguagePackageProvider` 与 `AssemblyLanguagePackageProvider` 的取消结果、格式错误 result 和 culture mismatch result 进入 1.0 兼容承诺。
 - `LocalizationService` 的 culture/package cache key、同一 culture/package in-flight load 合并和 lookup load failure fallback 行为进入 1.0 兼容承诺。
+- `LocalizationService` 的 descriptor scope lookup priority、missing marker、message format failure raw-template fallback 和 `LocalizedText` revision refresh 行为进入 1.0 兼容承诺。
 
 ## 数据格式兼容
 

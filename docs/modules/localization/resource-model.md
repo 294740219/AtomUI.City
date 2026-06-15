@@ -141,16 +141,18 @@ SalesPlugin.zh-CN
 查找层级：
 
 ```text
-Current feature / plugin
--> owning module
--> application host
--> shared framework
+route resources
+-> window resources
+-> plugin resources
+-> module resources
+-> host resources
+-> presentation framework resources
 -> fallback culture
 -> invariant fallback
 -> missing resource marker
 ```
 
-插件资源不能覆盖 Host 内置资源，除非 Host 显式允许 extension point。
+同一 scope 内保持 Host 注册顺序；Host 可以通过 descriptor 注册顺序和 contribution policy 控制同级覆盖。
 
 ### 7. 错误策略
 

@@ -425,7 +425,22 @@ public sealed class LocalizationService : ILocalizationService
     private IEnumerable<LanguagePackageDescriptor> GetDescriptors(CultureInfo culture)
     {
         return _descriptors.Where(descriptor =>
-            string.Equals(descriptor.Culture.Name, culture.Name, StringComparison.OrdinalIgnoreCase));
+                string.Equals(descriptor.Culture.Name, culture.Name, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(descriptor => GetScopeLookupRank(descriptor.Scope));
+    }
+
+    private static int GetScopeLookupRank(ResourceScope scope)
+    {
+        return scope switch
+        {
+            ResourceScope.Route => 0,
+            ResourceScope.Window => 1,
+            ResourceScope.Plugin => 2,
+            ResourceScope.Module => 3,
+            ResourceScope.Host => 4,
+            ResourceScope.Presentation => 5,
+            _ => int.MaxValue,
+        };
     }
 
     private IReadOnlyList<CultureInfo> CreateFallbackCultures(

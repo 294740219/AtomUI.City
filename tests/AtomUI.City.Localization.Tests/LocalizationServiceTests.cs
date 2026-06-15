@@ -161,6 +161,40 @@ public sealed class LocalizationServiceTests
     }
 
     [Fact]
+    public async Task LookupUsesScopePriorityBeforeHostFallback()
+    {
+        var host = Package(
+            "Host.zh-CN",
+            "zh-CN",
+            ResourceScope.Host,
+            ("Settings.Title", "Host Settings"),
+            ("Shell.Title", "Host Shell"));
+        var presentation = Package(
+            "Presentation.zh-CN",
+            "zh-CN",
+            ResourceScope.Presentation,
+            ("Settings.Title", "Framework Settings"));
+        var module = Package(
+            "SettingsModule.zh-CN",
+            "zh-CN",
+            ResourceScope.Module,
+            ("Settings.Title", "Module Settings"));
+        var service = new LocalizationService(
+            [host.Descriptor, presentation.Descriptor, module.Descriptor],
+            [new RecordingLanguagePackageProvider(host, presentation, module)],
+            bridge: new RecordingPresentationLocalizationBridge());
+
+        await service.SetCultureAsync("zh-CN");
+        var scopedText = await service.GetStringAsync("Settings.Title");
+        var hostFallbackText = await service.GetStringAsync("Shell.Title");
+
+        Assert.Equal("Module Settings", scopedText.Value);
+        Assert.Equal("zh-CN", scopedText.Culture.Name);
+        Assert.False(scopedText.IsFallback);
+        Assert.Equal("Host Shell", hostFallbackText.Value);
+    }
+
+    [Fact]
     public async Task MissingResourceReturnsMarkerAndDiagnostic()
     {
         var zh = Package("Host.zh-CN", "zh-CN");
@@ -434,11 +468,20 @@ public sealed class LocalizationServiceTests
         string cultureName,
         params (string Key, string Value)[] resources)
     {
+        return Package(packageId, cultureName, ResourceScope.Host, resources);
+    }
+
+    private static LanguagePackage Package(
+        string packageId,
+        string cultureName,
+        ResourceScope scope,
+        params (string Key, string Value)[] resources)
+    {
         return LanguagePackage.Create(
             new LanguagePackageDescriptor(
                 packageId,
                 CultureInfo.GetCultureInfo(cultureName),
-                ResourceScope.Host),
+                scope),
             resources.ToDictionary(resource => resource.Key, resource => resource.Value));
     }
 
