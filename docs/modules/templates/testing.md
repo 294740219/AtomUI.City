@@ -25,7 +25,7 @@
 | AUC-TEMPLATES-002 | TemplateSmoke | TemplatePackageLayoutTests | 断言 required files、路径规范化、重复文件、路径逃逸和 package id。 | 路径逃逸返回 `AUCTPL1001` 或参数异常；重复 normalized path 返回 `AUCTPL1002`；非法 change type 返回 `AUCTPL1003`。 | Completed |
 | AUC-TEMPLATES-003 | TemplateSmoke | ApplicationTemplateBuildSmokeTests | 断言变量默认值、非法值、命名空间生成和错误消息。 | 非法 identifier、保留字、空值、路径片段非法返回 `AUCTPL0001`；框架命名空间返回 `AUCTPL0002`；AOT/dynamic plugin 冲突返回 `AUCTPL0301`。 | Completed |
 | AUC-TEMPLATES-004 | TemplateSmoke | TemplatePackageLayoutTests | 断言单 assembly、NuGet metadata、manifest、msbuild 属性和测试项目。 | 缺少 plugin project、manifest、module、MSBuild 属性、NuGet metadata 或测试项目必须失败。 | Completed |
-| AUC-TEMPLATES-005 | TemplateSmoke | ApplicationTemplateBuildSmokeTests | 断言测试项目 build/test、TestLayer、Testing 引用边界和命名规则。 | 测试项目名非法、生产项目误引用 Testing、缺失 TestLayer 失败。 | Required |
+| AUC-TEMPLATES-005 | TemplateSmoke | ApplicationTemplateBuildSmokeTests | 断言测试项目 build/test、TestLayer、Testing 引用边界和命名规则。 | 测试项目名非法、生产项目误引用 Testing、缺失 TestLayer 失败。 | Completed |
 
 ## 缺口处理
 

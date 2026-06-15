@@ -248,6 +248,7 @@ public sealed class ApplicationTemplateRenderer
               </PropertyGroup>
 
               <ItemGroup>
+                <PackageReference Include="AtomUI.City.Testing" Version="{{AtomUICityPackageVersion}}" />
                 <PackageReference Include="Microsoft.NET.Test.Sdk" Version="{{MicrosoftNetTestSdkVersion}}" />
                 <PackageReference Include="xunit" Version="{{XUnitVersion}}" />
                 <PackageReference Include="xunit.runner.visualstudio" Version="{{XUnitRunnerVisualStudioVersion}}" PrivateAssets="all" />
@@ -310,10 +311,13 @@ public sealed class ApplicationTemplateRenderer
         var rootNamespace = options.EffectiveRootNamespace;
 
         return $$"""
+            using AtomUI.City.Testing;
+
             namespace {{rootNamespace}}.Tests;
 
             public sealed class ApplicationSmokeTests
             {
+                [TestLayer(TestLayerNames.TemplateSmoke)]
                 [Fact]
                 public void ApplicationTemplateContainsSmokeTest()
                 {

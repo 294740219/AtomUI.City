@@ -10,7 +10,7 @@
 | AUC-TEMPLATES-002 | Package Layout | Completed | TemplatePlan, TemplateChange | TemplatePackageLayoutTests |
 | AUC-TEMPLATES-003 | Template Variables | Completed | ApplicationTemplateOptions, TemplateRenderResult | ApplicationTemplateBuildSmokeTests |
 | AUC-TEMPLATES-004 | Plugin Template | Completed | Plugin template package | TemplatePackageLayoutTests |
-| AUC-TEMPLATES-005 | Test Template | Ready to Start Product Implementation | ApplicationTemplateRenderer, test project template | ApplicationTemplateBuildSmokeTests |
+| AUC-TEMPLATES-005 | Test Template | Completed | ApplicationTemplateRenderer, test project template | ApplicationTemplateBuildSmokeTests |
 
 ## Feature 硬门禁
 
@@ -88,7 +88,7 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-TEMPLATES-005 Test Template
 
 Feature ID: `AUC-TEMPLATES-005`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 为模块、插件和应用生成符合 Testing 模块规范的测试项目。
 Public Contract: ApplicationTemplateRenderer, test project template
 Runtime / Build Behavior: 输出 xUnit 项目、TestLayer 标记、Testing 包引用和基础 smoke tests。
@@ -96,5 +96,5 @@ Failure Behavior: 测试项目名非法、生产项目误引用 Testing、缺失
 Threading / Cancellation: 渲染可取消；生成后可参与 solution test。
 Diagnostics: diagnostic 必须包含 test project path 和 layer。
 Tests: `ApplicationTemplateBuildSmokeTests`
-Required Assertions: 断言测试项目 build/test、TestLayer、Testing 引用边界和命名规则。
+Required Assertions: 已断言测试项目 build/test、TestLayer、Testing 引用边界和命名规则。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。

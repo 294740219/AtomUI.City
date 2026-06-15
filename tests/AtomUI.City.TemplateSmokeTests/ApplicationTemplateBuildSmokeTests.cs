@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Xml.Linq;
 using AtomUI.City.Templates;
 
 namespace AtomUI.City.TemplateSmokeTests;
@@ -71,6 +72,47 @@ public sealed class ApplicationTemplateBuildSmokeTests
         var program = File.ReadAllText(programPath);
         Assert.Contains("using AtomUI.City.Hosting;", program, StringComparison.Ordinal);
         Assert.Contains("ApplicationHost.CreateBuilder(args)", program, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ApplicationTemplateGeneratesLayeredTestingProjectContract()
+    {
+        using var workspace = new TemplateSmokeWorkspace();
+        var renderer = new ApplicationTemplateRenderer();
+
+        renderer.Render(new ApplicationTemplateOptions
+        {
+            AppName = "SalesClient",
+            RootNamespace = "Company.SalesClient",
+            OutputPath = workspace.Root,
+            TargetFramework = "net10.0",
+            IncludeTests = true,
+        });
+
+        var appProjectPath = Path.Combine(workspace.Root, "src", "SalesClient", "SalesClient.csproj");
+        var testProjectPath = Path.Combine(workspace.Root, "tests", "SalesClient.Tests", "SalesClient.Tests.csproj");
+        var testSourcePath = Path.Combine(workspace.Root, "tests", "SalesClient.Tests", "ApplicationSmokeTests.cs");
+
+        Assert.True(File.Exists(testProjectPath), $"Expected test project at {testProjectPath}.");
+        Assert.True(File.Exists(testSourcePath), $"Expected generated smoke test at {testSourcePath}.");
+
+        var appPackageReferences = ReadPackageReferences(appProjectPath);
+        var testPackageReferences = ReadPackageReferences(testProjectPath);
+        var testProject = XDocument.Load(testProjectPath);
+        var rootNamespace = testProject.Descendants("RootNamespace").Single().Value;
+        var projectReferences = testProject.Descendants("ProjectReference")
+            .Select(reference => reference.Attribute("Include")?.Value)
+            .ToArray();
+
+        Assert.Equal("Company.SalesClient.Tests", rootNamespace);
+        Assert.DoesNotContain("AtomUI.City.Testing", appPackageReferences);
+        Assert.Contains("AtomUI.City.Testing", testPackageReferences);
+        Assert.Contains("../../src/SalesClient/SalesClient.csproj", projectReferences);
+
+        var smokeTest = File.ReadAllText(testSourcePath);
+        Assert.Contains("using AtomUI.City.Testing;", smokeTest, StringComparison.Ordinal);
+        Assert.Contains("[TestLayer(TestLayerNames.TemplateSmoke)]", smokeTest, StringComparison.Ordinal);
+        Assert.Contains("namespace Company.SalesClient.Tests;", smokeTest, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -311,6 +353,7 @@ public sealed class ApplicationTemplateBuildSmokeTests
             RedirectStandardError = true,
             RedirectStandardOutput = true,
         };
+        startInfo.Environment["MSBUILDDISABLENODEREUSE"] = "1";
 
         foreach (var argument in arguments)
         {
@@ -349,6 +392,15 @@ public sealed class ApplicationTemplateBuildSmokeTests
         }
 
         throw new DirectoryNotFoundException("Could not locate repository root from test output directory.");
+    }
+
+    private static string[] ReadPackageReferences(string projectPath)
+    {
+        return XDocument.Load(projectPath)
+            .Descendants("PackageReference")
+            .Select(reference => reference.Attribute("Include")?.Value)
+            .OfType<string>()
+            .ToArray();
     }
 
     private sealed class TemplateSmokeWorkspace : IDisposable

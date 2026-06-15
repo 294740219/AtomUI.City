@@ -10,6 +10,7 @@
 | Planning | ApplicationTemplateRenderer, TemplatePlan | 生成可 review 的文件变更计划。 | plan 先于写入；可校验重复路径和路径逃逸。 |
 | Rendering | TemplateChange, TemplateRenderResult | 应用模板文件变更。 | 路径必须规范化为 `/` 分隔的相对路径；冲突、路径逃逸、写入失败有稳定 result。 |
 | Generated Application | `.slnx`, `Directory.Build.props`, docs entry, app/test projects | 生成可独立 restore/build/test 的应用工作区。 | 输出只包含相对路径，不写入机器绝对路径。 |
+| Generated Test Project | `<AppName>.Tests.csproj`, `ApplicationSmokeTests.cs`, `FeatureTestMatrix.md` | 生成符合 Testing 模块分层规范的测试项目。 | 测试项目必须引用 `AtomUI.City.Testing`，默认 smoke test 必须标记 `TestLayerNames.TemplateSmoke`，生产项目不得引用 Testing。 |
 | Generated Plugin | plugin csproj, `atomui-city/plugin.json`, module, plugin tests | 生成单 assembly 插件包骨架。 | Plugin MSBuild 属性、NuGet metadata、manifest 和测试项目必须稳定。 |
 
 ## 关键方法合同
