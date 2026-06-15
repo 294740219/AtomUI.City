@@ -22,6 +22,7 @@
 | ILocalizationService.GetMessageAsync | 查找并格式化字符串。 | key、arguments、cancellationToken。 | LocalizedMessage。 | 缺失 key 返回 missing marker；格式化失败返回 raw template 并诊断。 | 必须观察 token。 | 格式化使用命中资源的 culture。 |
 | LocalizedText.Subscribe | 订阅 culture change 后的文本更新。 | handler 不得为 null。 | subscription handle。 | handler 失败被隔离并诊断。 | Dispose 后不再发送。 | 通知顺序跟随 culture state revision。 |
 | AssemblyLanguagePackageProvider.Discover | 发现 assembly 内语言包。 | assembly 不得为 null；读取 `LanguagePackageAttribute`。 | descriptor 列表，包含 assembly location、resource base name、fallback culture、version、checksum 和 contribution id。 | invalid culture 由 `CultureInfo` 拒绝；缺失资源在 `LoadAsync` 阶段返回失败 result。 | 发现同步执行，加载异步。 | descriptor 发布后不可变；owner revoke 由 registry 承接。 |
+| ILocalizationService.RevokePackagesByContributionIdAsync | 撤销插件或模块 contribution 的语言包。 | contributionId 不得为空；cancellationToken。 | revoked package count。 | 找不到 contribution 返回 0；已撤销 package 从后续 lookup、loaded package cache 和 current state 中移除。 | 必须在撤销前和 refresh/bridge 调用中观察 token。 | 重复 revoke 幂等；lookup 使用开始时 descriptor snapshot，后续 lookup 使用新 descriptor set。 |
 
 ## Public 类型覆盖
 

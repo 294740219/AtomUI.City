@@ -29,4 +29,8 @@ public interface ILocalizationService
         string key,
         IReadOnlyList<object?> arguments,
         CancellationToken cancellationToken = default);
+
+    ValueTask<int> RevokePackagesByContributionIdAsync(
+        string contributionId,
+        CancellationToken cancellationToken = default);
 }

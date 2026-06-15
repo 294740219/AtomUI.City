@@ -21,6 +21,7 @@
 | AUCLOC007 | CultureChanged | culture 切换提交成功。 | cultureName、fallbackCultureName。 |
 | AUCLOC008 | CultureSwitchRejected | culture 切换被拒绝。 | cultureName、fallbackCultureName、errorKind。 |
 | AUCLOC009 | CultureSwitchSkipped | 重复设置当前 culture。 | cultureName、fallbackCultureName。 |
+| AUCLOC010 | PluginPackagesRevoked | 插件或模块 contribution 的语言包已撤销。 | cultureName、contributionId、revokedPackageCount、errorKind。 |
 
 ## 产品级必须诊断的失败
 

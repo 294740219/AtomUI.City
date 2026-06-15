@@ -4,7 +4,7 @@ namespace AtomUI.City.Localization;
 
 public sealed class LocalizationService : ILocalizationService
 {
-    private readonly IReadOnlyList<LanguagePackageDescriptor> _descriptors;
+    private LanguagePackageDescriptor[] _descriptors;
     private readonly IReadOnlyDictionary<LanguagePackageProviderKind, ILanguagePackageProvider> _providers;
     private readonly IReadOnlyList<CultureInfo> _configuredFallbackCultures;
     private readonly IPresentationLocalizationBridge _bridge;
@@ -68,7 +68,7 @@ public sealed class LocalizationService : ILocalizationService
         _configuredFallbackCultures = configuredFallbackCultures.ToArray();
         _bridge = bridge ?? NoopPresentationLocalizationBridge.Instance;
         _diagnostics = diagnostics;
-        var fallbackCultures = CreateFallbackCultures(defaultCulture, out var rejectedFallbackCulture);
+        var fallbackCultures = CreateFallbackCultures(_descriptors, defaultCulture, out var rejectedFallbackCulture);
         if (rejectedFallbackCulture is not null)
         {
             throw new ArgumentException(
@@ -100,6 +100,7 @@ public sealed class LocalizationService : ILocalizationService
 
         try
         {
+            var descriptorSnapshot = GetDescriptorSnapshot();
             if (!TryGetCulture(cultureName, out var culture, out var invalidCultureError))
             {
                 WriteCultureSwitchRejected(cultureName, fallbackCultureName: null, invalidCultureError!);
@@ -107,7 +108,7 @@ public sealed class LocalizationService : ILocalizationService
                 return LocalizationResult.Failed(invalidCultureError!);
             }
 
-            var fallbackCultures = CreateFallbackCultures(culture, out var rejectedFallbackCulture);
+            var fallbackCultures = CreateFallbackCultures(descriptorSnapshot, culture, out var rejectedFallbackCulture);
             if (rejectedFallbackCulture is not null)
             {
                 var fallbackCycleError = new LocalizationError(
@@ -130,7 +131,7 @@ public sealed class LocalizationService : ILocalizationService
                 return LocalizationResult.Success();
             }
 
-            var targetDescriptors = GetDescriptors(culture).ToArray();
+            var targetDescriptors = GetDescriptors(descriptorSnapshot, culture).ToArray();
             var pendingPackages = new List<LanguagePackage>();
 
             foreach (var descriptor in targetDescriptors)
@@ -207,7 +208,10 @@ public sealed class LocalizationService : ILocalizationService
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
 
-        foreach (var descriptor in GetDescriptors(CurrentCulture))
+        var stateSnapshot = State;
+        var descriptorSnapshot = GetDescriptorSnapshot();
+
+        foreach (var descriptor in GetDescriptors(descriptorSnapshot, stateSnapshot.CurrentCulture))
         {
             var loadResult = await LoadPackageAsync(descriptor, cache: true, cancellationToken).ConfigureAwait(false);
             if (loadResult.Succeeded && loadResult.Package!.TryGetString(key, out var value))
@@ -221,9 +225,9 @@ public sealed class LocalizationService : ILocalizationService
             }
         }
 
-        foreach (var fallbackCulture in State.FallbackCultures)
+        foreach (var fallbackCulture in stateSnapshot.FallbackCultures)
         {
-            foreach (var descriptor in GetDescriptors(fallbackCulture))
+            foreach (var descriptor in GetDescriptors(descriptorSnapshot, fallbackCulture))
             {
                 var loadResult = await LoadPackageAsync(descriptor, cache: true, cancellationToken).ConfigureAwait(false);
                 if (loadResult.Succeeded && loadResult.Package!.TryGetString(key, out var value))
@@ -242,11 +246,11 @@ public sealed class LocalizationService : ILocalizationService
             LocalizationDiagnosticIds.ResourceMissing,
             $"Localized resource '{key}' was not found.",
             LocalizationDiagnosticSeverity.Warning,
-            cultureName: CurrentCulture.Name,
+            cultureName: stateSnapshot.CurrentCulture.Name,
             resourceKey: key,
             errorKind: LocalizationErrorKind.ResourceMissing);
 
-        return LocalizedString.Missing(key, CurrentCulture);
+        return LocalizedString.Missing(key, stateSnapshot.CurrentCulture);
     }
 
     public async ValueTask<LocalizedMessage> GetMessageAsync(
@@ -303,6 +307,96 @@ public sealed class LocalizationService : ILocalizationService
         RegisterLocalizedText(text);
 
         return text;
+    }
+
+    public async ValueTask<int> RevokePackagesByContributionIdAsync(
+        string contributionId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(contributionId);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        LanguagePackage[] packagesToDispose;
+        CultureState nextState;
+        int revokedCount;
+
+        lock (_packageLoadGate)
+        {
+            var revokedDescriptors = _descriptors
+                .Where(descriptor => string.Equals(
+                    descriptor.ContributionId,
+                    contributionId,
+                    StringComparison.Ordinal))
+                .ToArray();
+
+            if (revokedDescriptors.Length == 0)
+            {
+                return 0;
+            }
+
+            var revokedDescriptorSet = revokedDescriptors.ToHashSet();
+            var revokedPackageIds = revokedDescriptors
+                .Select(descriptor => descriptor.PackageId)
+                .ToHashSet(StringComparer.Ordinal);
+            var revokedCacheKeys = revokedDescriptors
+                .Select(CreatePackageCacheKey)
+                .ToHashSet();
+
+            _descriptors = _descriptors
+                .Where(descriptor => !revokedDescriptorSet.Contains(descriptor))
+                .ToArray();
+
+            packagesToDispose = _loadedPackages
+                .Where(pair => revokedCacheKeys.Contains(pair.Key))
+                .Select(pair => pair.Value)
+                .ToArray();
+
+            foreach (var cacheKey in revokedCacheKeys)
+            {
+                _loadedPackages.Remove(cacheKey);
+                _packageLoadTasks.Remove(cacheKey);
+            }
+
+            nextState = new CultureState(
+                State.CurrentCulture,
+                State.CurrentUICulture,
+                State.FallbackCultures,
+                State.Revision + 1,
+                State.LoadedPackageIds
+                    .Where(packageId => !revokedPackageIds.Contains(packageId))
+                    .ToArray());
+            State = nextState;
+            revokedCount = revokedDescriptors.Length;
+        }
+
+        foreach (var package in packagesToDispose)
+        {
+            package.Dispose();
+        }
+
+        WriteDiagnostic(
+            LocalizationDiagnosticIds.PluginPackagesRevoked,
+            $"Localization packages for contribution '{contributionId}' were revoked.",
+            LocalizationDiagnosticSeverity.Info,
+            cultureName: nextState.CurrentCulture.Name,
+            errorKind: LocalizationErrorKind.ResourceRevoked,
+            contributionId: contributionId,
+            revokedPackageCount: revokedCount);
+
+        var bridgeResult = await _bridge.ApplyCultureAsync(nextState, cancellationToken).ConfigureAwait(false);
+        if (!bridgeResult.Succeeded)
+        {
+            WriteDiagnostic(
+                LocalizationDiagnosticIds.AtomUiApplyFailed,
+                bridgeResult.Error!.Message,
+                LocalizationDiagnosticSeverity.Error,
+                cultureName: nextState.CurrentCulture.Name,
+                errorKind: bridgeResult.Error.Kind);
+        }
+
+        await RefreshLocalizedTextsAsync(cancellationToken).ConfigureAwait(false);
+
+        return revokedCount;
     }
 
     internal void UnregisterLocalizedText(ILocalizedText text)
@@ -390,7 +484,7 @@ public sealed class LocalizationService : ILocalizationService
                 _packageLoadTasks.Remove(cacheKey);
             }
 
-            if (loadResult.Succeeded)
+            if (loadResult.Succeeded && IsDescriptorActive(descriptor))
             {
                 _loadedPackages[cacheKey] = loadResult.Package!;
             }
@@ -420,9 +514,21 @@ public sealed class LocalizationService : ILocalizationService
         return (descriptor.Culture.Name, descriptor.PackageId);
     }
 
-    private IEnumerable<LanguagePackageDescriptor> GetDescriptors(CultureInfo culture)
+    private LanguagePackageDescriptor[] GetDescriptorSnapshot()
     {
-        return _descriptors.Where(descriptor =>
+        return _descriptors;
+    }
+
+    private bool IsDescriptorActive(LanguagePackageDescriptor descriptor)
+    {
+        return _descriptors.Any(activeDescriptor => ReferenceEquals(activeDescriptor, descriptor));
+    }
+
+    private static IEnumerable<LanguagePackageDescriptor> GetDescriptors(
+        IEnumerable<LanguagePackageDescriptor> descriptors,
+        CultureInfo culture)
+    {
+        return descriptors.Where(descriptor =>
                 string.Equals(descriptor.Culture.Name, culture.Name, StringComparison.OrdinalIgnoreCase))
             .OrderBy(descriptor => GetScopeLookupRank(descriptor.Scope));
     }
@@ -442,6 +548,7 @@ public sealed class LocalizationService : ILocalizationService
     }
 
     private IReadOnlyList<CultureInfo> CreateFallbackCultures(
+        IEnumerable<LanguagePackageDescriptor> descriptors,
         CultureInfo culture,
         out CultureInfo? rejectedFallbackCulture)
     {
@@ -452,7 +559,7 @@ public sealed class LocalizationService : ILocalizationService
             culture.Name,
         };
 
-        foreach (var fallbackCulture in GetExplicitFallbackCultures(culture))
+        foreach (var fallbackCulture in GetExplicitFallbackCultures(descriptors, culture))
         {
             if (string.Equals(fallbackCulture.Name, culture.Name, StringComparison.OrdinalIgnoreCase))
             {
@@ -486,9 +593,11 @@ public sealed class LocalizationService : ILocalizationService
         return fallbackCultures;
     }
 
-    private IEnumerable<CultureInfo> GetExplicitFallbackCultures(CultureInfo culture)
+    private IEnumerable<CultureInfo> GetExplicitFallbackCultures(
+        IEnumerable<LanguagePackageDescriptor> descriptors,
+        CultureInfo culture)
     {
-        foreach (var fallbackCulture in GetDescriptors(culture)
+        foreach (var fallbackCulture in GetDescriptors(descriptors, culture)
                      .Select(descriptor => descriptor.FallbackCulture)
                      .Where(fallbackCulture => fallbackCulture is not null)
                      .Cast<CultureInfo>())
@@ -582,7 +691,9 @@ public sealed class LocalizationService : ILocalizationService
         string? resourceKey = null,
         string? packageId = null,
         ResourceScope? scope = null,
-        LocalizationErrorKind? errorKind = null)
+        LocalizationErrorKind? errorKind = null,
+        string? contributionId = null,
+        int? revokedPackageCount = null)
     {
         _diagnostics?.Write(
             new LocalizationDiagnosticRecord(
@@ -595,7 +706,9 @@ public sealed class LocalizationService : ILocalizationService
                 PackageId: packageId,
                 Scope: scope,
                 CultureRevision: State.Revision,
-                ErrorKind: errorKind));
+                ErrorKind: errorKind,
+                ContributionId: contributionId,
+                RevokedPackageCount: revokedPackageCount));
     }
 
     private void WriteCultureSwitchRejected(

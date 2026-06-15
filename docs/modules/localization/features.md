@@ -12,7 +12,7 @@
 | AUC-LOCALIZATION-004 | Lookup and Missing Key Fallback | Completed | LocalizedString, LocalizedText, LocalizationResult | LocalizationServiceTests |
 | AUC-LOCALIZATION-005 | Assembly Language Packages | Completed | AssemblyLanguagePackageProvider, LanguagePackageAttribute | LanguagePackageProviderTests; LocalizationDeclarationAttributeTests |
 | AUC-LOCALIZATION-006 | Presentation Refresh Bridge | Completed | IPresentationLocalizationBridge, LocalizedTextChangedEventArgs | LocalizationServiceTests |
-| AUC-LOCALIZATION-007 | Plugin Package Revocation | Ready to Start Product Implementation | ResourceScope, LanguagePackageProviderKind | LanguagePackageProviderTests |
+| AUC-LOCALIZATION-007 | Plugin Package Revocation | Completed | ILocalizationService, ResourceScope, LanguagePackageProviderKind | LocalizationServiceTests |
 
 ## Feature 硬门禁
 
@@ -118,13 +118,13 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-LOCALIZATION-007 Plugin Package Revocation
 
 Feature ID: `AUC-LOCALIZATION-007`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 插件卸载时撤销语言包、文本订阅和 provider 缓存。
-Public Contract: ResourceScope, LanguagePackageProviderKind
-Runtime / Build Behavior: 插件 provider 绑定 plugin owner；unload 后 lookup 不再返回插件资源。
-Failure Behavior: 插件 active text binding 未释放时必须由 Presentation 协调撤销。
+Public Contract: ILocalizationService, ResourceScope, LanguagePackageProviderKind
+Runtime / Build Behavior: `RevokePackagesByContributionIdAsync` 按 contribution id 移除 descriptor、清理 loaded package cache、更新 `CultureState.LoadedPackageIds` 并刷新已注册 `ILocalizedText`。
+Failure Behavior: 重复 revoke 返回 0 且不递增 revision；撤销后 lookup 不再返回插件资源，已开始的 lookup 使用开始时 descriptor snapshot。
 Threading / Cancellation: unload 与 lookup 并发时，lookup 使用开始时 snapshot，后续 lookup 使用新 provider set。
-Diagnostics: plugin localization diagnostics 必须包含 plugin id、scope 和 revoked package count。
-Tests: `LanguagePackageProviderTests`
+Diagnostics: plugin localization diagnostics 必须包含 contribution id、culture、revoked package count 和 `ResourceRevoked` error kind。
+Tests: `LocalizationServiceTests`
 Required Assertions: 断言撤销后不可 lookup、旧 snapshot 稳定、订阅释放和重复 revoke。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。

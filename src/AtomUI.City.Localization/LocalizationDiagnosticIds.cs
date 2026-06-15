@@ -11,4 +11,5 @@ public static class LocalizationDiagnosticIds
     public const string CultureChanged = "AUCLOC007";
     public const string CultureSwitchRejected = "AUCLOC008";
     public const string CultureSwitchSkipped = "AUCLOC009";
+    public const string PluginPackagesRevoked = "AUCLOC010";
 }

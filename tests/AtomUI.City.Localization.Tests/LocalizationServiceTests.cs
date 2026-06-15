@@ -320,6 +320,128 @@ public sealed class LocalizationServiceTests
     }
 
     [Fact]
+    public async Task RevokePackagesByContributionIdRemovesPluginResourcesAndKeepsOldStateSnapshotStable()
+    {
+        var plugin = Package(
+            "Plugin.zh-CN",
+            "zh-CN",
+            ResourceScope.Plugin,
+            contributionId: "plugin.settings.localization",
+            ("Settings.Title", "Plugin Settings"));
+        var host = Package(
+            "Host.zh-CN",
+            "zh-CN",
+            ResourceScope.Host,
+            contributionId: null,
+            ("Settings.Title", "Host Settings"));
+        var diagnostics = new InMemoryLocalizationDiagnostics();
+        var service = new LocalizationService(
+            [plugin.Descriptor, host.Descriptor],
+            [new RecordingLanguagePackageProvider(plugin, host)],
+            bridge: new RecordingPresentationLocalizationBridge(),
+            diagnostics: diagnostics);
+
+        await service.SetCultureAsync("zh-CN");
+        var oldState = service.State;
+        var beforeRevoke = await service.GetStringAsync("Settings.Title");
+
+        var revokedCount = await service.RevokePackagesByContributionIdAsync("plugin.settings.localization");
+        var afterRevoke = await service.GetStringAsync("Settings.Title");
+        var secondRevokeCount = await service.RevokePackagesByContributionIdAsync("plugin.settings.localization");
+
+        Assert.Equal("Plugin Settings", beforeRevoke.Value);
+        Assert.Equal(1, revokedCount);
+        Assert.Equal(0, secondRevokeCount);
+        Assert.True(plugin.IsDisposed);
+        Assert.Equal("Host Settings", afterRevoke.Value);
+        Assert.DoesNotContain(
+            service.State.LoadedPackageIds,
+            packageId => packageId == "Plugin.zh-CN");
+        Assert.Contains(oldState.LoadedPackageIds, packageId => packageId == "Plugin.zh-CN");
+        Assert.Equal(2, service.CultureRevision);
+        Assert.Contains(
+            diagnostics.Records,
+            record => record.Code == LocalizationDiagnosticIds.PluginPackagesRevoked
+                && record.ContributionId == "plugin.settings.localization"
+                && record.RevokedPackageCount == 1
+                && record.ErrorKind == LocalizationErrorKind.ResourceRevoked);
+    }
+
+    [Fact]
+    public async Task RevokePackagesByContributionIdRefreshesActiveLocalizedTexts()
+    {
+        var plugin = Package(
+            "Plugin.zh-CN",
+            "zh-CN",
+            ResourceScope.Plugin,
+            contributionId: "plugin.settings.localization",
+            ("Settings.Title", "Plugin Settings"));
+        var host = Package(
+            "Host.zh-CN",
+            "zh-CN",
+            ResourceScope.Host,
+            contributionId: null,
+            ("Settings.Title", "Host Settings"));
+        var service = new LocalizationService(
+            [plugin.Descriptor, host.Descriptor],
+            [new RecordingLanguagePackageProvider(plugin, host)],
+            bridge: new RecordingPresentationLocalizationBridge());
+
+        await service.SetCultureAsync("zh-CN");
+        using var text = await service.CreateTextAsync("Settings.Title");
+        var changes = new List<string>();
+        text.Changed += (_, args) => changes.Add(args.Value);
+
+        await service.RevokePackagesByContributionIdAsync("plugin.settings.localization");
+
+        Assert.Equal("Host Settings", text.Value);
+        Assert.Equal(["Host Settings"], changes);
+    }
+
+    [Fact]
+    public async Task LookupStartedBeforeContributionRevokeUsesItsDescriptorSnapshot()
+    {
+        var plugin = Package(
+            "Plugin.zh-CN",
+            "zh-CN",
+            ResourceScope.Plugin,
+            contributionId: "plugin.settings.localization",
+            ("Settings.Title", "Plugin Settings"));
+        var host = Package(
+            "Host.zh-CN",
+            "zh-CN",
+            ResourceScope.Host,
+            contributionId: null,
+            ("Settings.Title", "Host Settings"));
+        var options = new LocalizationOptions
+        {
+            DefaultCulture = CultureInfo.GetCultureInfo("zh-CN"),
+            DefaultUICulture = CultureInfo.GetCultureInfo("zh-CN"),
+        };
+        options.LanguagePackages.Add(plugin.Descriptor);
+        options.LanguagePackages.Add(host.Descriptor);
+        var provider = new BlockingContributionLanguagePackageProvider(
+            blockedPackageId: "Plugin.zh-CN",
+            plugin,
+            host);
+        var service = new LocalizationService(
+            options,
+            [provider],
+            bridge: new RecordingPresentationLocalizationBridge());
+
+        var lookup = service.GetStringAsync("Settings.Title").AsTask();
+        await provider.BlockedLoadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        await service.RevokePackagesByContributionIdAsync("plugin.settings.localization");
+        provider.ReleaseBlockedLoad();
+        var oldSnapshotResult = await lookup;
+        var nextLookupResult = await service.GetStringAsync("Settings.Title");
+
+        Assert.Equal("Plugin Settings", oldSnapshotResult.Value);
+        Assert.Equal("Host Settings", nextLookupResult.Value);
+    }
+
+    [Fact]
     public async Task GetMessageAsyncFormatsMessageWithCurrentCulture()
     {
         var zh = Package("Host.zh-CN", "zh-CN", ("Errors.Upload.Size", "文件大小不能超过 {0:N1} MB"));
@@ -520,6 +642,68 @@ public sealed class LocalizationServiceTests
                 CultureInfo.GetCultureInfo(cultureName),
                 scope),
             resources.ToDictionary(resource => resource.Key, resource => resource.Value));
+    }
+
+    private static LanguagePackage Package(
+        string packageId,
+        string cultureName,
+        ResourceScope scope,
+        string? contributionId,
+        params (string Key, string Value)[] resources)
+    {
+        return LanguagePackage.Create(
+            new LanguagePackageDescriptor(
+                packageId,
+                CultureInfo.GetCultureInfo(cultureName),
+                scope)
+            {
+                ContributionId = contributionId,
+            },
+            resources.ToDictionary(resource => resource.Key, resource => resource.Value));
+    }
+
+    private sealed class BlockingContributionLanguagePackageProvider : ILanguagePackageProvider
+    {
+        private readonly string _blockedPackageId;
+        private readonly Dictionary<string, LanguagePackage> _packages;
+        private readonly TaskCompletionSource _release =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public BlockingContributionLanguagePackageProvider(
+            string blockedPackageId,
+            params LanguagePackage[] packages)
+        {
+            _blockedPackageId = blockedPackageId;
+            _packages = packages.ToDictionary(package => package.Descriptor.PackageId, StringComparer.Ordinal);
+        }
+
+        public LanguagePackageProviderKind Kind => LanguagePackageProviderKind.InMemory;
+
+        public TaskCompletionSource BlockedLoadStarted { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public void ReleaseBlockedLoad()
+        {
+            _release.TrySetResult();
+        }
+
+        public async ValueTask<LanguagePackageLoadResult> LoadAsync(
+            LanguagePackageDescriptor descriptor,
+            CancellationToken cancellationToken = default)
+        {
+            if (descriptor.PackageId == _blockedPackageId)
+            {
+                BlockedLoadStarted.TrySetResult();
+                await _release.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            return _packages.TryGetValue(descriptor.PackageId, out var package)
+                ? LanguagePackageLoadResult.Success(package)
+                : LanguagePackageLoadResult.Failed(
+                    new LocalizationError(
+                        LocalizationErrorKind.PackageNotFound,
+                        "Package was not found."));
+        }
     }
 
     private sealed class BlockingLanguagePackageProvider : ILanguagePackageProvider

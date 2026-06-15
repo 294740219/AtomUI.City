@@ -15,4 +15,5 @@ public enum LocalizationErrorKind
     InvalidCulture,
     PackageAlreadyRegistered,
     OwnerRevoked,
+    ResourceRevoked,
 }

@@ -10,7 +10,9 @@ public sealed record LocalizationDiagnosticRecord(
     string? PackageId = null,
     ResourceScope? Scope = null,
     long? CultureRevision = null,
-    LocalizationErrorKind? ErrorKind = null);
+    LocalizationErrorKind? ErrorKind = null,
+    string? ContributionId = null,
+    int? RevokedPackageCount = null);
 
 public enum LocalizationDiagnosticSeverity
 {
