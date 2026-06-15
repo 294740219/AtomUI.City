@@ -10,6 +10,8 @@
 - 模板变量必须校验。
 - 输出不得包含机器绝对路径。
 - dry-run 不写文件。
+- 应用模板生成的 `<AppName>.slnx`、`Directory.Build.props`、`docs/<AppName>.md`、app project 和 test project 属于 1.0 generated output 兼容面；不得写入机器绝对路径。
+- 应用模板生成结果必须能通过 AtomUI.City 本地包源或发布包源执行 restore、build 和 test。
 
 ## API 兼容规则
 

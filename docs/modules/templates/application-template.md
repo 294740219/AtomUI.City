@@ -66,6 +66,9 @@
 ### 2. 默认结构
 
 ```text
+<AppName>.slnx
+Directory.Build.props
+docs/<AppName>.md
 src/<AppName>/
   <AppName>.csproj
   Program.cs
@@ -95,6 +98,8 @@ tests/<AppName>.Tests/
 - `AtomUI.City.Build` 引用。
 - 测试项目。
 - 最小 App root。
+- solution、Directory.Build 对齐项和 docs entry。
+- 生成内容不包含机器绝对路径。
 
 可选启用：
 
@@ -174,6 +179,7 @@ tests/<AppName>.Tests/
 | 功能点 | 测试类型 | 必测场景 |
 |---|---|---|
 | 应用生成 | Smoke | 文件结构完整。 |
+| Solution 和工程对齐 | Smoke | `.slnx`、`Directory.Build.props`、docs entry 均存在并只使用相对路径。 |
 | Host 启动 | Framework integration | TestHost 能启动最小应用。 |
 | Build 接入 | Build | manifest 生成、analyzer 启用。 |
 | 测试项目 | Unit | `FeatureTestMatrix.md` 和 smoke test 存在。 |

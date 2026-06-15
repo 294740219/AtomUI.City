@@ -6,7 +6,7 @@
 
 | Feature ID | 名称 | 状态 | Public Contract | 主测试 |
 | --- | --- | --- | --- | --- |
-| AUC-TEMPLATES-001 | Application Template | Ready to Start Product Implementation | ApplicationTemplateOptions, ApplicationTemplateRenderer | ApplicationTemplateBuildSmokeTests |
+| AUC-TEMPLATES-001 | Application Template | Completed | ApplicationTemplateOptions, ApplicationTemplateRenderer | ApplicationTemplateBuildSmokeTests |
 | AUC-TEMPLATES-002 | Package Layout | Ready to Start Product Implementation | TemplatePlan, TemplateChange | TemplatePackageLayoutTests |
 | AUC-TEMPLATES-003 | Template Variables | Ready to Start Product Implementation | ApplicationTemplateOptions, TemplateRenderResult | TemplatePackageLayoutTests |
 | AUC-TEMPLATES-004 | Plugin Template | Ready to Start Product Implementation | ApplicationTemplateRenderer, Plugin template package | TemplatePackageLayoutTests |
@@ -32,15 +32,15 @@
 ## AUC-TEMPLATES-001 Application Template
 
 Feature ID: `AUC-TEMPLATES-001`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 生成符合 AtomUI.City 架构和工程规范的应用项目。
 Public Contract: ApplicationTemplateOptions, ApplicationTemplateRenderer
-Runtime / Build Behavior: 输出 solution、app project、test project、docs entry、Directory.Build 对齐项；生成后可 restore/build/test。
+Runtime / Build Behavior: 输出 solution、app project、test project、docs entry、Directory.Build 对齐项；生成后可通过本地包源 restore/build/test。
 Failure Behavior: 项目名非法、目标冲突、模板资源缺失不写半成品。
 Threading / Cancellation: 文件写入可取消；取消后 result 包含已写入文件清单。
 Diagnostics: diagnostic 必须包含 template id、target path 和 variable。
 Tests: `ApplicationTemplateBuildSmokeTests`
-Required Assertions: 断言生成、restore/build/test、命名空间、包引用、无绝对路径。
+Required Assertions: 已断言生成、restore/build/test、命名空间、包引用、solution、Directory.Build、docs entry 和无绝对路径。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 
 ## AUC-TEMPLATES-002 Package Layout

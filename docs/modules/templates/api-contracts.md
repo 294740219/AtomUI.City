@@ -9,6 +9,7 @@
 | Options | ApplicationTemplateOptions | 模板输入和命名规则。 | 非法名称不写文件。 |
 | Planning | ApplicationTemplateRenderer, TemplatePlan | 生成可 review 的文件变更计划。 | plan 先于写入。 |
 | Rendering | TemplateChange, TemplateRenderResult | 应用模板文件变更。 | 冲突、路径逃逸、写入失败有稳定 result。 |
+| Generated Application | `.slnx`, `Directory.Build.props`, docs entry, app/test projects | 生成可独立 restore/build/test 的应用工作区。 | 输出只包含相对路径，不写入机器绝对路径。 |
 
 ## 关键方法合同
 
@@ -17,6 +18,7 @@
 | ApplicationTemplateRenderer.CreatePlan | 生成模板变更计划。 | options、target directory。 | TemplatePlan。 | 非法名称、目标逃逸、冲突标记失败。 | 纯 CPU/文件枚举可观察 token。 | 不写文件，可重复调用。 |
 | ApplicationTemplateRenderer.Render | 执行模板写入。 | options，或 options + CancellationToken。 | TemplateRenderResult。 | 写入失败返回 diagnostics，并记录已写入文件。 | 可取消 overload 在每个文件写入前观察 token；预取消时不写文件并抛 `OperationCanceledException`。 | 同一目标目录并发 render 必须拒绝或文件锁保护。 |
 | TemplatePlan.Validate | 校验计划。 | plan entries。 | validation result。 | 重复路径、路径逃逸、非法 overwrite 失败。 | 纯 CPU，无 token。 | plan 不可变。 |
+| Generated application solution | 表达应用和测试项目 build graph。 | AppName、IncludeTests。 | `<AppName>.slnx`。 | 缺少 app/test project 时 smoke test 失败。 | 随 Render 观察 token。 | path 固定为相对路径。 |
 
 ## Public 类型覆盖
 

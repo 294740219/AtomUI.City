@@ -21,7 +21,7 @@
 
 | Feature ID | Test Type | Test File | Required Assertions | Failure Paths | Status |
 | --- | --- | --- | --- | --- | --- |
-| AUC-TEMPLATES-001 | TemplateSmoke | ApplicationTemplateBuildSmokeTests | 断言生成、restore/build/test、命名空间、包引用、无绝对路径。 | 项目名非法、目标冲突、模板资源缺失不写半成品。 | Required |
+| AUC-TEMPLATES-001 | TemplateSmoke | ApplicationTemplateBuildSmokeTests | 断言生成、restore/build/test、命名空间、包引用、solution、Directory.Build、docs entry、无绝对路径。 | 缺少 solution、Directory.Build、docs entry 或生成项目无法 restore/build/test 必须失败。 | Completed |
 | AUC-TEMPLATES-002 | TemplateSmoke | TemplatePackageLayoutTests | 断言 required files、路径规范化、重复文件、路径逃逸和 package id。 | 路径逃逸、重复 path、缺失 required file 失败。 | Required |
 | AUC-TEMPLATES-003 | TemplateSmoke | TemplatePackageLayoutTests | 断言变量默认值、非法值、命名空间生成和错误消息。 | 非法 identifier、保留字、空值、路径片段非法返回 validation diagnostic。 | Required |
 | AUC-TEMPLATES-004 | TemplateSmoke | TemplatePackageLayoutTests | 断言单 assembly、NuGet metadata、manifest、msbuild 属性和测试项目。 | plugin id 非法、capability 变量非法、package metadata 缺失失败。 | Required |
