@@ -91,7 +91,7 @@ Hub invoke
 -> DataResult<T>
 ```
 
-invoke 失败必须映射为 DataError。
+invoke context 必须携带 hub name、method name、DataRequestContext、credential 和 cancellation token。invoke 失败必须映射为 DataError。
 
 ### 4. Server Push
 
@@ -134,8 +134,8 @@ SignalR 不直接广播到所有模块。是否转为 EventBus 事件必须显�
 
 | 场景 | 默认处理 |
 |---|---|
-| connection closed | ConnectionClosed。 |
-| reconnect failed | ReconnectFailed。 |
+| `SignalRConnectionClosedException` | ConnectionClosed。 |
+| `SignalRReconnectFailedException` | ReconnectFailed。 |
 | hub invoke failed | TransportError 或 ServerError。 |
 | token unavailable | AuthenticationRequired。 |
 | owner stopped | stop connection and subscriptions。 |

@@ -33,6 +33,22 @@ public sealed class SignalRDataTransport : IRequestResponseTransport
 
             return DataResult<TResponse>.Success(response);
         }
+        catch (SignalRConnectionClosedException exception)
+        {
+            return DataResult<TResponse>.Failed(
+                new DataError(
+                    DataErrorKind.ConnectionClosed,
+                    exception.Message,
+                    Exception: exception));
+        }
+        catch (SignalRReconnectFailedException exception)
+        {
+            return DataResult<TResponse>.Failed(
+                new DataError(
+                    DataErrorKind.ReconnectFailed,
+                    exception.Message,
+                    Exception: exception));
+        }
         catch (TaskCanceledException exception) when (!cancellationToken.IsCancellationRequested)
         {
             return DataResult<TResponse>.Failed(

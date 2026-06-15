@@ -20,6 +20,7 @@
 - `DataRequestPipeline` 的 credential -> cache -> transport 顺序、取消后不写缓存、transient result retry 和 transport exception retry diagnostics 进入 1.0 兼容承诺。
 - `HttpDataTransport` 的非成功 status 映射进入 1.0 兼容承诺，特别是 422 -> `ValidationFailed`、504 -> `Timeout`。
 - `GrpcStatusCode` 的枚举数值必须匹配 gRPC protocol 标准状态码；`GrpcDataTransport` 的 status -> `DataErrorKind` 映射进入 1.0 兼容承诺。
+- `SignalRDataTransport` 的 invocation context 内容、`SignalRConnectionClosedException` -> `ConnectionClosed` 和 `SignalRReconnectFailedException` -> `ReconnectFailed` 映射进入 1.0 兼容承诺。
 
 ## 数据格式兼容
 

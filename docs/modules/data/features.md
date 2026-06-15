@@ -9,7 +9,7 @@
 | AUC-DATA-001 | Request Pipeline | Completed | IDataRequestPipeline, DataRequestPipeline | DataPipelineTests |
 | AUC-DATA-002 | HTTP Transport | Completed | HttpDataRequest<T>, HttpDataTransport | HttpDataTransportTests |
 | AUC-DATA-003 | gRPC Transport | Completed | GrpcDataRequest<T>, GrpcDataTransport | GrpcDataTransportTests |
-| AUC-DATA-004 | SignalR Transport | Ready to Start Product Implementation | SignalRDataRequest<T>, SignalRDataTransport | SignalRDataTransportTests |
+| AUC-DATA-004 | SignalR Transport | Completed | SignalRDataRequest<T>, SignalRDataTransport | SignalRDataTransportTests |
 | AUC-DATA-005 | Connection Lifecycle | Ready to Start Product Implementation | DataConnectionManager, IDataConnection | DataConnectionLifecycleTests |
 | AUC-DATA-006 | Authentication | Ready to Start Product Implementation | IDataCredentialProvider, AccessTokenCredentialProvider | AccessTokenCredentialProviderTests |
 | AUC-DATA-007 | Caching | Ready to Start Product Implementation | IDataRequestCache, DataCacheKey | DataRequestCacheTests |
@@ -76,15 +76,15 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-DATA-004 SignalR Transport
 
 Feature ID: `AUC-DATA-004`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: SignalR invocation 和实时连接。
 Public Contract: SignalRDataRequest<T>, SignalRDataTransport
-Runtime / Build Behavior: SignalR invocation 和实时连接。
-Failure Behavior: connection closed、invoke failed、cancel。
+Runtime / Build Behavior: SignalR invocation context 必须包含 hub、method、request context、credential 和 cancellation token；连接生命周期异常映射为稳定 DataErrorKind。
+Failure Behavior: connection closed、reconnect failed、invoke failed、timeout、cancel。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `SignalRDataTransportTests`。
-Required Assertions: 断言 invocation context。
+Required Assertions: 断言 invocation context、connection closed 和 reconnect failed。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 ## AUC-DATA-005 Connection Lifecycle
 
