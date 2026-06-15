@@ -77,6 +77,7 @@ Native AOT 不支持运行时动态加载 assembly，因此必须提供 file-bas
 
 ```text
 ILanguagePackageProvider
+-> LanguagePackageRegistry
 -> AssemblyLanguagePackageProvider
 -> FileLanguagePackageProvider
 ```
@@ -87,6 +88,8 @@ ILanguagePackageProvider
 | `FileLanguagePackageProvider` | Native AOT、严格 trimming、独立资源包。 |
 
 两者都输出同一套 `ILanguagePackage` / `ILocalizedResourceStore` contract。
+
+`LanguagePackageRegistry` 负责把 descriptor 绑定到 owner，拒绝重复 package id，并在 owner revoke 后移除该 owner 的 descriptors 且拒绝同 owner 后续注册。Provider load 取消必须返回 `LanguagePackageLoadResult.Failed(Cancelled)`，不能抛出未声明异常。
 
 ### 3. Assembly 语言包布局
 

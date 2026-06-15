@@ -7,7 +7,7 @@
 | Feature ID | 名称 | 状态 | Public Contract | 主测试 |
 | --- | --- | --- | --- | --- |
 | AUC-LOCALIZATION-001 | Culture State and Fallback | Completed | CultureState, LocalizationOptions | CultureStateTests |
-| AUC-LOCALIZATION-002 | Language Package Provider | Ready to Start Product Implementation | ILanguagePackageProvider, LanguagePackageDescriptor | LanguagePackageProviderTests |
+| AUC-LOCALIZATION-002 | Language Package Provider | Completed | ILanguagePackageProvider, LanguagePackageDescriptor, LanguagePackageRegistry | LanguagePackageProviderTests |
 | AUC-LOCALIZATION-003 | Lazy Package Loading | Ready to Start Product Implementation | LocalizationService, LanguagePackageLoadResult | LocalizationServiceTests |
 | AUC-LOCALIZATION-004 | Lookup and Missing Key Fallback | Ready to Start Product Implementation | LocalizedString, LocalizedText, LocalizationResult | LocalizationServiceTests |
 | AUC-LOCALIZATION-005 | Assembly Language Packages | Ready to Start Product Implementation | AssemblyLanguagePackageProvider, LanguagePackageAttribute | LanguagePackageProviderTests; LocalizationDeclarationAttributeTests |
@@ -48,11 +48,11 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-LOCALIZATION-002 Language Package Provider
 
 Feature ID: `AUC-LOCALIZATION-002`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 抽象文件、程序集和插件语言包来源。
-Public Contract: ILanguagePackageProvider, LanguagePackageDescriptor
-Runtime / Build Behavior: provider 声明 supported cultures、scope、owner 和 lazy load 函数。
-Failure Behavior: provider 格式错误、重复 package、owner 已撤销必须拒绝。
+Public Contract: ILanguagePackageProvider, LanguagePackageDescriptor, LanguagePackageRegistry
+Runtime / Build Behavior: provider 声明 culture、scope、owner 和 lazy load 函数；registry 按 owner 管理 descriptors。
+Failure Behavior: provider 格式错误、取消、重复 package、owner 已撤销必须返回稳定 Result。
 Threading / Cancellation: load 支持 CancellationToken；取消后不得缓存 partial package。
 Diagnostics: provider diagnostics 必须包含 provider kind、assembly/path、culture 和 scope。
 Tests: `LanguagePackageProviderTests`

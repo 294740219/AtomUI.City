@@ -13,4 +13,6 @@ public enum LocalizationErrorKind
     Cancelled,
     Unknown,
     InvalidCulture,
+    PackageAlreadyRegistered,
+    OwnerRevoked,
 }

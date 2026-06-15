@@ -11,7 +11,11 @@ public sealed class AssemblyLanguagePackageProvider : ILanguagePackageProvider
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(descriptor);
-        cancellationToken.ThrowIfCancellationRequested();
+
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return ValueTask.FromResult(Cancelled(cancellationToken));
+        }
 
         if (string.IsNullOrWhiteSpace(descriptor.Location))
         {
@@ -33,7 +37,9 @@ public sealed class AssemblyLanguagePackageProvider : ILanguagePackageProvider
 
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var assembly = Assembly.LoadFrom(descriptor.Location);
+            cancellationToken.ThrowIfCancellationRequested();
             var resourceName = ResolveResourceName(assembly, descriptor.ResourceBaseName);
 
             if (resourceName is null)
@@ -46,6 +52,7 @@ public sealed class AssemblyLanguagePackageProvider : ILanguagePackageProvider
             }
 
             using var stream = assembly.GetManifestResourceStream(resourceName);
+            cancellationToken.ThrowIfCancellationRequested();
             if (stream is null)
             {
                 return ValueTask.FromResult(
@@ -56,6 +63,10 @@ public sealed class AssemblyLanguagePackageProvider : ILanguagePackageProvider
             }
 
             return ValueTask.FromResult(LocPackReader.Read(stream, descriptor));
+        }
+        catch (OperationCanceledException exception)
+        {
+            return ValueTask.FromResult(Cancelled(cancellationToken, exception));
         }
         catch (Exception exception)
         {
@@ -74,5 +85,16 @@ public sealed class AssemblyLanguagePackageProvider : ILanguagePackageProvider
 
         return names.FirstOrDefault(name => string.Equals(name, resourceBaseName, StringComparison.Ordinal))
             ?? names.FirstOrDefault(name => name.EndsWith(resourceBaseName, StringComparison.Ordinal));
+    }
+
+    private static LanguagePackageLoadResult Cancelled(
+        CancellationToken cancellationToken,
+        OperationCanceledException? exception = null)
+    {
+        return LanguagePackageLoadResult.Failed(
+            new LocalizationError(
+                LocalizationErrorKind.Cancelled,
+                "Language package load was cancelled.",
+                exception ?? new OperationCanceledException(cancellationToken)));
     }
 }

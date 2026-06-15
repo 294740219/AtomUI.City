@@ -10,6 +10,11 @@ public sealed class FileLanguagePackageProvider : ILanguagePackageProvider
     {
         ArgumentNullException.ThrowIfNull(descriptor);
 
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return Cancelled(cancellationToken);
+        }
+
         if (string.IsNullOrWhiteSpace(descriptor.Location) || !File.Exists(descriptor.Location))
         {
             return LanguagePackageLoadResult.Failed(
@@ -20,9 +25,18 @@ public sealed class FileLanguagePackageProvider : ILanguagePackageProvider
 
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             await using var stream = File.OpenRead(descriptor.Location);
+            cancellationToken.ThrowIfCancellationRequested();
 
-            return LocPackReader.Read(stream, descriptor);
+            var result = LocPackReader.Read(stream, descriptor);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            return result;
+        }
+        catch (OperationCanceledException exception)
+        {
+            return Cancelled(cancellationToken, exception);
         }
         catch (Exception exception)
         {
@@ -32,5 +46,16 @@ public sealed class FileLanguagePackageProvider : ILanguagePackageProvider
                     exception.Message,
                     Exception: exception));
         }
+    }
+
+    private static LanguagePackageLoadResult Cancelled(
+        CancellationToken cancellationToken,
+        OperationCanceledException? exception = null)
+    {
+        return LanguagePackageLoadResult.Failed(
+            new LocalizationError(
+                LocalizationErrorKind.Cancelled,
+                "Language package load was cancelled.",
+                exception ?? new OperationCanceledException(cancellationToken)));
     }
 }

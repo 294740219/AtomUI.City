@@ -19,6 +19,7 @@ public static class LocalizationServiceCollectionExtensions
             return options;
         });
         services.TryAddSingleton<ILocalizationDiagnostics, InMemoryLocalizationDiagnostics>();
+        services.TryAddSingleton<LanguagePackageRegistry>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<ILanguagePackageProvider, FileLanguagePackageProvider>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<ILanguagePackageProvider, AssemblyLanguagePackageProvider>());
         services.TryAddSingleton<ILocalizationService>(serviceProvider =>
