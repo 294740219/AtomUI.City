@@ -90,6 +90,7 @@ Cache 不是 State。Cache 是数据访问层优化；State 是应用状态表�
 - Cache policy version。
 
 用户 A 的缓存不能被用户 B 读到。
+`DataCacheKey` 的 required string components 必须拒绝 `null`、空字符串和空白字符串，`PluginContributionId` 可以为 `null` 但不能是空白字符串。
 
 ### 4. Streaming 和 SignalR
 
@@ -144,6 +145,7 @@ Stop new plugin data operations
 
 - cache hit / miss。
 - principal 隔离。
+- key required components。
 - permission revision 失效。
 - mutation 后失效。
 - plugin cache revoke。

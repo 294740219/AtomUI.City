@@ -12,7 +12,7 @@
 | AUC-DATA-004 | SignalR Transport | Completed | SignalRDataRequest<T>, SignalRDataTransport | SignalRDataTransportTests |
 | AUC-DATA-005 | Connection Lifecycle | Completed | DataConnectionManager, IDataConnection | DataConnectionLifecycleTests |
 | AUC-DATA-006 | Authentication | Completed | IDataCredentialProvider, AccessTokenCredentialProvider | AccessTokenCredentialProviderTests |
-| AUC-DATA-007 | Caching | Ready to Start Product Implementation | IDataRequestCache, DataCacheKey | DataRequestCacheTests |
+| AUC-DATA-007 | Caching | Completed | IDataRequestCache, DataCacheKey | DataRequestCacheTests |
 | AUC-DATA-008 | Error Model | Ready to Start Product Implementation | DataResult<T>, DataError | DataResultTests; DataDiagnosticsTests |
 | AUC-DATA-009 | DI Registration | Ready to Start Product Implementation | DataServiceCollectionExtensions | DataRegistrationTests |
 
@@ -115,15 +115,15 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-DATA-007 Caching
 
 Feature ID: `AUC-DATA-007`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 请求缓存 key、命中、失效和并发访问。
 Public Contract: IDataRequestCache, DataCacheKey
-Runtime / Build Behavior: 请求缓存 key、命中、失效和并发访问。
-Failure Behavior: read failed、write failed。
+Runtime / Build Behavior: 请求缓存 key、命中、失效和并发访问；key required components 必须拒绝空白值并按 principal revision 隔离。
+Failure Behavior: read failed、write failed、invalid key。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `DataRequestCacheTests`。
-Required Assertions: 断言 key 组成和 hit/miss。
+Required Assertions: 断言 key 组成、principal isolation 和 hit/miss。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 ## AUC-DATA-008 Error Model
 
