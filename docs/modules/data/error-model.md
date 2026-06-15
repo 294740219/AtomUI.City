@@ -42,6 +42,8 @@
 | AUC-DATA-004 | SignalR Transport | SignalRDataTransportTests |
 | AUC-DATA-005 | Connection Lifecycle | DataConnectionLifecycleTests |
 | AUC-DATA-006 | Authentication | AccessTokenCredentialProviderTests |
+| AUC-DATA-007 | Caching | DataRequestCacheTests |
+| AUC-DATA-008 | Error Model | DataResultTests; DataDiagnosticsTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -65,6 +67,8 @@
 Data 不应该把预期失败都作为异常抛给 ViewModel。
 
 `DataResult<T>` 表达请求成功、失败、取消和部分结果。异常用于不可预期的框架错误，进入 DataError mapping 后返回调用方。
+
+成功结果只能携带 value，不能携带 error。失败、取消和 stale suppression 结果只能携带 DataError，不能携带 value。调用方必须用 `Status` 或 `Succeeded` 判断结果，不能通过 value 是否为空推断成功。
 
 ### 2. DataResult
 
@@ -113,6 +117,8 @@ PluginUnavailable
 LocalStorageError
 Unknown
 ```
+
+`DataErrorKind` 必须是已定义值；`DataError.Message` 必须是非空白字符串。`MessageKey` 和 `MessageArguments` 只承载本地化元数据，不改变错误分类。
 
 ### 4. Transport 映射
 

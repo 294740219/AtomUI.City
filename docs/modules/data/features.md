@@ -13,7 +13,7 @@
 | AUC-DATA-005 | Connection Lifecycle | Completed | DataConnectionManager, IDataConnection | DataConnectionLifecycleTests |
 | AUC-DATA-006 | Authentication | Completed | IDataCredentialProvider, AccessTokenCredentialProvider | AccessTokenCredentialProviderTests |
 | AUC-DATA-007 | Caching | Completed | IDataRequestCache, DataCacheKey | DataRequestCacheTests |
-| AUC-DATA-008 | Error Model | Ready to Start Product Implementation | DataResult<T>, DataError | DataResultTests; DataDiagnosticsTests |
+| AUC-DATA-008 | Error Model | Completed | DataResult<T>, DataError | DataResultTests; DataDiagnosticsTests |
 | AUC-DATA-009 | DI Registration | Ready to Start Product Implementation | DataServiceCollectionExtensions | DataRegistrationTests |
 
 ## Feature 硬门禁
@@ -128,15 +128,15 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-DATA-008 Error Model
 
 Feature ID: `AUC-DATA-008`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: DataResultStatus、DataErrorKind 和 mapper。
 Public Contract: DataResult<T>, DataError
-Runtime / Build Behavior: DataResultStatus、DataErrorKind 和 mapper。
-Failure Behavior: unknown exception、cancelled、timeout。
+Runtime / Build Behavior: DataResultStatus、DataErrorKind 和 mapper；success result 不携带 error，failed/cancelled/stale result 不携带 value；DataError kind 和 message 必须有效。
+Failure Behavior: unknown exception、cancelled、timeout、invalid error kind、blank error message。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `DataResultTests; DataDiagnosticsTests`。
-Required Assertions: 断言 result 不混用 success/error。
+Required Assertions: 断言 result 不混用 success/error，invalid error metadata 被拒绝。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 ## AUC-DATA-009 DI Registration
 

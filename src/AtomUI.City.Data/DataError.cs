@@ -8,12 +8,43 @@ public sealed record DataError(
     IReadOnlyList<object?>? MessageArguments = null,
     Exception? Exception = null)
 {
+    private DataErrorKind _kind = ValidateKind(Kind);
+    private string _message = ValidateMessage(Message);
     private readonly IReadOnlyList<object?>? _messageArguments =
         MessageArguments is null ? null : Array.AsReadOnly(MessageArguments.ToArray());
+
+    public DataErrorKind Kind
+    {
+        get => _kind;
+        init => _kind = ValidateKind(value);
+    }
+
+    public string Message
+    {
+        get => _message;
+        init => _message = ValidateMessage(value);
+    }
 
     public IReadOnlyList<object?>? MessageArguments
     {
         get => _messageArguments;
         init => _messageArguments = value is null ? null : Array.AsReadOnly(value.ToArray());
+    }
+
+    private static DataErrorKind ValidateKind(DataErrorKind kind)
+    {
+        if (!Enum.IsDefined(kind))
+        {
+            throw new ArgumentOutOfRangeException(nameof(kind), kind, "Data error kind is not supported.");
+        }
+
+        return kind;
+    }
+
+    private static string ValidateMessage(string message)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(message);
+
+        return message;
     }
 }

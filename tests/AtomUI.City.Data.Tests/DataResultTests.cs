@@ -25,6 +25,7 @@ public sealed class DataResultTests
 
         Assert.False(result.Succeeded);
         Assert.Equal(DataResultStatus.Failed, result.Status);
+        Assert.Null(result.Value);
         Assert.Equal(DataErrorKind.NotFound, result.Error?.Kind);
     }
 
@@ -80,6 +81,27 @@ public sealed class DataResultTests
     }
 
     [Fact]
+    public void DataErrorRejectsBlankMessage()
+    {
+        Assert.Throws<ArgumentException>(() => new DataError(DataErrorKind.Unknown, " "));
+    }
+
+    [Fact]
+    public void DataErrorRejectsUnknownKind()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new DataError((DataErrorKind)999, "Unknown error."));
+    }
+
+    [Fact]
+    public void DataErrorWithExpressionRejectsInvalidState()
+    {
+        var error = new DataError(DataErrorKind.Unknown, "Unknown error.");
+
+        Assert.Throws<ArgumentException>(() => error with { Message = "" });
+        Assert.Throws<ArgumentOutOfRangeException>(() => error with { Kind = (DataErrorKind)999 });
+    }
+
+    [Fact]
     public void HttpStatusMappingIncludesLocalizableMessageKey()
     {
         var error = DataErrorMapper.FromHttpStatusCode(HttpStatusCode.Forbidden);
@@ -104,6 +126,7 @@ public sealed class DataResultTests
 
         Assert.False(result.Succeeded);
         Assert.Equal(DataResultStatus.Cancelled, result.Status);
+        Assert.Null(result.Value);
         Assert.Equal(DataErrorKind.Cancelled, result.Error?.Kind);
     }
 
@@ -114,6 +137,7 @@ public sealed class DataResultTests
 
         Assert.False(result.Succeeded);
         Assert.Equal(DataResultStatus.StaleSuppressed, result.Status);
+        Assert.Null(result.Value);
         Assert.Equal(DataErrorKind.Cancelled, result.Error?.Kind);
     }
 }
