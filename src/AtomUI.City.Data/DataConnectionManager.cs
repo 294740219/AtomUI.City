@@ -102,6 +102,11 @@ public sealed class DataConnectionManager
         IDataConnection connection,
         CancellationToken cancellationToken)
     {
+        if (connection.State == DataConnectionState.Stopped)
+        {
+            return;
+        }
+
         try
         {
             await connection.StopAsync(cancellationToken).ConfigureAwait(false);

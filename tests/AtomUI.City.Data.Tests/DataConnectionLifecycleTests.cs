@@ -131,6 +131,21 @@ public sealed class DataConnectionLifecycleTests
     }
 
     [Fact]
+    public async Task ConnectionManagerDoesNotStopAlreadyStoppedConnectionTwice()
+    {
+        var owner = new DataConnectionOwner(DataConnectionOwnerKind.Plugin, "sales-plugin");
+        var connection = new RecordingConnection("sales-hub", owner);
+        var manager = new DataConnectionManager();
+        manager.Register(connection);
+
+        await manager.StopOwnerAsync(owner);
+        await manager.StopOwnerAsync(owner);
+
+        Assert.Equal(DataConnectionState.Stopped, connection.State);
+        Assert.Equal(1, connection.StopCount);
+    }
+
+    [Fact]
     public async Task ConnectionManagerWritesStopFailureDiagnosticAndPropagatesFailure()
     {
         var diagnostics = new InMemoryDataDiagnostics();

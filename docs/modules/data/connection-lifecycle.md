@@ -87,6 +87,7 @@ Manual
 - gRPC channel 可以由 client factory 管理，但使用方必须声明关闭策略。
 - Plugin owner 停止时必须关闭插件连接。
 - Manual owner 需要调用方显式 dispose，并进入诊断。
+- 已经处于 `Stopped` 的连接再次 stop 必须幂等，不能重复释放底层资源或重复调用连接 callback。
 
 ### 3. HTTP
 
@@ -137,6 +138,7 @@ Stop accepting new operations
 ```
 
 插件连接必须保证没有 callback 持有插件私有类型。
+如果 owner stop 被重复调用，已经停止的连接必须跳过后续 stop 流程。
 
 ### 7. 错误策略
 
