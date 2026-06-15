@@ -10,7 +10,7 @@
 | AUC-CLI-002 | New App Command | Completed | CliApplication, ApplicationTemplateRenderer, CliEnvelope | CliNewAppTests |
 | AUC-CLI-003 | Build and Test Commands | Completed | DotnetInvocation, ProcessRunner, CliEnvelope | CliBuildAndTestCommandTests |
 | AUC-CLI-004 | Plugin Inspect and Doctor | Completed | CliApplication, PluginManifestReader, PluginDiagnostic | CliInspectDoctorPluginTests |
-| AUC-CLI-005 | AI-Friendly Envelope | Ready to Start Product Implementation | CliEnvelope, CliDiagnostic, CliExecutionEnvironment | CliCommandArchitectureTests |
+| AUC-CLI-005 | AI-Friendly Envelope | Completed | CliEnvelope, CliDiagnostic, CliExecutionEnvironment | CliCommandArchitectureTests |
 | AUC-CLI-006 | Non-Interactive and CI Mode | Ready to Start Product Implementation | CliExecutionEnvironment, CliExitCodes | CliCommandArchitectureTests |
 
 ## Feature 硬门禁
@@ -89,13 +89,13 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-CLI-005 AI-Friendly Envelope
 
 Feature ID: `AUC-CLI-005`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 让 AI agent 能稳定读取命令结果和下一步建议。
 Public Contract: CliEnvelope, CliDiagnostic, CliExecutionEnvironment
-Runtime / Build Behavior: envelope 包含 status、exitCode、diagnostics、artifacts、suggestedCommands、changedFiles 和 retryable。
-Failure Behavior: schema 缺字段、普通日志混入 JSON、颜色控制字符进入 JSON 必须测试失败。
-Threading / Cancellation: 写入 JSON 前观察 token；输出 writer 失败返回 InternalError。
-Diagnostics: diagnostic 必须包含 schema version 和 command。
+Runtime / Build Behavior: envelope 包含 schemaVersion、command、status、success、exitCode、diagnostics、data、artifacts、suggestedCommands、changedFiles、retryable、suggestedActions 和 documentationLinks。
+Failure Behavior: `--json` 只输出 JSON；参数错误 retryable=false，运行时失败 retryable=true；diagnostic 自动生成 explain suggested command。
+Threading / Cancellation: 写入 JSON 前观察 token；artifact 和 changed file 从 data 中稳定提升。
+Diagnostics: diagnostic 包含 code、message、target、position；suggested command 使用 `atomui city explain <code> --json`。
 Tests: `CliCommandArchitectureTests`
 Required Assertions: 断言 schema、纯 JSON、artifact 列表、suggested commands、retryable 语义。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。

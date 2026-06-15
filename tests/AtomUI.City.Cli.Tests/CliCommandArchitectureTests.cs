@@ -17,9 +17,17 @@ public sealed class CliCommandArchitectureTests
         var root = json.RootElement;
         Assert.Equal("1.0", root.GetProperty("schemaVersion").GetString());
         Assert.Equal("atomui city doctor", root.GetProperty("command").GetString());
+        Assert.Equal("succeeded", root.GetProperty("status").GetString());
         Assert.True(root.GetProperty("success").GetBoolean());
         Assert.Equal(JsonValueKind.Array, root.GetProperty("diagnostics").ValueKind);
         Assert.Equal(JsonValueKind.Object, root.GetProperty("data").ValueKind);
+        Assert.Equal(JsonValueKind.Array, root.GetProperty("artifacts").ValueKind);
+        Assert.Equal(JsonValueKind.Array, root.GetProperty("suggestedCommands").ValueKind);
+        Assert.Equal(JsonValueKind.Array, root.GetProperty("changedFiles").ValueKind);
+        Assert.False(root.GetProperty("retryable").GetBoolean());
+        Assert.Equal(string.Empty, run.Error);
+        Assert.StartsWith("{", run.Output.TrimStart(), StringComparison.Ordinal);
+        Assert.DoesNotContain("OK", run.Output, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -49,6 +57,60 @@ public sealed class CliCommandArchitectureTests
         Assert.Equal("AUCCLI0002", diagnostic.GetProperty("code").GetString());
         Assert.Equal("unknown", diagnostic.GetProperty("target").GetString());
         Assert.Equal(1, diagnostic.GetProperty("position").GetInt32());
+        Assert.Equal("failed", json.RootElement.GetProperty("status").GetString());
+        Assert.False(json.RootElement.GetProperty("retryable").GetBoolean());
+        Assert.Contains(
+            json.RootElement.GetProperty("suggestedCommands").EnumerateArray(),
+            command => command.GetString() == "atomui city explain AUCCLI0002 --json");
+    }
+
+    [Fact]
+    public async Task RuntimeFailureEnvelopeIsRetryable()
+    {
+        var missingDirectory = Path.Combine(Path.GetTempPath(), "AtomUICityCliTests", Guid.NewGuid().ToString("N"));
+        var output = new StringWriter();
+        var error = new StringWriter();
+
+        var exitCode = await CliApplication.RunAsync(
+            [
+                "city",
+                "build",
+                "--json",
+            ],
+            output,
+            error,
+            new CliExecutionEnvironment(missingDirectory));
+
+        Assert.Equal(1, exitCode);
+        using var json = JsonDocument.Parse(output.ToString());
+        Assert.True(json.RootElement.GetProperty("retryable").GetBoolean());
+    }
+
+    [Fact]
+    public async Task JsonEnvelopePromotesArtifactsForAgents()
+    {
+        using var host = new CliTestHost();
+
+        var run = await host.RunAsync(
+            "city",
+            "new",
+            "app",
+            "SalesClient",
+            "--output",
+            host.WorkingDirectory,
+            "--dry-run",
+            "--json");
+
+        Assert.Equal(0, run.ExitCode);
+        using var json = run.ReadJson();
+        var artifacts = json.RootElement.GetProperty("artifacts");
+        var changedFiles = json.RootElement.GetProperty("changedFiles");
+        Assert.Contains(
+            artifacts.EnumerateArray(),
+            artifact => artifact.GetProperty("path").GetString() == "src/SalesClient/SalesClient.csproj");
+        Assert.Contains(
+            changedFiles.EnumerateArray(),
+            path => path.GetString() == "src/SalesClient/SalesClient.csproj");
     }
 
     [Fact]

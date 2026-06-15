@@ -14,11 +14,20 @@ public sealed class CliEnvelope
         ExitCode = exitCode;
         Diagnostics = Array.AsReadOnly(diagnostics.ToArray());
         Data = NormalizeData(data);
+        Status = success ? "succeeded" : "failed";
+        Artifacts = ExtractObjectList(Data, "artifacts");
+        ChangedFiles = ExtractChangedFiles(Data, Artifacts);
+        SuggestedCommands = CreateSuggestedCommands(Diagnostics);
+        SuggestedActions = SuggestedCommands;
+        DocumentationLinks = CreateDocumentationLinks(Diagnostics);
+        Retryable = !success && exitCode == CliExitCodes.Failure;
     }
 
     public string SchemaVersion { get; } = "1.0";
 
     public string Command { get; }
+
+    public string Status { get; }
 
     public bool Success { get; }
 
@@ -28,9 +37,17 @@ public sealed class CliEnvelope
 
     public object Data { get; }
 
-    public IReadOnlyList<string> SuggestedActions { get; } = [];
+    public IReadOnlyList<object?> Artifacts { get; }
 
-    public IReadOnlyList<string> DocumentationLinks { get; } = [];
+    public IReadOnlyList<string> SuggestedCommands { get; }
+
+    public IReadOnlyList<string> ChangedFiles { get; }
+
+    public bool Retryable { get; }
+
+    public IReadOnlyList<string> SuggestedActions { get; }
+
+    public IReadOnlyList<string> DocumentationLinks { get; }
 
     public static CliEnvelope Succeeded(string command, object? data)
     {
@@ -116,5 +133,111 @@ public sealed class CliEnvelope
         }
 
         return value;
+    }
+
+    private static IReadOnlyList<object?> ExtractObjectList(object data, string key)
+    {
+        if (!TryGetDataValue(data, key, out var value) ||
+            value is null or string ||
+            value is not System.Collections.IEnumerable enumerable)
+        {
+            return [];
+        }
+
+        return Array.AsReadOnly(enumerable.Cast<object?>().ToArray());
+    }
+
+    private static IReadOnlyList<string> ExtractChangedFiles(
+        object data,
+        IReadOnlyList<object?> artifacts)
+    {
+        var explicitChangedFiles = ExtractStringList(data, "changedFiles");
+        if (explicitChangedFiles.Count > 0)
+        {
+            return explicitChangedFiles;
+        }
+
+        return Array.AsReadOnly(
+            artifacts
+                .Select(TryGetArtifactPath)
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .Select(path => path!)
+                .Distinct(StringComparer.Ordinal)
+                .ToArray());
+    }
+
+    private static IReadOnlyList<string> ExtractStringList(object data, string key)
+    {
+        if (!TryGetDataValue(data, key, out var value) ||
+            value is null or string ||
+            value is not System.Collections.IEnumerable enumerable)
+        {
+            return [];
+        }
+
+        return Array.AsReadOnly(
+            enumerable
+                .Cast<object?>()
+                .OfType<string>()
+                .ToArray());
+    }
+
+    private static bool TryGetDataValue(object data, string key, out object? value)
+    {
+        if (data is IReadOnlyDictionary<string, object?> dictionary)
+        {
+            return dictionary.TryGetValue(key, out value);
+        }
+
+        if (data is System.Collections.IDictionary nonGenericDictionary &&
+            nonGenericDictionary.Contains(key))
+        {
+            value = nonGenericDictionary[key];
+            return true;
+        }
+
+        value = null;
+        return false;
+    }
+
+    private static string? TryGetArtifactPath(object? artifact)
+    {
+        if (artifact is IReadOnlyDictionary<string, object?> dictionary &&
+            dictionary.TryGetValue("path", out var dictionaryPath))
+        {
+            return dictionaryPath?.ToString();
+        }
+
+        if (artifact is System.Collections.IDictionary nonGenericDictionary &&
+            nonGenericDictionary.Contains("path"))
+        {
+            return nonGenericDictionary["path"]?.ToString();
+        }
+
+        var pathProperty = artifact?.GetType().GetProperty("path") ??
+            artifact?.GetType().GetProperty("Path");
+        return pathProperty?.GetValue(artifact)?.ToString();
+    }
+
+    private static IReadOnlyList<string> CreateSuggestedCommands(IReadOnlyList<CliDiagnostic> diagnostics)
+    {
+        return Array.AsReadOnly(
+            diagnostics
+                .Select(diagnostic => diagnostic.Code)
+                .Where(code => !string.IsNullOrWhiteSpace(code))
+                .Distinct(StringComparer.Ordinal)
+                .Select(code => $"atomui city explain {code} --json")
+                .ToArray());
+    }
+
+    private static IReadOnlyList<string> CreateDocumentationLinks(IReadOnlyList<CliDiagnostic> diagnostics)
+    {
+        return Array.AsReadOnly(
+            diagnostics
+                .Select(diagnostic => diagnostic.DocumentationLink)
+                .Where(link => !string.IsNullOrWhiteSpace(link))
+                .Select(link => link!)
+                .Distinct(StringComparer.Ordinal)
+                .ToArray());
     }
 }

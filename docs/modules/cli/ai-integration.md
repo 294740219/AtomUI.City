@@ -91,6 +91,10 @@ AI 友好不是增加聊天能力，而是让命令输出、计划、诊断和�
   "exitCode": 0,
   "diagnostics": [],
   "data": {},
+  "artifacts": [],
+  "suggestedCommands": [],
+  "changedFiles": [],
+  "retryable": false,
   "suggestedActions": [],
   "documentationLinks": []
 }
@@ -102,6 +106,9 @@ AI 友好不是增加聊天能力，而是让命令输出、计划、诊断和�
 - 所有错误也必须输出相同 envelope。
 - `schemaVersion` 变更必须兼容或提升主版本。
 - `diagnostics` 必须是数组。
+- `artifacts` 和 `changedFiles` 必须位于顶层，便于 agent 不解析业务 data 也能定位文件。
+- 失败 envelope 必须根据 diagnostic code 生成 `suggestedCommands`。
+- `retryable` 只表达同一命令在环境修复或暂时性失败后是否值得重试，不替代 exit code。
 
 ### 4. Plan / Apply
 

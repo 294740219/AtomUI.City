@@ -23,6 +23,8 @@
 - `atomui city build/test/pack/publish --json` 的 `data.invocation`、`data.exitCode`、`data.stdout`、`data.stderr` 和 `data.durationMs` 字段进入 1.0 兼容承诺；`DotnetInvocation` 的 `workingDirectory` 和 `ciMode` 字段进入 1.0 兼容承诺。
 - `AUCCLI0301` 表示 plugin install 缺少 package path，`AUCCLI0302` 表示 plugin inspect/doctor 缺少 package path。
 - `atomui city plugin inspect/doctor --json` 的 `data.packageRoot`、`data.manifestPath`、`data.manifest`、`data.succeeded` 和 `data.pluginDiagnostics` 字段进入 1.0 兼容承诺；PluginSystem `AUCPLG...` diagnostic code 必须原样进入 CLI diagnostics。
+- CLI JSON envelope 顶层 `status`、`artifacts`、`suggestedCommands`、`changedFiles` 和 `retryable` 字段进入 1.0 兼容承诺；`suggestedActions` 保留为兼容 alias。
+- `retryable=false` 用于成功和参数错误，`retryable=true` 用于运行时失败；每个 diagnostic code 必须生成 `atomui city explain <code> --json` suggested command。
 - `--json` 模式失败时只输出 JSON envelope；非 JSON 解析失败输出 `Usage:` 文本块。
 
 ## 数据格式兼容
