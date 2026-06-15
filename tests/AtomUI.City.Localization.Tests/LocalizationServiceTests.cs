@@ -242,7 +242,7 @@ public sealed class LocalizationServiceTests
     }
 
     [Fact]
-    public async Task CultureSwitchRollsBackWhenPresentationBridgeFails()
+    public async Task CultureSwitchCommitsStateAndRefreshesTextsWhenPresentationBridgeFails()
     {
         var zh = Package("Host.zh-CN", "zh-CN", ("Settings.Title", "Settings zh"));
         var ja = Package("Host.ja-JP", "ja-JP", ("Settings.Title", "Settings ja"));
@@ -258,10 +258,18 @@ public sealed class LocalizationServiceTests
             diagnostics: diagnostics);
 
         await service.SetCultureAsync("zh-CN");
+        using var text = await service.CreateTextAsync("Settings.Title");
+        var changes = new List<string>();
+        text.Changed += (_, args) => changes.Add(args.Value);
+
         var result = await service.SetCultureAsync("ja-JP");
 
         Assert.False(result.Succeeded);
-        Assert.Equal("zh-CN", service.CurrentCulture.Name);
+        Assert.Equal(LocalizationErrorKind.PresentationApplyFailed, result.Error?.Kind);
+        Assert.Equal("ja-JP", service.CurrentCulture.Name);
+        Assert.Equal(2, service.CultureRevision);
+        Assert.Equal("Settings ja", text.Value);
+        Assert.Equal(["Settings ja"], changes);
         Assert.Contains(diagnostics.Records, record => record.Code == LocalizationDiagnosticIds.AtomUiApplyFailed);
     }
 
@@ -280,6 +288,35 @@ public sealed class LocalizationServiceTests
         Assert.Single(bridge.AppliedCultures);
         Assert.Equal("zh-CN", bridge.AppliedCultures.Single());
         Assert.Equal(1, service.CultureRevision);
+    }
+
+    [Fact]
+    public async Task SuccessfulCultureSwitchSendsLoadedPackageBatchToPresentationBridge()
+    {
+        var host = Package("Host.zh-CN", "zh-CN", ResourceScope.Host, ("Shell.Title", "Shell"));
+        var module = Package("Module.zh-CN", "zh-CN", ResourceScope.Module, ("Settings.Title", "Settings"));
+        var bridge = new RecordingPresentationLocalizationBridge();
+        var service = new LocalizationService(
+            [host.Descriptor, module.Descriptor],
+            [new RecordingLanguagePackageProvider(host, module)],
+            bridge: bridge);
+
+        await service.SetCultureAsync("zh-CN");
+
+        var state = Assert.Single(bridge.AppliedStates);
+        Assert.Equal("zh-CN", state.CurrentCulture.Name);
+        Assert.Equal(1, state.Revision);
+        Assert.Equal(["Module.zh-CN", "Host.zh-CN"], state.LoadedPackageIds);
+    }
+
+    [Fact]
+    public void LocalizationPresentationBridgeContractDoesNotReferenceAvaloniaTypes()
+    {
+        var references = typeof(IPresentationLocalizationBridge).Assembly.GetReferencedAssemblies();
+
+        Assert.DoesNotContain(
+            references,
+            reference => reference.Name?.StartsWith("Avalonia", StringComparison.Ordinal) == true);
     }
 
     [Fact]

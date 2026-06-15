@@ -11,7 +11,7 @@
 | AUC-LOCALIZATION-003 | Lazy Package Loading | Completed | LocalizationService, LanguagePackageLoadResult | LocalizationServiceTests |
 | AUC-LOCALIZATION-004 | Lookup and Missing Key Fallback | Completed | LocalizedString, LocalizedText, LocalizationResult | LocalizationServiceTests |
 | AUC-LOCALIZATION-005 | Assembly Language Packages | Completed | AssemblyLanguagePackageProvider, LanguagePackageAttribute | LanguagePackageProviderTests; LocalizationDeclarationAttributeTests |
-| AUC-LOCALIZATION-006 | Presentation Refresh Bridge | Ready to Start Product Implementation | IPresentationLocalizationBridge, LocalizedTextChangedEventArgs | LocalizationServiceTests |
+| AUC-LOCALIZATION-006 | Presentation Refresh Bridge | Completed | IPresentationLocalizationBridge, LocalizedTextChangedEventArgs | LocalizationServiceTests |
 | AUC-LOCALIZATION-007 | Plugin Package Revocation | Ready to Start Product Implementation | ResourceScope, LanguagePackageProviderKind | LanguagePackageProviderTests |
 
 ## Feature 硬门禁
@@ -104,13 +104,13 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-LOCALIZATION-006 Presentation Refresh Bridge
 
 Feature ID: `AUC-LOCALIZATION-006`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 把 culture 变化通知 Presentation 刷新 UI 文本、方向和资源。
 Public Contract: IPresentationLocalizationBridge, LocalizedTextChangedEventArgs
-Runtime / Build Behavior: Localization 只发布 refresh request；具体 UI 更新由 Presentation 处理。
-Failure Behavior: Presentation bridge 失败不能回滚 culture state，但必须诊断。
-Threading / Cancellation: bridge 调用必须支持取消和批量刷新；UI work 由 Presentation dispatcher 处理。
-Diagnostics: bridge diagnostics 必须包含 target count、culture 和 failed target。
+Runtime / Build Behavior: Localization 在语言包加载成功后提交 `CultureState`，以包含 loaded package id 的 batch state 调用 Presentation bridge，并随后刷新已注册 `ILocalizedText`。
+Failure Behavior: Presentation bridge 失败不能回滚 culture state；失败 result 返回给调用方，同时记录 `AtomUiApplyFailed`，本地文本刷新继续执行。
+Threading / Cancellation: bridge 调用必须支持取消和批量刷新；Localization contract 不引用 Avalonia 类型，UI work 由 Presentation dispatcher 处理。
+Diagnostics: bridge diagnostics 必须包含 culture 和 error kind；Presentation 侧 target count 和 failed target 由 bridge/applier 诊断承接。
 Tests: `LocalizationServiceTests`
 Required Assertions: 断言 bridge 调用、局部失败、批量刷新和不依赖 Avalonia 类型。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。

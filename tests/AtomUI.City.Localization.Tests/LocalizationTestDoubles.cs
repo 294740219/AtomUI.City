@@ -46,6 +46,8 @@ internal sealed class RecordingPresentationLocalizationBridge : IPresentationLoc
 {
     public List<string> AppliedCultures { get; } = [];
 
+    public List<CultureState> AppliedStates { get; } = [];
+
     public string? FailingCultureName { get; set; }
 
     public ValueTask<LocalizationResult> ApplyCultureAsync(
@@ -62,6 +64,7 @@ internal sealed class RecordingPresentationLocalizationBridge : IPresentationLoc
         }
 
         AppliedCultures.Add(state.CurrentCulture.Name);
+        AppliedStates.Add(state);
 
         return ValueTask.FromResult(LocalizationResult.Success());
     }

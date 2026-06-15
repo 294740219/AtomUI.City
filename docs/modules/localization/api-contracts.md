@@ -16,7 +16,7 @@
 
 | Method | Purpose | Parameters | Return | Failure Behavior | Cancellation | Concurrency / Idempotency |
 | --- | --- | --- | --- | --- | --- | --- |
-| ILocalizationService.SetCultureAsync | 切换当前 culture。 | culture 不得为空；options 可指定 fallback。 | LocalizationResult。 | 非法 culture、fallback cycle、load 部分失败按 result/diagnostics 表达。 | 必须观察 token；取消不提交新 state。 | 串行切换；重复设置当前 culture 不重新加载 package 或递增 revision。 |
+| ILocalizationService.SetCultureAsync | 切换当前 culture。 | culture 不得为空；options 可指定 fallback。 | LocalizationResult。 | 非法 culture、fallback cycle、load 部分失败按 result/diagnostics 表达；Presentation bridge 失败不回滚已提交 state，返回失败 result 并继续本地文本刷新。 | 必须观察 token；取消不提交 package load 失败前的新 state。 | 串行切换；重复设置当前 culture 不重新加载 package 或递增 revision。 |
 | ILanguagePackageProvider.LoadAsync | 加载指定 culture 的语言包。 | descriptor、cancellationToken。 | LanguagePackageLoadResult。 | 格式错误、资源缺失、取消返回 Failed。 | 取消后不得缓存 partial package。 | 同一 culture/package 并发 load 合并或拒绝。 |
 | ILocalizationService.GetStringAsync | 查找字符串。 | key、cancellationToken；scope 来自 package descriptor；culture 来自当前 state 和 fallback chain。 | LocalizedString。 | package load 失败继续 fallback；缺失 key 返回 missing marker 并诊断。 | 必须观察 token。 | 基于 culture/package cache 并发安全；同一 scope 内保持注册顺序。 |
 | ILocalizationService.GetMessageAsync | 查找并格式化字符串。 | key、arguments、cancellationToken。 | LocalizedMessage。 | 缺失 key 返回 missing marker；格式化失败返回 raw template 并诊断。 | 必须观察 token。 | 格式化使用命中资源的 culture。 |

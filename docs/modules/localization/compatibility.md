@@ -23,6 +23,7 @@
 - `AssemblyLanguagePackageProvider.Discover(Assembly)` 的 attribute-to-descriptor 映射、assembly location、resource base name、fallback culture、version、checksum 和 contribution id 行为进入 1.0 兼容承诺。
 - `LocalizationService` 的 culture/package cache key、同一 culture/package in-flight load 合并和 lookup load failure fallback 行为进入 1.0 兼容承诺。
 - `LocalizationService` 的 descriptor scope lookup priority、missing marker、message format failure raw-template fallback 和 `LocalizedText` revision refresh 行为进入 1.0 兼容承诺。
+- `LocalizationService.SetCultureAsync` 在 Presentation bridge 失败时不回滚已提交 culture state、继续刷新本地 `ILocalizedText` 并返回失败 result 的行为进入 1.0 兼容承诺。
 
 ## 数据格式兼容
 

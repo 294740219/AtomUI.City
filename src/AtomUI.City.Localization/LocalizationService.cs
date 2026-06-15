@@ -158,20 +158,6 @@ public sealed class LocalizationService : ILocalizationService
                 fallbackCultures,
                 State.Revision + 1,
                 targetDescriptors.Select(descriptor => descriptor.PackageId).ToArray());
-            var bridgeResult = await _bridge.ApplyCultureAsync(nextState, cancellationToken).ConfigureAwait(false);
-
-            if (!bridgeResult.Succeeded)
-            {
-                DisposeAll(pendingPackages);
-                WriteDiagnostic(
-                    LocalizationDiagnosticIds.AtomUiApplyFailed,
-                    bridgeResult.Error!.Message,
-                    LocalizationDiagnosticSeverity.Error,
-                    cultureName: culture.Name,
-                    errorKind: bridgeResult.Error.Kind);
-
-                return bridgeResult;
-            }
 
             foreach (var package in pendingPackages)
             {
@@ -188,9 +174,21 @@ public sealed class LocalizationService : ILocalizationService
                 LocalizationDiagnosticSeverity.Info,
                 cultureName: culture.Name,
                 fallbackCultureName: FormatFallbackCultures(nextState.FallbackCultures));
+
+            var bridgeResult = await _bridge.ApplyCultureAsync(nextState, cancellationToken).ConfigureAwait(false);
+            if (!bridgeResult.Succeeded)
+            {
+                WriteDiagnostic(
+                    LocalizationDiagnosticIds.AtomUiApplyFailed,
+                    bridgeResult.Error!.Message,
+                    LocalizationDiagnosticSeverity.Error,
+                    cultureName: culture.Name,
+                    errorKind: bridgeResult.Error.Kind);
+            }
+
             await RefreshLocalizedTextsAsync(cancellationToken).ConfigureAwait(false);
 
-            return LocalizationResult.Success();
+            return bridgeResult.Succeeded ? LocalizationResult.Success() : bridgeResult;
         }
         catch (OperationCanceledException)
         {

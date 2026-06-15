@@ -38,9 +38,9 @@
 | --- | --- | --- |
 | AUC-LOCALIZATION-001 | Culture State | CultureStateTests |
 | AUC-LOCALIZATION-002 | Language Package Providers | LanguagePackageProviderTests |
-| AUC-LOCALIZATION-003 | Resource Declarations | LocalizationDeclarationAttributeTests |
+| AUC-LOCALIZATION-003 | Lazy Loading | LocalizationServiceTests |
 | AUC-LOCALIZATION-004 | Lookup and Fallback | LocalizationServiceTests |
-| AUC-LOCALIZATION-005 | Lazy Loading | LocalizationServiceTests |
+| AUC-LOCALIZATION-005 | Assembly Language Packages | LanguagePackageProviderTests; LocalizationDeclarationAttributeTests |
 | AUC-LOCALIZATION-006 | Presentation Bridge | LocalizationServiceTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
@@ -69,11 +69,12 @@ UI refresh 负责让文化变化后现有界面自动更新文本。
 ### 2. 刷新链路
 
 ```text
-CultureState committed
--> LocalizationChanged notification
+Language packages loaded
+-> CultureState committed
+-> IPresentationLocalizationBridge.ApplyCultureAsync(batch state)
 -> Presentation binding adapter refresh
 -> AtomUI/Avalonia resources swapped
--> View text updates
+-> LocalizedText batch refresh
 -> Command / Route / Validation text refresh
 ```
 
@@ -122,6 +123,7 @@ ViewModel 可以使用 `ILocalizedText` 或强类型 accessor。
 | 场景 | 默认处理 |
 |---|---|
 | binding key missing | missing marker + diagnostics。 |
+| presentation bridge failed | 不回滚 CultureState；返回失败 result、记录诊断，并继续刷新本地 LocalizedText。 |
 | refresh callback failed | 记录错误，不阻止其他 binding。 |
 | View detached | 停止刷新。 |
 | plugin resource revoked | fallback 或 clear UI。 |
