@@ -33,6 +33,27 @@ public sealed class RouteAuthorizationGuardTests
     }
 
     [Fact]
+    public async Task GuardRedirectsChallengeToConfiguredLoginRoute()
+    {
+        var guard = CreateGuard(
+            policyProvider =>
+            {
+                policyProvider.Add("settings", AuthorizationPolicy.RequireAuthenticated("SignedIn"));
+            },
+            options: new SecurityRouteGuardOptions
+            {
+                LoginRouteId = "login",
+            });
+        var context = CreateContext("settings");
+
+        var result = await guard.CanEnterAsync(context, CancellationToken.None);
+
+        Assert.Equal(RouteGuardResultStatus.Redirect, result.Status);
+        Assert.NotNull(result.RedirectTarget);
+        Assert.Equal("login", result.RedirectTarget.RouteId);
+    }
+
+    [Fact]
     public async Task GuardRejectsForbiddenRouteForAuthenticatedPrincipalWithoutPermission()
     {
         var store = new AuthenticationStateStore();
@@ -91,20 +112,54 @@ public sealed class RouteAuthorizationGuardTests
         Assert.Equal(RouteGuardResultStatus.Cancel, result.Status);
     }
 
+    [Fact]
+    public async Task GuardMapsPolicyProviderExceptionToFailedResult()
+    {
+        var exception = new InvalidOperationException("Policy provider failed.");
+        var guard = new SecurityRouteGuard(
+            new AuthorizationEvaluator(new PermissionRegistry()),
+            new AuthenticationStateStore(),
+            new ThrowingRouteAuthorizationPolicyProvider(exception));
+        var context = CreateContext("settings");
+
+        var result = await guard.CanEnterAsync(context, CancellationToken.None);
+
+        Assert.Equal(RouteGuardResultStatus.Failed, result.Status);
+        Assert.Equal(SecurityRouteGuardResultCodes.AuthorizationFailed, result.Code);
+        Assert.Same(exception, result.Exception);
+    }
+
+    [Fact]
+    public void RoutingAssemblyDoesNotReferenceSecurity()
+    {
+        var routingReferences = typeof(RouteGuardContext).Assembly.GetReferencedAssemblies();
+
+        Assert.DoesNotContain(
+            routingReferences,
+            reference => string.Equals(reference.Name, "AtomUI.City.Security", StringComparison.Ordinal));
+    }
+
     private static SecurityRouteGuard CreateGuard(
         Action<InMemoryRouteAuthorizationPolicyProvider>? configurePolicyProvider = null,
         AuthenticationStateStore? store = null,
-        PermissionRegistry? permissions = null)
+        PermissionRegistry? permissions = null,
+        SecurityRouteGuardOptions? options = null)
     {
         var policyProvider = new InMemoryRouteAuthorizationPolicyProvider();
         configurePolicyProvider?.Invoke(policyProvider);
         store ??= new AuthenticationStateStore();
         permissions ??= new PermissionRegistry();
 
-        return new SecurityRouteGuard(
-            new AuthorizationEvaluator(permissions),
-            store,
-            policyProvider);
+        return options is null
+            ? new SecurityRouteGuard(
+                new AuthorizationEvaluator(permissions),
+                store,
+                policyProvider)
+            : new SecurityRouteGuard(
+                new AuthorizationEvaluator(permissions),
+                store,
+                policyProvider,
+                options);
     }
 
     private static RouteGuardContext CreateContext(string routeId)
@@ -137,4 +192,21 @@ public sealed class RouteAuthorizationGuardTests
     }
 
     private sealed class TestViewModel;
+
+    private sealed class ThrowingRouteAuthorizationPolicyProvider : IRouteAuthorizationPolicyProvider
+    {
+        private readonly Exception _exception;
+
+        public ThrowingRouteAuthorizationPolicyProvider(Exception exception)
+        {
+            _exception = exception;
+        }
+
+        public ValueTask<AuthorizationPolicy?> GetPolicyAsync(
+            RouteGuardContext context,
+            CancellationToken cancellationToken = default)
+        {
+            throw _exception;
+        }
+    }
 }

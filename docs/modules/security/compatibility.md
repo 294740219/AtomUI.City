@@ -21,6 +21,7 @@
 - `PermissionRegistry` 使用大小写敏感权限名、成功变更递增 revision、重复注册返回 false、`RemoveByContribution` 撤销已有权限并阻止同一 contribution id 后续注册、重复撤销返回 0 的行为进入 1.0 兼容承诺。
 - `PermissionChecker` 对未注册或已撤销权限返回 `AuthorizationResultStatus.Failed` 和 `SecurityFailureKind.PermissionNotFound`，不执行 UI、导航或权限外副作用。
 - `IAuthorizationEvaluator.EvaluateAsync` 顺序评估 requirement；`EvaluatePolicyAsync` 通过 `IAuthorizationPolicyProvider` 读取 named policy，policy 缺失返回 `PolicyNotFound`，provider 异常返回 `EvaluatorFailed`，预取消不调用 provider。
+- `SecurityRouteGuard` 无 policy 时允许导航，Challenge 默认返回 `authentication-required` reject，配置 `SecurityRouteGuardOptions.LoginRouteId` 后返回 redirect；Forbidden 返回 `authorization-forbidden` reject，provider/evaluator 异常返回 `authorization-failed` failed result。
 
 ## 数据格式兼容
 

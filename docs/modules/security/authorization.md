@@ -154,6 +154,7 @@ Route、Command、Data 可以把结果映射成自己的行为，但不能改变
 | Forbidden | 拒绝或拒绝访问页 | 不可执行 | 403 处理 | 权限不足提示 |
 
 Presentation 可以展示 UI，但不能重新解释授权结果。
+`SecurityRouteGuard` 默认把 Challenge 映射为 reject；Host 配置 login route 后只返回 Routing redirect result，不直接执行导航。
 
 ### 7. 缓存策略
 

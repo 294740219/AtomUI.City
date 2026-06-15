@@ -10,7 +10,7 @@
 | AUC-SECURITY-002 | Current Principal Access | Completed | ICurrentPrincipalAccessor, SecurityPrincipals | AuthenticationStateTests |
 | AUC-SECURITY-003 | Permission Registry and Checker | Completed | PermissionRegistry, IPermissionChecker | PermissionRegistryTests; PermissionCheckerTests |
 | AUC-SECURITY-004 | Authorization Policy Evaluation | Completed | AuthorizationEvaluator, AuthorizationPolicy | AuthorizationEvaluatorTests; AuthorizationPolicyTests |
-| AUC-SECURITY-005 | Route Authorization Guard | Ready to Start Product Implementation | SecurityRouteGuard, IRouteAuthorizationPolicyProvider | RouteAuthorizationGuardTests |
+| AUC-SECURITY-005 | Route Authorization Guard | Completed | SecurityRouteGuard, IRouteAuthorizationPolicyProvider | RouteAuthorizationGuardTests |
 | AUC-SECURITY-006 | Command Authorization | Ready to Start Product Implementation | CommandAuthorizationSource, CommandAuthorizationDescriptor | CommandAuthorizationSourceTests |
 | AUC-SECURITY-007 | Access Token Provider | Ready to Start Product Implementation | IAccessTokenProvider, AccessTokenResult | SecurityRegistrationTests |
 
@@ -90,11 +90,11 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-SECURITY-005 Route Authorization Guard
 
 Feature ID: `AUC-SECURITY-005`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 把 Security 授权接入 Routing guard，但不执行导航本身。
-Public Contract: SecurityRouteGuard, IRouteAuthorizationPolicyProvider
-Runtime / Build Behavior: guard 从 route metadata 获取 policy，调用 evaluator，返回 allow/deny/redirect hint。
-Failure Behavior: 无权限返回 deny；需要登录返回 redirect hint；异常映射为 guard failed。
+Public Contract: SecurityRouteGuard, SecurityRouteGuardOptions, IRouteAuthorizationPolicyProvider
+Runtime / Build Behavior: guard 从 route metadata 获取 policy，调用 evaluator，返回 allow/reject/redirect/cancel/failed result；配置 LoginRouteId 后 Challenge 映射为 redirect hint。
+Failure Behavior: 无权限返回 Forbidden reject；未登录默认返回 AuthenticationRequired reject，配置 login route 后返回 redirect；provider 或 evaluator 未声明异常映射为 guard failed。
 Threading / Cancellation: guard 必须观察导航 token；取消后不继续评估。
 Diagnostics: route auth diagnostics 必须包含 route id、policy name 和 result status。
 Tests: `RouteAuthorizationGuardTests`

@@ -21,7 +21,7 @@
 | PermissionRegistry.Add / Remove / RemoveByContribution | 注册、移除或按 contribution 撤销权限。 | PermissionDescriptor 必须有 stable name；插件权限必须携带 contribution id；name 和 contribution id 不得为空白。 | Add/Remove 返回 bool；RemoveByContribution 返回移除数量。 | 重复 name 返回 false；已撤销 contribution 的新注册返回 false；未找到权限或重复撤销返回 false/0。 | 同步 API 无 token。 | 读并发安全，写串行；成功变更递增 revision 并发布 Changed；重复撤销不递增 revision。 |
 | IPermissionChecker.CheckAsync / CheckCurrentAsync | 检查权限。 | principal、permission name；Current 变体依赖 current principal accessor。 | AuthorizationResult。 | 未注册或撤销后权限返回 Failed/PermissionNotFound；未配置 current principal accessor 返回 Failed/EvaluatorFailed。 | 必须观察 token。 | 无共享 mutable result。 |
 | IAuthorizationEvaluator.EvaluateAsync / EvaluatePolicyAsync | 评估 policy。 | AuthorizationRequest 包含 principal、policy、resource；EvaluatePolicyAsync 接收 principal、policy name、resource、contribution。 | AuthorizationResult。 | policy 缺失返回 Failed/PolicyNotFound；requirement failed 返回 Challenge 或 Forbidden；provider 异常映射为 Failed/EvaluatorFailed。 | 必须观察 token；预取消不调用 provider。 | 同一 request 不修改全局状态；provider path 只读取 policy 后委托同一 requirement evaluator。 |
-| SecurityRouteGuard.CanEnterAsync | 将 route policy 转成 guard result。 | RouteGuardContext。 | RouteGuardResult。 | 未登录返回 redirect hint 或 deny。 | 必须观察 token。 | 不执行导航。 |
+| SecurityRouteGuard.CanEnterAsync | 将 route policy 转成 guard result。 | RouteGuardContext；SecurityRouteGuardOptions 可配置 LoginRouteId 和登录 redirect 的 NavigationOptions。 | RouteGuardResult。 | 无 policy 返回 Allow；未登录默认返回 AuthenticationRequired reject，配置 LoginRouteId 后返回 Redirect；无权限返回 Forbidden reject；provider/evaluator 未声明异常返回 Failed。 | 必须观察 token；取消返回 Cancel。 | 不执行导航，只返回 Routing result；Routing 程序集不得反向引用 Security。 |
 | IAccessTokenProvider.GetTokenAsync | 获取 access token。 | AccessTokenRequest。 | AccessTokenResult。 | 不可用、刷新失败、取消有独立 status。 | 必须观察 token。 | 并发 refresh 合并或拒绝，行为必须测试。 |
 
 ## Public 类型覆盖
@@ -70,6 +70,7 @@
 | `SecurityFailureKind` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `SecurityPrincipals` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `SecurityRouteGuard` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `SecurityRouteGuardOptions` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `SecurityRouteGuardResultCodes` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `SecurityServiceCollectionExtensions` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `UnavailableAccessTokenProvider` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |

@@ -7,19 +7,35 @@ public sealed class SecurityRouteGuard : IRouteEnterGuard
     private readonly IAuthorizationEvaluator _authorizationEvaluator;
     private readonly ICurrentPrincipalAccessor _principalAccessor;
     private readonly IRouteAuthorizationPolicyProvider _policyProvider;
+    private readonly SecurityRouteGuardOptions _options;
 
     public SecurityRouteGuard(
         IAuthorizationEvaluator authorizationEvaluator,
         ICurrentPrincipalAccessor principalAccessor,
         IRouteAuthorizationPolicyProvider policyProvider)
+        : this(
+            authorizationEvaluator,
+            principalAccessor,
+            policyProvider,
+            new SecurityRouteGuardOptions())
+    {
+    }
+
+    public SecurityRouteGuard(
+        IAuthorizationEvaluator authorizationEvaluator,
+        ICurrentPrincipalAccessor principalAccessor,
+        IRouteAuthorizationPolicyProvider policyProvider,
+        SecurityRouteGuardOptions options)
     {
         ArgumentNullException.ThrowIfNull(authorizationEvaluator);
         ArgumentNullException.ThrowIfNull(principalAccessor);
         ArgumentNullException.ThrowIfNull(policyProvider);
+        ArgumentNullException.ThrowIfNull(options);
 
         _authorizationEvaluator = authorizationEvaluator;
         _principalAccessor = principalAccessor;
         _policyProvider = policyProvider;
+        _options = options;
     }
 
     public async ValueTask<RouteGuardResult> CanEnterAsync(
@@ -57,13 +73,18 @@ public sealed class SecurityRouteGuard : IRouteEnterGuard
         {
             return RouteGuardResult.Cancel("Route authorization was cancelled.");
         }
+        catch (Exception exception)
+        {
+            return RouteGuardResult.Failed(
+                SecurityRouteGuardResultCodes.AuthorizationFailed,
+                exception.Message,
+                exception);
+        }
 
         return authorization.Status switch
         {
             AuthorizationResultStatus.Allowed => RouteGuardResult.Allow(),
-            AuthorizationResultStatus.Challenge => RouteGuardResult.Reject(
-                SecurityRouteGuardResultCodes.AuthenticationRequired,
-                authorization.Message),
+            AuthorizationResultStatus.Challenge => CreateChallengeResult(authorization),
             AuthorizationResultStatus.Forbidden or AuthorizationResultStatus.Denied => RouteGuardResult.Reject(
                 SecurityRouteGuardResultCodes.Forbidden,
                 authorization.Message),
@@ -76,5 +97,21 @@ public sealed class SecurityRouteGuard : IRouteEnterGuard
                 SecurityRouteGuardResultCodes.AuthorizationFailed,
                 "Route authorization returned an unsupported result."),
         };
+    }
+
+    private RouteGuardResult CreateChallengeResult(AuthorizationResult authorization)
+    {
+        if (!string.IsNullOrWhiteSpace(_options.LoginRouteId))
+        {
+            return RouteGuardResult.Redirect(
+                NavigationTarget.FromRouteReference(
+                    _options.LoginRouteId,
+                    parameters: null,
+                    _options.LoginNavigationOptions));
+        }
+
+        return RouteGuardResult.Reject(
+            SecurityRouteGuardResultCodes.AuthenticationRequired,
+            authorization.Message);
     }
 }
