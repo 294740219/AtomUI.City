@@ -5,9 +5,9 @@
 ## 当前结论
 
 - 1.0 发布状态：不可发布。
-- 全局进度：112/118。
+- 全局进度：113/118。
 - 模块 Feature 合同：109/109。
-- 最终发布门禁：3/9。
+- 最终发布门禁：4/9。
 - 最近校准日期：2026-06-15。
 
 ## 统计规则
@@ -48,7 +48,7 @@
 | Security | 7 | 0 | 7 | 已完成 |
 | CLI | 6 | 0 | 6 | 已完成 |
 | Templates | 5 | 0 | 5 | 已完成 |
-| Release Gates | 3 | 6 | 9 | 进行中 |
+| Release Gates | 4 | 5 | 9 | 进行中 |
 
 ## Core
 
@@ -209,7 +209,7 @@
 - [x] AUC-RELEASE-001 Full solution build。通过 `dotnet build AtomUICity.slnx`，且无 warning、无 error。
 - [x] AUC-RELEASE-002 Full solution tests。通过 `dotnet test AtomUICity.slnx --no-build`。
 - [x] AUC-RELEASE-003 Documentation gate。通过 `bash engineering/check-docs.sh`。
-- [ ] AUC-RELEASE-004 Public API gate。通过 `bash engineering/check-public-api.sh`，并确认 public API 变化已审阅。
+- [x] AUC-RELEASE-004 Public API gate。通过 `bash engineering/check-public-api.sh`，并确认 public API 变化已审阅。
 - [ ] AUC-RELEASE-005 Package generation。通过 `bash engineering/pack.sh --configuration Release`。
 - [ ] AUC-RELEASE-006 Package validation。通过 `bash engineering/validate-packages.sh --configuration Release`。
 - [ ] AUC-RELEASE-007 Template smoke gate。通过 `bash engineering/check-template-smoke.sh`。
