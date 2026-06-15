@@ -8,7 +8,7 @@
 | --- | --- | --- | --- | --- |
 | AUC-TEMPLATES-001 | Application Template | Completed | ApplicationTemplateOptions, ApplicationTemplateRenderer | ApplicationTemplateBuildSmokeTests |
 | AUC-TEMPLATES-002 | Package Layout | Completed | TemplatePlan, TemplateChange | TemplatePackageLayoutTests |
-| AUC-TEMPLATES-003 | Template Variables | Ready to Start Product Implementation | ApplicationTemplateOptions, TemplateRenderResult | TemplatePackageLayoutTests |
+| AUC-TEMPLATES-003 | Template Variables | Completed | ApplicationTemplateOptions, TemplateRenderResult | ApplicationTemplateBuildSmokeTests |
 | AUC-TEMPLATES-004 | Plugin Template | Ready to Start Product Implementation | ApplicationTemplateRenderer, Plugin template package | TemplatePackageLayoutTests |
 | AUC-TEMPLATES-005 | Test Template | Ready to Start Product Implementation | ApplicationTemplateRenderer, test project template | ApplicationTemplateBuildSmokeTests |
 
@@ -60,15 +60,15 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-TEMPLATES-003 Template Variables
 
 Feature ID: `AUC-TEMPLATES-003`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 定义模板变量 schema、默认值和验证规则。
 Public Contract: ApplicationTemplateOptions, TemplateRenderResult
-Runtime / Build Behavior: 变量包括 projectName、rootNamespace、targetFramework、includeTests、usePlugins 等；渲染前统一校验。
-Failure Behavior: 非法 identifier、保留字、空值、路径片段非法返回 validation diagnostic。
+Runtime / Build Behavior: 变量包括 appName、rootNamespace、targetFramework、includeTests、useAot、useDynamicPlugins 和 includeSample；渲染前统一校验，空 rootNamespace 默认派生自 appName。
+Failure Behavior: 非法 identifier、保留字、空值、路径片段非法返回 `AUCTPL0001`；框架命名空间返回 `AUCTPL0002`；AOT 与动态插件冲突返回 `AUCTPL0301`。
 Threading / Cancellation: 校验无副作用；取消发生在 render 前。
-Diagnostics: diagnostic 必须包含 variable name、raw value 和 rule。
-Tests: `TemplatePackageLayoutTests`
-Required Assertions: 断言变量默认值、非法值、命名空间生成和错误消息。
+Diagnostics: diagnostic 包含 variable name、raw value 和 rule。
+Tests: `ApplicationTemplateBuildSmokeTests`
+Required Assertions: 已断言变量默认值、非法值、命名空间生成和错误消息。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 
 ## AUC-TEMPLATES-004 Plugin Template

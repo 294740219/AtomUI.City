@@ -159,6 +159,129 @@ public sealed class ApplicationTemplateBuildSmokeTests
     }
 
     [Fact]
+    public void ApplicationTemplateOptionsExposeStableDefaults()
+    {
+        var options = new ApplicationTemplateOptions
+        {
+            AppName = "SalesClient",
+            RootNamespace = string.Empty,
+            OutputPath = "out",
+        };
+
+        Assert.Equal("net10.0", options.TargetFramework);
+        Assert.True(options.IncludeTests);
+        Assert.False(options.IncludeSample);
+        Assert.False(options.UseAot);
+        Assert.False(options.UseDynamicPlugins);
+        Assert.Equal("SalesClient", options.EffectiveRootNamespace);
+        Assert.Empty(options.Validate());
+    }
+
+    [Fact]
+    public void ApplicationTemplateRenderRejectsInvalidAppNameWithoutWritingFiles()
+    {
+        using var workspace = new TemplateSmokeWorkspace();
+        var renderer = new ApplicationTemplateRenderer();
+
+        var result = renderer.Render(new ApplicationTemplateOptions
+        {
+            AppName = "Sales Client",
+            RootNamespace = "Company.SalesClient",
+            OutputPath = workspace.Root,
+        });
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.False(result.Succeeded);
+        Assert.Null(result.Plan);
+        Assert.Equal("AUCTPL0001", diagnostic.Code);
+        Assert.Equal("appName", diagnostic.Context["variable"]);
+        Assert.Equal("Sales Client", diagnostic.Context["rawValue"]);
+        Assert.False(Directory.Exists(Path.Combine(workspace.Root, "src")));
+    }
+
+    [Fact]
+    public void ApplicationTemplateRenderRejectsFrameworkRootNamespace()
+    {
+        using var workspace = new TemplateSmokeWorkspace();
+        var renderer = new ApplicationTemplateRenderer();
+
+        var result = renderer.Render(new ApplicationTemplateOptions
+        {
+            AppName = "SalesClient",
+            RootNamespace = "AtomUI.City.SalesClient",
+            OutputPath = workspace.Root,
+        });
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal("AUCTPL0002", diagnostic.Code);
+        Assert.Equal("rootNamespace", diagnostic.Context["variable"]);
+        Assert.Equal("AtomUI.City.SalesClient", diagnostic.Context["rawValue"]);
+        Assert.False(Directory.Exists(Path.Combine(workspace.Root, "src")));
+    }
+
+    [Fact]
+    public void ApplicationTemplateRenderRejectsInvalidTargetFramework()
+    {
+        using var workspace = new TemplateSmokeWorkspace();
+        var renderer = new ApplicationTemplateRenderer();
+
+        var result = renderer.Render(new ApplicationTemplateOptions
+        {
+            AppName = "SalesClient",
+            RootNamespace = "Company.SalesClient",
+            OutputPath = workspace.Root,
+            TargetFramework = "../net10.0",
+        });
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal("AUCTPL0001", diagnostic.Code);
+        Assert.Equal("targetFramework", diagnostic.Context["variable"]);
+        Assert.Equal("../net10.0", diagnostic.Context["rawValue"]);
+        Assert.False(Directory.Exists(Path.Combine(workspace.Root, "src")));
+    }
+
+    [Fact]
+    public void ApplicationTemplateRenderRejectsAotDynamicPluginConflict()
+    {
+        using var workspace = new TemplateSmokeWorkspace();
+        var renderer = new ApplicationTemplateRenderer();
+
+        var result = renderer.Render(new ApplicationTemplateOptions
+        {
+            AppName = "SalesClient",
+            RootNamespace = "Company.SalesClient",
+            OutputPath = workspace.Root,
+            UseAot = true,
+            UseDynamicPlugins = true,
+        });
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal("AUCTPL0301", diagnostic.Code);
+        Assert.Equal("useDynamicPlugins", diagnostic.Context["variable"]);
+        Assert.False(Directory.Exists(Path.Combine(workspace.Root, "src")));
+    }
+
+    [Fact]
+    public void BlankRootNamespaceUsesAppNameForGeneratedNamespace()
+    {
+        using var workspace = new TemplateSmokeWorkspace();
+        var renderer = new ApplicationTemplateRenderer();
+
+        var result = renderer.Render(new ApplicationTemplateOptions
+        {
+            AppName = "SalesClient",
+            RootNamespace = string.Empty,
+            OutputPath = workspace.Root,
+        });
+
+        Assert.True(result.Succeeded);
+        var project = File.ReadAllText(Path.Combine(workspace.Root, "src", "SalesClient", "SalesClient.csproj"));
+        var program = File.ReadAllText(Path.Combine(workspace.Root, "src", "SalesClient", "Program.cs"));
+        Assert.Contains("<RootNamespace>SalesClient</RootNamespace>", project, StringComparison.Ordinal);
+        Assert.Contains("namespace SalesClient;", program, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ApplicationTemplateRenderObservesPreCancelledTokenBeforeWriting()
     {
         using var workspace = new TemplateSmokeWorkspace();

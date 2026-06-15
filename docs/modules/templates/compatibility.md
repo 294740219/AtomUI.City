@@ -13,6 +13,7 @@
 - 应用模板生成的 `<AppName>.slnx`、`Directory.Build.props`、`docs/<AppName>.md`、app project 和 test project 属于 1.0 generated output 兼容面；不得写入机器绝对路径。
 - 应用模板生成结果必须能通过 AtomUI.City 本地包源或发布包源执行 restore、build 和 test。
 - `TemplateChange.Create` 的路径规范化语义、`TemplatePlan.Validate` 返回的 `AUCTPL1001`、`AUCTPL1002`、`AUCTPL1003` 诊断码和 context 字段属于 1.0 兼容承诺。
+- `ApplicationTemplateOptions` 默认值、`EffectiveRootNamespace` 派生规则、`Validate` 诊断码 `AUCTPL0001`、`AUCTPL0002`、`AUCTPL0301` 及其 `variable`、`rawValue`、`rule` context 字段属于 1.0 兼容承诺。
 
 ## API 兼容规则
 

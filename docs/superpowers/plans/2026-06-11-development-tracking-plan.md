@@ -5,8 +5,8 @@
 ## 当前结论
 
 - 1.0 发布状态：不可发布。
-- 全局进度：106/118。
-- 模块 Feature 合同：106/109。
+- 全局进度：107/118。
+- 模块 Feature 合同：107/109。
 - 最终发布门禁：0/9。
 - 最近校准日期：2026-06-15。
 
@@ -47,7 +47,7 @@
 | Localization | 7 | 0 | 7 | 已完成 |
 | Security | 7 | 0 | 7 | 已完成 |
 | CLI | 6 | 0 | 6 | 已完成 |
-| Templates | 2 | 3 | 5 | 产品化进行中 |
+| Templates | 3 | 2 | 5 | 产品化进行中 |
 | Release Gates | 0 | 9 | 9 | 未完成 |
 
 ## Core
@@ -200,7 +200,7 @@
 
 - [x] AUC-TEMPLATES-001 Application Template。验收重点：生成、restore/build/test、命名空间、包引用、无绝对路径。
 - [x] AUC-TEMPLATES-002 Package Layout。验收重点：required files、路径规范化、重复文件、路径逃逸和 package id。
-- [ ] AUC-TEMPLATES-003 Template Variables。验收重点：变量默认值、非法值、命名空间生成和错误消息。
+- [x] AUC-TEMPLATES-003 Template Variables。验收重点：变量默认值、非法值、命名空间生成和错误消息。
 - [ ] AUC-TEMPLATES-004 Plugin Template。验收重点：单 assembly、NuGet metadata、manifest、msbuild 属性和测试项目。
 - [ ] AUC-TEMPLATES-005 Test Template。验收重点：测试项目 build/test、TestLayer、Testing 引用边界和命名规则。
 

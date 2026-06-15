@@ -12,6 +12,9 @@
 
 | Code | Name | Source |
 | --- | --- | --- |
+| `AUCTPL0001` | InvalidTemplateVariable | `src/AtomUI.City.Templates/ApplicationTemplateOptions.cs` |
+| `AUCTPL0002` | ReservedFrameworkNamespace | `src/AtomUI.City.Templates/ApplicationTemplateOptions.cs` |
+| `AUCTPL0301` | AotDynamicPluginConflict | `src/AtomUI.City.Templates/ApplicationTemplateOptions.cs` |
 | `AUCTPL1001` | InvalidTemplatePath | `src/AtomUI.City.Templates/TemplatePlan.cs` |
 | `AUCTPL1002` | DuplicateTemplatePath | `src/AtomUI.City.Templates/TemplatePlan.cs` |
 | `AUCTPL1003` | UnsupportedTemplateChangeType | `src/AtomUI.City.Templates/TemplatePlan.cs` |
@@ -24,7 +27,7 @@
 
 ## 上下文字段
 
-推荐字段：`operationId`、`scopeId`、`module`、`pluginId`、`routeId`、`stateKey`、`eventType`、`handlerType`、`assembly`、`path`、`firstPath`、`normalizedPath`、`type`、`featureId`、`threadId`、`attempt`、`transportKind`。
+推荐字段：`operationId`、`scopeId`、`module`、`pluginId`、`routeId`、`stateKey`、`eventType`、`handlerType`、`assembly`、`path`、`firstPath`、`normalizedPath`、`type`、`variable`、`rawValue`、`rule`、`featureId`、`threadId`、`attempt`、`transportKind`。
 
 ## 诊断缺口处理
 

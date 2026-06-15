@@ -10,6 +10,7 @@ public sealed class ApplicationTemplateRenderer
     public TemplatePlan CreatePlan(ApplicationTemplateOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
+        var rootNamespace = options.EffectiveRootNamespace;
 
         return new TemplatePlan(
             operationId: $"new-app-{options.AppName}",
@@ -17,7 +18,7 @@ public sealed class ApplicationTemplateRenderer
             inputs: new Dictionary<string, object?>
             {
                 ["appName"] = options.AppName,
-                ["rootNamespace"] = options.RootNamespace,
+                ["rootNamespace"] = rootNamespace,
                 ["targetFramework"] = options.TargetFramework,
                 ["includeTests"] = options.IncludeTests,
                 ["useAot"] = options.UseAot,
@@ -37,7 +38,18 @@ public sealed class ApplicationTemplateRenderer
         ArgumentNullException.ThrowIfNull(options);
         cancellationToken.ThrowIfCancellationRequested();
 
+        var optionDiagnostics = options.Validate();
+        if (optionDiagnostics.Count > 0)
+        {
+            return TemplateRenderResult.Failed([.. optionDiagnostics]);
+        }
+
         var plan = CreatePlan(options);
+        var planDiagnostics = plan.Validate();
+        if (planDiagnostics.Count > 0)
+        {
+            return TemplateRenderResult.Failed([.. planDiagnostics]);
+        }
 
         WriteFile(options, $"{options.AppName}.slnx", CreateSolution(options), cancellationToken);
         WriteFile(options, "Directory.Build.props", CreateDirectoryBuildProps(), cancellationToken);
@@ -137,6 +149,8 @@ public sealed class ApplicationTemplateRenderer
 
     private static string CreateDocsEntry(ApplicationTemplateOptions options)
     {
+        var rootNamespace = options.EffectiveRootNamespace;
+
         return $$"""
             # {{options.AppName}}
 
@@ -144,7 +158,7 @@ public sealed class ApplicationTemplateRenderer
 
             | Field | Value |
             | --- | --- |
-            | Root namespace | `{{options.RootNamespace}}` |
+            | Root namespace | `{{rootNamespace}}` |
             | Target framework | `{{options.TargetFramework}}` |
             | Tests included | `{{options.IncludeTests.ToString().ToLowerInvariant()}}` |
 
@@ -160,6 +174,7 @@ public sealed class ApplicationTemplateRenderer
 
     private static string CreateApplicationProject(ApplicationTemplateOptions options)
     {
+        var rootNamespace = options.EffectiveRootNamespace;
         var dynamicPlugins = options.UseDynamicPlugins
             ? """
                 <PackageReference Include="AtomUI.City.PluginSystem" Version="0.1.0" />
@@ -172,7 +187,7 @@ public sealed class ApplicationTemplateRenderer
               <PropertyGroup>
                 <OutputType>WinExe</OutputType>
                 <TargetFramework>{{options.TargetFramework}}</TargetFramework>
-                <RootNamespace>{{options.RootNamespace}}</RootNamespace>
+                <RootNamespace>{{rootNamespace}}</RootNamespace>
                 <ImplicitUsings>enable</ImplicitUsings>
                 <Nullable>enable</Nullable>
                 <AtomUICityManifestGeneration>true</AtomUICityManifestGeneration>
@@ -195,10 +210,12 @@ public sealed class ApplicationTemplateRenderer
 
     private static string CreateProgram(ApplicationTemplateOptions options)
     {
+        var rootNamespace = options.EffectiveRootNamespace;
+
         return $$"""
             using AtomUI.City.Hosting;
 
-            namespace {{options.RootNamespace}};
+            namespace {{rootNamespace}};
 
             internal static class Program
             {
@@ -217,12 +234,14 @@ public sealed class ApplicationTemplateRenderer
 
     private static string CreateTestProject(ApplicationTemplateOptions options)
     {
+        var rootNamespace = options.EffectiveRootNamespace;
+
         return $$"""
             <Project Sdk="Microsoft.NET.Sdk">
 
               <PropertyGroup>
                 <TargetFramework>{{options.TargetFramework}}</TargetFramework>
-                <RootNamespace>{{options.RootNamespace}}.Tests</RootNamespace>
+                <RootNamespace>{{rootNamespace}}.Tests</RootNamespace>
                 <ImplicitUsings>enable</ImplicitUsings>
                 <Nullable>enable</Nullable>
                 <IsPackable>false</IsPackable>
@@ -248,9 +267,11 @@ public sealed class ApplicationTemplateRenderer
 
     private static string CreateAppXaml(ApplicationTemplateOptions options)
     {
+        var rootNamespace = options.EffectiveRootNamespace;
+
         return $$"""
             <Application
-                x:Class="{{options.RootNamespace}}.App"
+                x:Class="{{rootNamespace}}.App"
                 xmlns="https://github.com/avaloniaui"
                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
             </Application>
@@ -259,8 +280,10 @@ public sealed class ApplicationTemplateRenderer
 
     private static string CreateAppCodeBehind(ApplicationTemplateOptions options)
     {
+        var rootNamespace = options.EffectiveRootNamespace;
+
         return $$"""
-            namespace {{options.RootNamespace}};
+            namespace {{rootNamespace}};
 
             public sealed partial class App
             {
@@ -284,8 +307,10 @@ public sealed class ApplicationTemplateRenderer
 
     private static string CreateApplicationSmokeTests(ApplicationTemplateOptions options)
     {
+        var rootNamespace = options.EffectiveRootNamespace;
+
         return $$"""
-            namespace {{options.RootNamespace}}.Tests;
+            namespace {{rootNamespace}}.Tests;
 
             public sealed class ApplicationSmokeTests
             {

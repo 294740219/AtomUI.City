@@ -111,6 +111,7 @@
 | `IncludeSample` | `false`。 |
 | `UseAot` | `false`。 |
 | `UseDynamicPlugins` | `false`。 |
+| `RootNamespace` | 为空白时使用 `AppName`。 |
 
 ### 6. 校验规则
 
@@ -122,6 +123,8 @@
 - `PackageId` 符合 NuGet 包名要求。
 - `RootNamespace` 不以 `AtomUI.City` 开头。
 - `UseAot=true` 时不默认启用动态插件。
+- 变量诊断必须包含 `variable`、`rawValue` 和 `rule`。
+- 校验失败时 `ApplicationTemplateRenderer.Render` 不写任何文件。
 
 ### 7. 测试矩阵
 

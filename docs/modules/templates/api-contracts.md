@@ -16,7 +16,9 @@
 | Method | Purpose | Parameters | Return | Failure Behavior | Cancellation | Concurrency / Idempotency |
 | --- | --- | --- | --- | --- | --- | --- |
 | ApplicationTemplateRenderer.CreatePlan | 生成模板变更计划。 | options、target directory。 | TemplatePlan。 | 非法名称、目标逃逸、冲突标记失败。 | 纯 CPU/文件枚举可观察 token。 | 不写文件，可重复调用。 |
-| ApplicationTemplateRenderer.Render | 执行模板写入。 | options，或 options + CancellationToken。 | TemplateRenderResult。 | 写入失败返回 diagnostics，并记录已写入文件。 | 可取消 overload 在每个文件写入前观察 token；预取消时不写文件并抛 `OperationCanceledException`。 | 同一目标目录并发 render 必须拒绝或文件锁保护。 |
+| ApplicationTemplateRenderer.Render | 执行模板写入。 | options，或 options + CancellationToken。 | TemplateRenderResult。 | 变量校验失败返回 diagnostics 且不写文件；写入失败返回 diagnostics，并记录已写入文件。 | 可取消 overload 在每个文件写入前观察 token；预取消时不写文件并抛 `OperationCanceledException`。 | 同一目标目录并发 render 必须拒绝或文件锁保护。 |
+| ApplicationTemplateOptions.Validate | 校验模板变量。 | AppName、RootNamespace、TargetFramework、OutputPath、UseAot、UseDynamicPlugins。 | `IReadOnlyList<TemplateDiagnostic>`。 | 非法变量返回 `AUCTPL0001`；RootNamespace 使用框架命名空间返回 `AUCTPL0002`；AOT/dynamic plugin 冲突返回 `AUCTPL0301`。 | 纯 CPU，无 token。 | 无副作用，可重复调用。 |
+| ApplicationTemplateOptions.EffectiveRootNamespace | 计算实际 root namespace。 | RootNamespace、AppName。 | string。 | RootNamespace 为空白时派生自 AppName。 | 纯 CPU，无 token。 | 同一 options 结果稳定。 |
 | TemplatePlan.Validate | 校验计划。 | plan entries。 | `IReadOnlyList<TemplateDiagnostic>`。 | 重复 normalized path 返回 `AUCTPL1002`；路径逃逸返回 `AUCTPL1001`；非法 change type 返回 `AUCTPL1003`。 | 纯 CPU，无 token。 | plan 不可变，返回 diagnostics 不可变。 |
 | TemplateChange.Create | 创建文件变更。 | relative path。 | normalized create change。 | 空路径、绝对路径、路径逃逸抛 `ArgumentException`。 | 纯 CPU，无 token。 | 同一路径变体归一化为同一 `Path`。 |
 | Generated application solution | 表达应用和测试项目 build graph。 | AppName、IncludeTests。 | `<AppName>.slnx`。 | 缺少 app/test project 时 smoke test 失败。 | 随 Render 观察 token。 | path 固定为相对路径。 |
