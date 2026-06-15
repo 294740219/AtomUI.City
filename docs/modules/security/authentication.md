@@ -107,12 +107,13 @@ Unknown
 规则：
 
 - 未登录时返回空主体或 anonymous principal，但不能返回 null。
+- `SecurityPrincipals.Anonymous` 必须返回独立 unauthenticated principal，调用方修改其中一个 anonymous principal 不得污染后续读取。
 - `ClaimsPrincipal` 表达身份、claim、role 等通用信息。
 - Security 不内置业务用户模型。
 - 业务用户信息应由应用或 Data 模块按需加载。
 - 插件不能修改 Host root principal。
 
-`ICurrentPrincipalAccessor` 只提供读取入口。写入必须通过认证状态服务完成。
+`ICurrentPrincipalAccessor` 只提供读取入口。写入必须通过认证状态服务完成；读取到的 principal 是当时 snapshot 的稳定视图，后续状态变化不能反向修改已读取对象。
 
 ### 4. 认证服务
 

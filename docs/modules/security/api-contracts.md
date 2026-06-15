@@ -17,6 +17,7 @@
 | Method | Purpose | Parameters | Return | Failure Behavior | Cancellation | Concurrency / Idempotency |
 | --- | --- | --- | --- | --- | --- | --- |
 | AuthenticationStateStore.SetAnonymous / SetAuthenticated / SetRefreshing / SetSignedOut / SetFailed | 发布认证状态。 | principal 不得为 null；failure message 不得为空。 | AuthenticationStateSnapshot。 | Failed 和 SignedOut 清除 principal、scheme、expiry；外部 principal mutation 不影响已发布 snapshot。 | 同步提交无 token。 | 等价重复设置幂等，不递增 revision、不重复通知；订阅通知基于 immutable snapshot。 |
+| ICurrentPrincipalAccessor.Principal / SecurityPrincipals.Anonymous | 同步读取当前 principal 与 anonymous principal。 | 无。 | ClaimsPrincipal。 | 未认证状态返回 unauthenticated principal；`SecurityPrincipals.Anonymous` 不返回可污染的 singleton。 | 无 token，同步无阻塞。 | 读取返回当前 snapshot principal；已读取 principal 不随后续状态变化改变。 |
 | IPermissionRegistry.Register | 注册权限。 | PermissionDescriptor 必须有 stable name 和 owner。 | registration handle 或 result。 | 重复 name、owner revoked 返回失败。 | 同步 API 无 token。 | 读并发安全，写串行。 |
 | IPermissionChecker.IsGrantedAsync | 检查权限。 | principal、permission name、resource 可选。 | AuthorizationResult 或 bool result。 | 未注册、provider 异常稳定映射。 | 必须观察 token。 | 无共享 mutable result。 |
 | IAuthorizationEvaluator.AuthorizeAsync | 评估 policy。 | AuthorizationRequest 包含 principal、policy、resource。 | AuthorizationResult。 | policy 缺失、requirement failed、异常映射为 Failed/Forbidden。 | 必须观察 token。 | 同一 request 不修改全局状态。 |
@@ -67,6 +68,7 @@
 | `PermissionRegistry` | 关键 contract | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `PermissionRegistryChangedEventArgs` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `SecurityFailureKind` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `SecurityPrincipals` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `SecurityRouteGuard` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `SecurityRouteGuardResultCodes` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `SecurityServiceCollectionExtensions` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |

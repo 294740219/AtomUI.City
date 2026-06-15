@@ -7,7 +7,7 @@
 | Feature ID | 名称 | 状态 | Public Contract | 主测试 |
 | --- | --- | --- | --- | --- |
 | AUC-SECURITY-001 | Authentication State Store | Completed | AuthenticationStateStore, AuthenticationStateSnapshot | AuthenticationStateTests |
-| AUC-SECURITY-002 | Current Principal Access | Ready to Start Product Implementation | ICurrentPrincipalAccessor, SecurityPrincipals | AuthenticationStateTests |
+| AUC-SECURITY-002 | Current Principal Access | Completed | ICurrentPrincipalAccessor, SecurityPrincipals | AuthenticationStateTests |
 | AUC-SECURITY-003 | Permission Registry and Checker | Ready to Start Product Implementation | PermissionRegistry, IPermissionChecker | PermissionRegistryTests; PermissionCheckerTests |
 | AUC-SECURITY-004 | Authorization Policy Evaluation | Ready to Start Product Implementation | AuthorizationEvaluator, AuthorizationPolicy | AuthorizationEvaluatorTests; AuthorizationPolicyTests |
 | AUC-SECURITY-005 | Route Authorization Guard | Ready to Start Product Implementation | SecurityRouteGuard, IRouteAuthorizationPolicyProvider | RouteAuthorizationGuardTests |
@@ -48,10 +48,10 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-SECURITY-002 Current Principal Access
 
 Feature ID: `AUC-SECURITY-002`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 为业务代码提供当前 principal 的同步读取边界。
 Public Contract: ICurrentPrincipalAccessor, SecurityPrincipals
-Runtime / Build Behavior: 读取返回当前 snapshot 中 principal；无用户时返回 anonymous principal。
+Runtime / Build Behavior: 读取返回当前 snapshot 中 principal；无用户时返回 anonymous principal；`SecurityPrincipals.Anonymous` 每次返回独立 unauthenticated principal。
 Failure Behavior: principal 缺失、claims 格式异常按 anonymous 或 failed result 处理，不能抛随机异常。
 Threading / Cancellation: 读取必须无阻塞；后台线程读取看到一致 snapshot。
 Diagnostics: principal diagnostics 必须包含 principal kind 和 missing claim。

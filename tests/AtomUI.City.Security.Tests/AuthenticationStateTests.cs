@@ -110,6 +110,49 @@ public sealed class AuthenticationStateTests
     }
 
     [Fact]
+    public void SecurityPrincipalsAnonymousReturnsIndependentUnauthenticatedPrincipal()
+    {
+        var first = SecurityPrincipals.Anonymous;
+        var second = SecurityPrincipals.Anonymous;
+
+        ((ClaimsIdentity)first.Identity!).AddClaim(new Claim("permission", "mutated"));
+
+        Assert.NotSame(first, second);
+        Assert.False(first.Identity?.IsAuthenticated);
+        Assert.False(second.Identity?.IsAuthenticated);
+        Assert.DoesNotContain(second.Claims, claim => claim.Type == "permission");
+    }
+
+    [Fact]
+    public void CurrentPrincipalAccessorReturnsAuthenticatedSnapshotClaims()
+    {
+        var store = new AuthenticationStateStore();
+        var accessor = (ICurrentPrincipalAccessor)store;
+
+        store.SetAuthenticated(CreatePrincipal("42", "settings.read"), scheme: "Bearer");
+
+        Assert.True(accessor.Principal.Identity?.IsAuthenticated);
+        Assert.Equal("42", accessor.Principal.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+        Assert.Contains(
+            accessor.Principal.Claims,
+            claim => claim.Type == "permission" && claim.Value == "settings.read");
+    }
+
+    [Fact]
+    public void PrincipalSnapshotReadRemainsStableAfterLaterStateChanges()
+    {
+        var store = new AuthenticationStateStore();
+        var accessor = (ICurrentPrincipalAccessor)store;
+        store.SetAuthenticated(CreatePrincipal("42", "settings.read"), scheme: "Bearer");
+        var firstRead = accessor.Principal;
+
+        store.SetAuthenticated(CreatePrincipal("84", "orders.read"), scheme: "Bearer");
+
+        Assert.Equal("42", firstRead.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+        Assert.Equal("84", accessor.Principal.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+    }
+
+    [Fact]
     public async Task DelegateAccessTokenProviderReturnsTokenForAuthenticatedPrincipal()
     {
         var provider = new DelegateAccessTokenProvider((context, cancellationToken) =>
