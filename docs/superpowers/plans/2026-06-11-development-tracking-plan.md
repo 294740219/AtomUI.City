@@ -5,9 +5,9 @@
 ## 当前结论
 
 - 1.0 发布状态：不可发布。
-- 全局进度：115/118。
+- 全局进度：116/118。
 - 模块 Feature 合同：109/109。
-- 最终发布门禁：6/9。
+- 最终发布门禁：7/9。
 - 最近校准日期：2026-06-15。
 
 ## 统计规则
@@ -48,7 +48,7 @@
 | Security | 7 | 0 | 7 | 已完成 |
 | CLI | 6 | 0 | 6 | 已完成 |
 | Templates | 5 | 0 | 5 | 已完成 |
-| Release Gates | 6 | 3 | 9 | 进行中 |
+| Release Gates | 7 | 2 | 9 | 进行中 |
 
 ## Core
 
@@ -212,7 +212,7 @@
 - [x] AUC-RELEASE-004 Public API gate。通过 `bash engineering/check-public-api.sh`，并确认 public API 变化已审阅。
 - [x] AUC-RELEASE-005 Package generation。通过 `bash engineering/pack.sh --configuration Release`。
 - [x] AUC-RELEASE-006 Package validation。通过 `bash engineering/validate-packages.sh --configuration Release`。
-- [ ] AUC-RELEASE-007 Template smoke gate。通过 `bash engineering/check-template-smoke.sh`。
+- [x] AUC-RELEASE-007 Template smoke gate。通过 `bash engineering/check-template-smoke.sh`。
 - [ ] AUC-RELEASE-008 CI-equivalent local gate。通过 `bash engineering/test-ci.sh` 和必要的 platform integration gate。
 - [ ] AUC-RELEASE-009 Release notes and versioning。通过 `bash engineering/generate-release-notes.sh`，并完成 1.0 版本号、包元数据和发布说明审阅。
 
