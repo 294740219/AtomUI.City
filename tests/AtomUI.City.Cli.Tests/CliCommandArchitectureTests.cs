@@ -45,7 +45,74 @@ public sealed class CliCommandArchitectureTests
 
         Assert.Equal(2, run.ExitCode);
         using var json = run.ReadJson();
-        Assert.Equal("AUCCLI0002", json.RootElement.GetProperty("diagnostics")[0].GetProperty("code").GetString());
+        var diagnostic = json.RootElement.GetProperty("diagnostics")[0];
+        Assert.Equal("AUCCLI0002", diagnostic.GetProperty("code").GetString());
+        Assert.Equal("unknown", diagnostic.GetProperty("target").GetString());
+        Assert.Equal(1, diagnostic.GetProperty("position").GetInt32());
+    }
+
+    [Fact]
+    public async Task MissingCommandReturnsUsageDiagnostic()
+    {
+        using var host = new CliTestHost();
+
+        var run = await host.RunAsync("city", "--json");
+
+        Assert.Equal(2, run.ExitCode);
+        using var json = run.ReadJson();
+        var root = json.RootElement;
+        var diagnostic = root.GetProperty("diagnostics")[0];
+        Assert.False(root.GetProperty("success").GetBoolean());
+        Assert.Equal("AUCCLI0003", diagnostic.GetProperty("code").GetString());
+        Assert.Equal("city", diagnostic.GetProperty("target").GetString());
+        Assert.Equal(1, diagnostic.GetProperty("position").GetInt32());
+        Assert.Contains(
+            root.GetProperty("data").GetProperty("usage").EnumerateArray(),
+            item => item.GetString() == "atomui city doctor");
+    }
+
+    [Fact]
+    public async Task UnknownOptionReturnsStableDiagnosticBeforeHandlerRuns()
+    {
+        using var host = new CliTestHost();
+
+        var run = await host.RunAsync("city", "doctor", "--unknown", "--json");
+
+        Assert.Equal(2, run.ExitCode);
+        using var json = run.ReadJson();
+        var diagnostic = json.RootElement.GetProperty("diagnostics")[0];
+        Assert.Equal("AUCCLI0004", diagnostic.GetProperty("code").GetString());
+        Assert.Equal("--unknown", diagnostic.GetProperty("target").GetString());
+        Assert.Equal(2, diagnostic.GetProperty("position").GetInt32());
+    }
+
+    [Fact]
+    public async Task MissingValueOptionDoesNotConsumeJsonFlag()
+    {
+        using var host = new CliTestHost();
+
+        var run = await host.RunAsync("city", "doctor", "--working-directory", "--json");
+
+        Assert.Equal(2, run.ExitCode);
+        Assert.Equal(string.Empty, run.Error);
+        using var json = run.ReadJson();
+        var diagnostic = json.RootElement.GetProperty("diagnostics")[0];
+        Assert.Equal("AUCCLI0005", diagnostic.GetProperty("code").GetString());
+        Assert.Equal("--working-directory", diagnostic.GetProperty("target").GetString());
+        Assert.Equal(2, diagnostic.GetProperty("position").GetInt32());
+    }
+
+    [Fact]
+    public async Task UnknownCommandWithoutJsonWritesUsageText()
+    {
+        using var host = new CliTestHost();
+
+        var run = await host.RunAsync("city", "unknown");
+
+        Assert.Equal(2, run.ExitCode);
+        Assert.Contains("atomui city unknown: failed", run.Output, StringComparison.Ordinal);
+        Assert.Contains("Usage:", run.Output, StringComparison.Ordinal);
+        Assert.Contains("atomui city new app <AppName>", run.Output, StringComparison.Ordinal);
     }
 
     [Fact]

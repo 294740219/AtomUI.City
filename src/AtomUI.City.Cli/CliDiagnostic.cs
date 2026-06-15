@@ -7,8 +7,20 @@ public sealed record CliDiagnostic(
     string? SuggestedAction = null,
     string? DocumentationLink = null)
 {
-    public static CliDiagnostic Error(string code, string message)
+    public string? Target { get; init; }
+
+    public int? Position { get; init; }
+
+    public static CliDiagnostic Error(
+        string code,
+        string message,
+        string? target = null,
+        int? position = null)
     {
-        return new CliDiagnostic(code, message, "Error");
+        return new CliDiagnostic(code, message, "Error")
+        {
+            Target = target,
+            Position = position,
+        };
     }
 }

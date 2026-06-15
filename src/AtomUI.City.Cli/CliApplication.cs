@@ -7,6 +7,19 @@ namespace AtomUI.City.Cli;
 
 public static class CliApplication
 {
+    private static readonly string[] UsageLines =
+    [
+        "atomui city doctor",
+        "atomui city new app <AppName>",
+        "atomui city build",
+        "atomui city test",
+        "atomui city inspect workspace",
+        "atomui city plugin list",
+        "atomui city plugin inspect <Path>",
+        "atomui city docs check",
+        "atomui city tests check",
+    ];
+
     public static async ValueTask<int> RunAsync(
         string[] args,
         TextWriter output,
@@ -19,7 +32,11 @@ public static class CliApplication
         ArgumentNullException.ThrowIfNull(error);
 
         var commandLine = CliCommandLine.Parse(args);
-        var executionEnvironment = environment ?? new CliExecutionEnvironment(Directory.GetCurrentDirectory());
+        var baseEnvironment = environment ?? new CliExecutionEnvironment(Directory.GetCurrentDirectory());
+        var workingDirectory = commandLine.GetOptionValue("--working-directory");
+        var executionEnvironment = string.IsNullOrWhiteSpace(workingDirectory)
+            ? baseEnvironment
+            : new CliExecutionEnvironment(Path.GetFullPath(workingDirectory, baseEnvironment.WorkingDirectory));
 
         if (commandLine.Positionals.Count == 0 || commandLine.Positionals[0] != "city")
         {
@@ -30,7 +47,44 @@ public static class CliApplication
                     CliEnvelope.Failed(
                         "atomui city",
                         CliExitCodes.ArgumentError,
-                        CliDiagnostic.Error("AUCCLI0001", "Command must start with 'city'.")))
+                        CliDiagnostic.Error(
+                            "AUCCLI0001",
+                            "Command must start with 'city'.",
+                            commandLine.Positionals.Count == 0 ? null : commandLine.Positionals[0],
+                            commandLine.Positionals.Count == 0 ? null : 0)))
+                .ConfigureAwait(false);
+        }
+
+        if (commandLine.Diagnostics.Count > 0)
+        {
+            var command = BuildCommandName(commandLine);
+            return await WriteAsync(
+                    output,
+                    commandLine,
+                    command,
+                    CliEnvelope.FailedWithData(
+                        command,
+                        CliExitCodes.ArgumentError,
+                        CreateUsageData(),
+                        commandLine.Diagnostics.ToArray()))
+                .ConfigureAwait(false);
+        }
+
+        if (commandLine.Positionals.Count == 1)
+        {
+            return await WriteAsync(
+                    output,
+                    commandLine,
+                    "atomui city",
+                    CliEnvelope.FailedWithData(
+                        "atomui city",
+                        CliExitCodes.ArgumentError,
+                        CreateUsageData(),
+                        CliDiagnostic.Error(
+                            "AUCCLI0003",
+                            "Command is required.",
+                            "city",
+                            1)))
                 .ConfigureAwait(false);
         }
 
@@ -63,10 +117,15 @@ public static class CliApplication
                     output,
                     commandLine,
                     "atomui city " + command,
-                    CliEnvelope.Failed(
+                    CliEnvelope.FailedWithData(
                         "atomui city " + command,
                         CliExitCodes.ArgumentError,
-                        CliDiagnostic.Error("AUCCLI0002", $"Unknown command '{command}'.")))
+                        CreateUsageData(),
+                        CliDiagnostic.Error(
+                            "AUCCLI0002",
+                            $"Unknown command '{command}'.",
+                            command,
+                            1)))
                 .ConfigureAwait(false),
         };
     }
@@ -353,6 +412,26 @@ public static class CliApplication
         return await WriteAsync(output, commandLine, command, CliEnvelope.Succeeded(command, data)).ConfigureAwait(false);
     }
 
+    private static string BuildCommandName(CliCommandLine commandLine)
+    {
+        if (commandLine.Positionals.Count == 0 || commandLine.Positionals[0] != "city")
+        {
+            return "atomui city";
+        }
+
+        return commandLine.Positionals.Count == 1
+            ? "atomui city"
+            : "atomui city " + commandLine.Positionals[1];
+    }
+
+    private static Dictionary<string, object?> CreateUsageData()
+    {
+        return new Dictionary<string, object?>
+        {
+            ["usage"] = UsageLines,
+        };
+    }
+
     private static async ValueTask<int> ApplyAsync(CliCommandLine commandLine, TextWriter output)
     {
         var command = "atomui city apply";
@@ -441,8 +520,35 @@ public static class CliApplication
         else
         {
             await output.WriteLineAsync(envelope.Success ? $"{command}: OK" : $"{command}: failed").ConfigureAwait(false);
+            if (!envelope.Success && TryGetUsage(envelope.Data, out var usage))
+            {
+                await output.WriteLineAsync("Usage:").ConfigureAwait(false);
+                foreach (var line in usage)
+                {
+                    await output.WriteLineAsync("  " + line).ConfigureAwait(false);
+                }
+            }
         }
 
         return envelope.ExitCode;
+    }
+
+    private static bool TryGetUsage(
+        object data,
+        out IReadOnlyList<string> usage)
+    {
+        usage = [];
+        if (data is not IReadOnlyDictionary<string, object?> dictionary ||
+            !dictionary.TryGetValue("usage", out var value) ||
+            value is not IEnumerable<object?> rawUsage)
+        {
+            return false;
+        }
+
+        usage = rawUsage
+            .OfType<string>()
+            .ToArray();
+
+        return usage.Count > 0;
     }
 }

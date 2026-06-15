@@ -16,17 +16,36 @@ internal sealed class CliCommandLine
         "--plugins-root",
     ];
 
+    private static readonly HashSet<string> FlagOptions =
+    [
+        "--ci",
+        "--dry-run",
+        "--json",
+        "--no-color",
+        "--no-tests",
+        "--non-interactive",
+        "--pretty",
+        "--sample",
+        "--use-aot",
+        "--use-dynamic-plugins",
+        "--yes",
+    ];
+
     private readonly Dictionary<string, string?> _options;
 
     private CliCommandLine(
         IReadOnlyList<string> positionals,
-        Dictionary<string, string?> options)
+        Dictionary<string, string?> options,
+        IReadOnlyList<CliDiagnostic> diagnostics)
     {
         Positionals = positionals;
         _options = options;
+        Diagnostics = diagnostics;
     }
 
     public IReadOnlyList<string> Positionals { get; }
+
+    public IReadOnlyList<CliDiagnostic> Diagnostics { get; }
 
     public bool HasOption(string option)
     {
@@ -42,6 +61,7 @@ internal sealed class CliCommandLine
     {
         var positionals = new List<string>();
         var options = new Dictionary<string, string?>(StringComparer.Ordinal);
+        var diagnostics = new List<CliDiagnostic>();
 
         for (var i = 0; i < args.Length; i++)
         {
@@ -54,14 +74,34 @@ internal sealed class CliCommandLine
 
             if (ValueOptions.Contains(arg))
             {
-                options[arg] = i + 1 < args.Length ? args[++i] : null;
+                if (i + 1 >= args.Length || args[i + 1].StartsWith("--", StringComparison.Ordinal))
+                {
+                    options[arg] = null;
+                    diagnostics.Add(CliDiagnostic.Error(
+                        "AUCCLI0005",
+                        $"Option '{arg}' requires a value.",
+                        arg,
+                        i));
+                    continue;
+                }
+
+                options[arg] = args[++i];
+            }
+            else if (FlagOptions.Contains(arg))
+            {
+                options[arg] = "true";
             }
             else
             {
                 options[arg] = "true";
+                diagnostics.Add(CliDiagnostic.Error(
+                    "AUCCLI0004",
+                    $"Unknown option '{arg}'.",
+                    arg,
+                    i));
             }
         }
 
-        return new CliCommandLine(positionals, options);
+        return new CliCommandLine(positionals, options, Array.AsReadOnly(diagnostics.ToArray()));
     }
 }

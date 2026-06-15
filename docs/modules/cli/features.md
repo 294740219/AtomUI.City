@@ -6,7 +6,7 @@
 
 | Feature ID | 名称 | 状态 | Public Contract | 主测试 |
 | --- | --- | --- | --- | --- |
-| AUC-CLI-001 | Command Model | Ready to Start Product Implementation | CliApplication, CliCommandLine, CliExitCodes | CliCommandArchitectureTests |
+| AUC-CLI-001 | Command Model | Completed | CliApplication, CliCommandLine, CliExitCodes | CliCommandArchitectureTests |
 | AUC-CLI-002 | New App Command | Ready to Start Product Implementation | CliApplication, ApplicationTemplateRenderer, CliEnvelope | CliNewAppTests |
 | AUC-CLI-003 | Build and Test Commands | Ready to Start Product Implementation | DotnetInvocation, ProcessRunner, CliEnvelope | CliBuildAndTestCommandTests |
 | AUC-CLI-004 | Plugin Inspect and Doctor | Ready to Start Product Implementation | CliApplication, PluginManifestReader, PluginDiagnostic | CliInspectDoctorPluginTests |
@@ -33,13 +33,13 @@
 ## AUC-CLI-001 Command Model
 
 Feature ID: `AUC-CLI-001`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 定义 `atomui city` 命令解析、全局选项、exit code 和 usage 行为。
 Public Contract: CliApplication, CliCommandLine, CliExitCodes
-Runtime / Build Behavior: 解析 command、option、argument、`--json`、`--ci` 和工作目录；未知命令输出 usage diagnostic。
-Failure Behavior: 未知命令、缺参、非法 option 返回 InvalidArguments，不执行 handler。
+Runtime / Build Behavior: 解析 command、option、argument、`--json`、`--ci` 和工作目录；未知命令和缺少子命令输出 usage diagnostic。
+Failure Behavior: 未知命令、缺参、未知 option、value option 缺值返回 ArgumentError，不执行 handler。
 Threading / Cancellation: 解析为纯 CPU；RunAsync 必须观察 CancellationToken。
-Diagnostics: diagnostic 必须包含 command、option、position 和 exit code。
+Diagnostics: diagnostic 包含 code、message、target、position；envelope 包含 command 和 exit code。
 Tests: `CliCommandArchitectureTests`
 Required Assertions: 断言入口名、未知命令、缺参、exit code、usage 输出和 JSON 模式隔离。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。

@@ -16,6 +16,8 @@
 - public 类型、成员、枚举值、attribute 参数和扩展方法默认视为兼容性承诺。
 - 删除、重命名、改变默认行为、异常类型、Result status 或诊断码语义属于 breaking change。
 - 新增 API 可以 minor 版本发布，但必须有文档、测试和迁移说明。
+- `AUCCLI0001` 表示缺少 `city` 根命令，`AUCCLI0002` 表示未知命令，`AUCCLI0003` 表示缺少子命令，`AUCCLI0004` 表示未知 option，`AUCCLI0005` 表示 value option 缺值；diagnostic `target` 和 `position` 字段进入 1.0 兼容承诺。
+- `--json` 模式失败时只输出 JSON envelope；非 JSON 解析失败输出 `Usage:` 文本块。
 
 ## 数据格式兼容
 

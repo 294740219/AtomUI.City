@@ -45,6 +45,15 @@ public sealed class CliEnvelope
         return new CliEnvelope(command, success: false, exitCode, diagnostics, data: new Dictionary<string, object?>());
     }
 
+    public static CliEnvelope FailedWithData(
+        string command,
+        int exitCode,
+        object? data,
+        params CliDiagnostic[] diagnostics)
+    {
+        return new CliEnvelope(command, success: false, exitCode, diagnostics, data);
+    }
+
     private static object NormalizeData(object? data)
     {
         if (data is null)

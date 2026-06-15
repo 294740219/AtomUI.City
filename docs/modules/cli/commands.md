@@ -41,7 +41,7 @@
 | AUC-CLI-003 | Build and Test | CliBuildAndTestCommandTests |
 | AUC-CLI-004 | Plugin Inspect Doctor | CliInspectDoctorPluginTests |
 | AUC-CLI-005 | AI Envelope | CliCommandArchitectureTests |
-| AUC-CLI-006 | Assembly Smoke | CliAssemblyTests |
+| AUC-CLI-006 | Non-Interactive and CI Mode | CliCommandArchitectureTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -136,6 +136,8 @@ atomui city
 规则：
 
 - 必填参数缺失时返回参数错误。
+- `atomui city` 缺少子命令时返回 `AUCCLI0003` 并输出 usage。
+- 未知 option 返回 `AUCCLI0004`，value option 缺值返回 `AUCCLI0005`，不得执行 handler。
 - 非交互模式不提示补参。
 - 参数名稳定，不随输出文本变化。
 - 文件路径可相对工作目录解析。

@@ -15,9 +15,9 @@
 
 | Method | Purpose | Parameters | Return | Failure Behavior | Cancellation | Concurrency / Idempotency |
 | --- | --- | --- | --- | --- | --- | --- |
-| CliApplication.RunAsync | 执行命令。 | argv、environment、stdout/stderr。 | exit code。 | 解析失败、handler 失败映射 CliExitCodes。 | 必须观察 token。 | 单进程单次调用；handler 内部并发隔离。 |
-| CliCommandLine.Parse | 解析命令行。 | argv 不得为 null。 | CliCommandLine 或 diagnostic。 | 未知 option、缺参返回 InvalidArguments。 | 纯 CPU，无 token。 | 无共享状态。 |
-| CliEnvelope.WriteJson | 输出机器可读 envelope。 | envelope、TextWriter。 | 写入完成。 | 序列化失败返回 InternalError。 | 写入前观察 token。 | JSON 输出不得混入普通日志。 |
+| CliApplication.RunAsync | 执行命令。 | argv、environment、stdout/stderr。 | exit code。 | 解析失败、handler 失败映射 CliExitCodes；缺少 `city`、缺少子命令、未知 command、未知 option 和 option 缺值都返回 ArgumentError。 | 必须观察 token。 | 单进程单次调用；handler 内部并发隔离。 |
+| CliCommandLine.Parse | 解析命令行。 | argv 不得为 null。 | CliCommandLine 和 parse diagnostics。 | 未知 option、缺参返回 parse diagnostic，不执行 handler。 | 纯 CPU，无 token。 | 无共享状态。 |
+| CliEnvelope JSON/Text 输出 | 输出机器可读 envelope 或文本摘要。 | envelope、TextWriter。 | 写入完成。 | JSON 模式只写 JSON envelope；文本失败输出稳定 usage。 | 写入前观察 token。 | JSON 输出不得混入普通日志。 |
 | ProcessRunner.RunAsync | 运行 dotnet 或其他子进程。 | DotnetInvocation。 | process result。 | 非零 exit code 保留为 command failure。 | 取消必须终止子进程或停止等待。 | stdout/stderr 缓冲必须有上限。 |
 
 ## Public 类型覆盖
@@ -25,8 +25,8 @@
 | Type | 分类 | Review 规则 |
 | --- | --- | --- |
 | `CliApplication` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
-| `CliDiagnostic` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
-| `CliEnvelope` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `CliDiagnostic` | 关键 contract | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `CliEnvelope` | 关键 contract | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `CliExecutionEnvironment` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `CliExitCodes` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `DotnetInvocation` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
