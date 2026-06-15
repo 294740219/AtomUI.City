@@ -9,7 +9,7 @@
 | AUC-SECURITY-001 | Authentication State Store | Completed | AuthenticationStateStore, AuthenticationStateSnapshot | AuthenticationStateTests |
 | AUC-SECURITY-002 | Current Principal Access | Completed | ICurrentPrincipalAccessor, SecurityPrincipals | AuthenticationStateTests |
 | AUC-SECURITY-003 | Permission Registry and Checker | Completed | PermissionRegistry, IPermissionChecker | PermissionRegistryTests; PermissionCheckerTests |
-| AUC-SECURITY-004 | Authorization Policy Evaluation | Ready to Start Product Implementation | AuthorizationEvaluator, AuthorizationPolicy | AuthorizationEvaluatorTests; AuthorizationPolicyTests |
+| AUC-SECURITY-004 | Authorization Policy Evaluation | Completed | AuthorizationEvaluator, AuthorizationPolicy | AuthorizationEvaluatorTests; AuthorizationPolicyTests |
 | AUC-SECURITY-005 | Route Authorization Guard | Ready to Start Product Implementation | SecurityRouteGuard, IRouteAuthorizationPolicyProvider | RouteAuthorizationGuardTests |
 | AUC-SECURITY-006 | Command Authorization | Ready to Start Product Implementation | CommandAuthorizationSource, CommandAuthorizationDescriptor | CommandAuthorizationSourceTests |
 | AUC-SECURITY-007 | Access Token Provider | Ready to Start Product Implementation | IAccessTokenProvider, AccessTokenResult | SecurityRegistrationTests |
@@ -76,12 +76,12 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-SECURITY-004 Authorization Policy Evaluation
 
 Feature ID: `AUC-SECURITY-004`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 把 requirement、permission、principal 和 resource 汇总为授权结果。
 Public Contract: AuthorizationEvaluator, AuthorizationPolicy, AuthorizationRequirement
-Runtime / Build Behavior: policy provider 返回 requirement 集合；evaluator 顺序评估并输出 AuthorizationResult。
-Failure Behavior: policy 缺失、requirement 失败、provider 抛异常映射为 Failed/Forbidden。
-Threading / Cancellation: 评估可以异步取消；取消返回 Cancelled，不触发导航。
+Runtime / Build Behavior: evaluator 可直接评估 AuthorizationRequest，也可按 policy name 从 IAuthorizationPolicyProvider 读取 policy 后顺序评估 requirement 并输出 AuthorizationResult。
+Failure Behavior: policy 缺失返回 Failed/PolicyNotFound；requirement 不满足返回 Challenge 或 Forbidden；provider 抛异常映射为 Failed/EvaluatorFailed。
+Threading / Cancellation: 评估可以异步取消；预取消不调用 provider；取消返回 Cancelled，不触发导航。
 Diagnostics: authorization diagnostics 必须包含 policy name、requirement kind 和 resource。
 Tests: `AuthorizationEvaluatorTests; AuthorizationPolicyTests`
 Required Assertions: 断言成功、拒绝、失败、取消、多 requirement 和 provider 异常。

@@ -7,12 +7,23 @@ public sealed class AuthorizationEvaluator : IAuthorizationEvaluator
     private const string PermissionClaimType = "permission";
 
     private readonly IPermissionRegistry _permissions;
+    private readonly IAuthorizationPolicyProvider? _policyProvider;
 
     public AuthorizationEvaluator(IPermissionRegistry permissions)
     {
         ArgumentNullException.ThrowIfNull(permissions);
 
         _permissions = permissions;
+    }
+
+    public AuthorizationEvaluator(
+        IPermissionRegistry permissions,
+        IAuthorizationPolicyProvider policyProvider)
+        : this(permissions)
+    {
+        ArgumentNullException.ThrowIfNull(policyProvider);
+
+        _policyProvider = policyProvider;
     }
 
     public ValueTask<AuthorizationResult> EvaluateAsync(
@@ -30,6 +41,11 @@ public sealed class AuthorizationEvaluator : IAuthorizationEvaluator
         {
             foreach (var requirement in request.Policy.Requirements)
             {
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    return ValueTask.FromResult(AuthorizationResult.Cancelled());
+                }
+
                 var result = EvaluateRequirement(request.Principal, requirement);
                 if (!result.Succeeded)
                 {
@@ -50,6 +66,65 @@ public sealed class AuthorizationEvaluator : IAuthorizationEvaluator
                     SecurityFailureKind.EvaluatorFailed,
                     message: exception.Message,
                     exception: exception));
+        }
+    }
+
+    public async ValueTask<AuthorizationResult> EvaluatePolicyAsync(
+        ClaimsPrincipal? principal,
+        string policyName,
+        string? resourceName = null,
+        string? contributionId = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(policyName);
+
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return AuthorizationResult.Cancelled();
+        }
+
+        if (_policyProvider is null)
+        {
+            return AuthorizationResult.Failed(
+                SecurityFailureKind.EvaluatorFailed,
+                policyName,
+                "No authorization policy provider is configured.");
+        }
+
+        try
+        {
+            var policy = await _policyProvider.GetPolicyAsync(policyName, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return AuthorizationResult.Cancelled();
+            }
+
+            if (policy is null)
+            {
+                return AuthorizationResult.Failed(
+                    SecurityFailureKind.PolicyNotFound,
+                    policyName,
+                    $"Authorization policy '{policyName}' is not registered.");
+            }
+
+            return await EvaluateAsync(
+                    new AuthorizationRequest(principal, policy, resourceName, contributionId),
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return AuthorizationResult.Cancelled();
+        }
+        catch (Exception exception)
+        {
+            return AuthorizationResult.Failed(
+                SecurityFailureKind.EvaluatorFailed,
+                policyName,
+                exception.Message,
+                exception: exception);
         }
     }
 

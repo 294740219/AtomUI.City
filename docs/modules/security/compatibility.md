@@ -20,6 +20,7 @@
 - `ICurrentPrincipalAccessor.Principal` 返回当前 snapshot principal、已读取 principal 保持稳定、`SecurityPrincipals.Anonymous` 每次返回独立 unauthenticated principal 的行为进入 1.0 兼容承诺。
 - `PermissionRegistry` 使用大小写敏感权限名、成功变更递增 revision、重复注册返回 false、`RemoveByContribution` 撤销已有权限并阻止同一 contribution id 后续注册、重复撤销返回 0 的行为进入 1.0 兼容承诺。
 - `PermissionChecker` 对未注册或已撤销权限返回 `AuthorizationResultStatus.Failed` 和 `SecurityFailureKind.PermissionNotFound`，不执行 UI、导航或权限外副作用。
+- `IAuthorizationEvaluator.EvaluateAsync` 顺序评估 requirement；`EvaluatePolicyAsync` 通过 `IAuthorizationPolicyProvider` 读取 named policy，policy 缺失返回 `PolicyNotFound`，provider 异常返回 `EvaluatorFailed`，预取消不调用 provider。
 
 ## 数据格式兼容
 

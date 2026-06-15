@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Security.Claims;
 using AtomUI.City.Security;
 
@@ -106,9 +107,90 @@ public sealed class AuthorizationEvaluatorTests
         Assert.Equal(AuthorizationResultStatus.Cancelled, result.Status);
     }
 
-    private static AuthorizationEvaluator CreateEvaluator(PermissionRegistry? registry = null)
+    [Fact]
+    public async Task EvaluatePolicyAsyncAllowsPolicyFromProvider()
     {
-        return new AuthorizationEvaluator(registry ?? new PermissionRegistry());
+        var registry = new PermissionRegistry();
+        registry.Add(new PermissionDescriptor("settings.read"));
+        var provider = new StubAuthorizationPolicyProvider(
+            (name, _) => name == "CanReadSettings"
+                ? new ValueTask<AuthorizationPolicy?>(AuthorizationPolicy.RequirePermission(name, "settings.read"))
+                : new ValueTask<AuthorizationPolicy?>((AuthorizationPolicy?)null));
+        var evaluator = CreateEvaluator(registry, provider);
+        var principal = CreatePrincipal(
+            permissions: ["settings.read"],
+            claims: [],
+            roles: []);
+
+        var result = await evaluator.EvaluatePolicyAsync(principal, "CanReadSettings");
+
+        Assert.Equal(AuthorizationResultStatus.Allowed, result.Status);
+    }
+
+    [Fact]
+    public async Task EvaluatePolicyAsyncReturnsPolicyNotFoundWhenProviderReturnsNull()
+    {
+        var evaluator = CreateEvaluator(
+            policyProvider: new StubAuthorizationPolicyProvider(
+                (_, _) => new ValueTask<AuthorizationPolicy?>((AuthorizationPolicy?)null)));
+
+        var result = await evaluator.EvaluatePolicyAsync(
+            CreatePrincipal(permissions: [], claims: [], roles: []),
+            "MissingPolicy");
+
+        Assert.Equal(AuthorizationResultStatus.Failed, result.Status);
+        Assert.Equal(SecurityFailureKind.PolicyNotFound, result.FailureKind);
+        Assert.Equal("MissingPolicy", result.FailedRequirement);
+    }
+
+    [Fact]
+    public async Task EvaluatePolicyAsyncMapsProviderExceptionToFailedResult()
+    {
+        var exception = new InvalidOperationException("Policy catalog failed.");
+        var evaluator = CreateEvaluator(
+            policyProvider: new StubAuthorizationPolicyProvider((_, _) => throw exception));
+
+        var result = await evaluator.EvaluatePolicyAsync(
+            CreatePrincipal(permissions: [], claims: [], roles: []),
+            "BrokenPolicy");
+
+        Assert.Equal(AuthorizationResultStatus.Failed, result.Status);
+        Assert.Equal(SecurityFailureKind.EvaluatorFailed, result.FailureKind);
+        Assert.Equal("BrokenPolicy", result.FailedRequirement);
+        Assert.Same(exception, result.Exception);
+    }
+
+    [Fact]
+    public async Task EvaluatePolicyAsyncReturnsCancelledWithoutCallingProvider()
+    {
+        var providerCalled = false;
+        var evaluator = CreateEvaluator(
+            policyProvider: new StubAuthorizationPolicyProvider(
+                (_, _) =>
+                {
+                    providerCalled = true;
+                    return new ValueTask<AuthorizationPolicy?>(
+                        AuthorizationPolicy.RequireAuthenticated("SignedIn"));
+                }));
+        using var cancellation = new CancellationTokenSource();
+        await cancellation.CancelAsync();
+
+        var result = await evaluator.EvaluatePolicyAsync(
+            CreatePrincipal(permissions: [], claims: [], roles: []),
+            "SignedIn",
+            cancellationToken: cancellation.Token);
+
+        Assert.Equal(AuthorizationResultStatus.Cancelled, result.Status);
+        Assert.False(providerCalled);
+    }
+
+    private static AuthorizationEvaluator CreateEvaluator(
+        PermissionRegistry? registry = null,
+        IAuthorizationPolicyProvider? policyProvider = null)
+    {
+        return policyProvider is null
+            ? new AuthorizationEvaluator(registry ?? new PermissionRegistry())
+            : new AuthorizationEvaluator(registry ?? new PermissionRegistry(), policyProvider);
     }
 
     private static ClaimsPrincipal CreatePrincipal(
@@ -135,5 +217,41 @@ public sealed class AuthorizationEvaluatorTests
         }
 
         return new ClaimsPrincipal(identity);
+    }
+
+    private sealed class StubAuthorizationPolicyProvider : IAuthorizationPolicyProvider
+    {
+        private readonly Func<string, CancellationToken, ValueTask<AuthorizationPolicy?>> _getPolicy;
+
+        public StubAuthorizationPolicyProvider(
+            Func<string, CancellationToken, ValueTask<AuthorizationPolicy?>> getPolicy)
+        {
+            _getPolicy = getPolicy;
+        }
+
+        public long Revision => 0;
+
+        public IReadOnlyCollection<AuthorizationPolicy> Policies => [];
+
+        public bool Contains(string name)
+        {
+            return false;
+        }
+
+        public bool TryGet(
+            string name,
+            [NotNullWhen(true)]
+            out AuthorizationPolicy? policy)
+        {
+            policy = null;
+            return false;
+        }
+
+        public ValueTask<AuthorizationPolicy?> GetPolicyAsync(
+            string name,
+            CancellationToken cancellationToken = default)
+        {
+            return _getPolicy(name, cancellationToken);
+        }
     }
 }

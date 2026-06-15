@@ -134,6 +134,7 @@ Route、Command、Data 可以把结果映射成自己的行为，但不能改变
 
 - 必须支持异步。
 - 必须支持取消。
+- 可以直接评估 `AuthorizationRequest`，也可以通过 `IAuthorizationPolicyProvider` 按 policy name 读取策略后评估。
 - 不能访问 UI 对象。
 - 不能阻塞 UI Thread。
 - 可以使用缓存，但缓存必须带认证状态 revision 和 contribution revision。
