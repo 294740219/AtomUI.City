@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Xml.Linq;
 using AtomUI.City.Templates;
 
 namespace AtomUI.City.TemplateSmokeTests;
@@ -137,15 +138,100 @@ public sealed class TemplatePackageLayoutTests
         Assert.False(string.IsNullOrWhiteSpace(metadata.RootElement.GetProperty("sourceName").GetString()));
     }
 
-    private static JsonDocument ReadTemplateMetadata(string templateName)
+    [Fact]
+    public void PluginTemplatePackageContainsPluginProjectManifestModuleAndTests()
+    {
+        var root = GetTemplateRoot("atomui-city-plugin");
+
+        Assert.True(File.Exists(Path.Combine(root, "src", "AtomUICityPlugin", "AtomUICityPlugin.csproj")));
+        Assert.True(File.Exists(Path.Combine(root, "src", "AtomUICityPlugin", "AtomUICityPluginModule.cs")));
+        Assert.True(File.Exists(Path.Combine(root, "src", "AtomUICityPlugin", "atomui-city", "plugin.json")));
+        Assert.True(File.Exists(Path.Combine(root, "tests", "AtomUICityPlugin.Tests", "AtomUICityPlugin.Tests.csproj")));
+        Assert.True(File.Exists(Path.Combine(root, "tests", "AtomUICityPlugin.Tests", "PluginPackageTests.cs")));
+        Assert.True(File.Exists(Path.Combine(root, "tests", "AtomUICityPlugin.Tests", "FeatureTestMatrix.md")));
+    }
+
+    [Fact]
+    public void PluginTemplateProjectDefinesSingleAssemblyNuGetAndMsBuildMetadata()
+    {
+        var projectPath = Path.Combine(GetTemplateRoot("atomui-city-plugin"), "src", "AtomUICityPlugin", "AtomUICityPlugin.csproj");
+        var project = XDocument.Load(projectPath);
+        var properties = project
+            .Descendants("PropertyGroup")
+            .Elements()
+            .ToDictionary(element => element.Name.LocalName, element => element.Value, StringComparer.Ordinal);
+        var packageReferences = project
+            .Descendants("PackageReference")
+            .Select(element => element.Attribute("Include")?.Value)
+            .Where(value => value is not null)
+            .Cast<string>()
+            .ToHashSet(StringComparer.Ordinal);
+
+        Assert.Equal("AtomUICityPlugin", properties["PackageId"]);
+        Assert.Equal("true", properties["AtomUICityPlugin"]);
+        Assert.Equal("PluginId", properties["AtomUICityPluginId"]);
+        Assert.Equal("1.0.0", properties["AtomUICityPluginVersion"]);
+        Assert.Equal("Plugin.DisplayName", properties["AtomUICityPluginDisplayNameKey"]);
+        Assert.Equal("Plugin.Description", properties["AtomUICityPluginDescriptionKey"]);
+        Assert.Equal("true", properties["AtomUICityPluginGenerateManifest"]);
+        Assert.Equal("true", properties["AtomUICityPluginValidateManifest"]);
+        Assert.Equal("true", properties["AtomUICityPackageAsPlugin"]);
+        Assert.Contains("AtomUI.City.Build", packageReferences);
+        Assert.Contains("AtomUI.City.Core", packageReferences);
+        Assert.Contains("AtomUI.City.PluginSystem", packageReferences);
+    }
+
+    [Fact]
+    public void PluginTemplateManifestMatchesSingleAssemblyContract()
+    {
+        var manifestPath = Path.Combine(GetTemplateRoot("atomui-city-plugin"), "src", "AtomUICityPlugin", "atomui-city", "plugin.json");
+        using var manifest = JsonDocument.Parse(File.ReadAllText(manifestPath));
+        var root = manifest.RootElement;
+
+        Assert.Equal("1.0", root.GetProperty("schemaVersion").GetString());
+        Assert.Equal("PluginId", root.GetProperty("pluginId").GetString());
+        Assert.Equal("AtomUICityPlugin", root.GetProperty("packageId").GetString());
+        Assert.Equal("AtomUICityPlugin.dll", root.GetProperty("mainAssembly").GetString());
+        Assert.Equal("net10.0", root.GetProperty("targetFramework").GetString());
+        Assert.Equal("1.0", root.GetProperty("pluginApiVersion").GetString());
+        Assert.Equal("AtomUICityPluginModule", root.GetProperty("modules")[0].GetProperty("name").GetString());
+        Assert.Equal("AtomUICityPlugin.AtomUICityPluginModule", root.GetProperty("modules")[0].GetProperty("type").GetString());
+    }
+
+    [Fact]
+    public void PluginTemplateTestProjectReferencesPluginAndTestingPackage()
+    {
+        var testProjectPath = Path.Combine(GetTemplateRoot("atomui-city-plugin"), "tests", "AtomUICityPlugin.Tests", "AtomUICityPlugin.Tests.csproj");
+        var project = XDocument.Load(testProjectPath);
+        var packageReferences = project
+            .Descendants("PackageReference")
+            .Select(element => element.Attribute("Include")?.Value)
+            .Where(value => value is not null)
+            .Cast<string>()
+            .ToHashSet(StringComparer.Ordinal);
+        var projectReference = Assert.Single(project.Descendants("ProjectReference"));
+
+        Assert.Equal("../../src/AtomUICityPlugin/AtomUICityPlugin.csproj", projectReference.Attribute("Include")?.Value);
+        Assert.Contains("AtomUI.City.Testing", packageReferences);
+        Assert.Contains("Microsoft.NET.Test.Sdk", packageReferences);
+        Assert.Contains("xunit", packageReferences);
+    }
+
+    private static string GetTemplateRoot(string templateName)
     {
         var repositoryRoot = FindRepositoryRoot();
-        var templateJson = Path.Combine(
+        return Path.Combine(
             repositoryRoot.FullName,
             "src",
             "AtomUI.City.Templates",
             "templates",
-            templateName,
+            templateName);
+    }
+
+    private static JsonDocument ReadTemplateMetadata(string templateName)
+    {
+        var templateJson = Path.Combine(
+            GetTemplateRoot(templateName),
             ".template.config",
             "template.json");
 

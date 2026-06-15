@@ -76,9 +76,9 @@
 src/<PluginName>/
   <PluginName>.csproj
   <PluginName>Module.cs
+  atomui-city/plugin.json
   Resources/
   Localization/
-  atomui-city/
 tests/<PluginName>.Tests/
   FeatureTestMatrix.md
   PluginPackageTests.cs
@@ -137,7 +137,7 @@ Resources/
 
 插件模板必须生成符合 Build 插件打包规则的项目：
 
-- `atomui-city/plugin.json` 由 Build 生成。
+- `atomui-city/plugin.json` 在模板中提供可读初始 manifest，并由 Build 生成流程继续验证或覆盖。
 - contribution manifests 由 source generator 和 Build task 生成。
 - package 输出到 `output/packages/plugins`。
 - 包布局必须通过 validation。

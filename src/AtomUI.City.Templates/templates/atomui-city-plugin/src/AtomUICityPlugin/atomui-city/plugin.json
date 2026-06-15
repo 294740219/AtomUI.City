@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "1.0",
+  "pluginId": "PluginId",
+  "packageId": "AtomUICityPlugin",
+  "version": "1.0.0",
+  "displayNameKey": "Plugin.DisplayName",
+  "descriptionKey": "Plugin.Description",
+  "publisher": "Company",
+  "mainAssembly": "AtomUICityPlugin.dll",
+  "targetFramework": "net10.0",
+  "pluginApiVersion": "1.0",
+  "minHostVersion": "1.0.0",
+  "unloadable": true,
+  "aotCompatible": false,
+  "capabilities": [],
+  "contributions": {},
+  "dependencies": {
+    "plugins": []
+  },
+  "modules": [
+    {
+      "name": "AtomUICityPluginModule",
+      "type": "AtomUICityPlugin.AtomUICityPluginModule"
+    }
+  ]
+}

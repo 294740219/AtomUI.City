@@ -9,7 +9,7 @@
 | AUC-TEMPLATES-001 | Application Template | Completed | ApplicationTemplateOptions, ApplicationTemplateRenderer | ApplicationTemplateBuildSmokeTests |
 | AUC-TEMPLATES-002 | Package Layout | Completed | TemplatePlan, TemplateChange | TemplatePackageLayoutTests |
 | AUC-TEMPLATES-003 | Template Variables | Completed | ApplicationTemplateOptions, TemplateRenderResult | ApplicationTemplateBuildSmokeTests |
-| AUC-TEMPLATES-004 | Plugin Template | Ready to Start Product Implementation | ApplicationTemplateRenderer, Plugin template package | TemplatePackageLayoutTests |
+| AUC-TEMPLATES-004 | Plugin Template | Completed | Plugin template package | TemplatePackageLayoutTests |
 | AUC-TEMPLATES-005 | Test Template | Ready to Start Product Implementation | ApplicationTemplateRenderer, test project template | ApplicationTemplateBuildSmokeTests |
 
 ## Feature 硬门禁
@@ -74,15 +74,15 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-TEMPLATES-004 Plugin Template
 
 Feature ID: `AUC-TEMPLATES-004`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 生成单 assembly 插件项目和 NuGet 打包约定。
-Public Contract: ApplicationTemplateRenderer, Plugin template package
+Public Contract: Plugin template package
 Runtime / Build Behavior: 输出插件 csproj、manifest、module、package metadata、plugin tests 和 pack properties。
 Failure Behavior: plugin id 非法、capability 变量非法、package metadata 缺失失败。
 Threading / Cancellation: 文件写入可取消；pack smoke 可由后续测试执行。
 Diagnostics: diagnostic 必须包含 plugin id、package id 和 contribution。
 Tests: `TemplatePackageLayoutTests`
-Required Assertions: 断言单 assembly、NuGet metadata、manifest、msbuild 属性和测试项目。
+Required Assertions: 已断言单 assembly、NuGet metadata、manifest、msbuild 属性和测试项目。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 
 ## AUC-TEMPLATES-005 Test Template

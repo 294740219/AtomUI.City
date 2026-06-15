@@ -10,6 +10,7 @@
 | Planning | ApplicationTemplateRenderer, TemplatePlan | 生成可 review 的文件变更计划。 | plan 先于写入；可校验重复路径和路径逃逸。 |
 | Rendering | TemplateChange, TemplateRenderResult | 应用模板文件变更。 | 路径必须规范化为 `/` 分隔的相对路径；冲突、路径逃逸、写入失败有稳定 result。 |
 | Generated Application | `.slnx`, `Directory.Build.props`, docs entry, app/test projects | 生成可独立 restore/build/test 的应用工作区。 | 输出只包含相对路径，不写入机器绝对路径。 |
+| Generated Plugin | plugin csproj, `atomui-city/plugin.json`, module, plugin tests | 生成单 assembly 插件包骨架。 | Plugin MSBuild 属性、NuGet metadata、manifest 和测试项目必须稳定。 |
 
 ## 关键方法合同
 
@@ -22,6 +23,7 @@
 | TemplatePlan.Validate | 校验计划。 | plan entries。 | `IReadOnlyList<TemplateDiagnostic>`。 | 重复 normalized path 返回 `AUCTPL1002`；路径逃逸返回 `AUCTPL1001`；非法 change type 返回 `AUCTPL1003`。 | 纯 CPU，无 token。 | plan 不可变，返回 diagnostics 不可变。 |
 | TemplateChange.Create | 创建文件变更。 | relative path。 | normalized create change。 | 空路径、绝对路径、路径逃逸抛 `ArgumentException`。 | 纯 CPU，无 token。 | 同一路径变体归一化为同一 `Path`。 |
 | Generated application solution | 表达应用和测试项目 build graph。 | AppName、IncludeTests。 | `<AppName>.slnx`。 | 缺少 app/test project 时 smoke test 失败。 | 随 Render 观察 token。 | path 固定为相对路径。 |
+| Plugin template package | 表达插件模板包布局。 | `atomui-city-plugin` template package。 | plugin project、manifest、module、test project。 | 缺少必需文件或 metadata 时 smoke test 失败。 | 文件读取测试无 token。 | sourceName 为 `AtomUICityPlugin`，PluginId symbol 为 `PluginId`。 |
 
 ## Public 类型覆盖
 
