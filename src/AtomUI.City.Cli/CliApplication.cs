@@ -103,7 +103,7 @@ public static class CliApplication
         return command switch
         {
             "doctor" => await DoctorAsync(commandLine, environment, output).ConfigureAwait(false),
-            "new" => await NewAsync(commandLine, environment, output).ConfigureAwait(false),
+            "new" => await NewAsync(commandLine, environment, output, cancellationToken).ConfigureAwait(false),
             "build" or "test" or "pack" or "publish" => await DotnetCommandAsync(command, commandLine, output, cancellationToken).ConfigureAwait(false),
             "inspect" => await InspectAsync(commandLine, environment, output).ConfigureAwait(false),
             "plugin" => await PluginAsync(commandLine, environment, output, cancellationToken).ConfigureAwait(false),
@@ -155,7 +155,8 @@ public static class CliApplication
     private static async ValueTask<int> NewAsync(
         CliCommandLine commandLine,
         CliExecutionEnvironment environment,
-        TextWriter output)
+        TextWriter output,
+        CancellationToken cancellationToken)
     {
         var positionals = commandLine.Positionals;
         if (positionals.Count < 4 || positionals[2] != "app")
@@ -172,6 +173,23 @@ public static class CliApplication
         }
 
         var appName = positionals[3];
+        if (!IsValidIdentifier(appName))
+        {
+            return await WriteAsync(
+                    output,
+                    commandLine,
+                    "atomui city new app",
+                    CliEnvelope.Failed(
+                        "atomui city new app",
+                        CliExitCodes.ArgumentError,
+                        CliDiagnostic.Error(
+                            "AUCCLI0104",
+                            "AppName must be a valid identifier.",
+                            appName,
+                            3)))
+                .ConfigureAwait(false);
+        }
+
         var rootNamespace = commandLine.GetOptionValue("--namespace") ?? appName;
         if (rootNamespace.StartsWith("AtomUI.City", StringComparison.Ordinal))
         {
@@ -213,10 +231,58 @@ public static class CliApplication
         };
         var renderer = new ApplicationTemplateRenderer();
         var plan = renderer.CreatePlan(options);
+        var artifacts = CreateArtifacts(plan);
 
         if (!commandLine.HasOption("--dry-run"))
         {
-            renderer.Render(options);
+            var conflict = plan.Changes
+                .Select(change => change.Path)
+                .FirstOrDefault(relativePath => File.Exists(ResolveTemplatePath(options.OutputPath, relativePath)));
+            if (conflict is not null)
+            {
+                return await WriteAsync(
+                        output,
+                        commandLine,
+                        "atomui city new app",
+                        CliEnvelope.FailedWithData(
+                            "atomui city new app",
+                            CliExitCodes.ArgumentError,
+                            new Dictionary<string, object?>
+                            {
+                                ["plan"] = plan,
+                                ["artifacts"] = artifacts,
+                                ["conflict"] = conflict,
+                            },
+                            CliDiagnostic.Error(
+                                "AUCCLI0105",
+                                $"Target already exists: '{conflict}'.",
+                                conflict)))
+                    .ConfigureAwait(false);
+            }
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return await WriteAsync(
+                        output,
+                        commandLine,
+                        "atomui city new app",
+                        CliEnvelope.FailedWithData(
+                            "atomui city new app",
+                            CliExitCodes.Failure,
+                            new Dictionary<string, object?>
+                            {
+                                ["plan"] = plan,
+                                ["artifacts"] = artifacts,
+                            },
+                            CliDiagnostic.Error(
+                                "AUCCLI0106",
+                                "New app generation was cancelled.",
+                                appName,
+                                3)))
+                    .ConfigureAwait(false);
+            }
+
+            renderer.Render(options, cancellationToken);
         }
 
         return await WriteAsync(
@@ -225,7 +291,11 @@ public static class CliApplication
                 "atomui city new app",
                 CliEnvelope.Succeeded(
                     "atomui city new app",
-                    new Dictionary<string, object?> { ["plan"] = plan }))
+                    new Dictionary<string, object?>
+                    {
+                        ["plan"] = plan,
+                        ["artifacts"] = artifacts,
+                    }))
             .ConfigureAwait(false);
     }
 
@@ -430,6 +500,46 @@ public static class CliApplication
         {
             ["usage"] = UsageLines,
         };
+    }
+
+    private static IReadOnlyList<object> CreateArtifacts(TemplatePlan plan)
+    {
+        return plan.Changes
+            .Select(change => new
+            {
+                type = change.Type,
+                path = change.Path,
+            })
+            .Cast<object>()
+            .ToArray();
+    }
+
+    private static string ResolveTemplatePath(
+        string outputPath,
+        string relativePath)
+    {
+        return Path.Combine([outputPath, .. relativePath.Split('/')]);
+    }
+
+    private static bool IsValidIdentifier(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value) ||
+            !IsIdentifierStart(value[0]))
+        {
+            return false;
+        }
+
+        return value.Skip(1).All(IsIdentifierPart);
+    }
+
+    private static bool IsIdentifierStart(char value)
+    {
+        return value == '_' || char.IsLetter(value);
+    }
+
+    private static bool IsIdentifierPart(char value)
+    {
+        return value == '_' || char.IsLetterOrDigit(value);
     }
 
     private static async ValueTask<int> ApplyAsync(CliCommandLine commandLine, TextWriter output)

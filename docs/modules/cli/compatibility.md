@@ -17,6 +17,8 @@
 - 删除、重命名、改变默认行为、异常类型、Result status 或诊断码语义属于 breaking change。
 - 新增 API 可以 minor 版本发布，但必须有文档、测试和迁移说明。
 - `AUCCLI0001` 表示缺少 `city` 根命令，`AUCCLI0002` 表示未知命令，`AUCCLI0003` 表示缺少子命令，`AUCCLI0004` 表示未知 option，`AUCCLI0005` 表示 value option 缺值；diagnostic `target` 和 `position` 字段进入 1.0 兼容承诺。
+- `AUCCLI0101` 表示缺少 app name，`AUCCLI0102` 表示 root namespace 使用框架保留前缀，`AUCCLI0103` 表示 AOT 与 dynamic plugin 默认冲突，`AUCCLI0104` 表示 app name 不是合法 identifier，`AUCCLI0105` 表示目标文件已存在，`AUCCLI0106` 表示 new app generation 取消。
+- `atomui city new app --json` 成功、dry-run、目标冲突和取消 envelope 的 `data.plan`、`data.artifacts` 字段进入 1.0 兼容承诺；目标冲突还包含 `data.conflict`。
 - `--json` 模式失败时只输出 JSON envelope；非 JSON 解析失败输出 `Usage:` 文本块。
 
 ## 数据格式兼容

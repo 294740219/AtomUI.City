@@ -7,7 +7,7 @@
 | Feature ID | 名称 | 状态 | Public Contract | 主测试 |
 | --- | --- | --- | --- | --- |
 | AUC-CLI-001 | Command Model | Completed | CliApplication, CliCommandLine, CliExitCodes | CliCommandArchitectureTests |
-| AUC-CLI-002 | New App Command | Ready to Start Product Implementation | CliApplication, ApplicationTemplateRenderer, CliEnvelope | CliNewAppTests |
+| AUC-CLI-002 | New App Command | Completed | CliApplication, ApplicationTemplateRenderer, CliEnvelope | CliNewAppTests |
 | AUC-CLI-003 | Build and Test Commands | Ready to Start Product Implementation | DotnetInvocation, ProcessRunner, CliEnvelope | CliBuildAndTestCommandTests |
 | AUC-CLI-004 | Plugin Inspect and Doctor | Ready to Start Product Implementation | CliApplication, PluginManifestReader, PluginDiagnostic | CliInspectDoctorPluginTests |
 | AUC-CLI-005 | AI-Friendly Envelope | Ready to Start Product Implementation | CliEnvelope, CliDiagnostic, CliExecutionEnvironment | CliCommandArchitectureTests |
@@ -47,13 +47,13 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-CLI-002 New App Command
 
 Feature ID: `AUC-CLI-002`
-Status: Ready to Start Product Implementation
+Status: Completed
 Goal: 通过 CLI 调用 Templates 生成可构建应用。
 Public Contract: CliApplication, ApplicationTemplateRenderer, CliEnvelope
-Runtime / Build Behavior: `atomui city new app` 校验项目名、目标目录、模板变量，先 plan 后 render。
-Failure Behavior: 目标冲突、变量非法、模板缺失、render 失败不得返回成功。
-Threading / Cancellation: 文件写入和模板渲染必须观察 token；取消后输出 partial artifact list。
-Diagnostics: diagnostic 必须包含 template name、target path 和 failed variable。
+Runtime / Build Behavior: `atomui city new app` 校验 app name、root namespace、AOT/dynamic plugin 冲突和目标文件冲突；先生成 plan/artifacts，再按需 render。`--dry-run` 只输出 plan/artifacts，不写文件。
+Failure Behavior: 缺少 app name、非法 app name、保留 root namespace、AOT/dynamic plugin 冲突、目标文件冲突和取消都返回失败 envelope，且不得覆盖或写入目标文件。
+Threading / Cancellation: CLI 在渲染前观察 token，renderer 在每个文件写入前观察 token；取消后输出 plan/artifacts 和 `AUCCLI0106`。
+Diagnostics: `AUCCLI0101` 到 `AUCCLI0106` 覆盖缺参、保留 namespace、冲突变量、非法 app name、目标冲突和取消。
 Tests: `CliNewAppTests`
 Required Assertions: 断言生成项目、冲突、非法名称、dry-run、JSON artifacts 和取消。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。

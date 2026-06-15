@@ -41,7 +41,7 @@
 | AUC-CLI-003 | Build and Test | CliBuildAndTestCommandTests |
 | AUC-CLI-004 | Plugin Inspect Doctor | CliInspectDoctorPluginTests |
 | AUC-CLI-005 | AI Envelope | CliCommandArchitectureTests |
-| AUC-CLI-006 | Assembly Smoke | CliAssemblyTests |
+| AUC-CLI-006 | Non-Interactive and CI Mode | CliCommandArchitectureTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -103,8 +103,11 @@ Parse arguments
 - 默认生成测试项目。
 - 默认不生成业务页面。
 - 默认不启用动态插件。
-- `--use-aot` 和 `--use-dynamic-plugins` 冲突时必须诊断。
-- 用户命名空间不能以 `AtomUI.City` 开头。
+- `AppName` 必须是合法 C# identifier；非法值返回 `AUCCLI0104`，不写文件。
+- `--use-aot` 和 `--use-dynamic-plugins` 冲突时返回 `AUCCLI0103`。
+- 用户命名空间不能以 `AtomUI.City` 开头，违规返回 `AUCCLI0102`。
+- 目标文件已存在时返回 `AUCCLI0105`，不得覆盖已有文件。
+- 取消时返回 `AUCCLI0106`，JSON 输出包含已计算的 plan/artifacts，且不得写入新文件。
 - 生成项目必须引用 `AtomUI.City.Build`。
 
 ### 5. Dry-run
@@ -113,7 +116,7 @@ Parse arguments
 atomui city new app SalesClient --dry-run --json
 ```
 
-输出将创建的目录、文件、项目引用、测试项目和风险。
+输出 `data.plan` 和 `data.artifacts`，列出将创建的目录、文件、项目引用、测试项目和风险；dry-run 不写文件。
 
 ### 6. 测试矩阵
 

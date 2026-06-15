@@ -15,7 +15,7 @@
 | Method | Purpose | Parameters | Return | Failure Behavior | Cancellation | Concurrency / Idempotency |
 | --- | --- | --- | --- | --- | --- | --- |
 | ApplicationTemplateRenderer.CreatePlan | 生成模板变更计划。 | options、target directory。 | TemplatePlan。 | 非法名称、目标逃逸、冲突标记失败。 | 纯 CPU/文件枚举可观察 token。 | 不写文件，可重复调用。 |
-| ApplicationTemplateRenderer.RenderAsync | 执行模板写入。 | TemplatePlan 或 options。 | TemplateRenderResult。 | 写入失败返回 diagnostics，并记录已写入文件。 | 取消后停止后续写入并返回 partial result。 | 同一目标目录并发 render 必须拒绝或文件锁保护。 |
+| ApplicationTemplateRenderer.Render | 执行模板写入。 | options，或 options + CancellationToken。 | TemplateRenderResult。 | 写入失败返回 diagnostics，并记录已写入文件。 | 可取消 overload 在每个文件写入前观察 token；预取消时不写文件并抛 `OperationCanceledException`。 | 同一目标目录并发 render 必须拒绝或文件锁保护。 |
 | TemplatePlan.Validate | 校验计划。 | plan entries。 | validation result。 | 重复路径、路径逃逸、非法 overwrite 失败。 | 纯 CPU，无 token。 | plan 不可变。 |
 
 ## Public 类型覆盖

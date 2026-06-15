@@ -29,25 +29,31 @@ public sealed class ApplicationTemplateRenderer
 
     public TemplateRenderResult Render(ApplicationTemplateOptions options)
     {
+        return Render(options, CancellationToken.None);
+    }
+
+    public TemplateRenderResult Render(ApplicationTemplateOptions options, CancellationToken cancellationToken)
+    {
         ArgumentNullException.ThrowIfNull(options);
+        cancellationToken.ThrowIfCancellationRequested();
 
         var plan = CreatePlan(options);
 
-        WriteFile(options, $"src/{options.AppName}/{options.AppName}.csproj", CreateApplicationProject(options));
-        WriteFile(options, $"src/{options.AppName}/Program.cs", CreateProgram(options));
-        WriteFile(options, $"src/{options.AppName}/App.axaml", CreateAppXaml(options));
-        WriteFile(options, $"src/{options.AppName}/App.axaml.cs", CreateAppCodeBehind(options));
-        WriteFile(options, $"src/{options.AppName}/Modules/.gitkeep", string.Empty);
-        WriteFile(options, $"src/{options.AppName}/Routes/.gitkeep", string.Empty);
-        WriteFile(options, $"src/{options.AppName}/Resources/.gitkeep", string.Empty);
-        WriteFile(options, $"src/{options.AppName}/Configuration/.gitkeep", string.Empty);
-        WriteFile(options, $"src/{options.AppName}/Localization/.gitkeep", string.Empty);
+        WriteFile(options, $"src/{options.AppName}/{options.AppName}.csproj", CreateApplicationProject(options), cancellationToken);
+        WriteFile(options, $"src/{options.AppName}/Program.cs", CreateProgram(options), cancellationToken);
+        WriteFile(options, $"src/{options.AppName}/App.axaml", CreateAppXaml(options), cancellationToken);
+        WriteFile(options, $"src/{options.AppName}/App.axaml.cs", CreateAppCodeBehind(options), cancellationToken);
+        WriteFile(options, $"src/{options.AppName}/Modules/.gitkeep", string.Empty, cancellationToken);
+        WriteFile(options, $"src/{options.AppName}/Routes/.gitkeep", string.Empty, cancellationToken);
+        WriteFile(options, $"src/{options.AppName}/Resources/.gitkeep", string.Empty, cancellationToken);
+        WriteFile(options, $"src/{options.AppName}/Configuration/.gitkeep", string.Empty, cancellationToken);
+        WriteFile(options, $"src/{options.AppName}/Localization/.gitkeep", string.Empty, cancellationToken);
 
         if (options.IncludeTests)
         {
-            WriteFile(options, $"tests/{options.AppName}.Tests/{options.AppName}.Tests.csproj", CreateTestProject(options));
-            WriteFile(options, $"tests/{options.AppName}.Tests/FeatureTestMatrix.md", CreateFeatureTestMatrix(options));
-            WriteFile(options, $"tests/{options.AppName}.Tests/ApplicationSmokeTests.cs", CreateApplicationSmokeTests(options));
+            WriteFile(options, $"tests/{options.AppName}.Tests/{options.AppName}.Tests.csproj", CreateTestProject(options), cancellationToken);
+            WriteFile(options, $"tests/{options.AppName}.Tests/FeatureTestMatrix.md", CreateFeatureTestMatrix(options), cancellationToken);
+            WriteFile(options, $"tests/{options.AppName}.Tests/ApplicationSmokeTests.cs", CreateApplicationSmokeTests(options), cancellationToken);
         }
 
         return TemplateRenderResult.Success(plan);
@@ -76,10 +82,14 @@ public sealed class ApplicationTemplateRenderer
     private static void WriteFile(
         ApplicationTemplateOptions options,
         string relativePath,
-        string content)
+        string content,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         var path = Path.Combine([options.OutputPath, .. relativePath.Split('/')]);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        cancellationToken.ThrowIfCancellationRequested();
         File.WriteAllText(path, content);
     }
 

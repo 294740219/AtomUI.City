@@ -22,7 +22,7 @@
 | Feature ID | Test Type | Test File | Required Assertions | Failure Paths | Status |
 | --- | --- | --- | --- | --- | --- |
 | AUC-CLI-001 | Unit | CliCommandArchitectureTests | 断言入口名、未知命令、缺参、exit code、usage 输出和 JSON 模式隔离。 | 未知命令、缺参、未知 option、value option 缺值返回 ArgumentError，不执行 handler。 | Completed |
-| AUC-CLI-002 | Unit | CliNewAppTests | 断言生成项目、冲突、非法名称、dry-run、JSON artifacts 和取消。 | 目标冲突、变量非法、模板缺失、render 失败不得返回成功。 | Required |
+| AUC-CLI-002 | Unit | CliNewAppTests | 断言生成项目、冲突、非法名称、dry-run、JSON artifacts 和取消。 | 缺少 app name、非法 app name、保留 root namespace、AOT/dynamic plugin 冲突、目标文件冲突和取消返回稳定诊断，且不得写入或覆盖文件。 | Completed |
 | AUC-CLI-003 | Unit | CliBuildAndTestCommandTests | 断言成功、失败、非零 exit code、取消、CI 模式和输出截断。 | dotnet 非零退出、超时、工作目录不存在返回失败 envelope。 | Required |
 | AUC-CLI-004 | Unit | CliInspectDoctorPluginTests | 断言合法插件、manifest 缺失、版本非法、layout 错误和 JSON diagnostics。 | manifest 缺失、版本非法、依赖冲突、layout 错误输出 plugin diagnostics。 | Required |
 | AUC-CLI-005 | Unit | CliCommandArchitectureTests | 断言 schema、纯 JSON、artifact 列表、suggested commands、retryable 语义。 | schema 缺字段、普通日志混入 JSON、颜色控制字符进入 JSON 必须测试失败。 | Required |

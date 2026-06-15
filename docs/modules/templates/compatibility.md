@@ -16,6 +16,7 @@
 - public 类型、成员、枚举值、attribute 参数和扩展方法默认视为兼容性承诺。
 - 删除、重命名、改变默认行为、异常类型、Result status 或诊断码语义属于 breaking change。
 - 新增 API 可以 minor 版本发布，但必须有文档、测试和迁移说明。
+- `ApplicationTemplateRenderer.Render(ApplicationTemplateOptions, CancellationToken)` 是 1.0 兼容承诺；预取消 token 必须在写入任何文件前抛 `OperationCanceledException`。
 
 ## 数据格式兼容
 

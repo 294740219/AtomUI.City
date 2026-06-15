@@ -72,6 +72,28 @@ public sealed class ApplicationTemplateBuildSmokeTests
         Assert.Contains("ApplicationHost.CreateBuilder(args)", program, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void ApplicationTemplateRenderObservesPreCancelledTokenBeforeWriting()
+    {
+        using var workspace = new TemplateSmokeWorkspace();
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var renderer = new ApplicationTemplateRenderer();
+
+        Assert.Throws<OperationCanceledException>(() => renderer.Render(
+            new ApplicationTemplateOptions
+            {
+                AppName = "SalesClient",
+                RootNamespace = "Company.SalesClient",
+                OutputPath = workspace.Root,
+                TargetFramework = "net10.0",
+                IncludeTests = true,
+            },
+            cancellation.Token));
+        Assert.False(Directory.Exists(Path.Combine(workspace.Root, "src", "SalesClient")));
+        Assert.False(Directory.Exists(Path.Combine(workspace.Root, "tests", "SalesClient.Tests")));
+    }
+
     private sealed class TemplateSmokeWorkspace : IDisposable
     {
         public TemplateSmokeWorkspace()

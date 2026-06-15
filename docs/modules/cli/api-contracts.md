@@ -17,6 +17,7 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | CliApplication.RunAsync | 执行命令。 | argv、environment、stdout/stderr。 | exit code。 | 解析失败、handler 失败映射 CliExitCodes；缺少 `city`、缺少子命令、未知 command、未知 option 和 option 缺值都返回 ArgumentError。 | 必须观察 token。 | 单进程单次调用；handler 内部并发隔离。 |
 | CliCommandLine.Parse | 解析命令行。 | argv 不得为 null。 | CliCommandLine 和 parse diagnostics。 | 未知 option、缺参返回 parse diagnostic，不执行 handler。 | 纯 CPU，无 token。 | 无共享状态。 |
+| `atomui city new app` handler | 生成应用模板。 | AppName、namespace、target framework、output、dry-run、AOT/plugin flags。 | exit code 和 CliEnvelope。 | `AUCCLI0101` 到 `AUCCLI0106` 覆盖缺参、保留 namespace、冲突变量、非法 app name、目标冲突和取消；目标冲突不得覆盖已有文件。 | 渲染前和每个文件写入前观察 token；取消输出失败 envelope。 | 先 plan 后 render；dry-run 可重复调用且不写文件。 |
 | CliEnvelope JSON/Text 输出 | 输出机器可读 envelope 或文本摘要。 | envelope、TextWriter。 | 写入完成。 | JSON 模式只写 JSON envelope；文本失败输出稳定 usage。 | 写入前观察 token。 | JSON 输出不得混入普通日志。 |
 | ProcessRunner.RunAsync | 运行 dotnet 或其他子进程。 | DotnetInvocation。 | process result。 | 非零 exit code 保留为 command failure。 | 取消必须终止子进程或停止等待。 | stdout/stderr 缓冲必须有上限。 |
 

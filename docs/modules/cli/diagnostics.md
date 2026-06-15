@@ -14,9 +14,15 @@
 | --- | --- | --- |
 | `AUCCLI0001` | CommandPrefixInvalid | `src/AtomUI.City.Cli/CliApplication.cs` |
 | `AUCCLI0002` | UnknownCommand | `src/AtomUI.City.Cli/CliApplication.cs` |
+| `AUCCLI0003` | CommandRequired | `src/AtomUI.City.Cli/CliApplication.cs` |
+| `AUCCLI0004` | UnknownOption | `src/AtomUI.City.Cli/CliCommandLine.cs` |
+| `AUCCLI0005` | OptionValueRequired | `src/AtomUI.City.Cli/CliCommandLine.cs` |
 | `AUCCLI0101` | AppNameRequired | `src/AtomUI.City.Cli/CliApplication.cs` |
 | `AUCCLI0102` | RootNamespaceReserved | `src/AtomUI.City.Cli/CliApplication.cs` |
 | `AUCCLI0103` | AotDynamicPluginConflict | `src/AtomUI.City.Cli/CliApplication.cs` |
+| `AUCCLI0104` | AppNameInvalid | `src/AtomUI.City.Cli/CliApplication.cs` |
+| `AUCCLI0105` | TargetAlreadyExists | `src/AtomUI.City.Cli/CliApplication.cs` |
+| `AUCCLI0106` | NewAppCancelled | `src/AtomUI.City.Cli/CliApplication.cs` |
 | `AUCCLI0201` | DotnetCommandFailed | `src/AtomUI.City.Cli/CliApplication.cs` |
 | `AUCCLI0301` | PluginPackagePathRequired | `src/AtomUI.City.Cli/CliApplication.cs` |
 
