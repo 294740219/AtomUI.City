@@ -46,13 +46,13 @@ AtomUI.City 需要依赖成熟的开源基础设施，但不能让外部库决�
 | [System.Reactive](https://github.com/dotnet/reactive) | `AtomUI.City.Reactive` | 可选适配 | 适合事件流、调度、异步组合和测试调度。 | 不把 `IObservable<T>` 作为 State、Routing、Command、EventBus 的主公共 API。 |
 | [ReactiveUI](https://www.reactiveui.net/) | `AtomUI.City.ReactiveUI` | 可选适配 | 方便已有 ReactiveUI 应用迁移，并提供 activation、command、interaction 等互操作能力。 | 不作为默认 ViewModel 基类；不让 ReactiveUI RoutingState 成为 AtomUI.City 路由模型。 |
 | [DynamicData](https://github.com/reactivemarbles/DynamicData) | `AtomUI.City.State.DynamicData` | 可选适配 | 适合复杂集合状态的过滤、排序、分组、增量更新和派生集合。 | 依赖 Rx，不能进入 State Core；应作为高级集合状态扩展。 |
-| [Scrutor](https://github.com/khellang/Scrutor) | Core 内部实现或 `AtomUI.City.Modularity` 内部能力 | 谨慎 | 可以补足 Microsoft.Extensions.DependencyInjection 的 assembly scanning 和 decorator 能力。 | 反射扫描必须考虑 AOT、trimming 和启动性能；模块注册优先支持显式注册。 |
+| [Scrutor](https://github.com/khellang/Scrutor) | Core 内部实现或 `AtomUI.City.Core.Modularity` 内部能力 | 谨慎 | 可以补足 Microsoft.Extensions.DependencyInjection 的 assembly scanning 和 decorator 能力。 | 反射扫描必须考虑 AOT、trimming 和启动性能；模块注册优先支持显式注册。 |
 | [Microsoft.CodeAnalysis](https://learn.microsoft.com/en-us/dotnet/csharp/roslyn-sdk/) | `AtomUI.City.Build` / Generator | 强推荐 | 路由清单、模块清单、模板诊断、代码约定检查、source generator 和 analyzer 都需要 Roslyn 能力。 | 只进入 Build/Generator 相关包，不进入应用运行时主链路。 |
 | [Scriban](https://github.com/scriban/scriban) | `AtomUI.City.Templates` / `AtomUI.City.Cli` | 强推荐 | 适合作为项目、模块、页面、插件、测试模板的文本模板引擎。 | 模板语法必须保持稳定；模板输出要经过测试验证。 |
 | [System.CommandLine](https://learn.microsoft.com/en-us/dotnet/standard/commandline/) | `AtomUI.City.Cli` | 推荐 | 适合构建命令、参数、帮助文本和 CLI command model。 | CLI 命令模型不应泄漏到 Core。 |
 | [Spectre.Console](https://spectreconsole.net/) | `AtomUI.City.Cli` | 推荐 | 适合输出表格、树、进度、诊断信息和交互式提示，提高 CLI 可用性。 | 只负责终端体验，不负责业务逻辑和构建逻辑。 |
 | [NuGet.Protocol](https://learn.microsoft.com/en-us/nuget/reference/nuget-client-sdk) | `AtomUI.City.PluginSystem` / `AtomUI.City.Build` / `AtomUI.City.Cli` | 推荐 | 插件包、模板包、模块包、feed 查询和包元数据读取需要 NuGet Client SDK。 | 插件加载和包下载必须有安全边界、版本策略和缓存策略。 |
-| [OpenTelemetry](https://opentelemetry.io/docs/) | `AtomUI.City.Diagnostics` 或可选集成 | 可选 | Host、Routing、Data、EventBus、PluginSystem 都需要 tracing、metrics、logs 等可观测性扩展点。 | 不作为 v1 Core 必选依赖；先保留诊断抽象，再提供 OTel 适配。 |
+| [OpenTelemetry](https://opentelemetry.io/docs/) | `AtomUI.City.Core.Diagnostics` 或可选集成 | 可选 | Host、Routing、Data、EventBus、PluginSystem 都需要 tracing、metrics、logs 等可观测性扩展点。 | 不作为 v1 Core 必选依赖；先保留诊断抽象，再提供 OTel 适配。 |
 | [xUnit.net](https://xunit.net/) / [NSubstitute](https://nsubstitute.github.io/) / [Shouldly](https://docs.shouldly.org/) | `AtomUI.City.Testing` 和测试项目 | 推荐 | 分别承担测试框架、替身对象和可读断言，适合框架级行为测试。 | 这些依赖只进入测试包和测试项目，不进入运行时包。 |
 
 ## 4. 第一版硬依赖建议
@@ -100,7 +100,7 @@ AtomUI.City 需要依赖成熟的开源基础设施，但不能让外部库决�
 - `AtomUI.City.State.DynamicData`
 - `AtomUI.City.Data.Refit`
 - `AtomUI.City.Validation.FluentValidation`
-- `AtomUI.City.Diagnostics.OpenTelemetry`
+- `AtomUI.City.Core.Diagnostics.OpenTelemetry`
 
 是否创建这些包，应由实际功能落地需求驱动，不提前拆包。
 

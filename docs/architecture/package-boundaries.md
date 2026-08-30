@@ -61,13 +61,13 @@ Testing -> Core and selected framework packages
 
 `AtomUI.City.Core` 可以包含以下命名空间：
 
-- `AtomUI.City.Hosting`
-- `AtomUI.City.Lifecycle`
-- `AtomUI.City.Modularity`
+- `AtomUI.City.Core.Hosting`
+- `AtomUI.City.Core.Lifecycle`
+- `AtomUI.City.Core.Modularity`
 - `AtomUI.City.Configuration`
-- `AtomUI.City.DependencyInjection`
-- `AtomUI.City.Threading`
-- `AtomUI.City.Diagnostics`
+- `AtomUI.City.Core.DependencyInjection`
+- `AtomUI.City.Core.Threading`
+- `AtomUI.City.Core.Diagnostics`
 
 Core 不应依赖：
 

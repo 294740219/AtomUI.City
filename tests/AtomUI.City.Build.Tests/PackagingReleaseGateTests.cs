@@ -153,6 +153,10 @@ public sealed class PackagingReleaseGateTests
         Assert.Contains("dotnet restore", templateSmokeScript, StringComparison.Ordinal);
         Assert.Contains("dotnet build", templateSmokeScript, StringComparison.Ordinal);
         Assert.Contains("dotnet test", templateSmokeScript, StringComparison.Ordinal);
+        Assert.Contains("NUGET_PACKAGES", templateSmokeScript, StringComparison.Ordinal);
+        Assert.Contains("DefaultServiceProviderFactory", templateSmokeScript, StringComparison.Ordinal);
+        Assert.Contains("Host.CreateApplicationBuilder().Build()", templateSmokeScript, StringComparison.Ordinal);
+        Assert.Contains("AUCANL0001", templateSmokeScript, StringComparison.Ordinal);
 
         var releaseNotesScript = File.ReadAllText(releaseNotesScriptPath);
         Assert.Contains("output/release-notes", releaseNotesScript, StringComparison.Ordinal);

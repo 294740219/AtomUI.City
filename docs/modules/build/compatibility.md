@@ -18,6 +18,8 @@
 - public 类型、成员、枚举值、attribute 参数和扩展方法默认视为兼容性承诺。
 - 删除、重命名、改变默认行为、异常类型、Result status 或诊断码语义属于 breaking change。
 - 新增 API 可以 minor 版本发布，但必须有文档、测试和迁移说明。
+- `AtomUI.City.Build.props` 必须把 `IsTestProject` 暴露给 Analyzer，确保 `AUCANL0001` 不影响测试项目的独立 DI 装配。
+- `AUCANL0001` 的 Root Provider 所有权约束覆盖 Microsoft Generic Host 构建/启动入口；生产 City 项目必须通过 City `ApplicationHost` 构建应用 Host。
 
 ## 数据格式兼容
 

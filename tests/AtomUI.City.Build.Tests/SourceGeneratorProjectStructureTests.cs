@@ -13,6 +13,7 @@ public sealed class SourceGeneratorProjectStructureTests
         Assert.True(File.Exists(Path.Combine(generatorRoot, "AtomUI.City.Generators.csproj")));
 
         AssertDirectoryExists(generatorRoot, "Common");
+        AssertDirectoryExists(generatorRoot, "Analyzers");
         AssertDirectoryExists(generatorRoot, "Diagnostics");
         AssertDirectoryExists(generatorRoot, "EventBus");
         AssertDirectoryExists(generatorRoot, "Localization");
@@ -86,6 +87,11 @@ public sealed class SourceGeneratorProjectStructureTests
         Assert.True(File.Exists(Path.Combine(buildRoot, "buildTransitive", "AtomUI.City.Application.targets")));
         Assert.True(File.Exists(Path.Combine(buildRoot, "buildTransitive", "AtomUI.City.Plugin.targets")));
         Assert.True(File.Exists(Path.Combine(buildRoot, "buildTransitive", "AtomUI.City.Diagnostics.targets")));
+
+        var buildProps = XDocument.Load(Path.Combine(buildRoot, "buildTransitive", "AtomUI.City.Build.props"));
+        Assert.Contains(
+            buildProps.Descendants("CompilerVisibleProperty"),
+            property => property.Attribute("Include")?.Value == "IsTestProject");
 
         var packedItems = buildProject
             .Descendants("None")

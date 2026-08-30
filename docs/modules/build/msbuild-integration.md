@@ -83,7 +83,7 @@ buildTransitive/
   AtomUI.City.Build.targets
   AtomUI.City.Application.targets
   AtomUI.City.Plugin.targets
-  AtomUI.City.Diagnostics.targets
+  AtomUI.City.Core.Diagnostics.targets
 analyzers/
   dotnet/cs/AtomUI.City.Generators.dll
 tools/

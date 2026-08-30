@@ -13,4 +13,8 @@
     <AtomUICityManifestIntermediateOutputPath Condition="'$(AtomUICityManifestIntermediateOutputPath)' == ''">$(IntermediateOutputPath)AtomUI.City/manifests/</AtomUICityManifestIntermediateOutputPath>
     <AtomUICityBuildDiagnosticsOutputPath Condition="'$(AtomUICityBuildDiagnosticsOutputPath)' == ''">$(IntermediateOutputPath)AtomUI.City/diagnostics/</AtomUICityBuildDiagnosticsOutputPath>
   </PropertyGroup>
+
+  <ItemGroup>
+    <CompilerVisibleProperty Include="IsTestProject" />
+  </ItemGroup>
 </Project>

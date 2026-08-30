@@ -213,7 +213,7 @@ public sealed class ApplicationTemplateRenderer
         var rootNamespace = options.EffectiveRootNamespace;
 
         return $$"""
-            using AtomUI.City.Hosting;
+            using AtomUI.City.Core.Hosting;
 
             namespace {{rootNamespace}};
 

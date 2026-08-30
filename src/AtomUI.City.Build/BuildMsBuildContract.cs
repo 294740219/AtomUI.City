@@ -49,7 +49,7 @@ public static class BuildMsBuildContract
         "buildTransitive/AtomUI.City.Build.targets",
         "buildTransitive/AtomUI.City.Application.targets",
         "buildTransitive/AtomUI.City.Plugin.targets",
-        "buildTransitive/AtomUI.City.Diagnostics.targets",
+        "buildTransitive/AtomUI.City.Core.Diagnostics.targets",
         "analyzers/dotnet/cs/AtomUI.City.Generators.dll",
     ];
 

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Xml.Linq;
 using AtomUI.City.Templates;
 
@@ -70,7 +71,7 @@ public sealed class ApplicationTemplateBuildSmokeTests
         Assert.Contains("""<ProjectReference Include="../../src/SalesClient/SalesClient.csproj" />""", testProject, StringComparison.Ordinal);
 
         var program = File.ReadAllText(programPath);
-        Assert.Contains("using AtomUI.City.Hosting;", program, StringComparison.Ordinal);
+        Assert.Contains("using AtomUI.City.Core.Hosting;", program, StringComparison.Ordinal);
         Assert.Contains("ApplicationHost.CreateBuilder(args)", program, StringComparison.Ordinal);
     }
 
@@ -194,10 +195,28 @@ public sealed class ApplicationTemplateBuildSmokeTests
         var repositoryRoot = FindRepositoryRoot();
         var packageSource = Path.Combine(repositoryRoot.FullName, "output", "NuGet", "Debug");
         Assert.True(Directory.Exists(packageSource), $"Expected local package source at {packageSource}.");
+        var corePackagePath = Path.Combine(packageSource, "AtomUI.City.Core.1.0.0.nupkg");
+        Assert.True(File.Exists(corePackagePath), $"Expected Core package at {corePackagePath}.");
+        var packageCacheKey = File.GetLastWriteTimeUtc(corePackagePath).Ticks.ToString(CultureInfo.InvariantCulture);
+        var nugetPackagesPath = Path.Combine(
+            Path.GetTempPath(),
+            "AtomUICityTemplateSmokePackages",
+            packageCacheKey);
+        var nugetConfigPath = Path.Combine(workspace.Root, "NuGet.Config");
+        new XDocument(
+            new XElement(
+                "configuration",
+                new XElement(
+                    "packageSources",
+                    new XElement("clear"),
+                    new XElement("add", new XAttribute("key", "AtomUICityLocal"), new XAttribute("value", packageSource)),
+                    new XElement("add", new XAttribute("key", "nuget.org"), new XAttribute("value", "https://api.nuget.org/v3/index.json")))))
+            .Save(nugetConfigPath);
 
-        await RunDotnetAsync(workspace.Root, "restore", "SalesClient.slnx", "--source", packageSource, "--source", "https://api.nuget.org/v3/index.json");
-        await RunDotnetAsync(workspace.Root, "build", "SalesClient.slnx", "--no-restore");
-        await RunDotnetAsync(workspace.Root, "test", "SalesClient.slnx", "--no-build");
+        await RunDotnetAsync(workspace.Root, nugetPackagesPath, "restore", "SalesClient.slnx", "--configfile", nugetConfigPath);
+        await RunDotnetAsync(workspace.Root, nugetPackagesPath, "build", "SalesClient.slnx", "--no-restore");
+        await RunDotnetAsync(workspace.Root, nugetPackagesPath, "test", "SalesClient.slnx", "--no-build");
+        await RunDotnetAsync(workspace.Root, nugetPackagesPath, "build-server", "shutdown");
     }
 
     [Fact]
@@ -345,7 +364,10 @@ public sealed class ApplicationTemplateBuildSmokeTests
         Assert.False(Directory.Exists(Path.Combine(workspace.Root, "tests", "SalesClient.Tests")));
     }
 
-    private static async Task RunDotnetAsync(string workingDirectory, params string[] arguments)
+    private static async Task RunDotnetAsync(
+        string workingDirectory,
+        string nugetPackagesPath,
+        params string[] arguments)
     {
         var startInfo = new ProcessStartInfo("dotnet")
         {
@@ -353,7 +375,10 @@ public sealed class ApplicationTemplateBuildSmokeTests
             RedirectStandardError = true,
             RedirectStandardOutput = true,
         };
+        startInfo.Environment["DOTNET_CLI_USE_MSBUILD_SERVER"] = "0";
         startInfo.Environment["MSBUILDDISABLENODEREUSE"] = "1";
+        startInfo.Environment["NUGET_PACKAGES"] = nugetPackagesPath;
+        startInfo.Environment["UseSharedCompilation"] = "false";
 
         foreach (var argument in arguments)
         {
@@ -415,9 +440,31 @@ public sealed class ApplicationTemplateBuildSmokeTests
 
         public void Dispose()
         {
-            if (Directory.Exists(Root))
+            const int cleanupAttempts = 5;
+
+            for (var attempt = 1; attempt <= cleanupAttempts; attempt++)
             {
-                Directory.Delete(Root, recursive: true);
+                if (!Directory.Exists(Root))
+                {
+                    return;
+                }
+
+                try
+                {
+                    Directory.Delete(Root, recursive: true);
+                    return;
+                }
+                catch (Exception exception) when (
+                    exception is IOException or UnauthorizedAccessException &&
+                    attempt < cleanupAttempts)
+                {
+                    Thread.Sleep(200);
+                }
+                catch (Exception exception) when (
+                    exception is IOException or UnauthorizedAccessException)
+                {
+                    Trace.WriteLine($"Could not fully remove template smoke workspace '{Root}': {exception.Message}");
+                }
             }
         }
     }

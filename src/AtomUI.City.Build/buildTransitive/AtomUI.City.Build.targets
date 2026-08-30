@@ -1,7 +1,7 @@
 <Project>
   <Import Project="$(MSBuildThisFileDirectory)AtomUI.City.Application.targets" Condition="Exists('$(MSBuildThisFileDirectory)AtomUI.City.Application.targets')" />
   <Import Project="$(MSBuildThisFileDirectory)AtomUI.City.Plugin.targets" Condition="Exists('$(MSBuildThisFileDirectory)AtomUI.City.Plugin.targets')" />
-  <Import Project="$(MSBuildThisFileDirectory)AtomUI.City.Diagnostics.targets" Condition="Exists('$(MSBuildThisFileDirectory)AtomUI.City.Diagnostics.targets')" />
+  <Import Project="$(MSBuildThisFileDirectory)AtomUI.City.Core.Diagnostics.targets" Condition="Exists('$(MSBuildThisFileDirectory)AtomUI.City.Core.Diagnostics.targets')" />
 
   <ItemGroup Condition="'$(AtomUICityEnableAnalyzers)' != 'true'">
     <Analyzer Remove="@(Analyzer)" Condition="'%(Filename)%(Extension)' == 'AtomUI.City.Generators.dll'" />

@@ -18,6 +18,7 @@
 | `AUCGEN004` | DuplicateRoute | `src/AtomUI.City.Generators/Diagnostics/GeneratorDiagnosticIds.cs` |
 | `AUCGEN005` | InvalidManifestInput | `src/AtomUI.City.Generators/Diagnostics/GeneratorDiagnosticIds.cs` |
 | `AUCGEN006` | DuplicatePresentationView | `src/AtomUI.City.Generators/Diagnostics/GeneratorDiagnosticIds.cs` |
+| `AUCANL0001` | BuildServiceProviderNotAllowed | `src/AtomUI.City.Generators/Diagnostics/AnalyzerDiagnosticIds.cs` |
 
 ## 产品级必须诊断的失败
 

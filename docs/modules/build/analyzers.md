@@ -83,6 +83,12 @@ AUCANL0001
 | `AUCANL` | Analyzer 诊断。 |
 | `AUCPLG` | Plugin package 诊断，和 PluginSystem 文档保持一致。 |
 
+当前稳定 Analyzer 诊断：
+
+| ID | Severity | Contract |
+|---|---|---|
+| `AUCANL0001` | Error | 非测试 City 项目不得调用或引用 City/微软的 `BuildServiceProvider`、`IServiceProviderFactory<T>.CreateServiceProvider` 或 Microsoft Generic Host 构建/启动入口；Root Provider 必须由 `ApplicationHost` 构建。 |
+
 ### 3. 诊断级别
 
 | 级别 | 用途 |
@@ -107,6 +113,9 @@ AUCANL0001
 - EventBus 跨插件事件不在共享 contract。
 - Source generator 无法识别需要生成的声明。
 - 测试矩阵缺失。
+- 生产 City 项目显式调用或引用 `BuildServiceProvider`、主动调用 `IServiceProviderFactory<T>.CreateServiceProvider`，或者调用/引用 `HostApplicationBuilder.Build()`、`IHostBuilder.Build()` 及其实现、`IHostBuilder.Start/StartAsync/RunConsoleAsync`。
+
+`AUCANL0001` 对 `IsTestProject=true` 和 generated code 不生效；服务注册、构造函数注入、`GetRequiredService`、`CreateScope`、仅配置 `IServiceProviderFactory<T>` 或仅创建/配置 Microsoft Generic Host builder 不产生诊断。City `ApplicationHost.CreateBuilder().Build()` 是唯一允许的应用 Root Provider 构建入口。Analyzer 检查源码中的语义调用和方法引用，不把可信进程内代码当作安全沙箱，也不分析第三方已编译程序集内部实现。
 
 ### 5. AOT 和 trimming
 
@@ -138,3 +147,4 @@ Analyzer 可以辅助发现：
 | plugin leak | Analyzer test | private contract 泄漏报错。 |
 | route conflict | Analyzer test | 重复 route 报错。 |
 | no false positive | Analyzer test | 正确代码不报错。 |
+| root provider ownership | Analyzer/package smoke test | 直接调用、重载、强转、静态调用、方法引用、helper、独立 ServiceCollection、service provider factory 和 Microsoft Generic Host 构建/启动入口报 `AUCANL0001`；City ApplicationHost Build、已有 IHost 的启动、测试项目和 generated code 豁免。 |
