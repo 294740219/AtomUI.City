@@ -10,7 +10,7 @@ public sealed class FakeUiDispatcherTests
         var dispatcher = new FakeUiDispatcher();
         var calls = new List<string>();
 
-        Assert.IsAssignableFrom<AtomUI.City.Threading.IUiDispatcher>(dispatcher);
+        Assert.IsAssignableFrom<AtomUI.City.Core.Threading.IUiDispatcher>(dispatcher);
         Assert.False(dispatcher.CheckAccess());
 
         await dispatcher.InvokeAsync(() =>

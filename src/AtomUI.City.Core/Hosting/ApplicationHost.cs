@@ -1,4 +1,4 @@
-namespace AtomUI.City.Hosting;
+namespace AtomUI.City.Core.Hosting;
 
 public static class ApplicationHost
 {

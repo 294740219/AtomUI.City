@@ -1,5 +1,5 @@
 using AtomUI.City.Localization;
-using AtomUI.City.Threading;
+using AtomUI.City.Core.Threading;
 
 namespace AtomUI.City.Presentation;
 

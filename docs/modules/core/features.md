@@ -6,13 +6,13 @@
 
 | Feature ID | 名称 | 状态 | 公开合同 | 主测试 |
 | --- | --- | --- | --- | --- |
-| AUC-CORE-001 | Application Host Builder | 已实现并通过产品合同测试 | ApplicationHostBuilder, ApplicationHostOptions, IApplicationHostBuilder | ApplicationHostBuilderTests; ApplicationHostRuntimeTests |
-| AUC-CORE-002 | Lifecycle Pipeline | 已实现并通过产品合同测试 | LifecyclePipeline, LifecyclePipelineBuilder, LifecycleStage | LifecycleMiddlewarePipelineTests; ApplicationHostLifecycleIntegrationTests |
-| AUC-CORE-003 | Lifecycle Scope Tree | 已实现并通过产品合同测试 | LifecycleScope, LifecycleScopeKind, LifecycleScopeState | LifecycleScopeTreeTests |
-| AUC-CORE-004 | Module Contract | 已实现并通过产品合同测试 | ModuleBase, IModule, ModuleDescriptor, ModuleOrigin, DependsOnAttribute, ServiceConfigurationContext | ModuleAttributeTests; ModuleBaseTests; ModuleDescriptorTests; ApplicationHostModuleLifecycleTests |
-| AUC-CORE-005 | DI Registration Markers | 已实现并通过产品合同测试 | ServiceAttribute, ScopedServiceAttribute, ExposeServicesAttribute, 标记接口 | ServiceRegistrationAttributeTests |
-| AUC-CORE-006 | Host Diagnostics | 已实现并通过产品合同测试 | IHostDiagnostics, HostDiagnosticRecord, HostDiagnosticIds | HostDiagnosticsTests |
-| AUC-CORE-007 | UI Dispatcher Contract | 已实现并通过产品合同测试 | IUiDispatcher, UnavailableUiDispatcher | UiDispatcherIntegrationTests |
+| AUC-CORE-001 | Application Host Builder | Verified | ApplicationHostBuilder, ApplicationHostOptions, IApplicationHostBuilder | ApplicationHostBuilderTests; ApplicationHostRuntimeTests; ApplicationHostIndustrialLifecycleTests |
+| AUC-CORE-002 | Lifecycle Pipeline | Verified | LifecyclePipeline, LifecyclePipelineBuilder, LifecycleStage | LifecycleMiddlewarePipelineTests; ApplicationHostIndustrialLifecycleTests |
+| AUC-CORE-003 | Lifecycle Scope Tree | Verified | LifecycleScope, LifecycleScopeKind, LifecycleScopeState | LifecycleScopeTreeTests |
+| AUC-CORE-004 | Module Contract | Verified | ModuleBase, IModule, ModuleDescriptor, ModuleOrigin, DependsOnAttribute, ServiceConfigurationContext | ModuleBaseTests; ModuleDescriptorTests; ApplicationHostModuleLifecycleTests; ApplicationHostIndustrialLifecycleTests |
+| AUC-CORE-005 | DI Registration Markers | Verified | ServiceAttribute, ScopedServiceAttribute, ExposeServicesAttribute, 标记接口 | ServiceRegistrationAttributeTests |
+| AUC-CORE-006 | Host Diagnostics | Verified | IHostDiagnostics, HostDiagnosticRecord, HostDiagnosticIds | HostDiagnosticsTests |
+| AUC-CORE-007 | UI Dispatcher Contract | Verified | IUiDispatcher, UnavailableUiDispatcher | UiDispatcherIntegrationTests |
 
 ## Feature 硬门禁
 
@@ -36,7 +36,7 @@
 ## AUC-CORE-001 Application Host Builder
 
 Feature ID: `AUC-CORE-001`
-Status: 已实现并通过产品合同测试
+Status: Verified
 Goal: 构建 Host、冻结注册入口、创建 ApplicationContext。
 Public Contract: ApplicationHostBuilder, ApplicationHostOptions, IApplicationHostBuilder
 Runtime / Build Behavior: 构建 Host、冻结注册入口、创建 ApplicationContext。
@@ -49,7 +49,7 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-CORE-002 Lifecycle Pipeline
 
 Feature ID: `AUC-CORE-002`
-Status: 已实现并通过产品合同测试
+Status: Verified
 Goal: 按阶段执行 middleware，支持取消、异常聚合和幂等停止。
 Public Contract: LifecyclePipeline, LifecyclePipelineBuilder, LifecycleStage
 Runtime / Build Behavior: 按阶段执行 middleware，支持取消、异常聚合和幂等停止。
@@ -62,7 +62,7 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-CORE-003 Lifecycle Scope Tree
 
 Feature ID: `AUC-CORE-003`
-Status: 已实现并通过产品合同测试
+Status: Verified
 Goal: 表达 application/module/plugin contribution/operation 所有权树。
 Public Contract: LifecycleScope, LifecycleScopeKind, LifecycleScopeState
 Runtime / Build Behavior: 表达 application/module/plugin contribution/operation 所有权树。
@@ -75,7 +75,7 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-CORE-004 Module Contract
 
 Feature ID: `AUC-CORE-004`
-Status: 已实现并通过产品合同测试
+Status: Verified
 Goal: 模块声明、依赖、配置、服务注册和初始化钩子。
 Public Contract: ModuleBase, IModule, ModuleDescriptor, ModuleOrigin, DependsOnAttribute, ServiceConfigurationContext
 Runtime / Build Behavior: 模块声明、依赖、PreConfigure 配置、服务注册阶段边界和初始化钩子。
@@ -88,7 +88,7 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-CORE-005 DI Registration Markers
 
 Feature ID: `AUC-CORE-005`
-Status: 已实现并通过产品合同测试
+Status: Verified
 Goal: 声明服务 lifetime 和暴露服务。
 Public Contract: ServiceAttribute, ScopedServiceAttribute, ExposeServicesAttribute, 标记接口
 Runtime / Build Behavior: 声明服务 lifetime 和暴露服务。
@@ -101,7 +101,7 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-CORE-006 Host Diagnostics
 
 Feature ID: `AUC-CORE-006`
-Status: 已实现并通过产品合同测试
+Status: Verified
 Goal: 记录 Host 构建、启动、停止和失败上下文。
 Public Contract: IHostDiagnostics, HostDiagnosticRecord, HostDiagnosticIds
 Runtime / Build Behavior: 记录 Host 构建、启动、停止和失败上下文。
@@ -114,7 +114,7 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 ## AUC-CORE-007 UI Dispatcher Contract
 
 Feature ID: `AUC-CORE-007`
-Status: 已实现并通过产品合同测试
+Status: Verified
 Goal: 为 Presentation 提供调度抽象和不可用实现。
 Public Contract: IUiDispatcher, UnavailableUiDispatcher
 Runtime / Build Behavior: 为 Presentation 提供调度抽象和不可用实现。

@@ -1,4 +1,4 @@
-namespace AtomUI.City.Modularity;
+namespace AtomUI.City.Core.Modularity;
 
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = true, Inherited = false)]
 public sealed class DependsOnAttribute : Attribute

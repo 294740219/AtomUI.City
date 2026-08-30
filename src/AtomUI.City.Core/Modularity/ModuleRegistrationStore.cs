@@ -1,39 +1,24 @@
-using AtomUI.City.Hosting;
+using System.Runtime.CompilerServices;
+using AtomUI.City.Core.Hosting;
 
-namespace AtomUI.City.Modularity;
+namespace AtomUI.City.Core.Modularity;
 
 internal static class ModuleRegistrationStore
 {
-    private const string Key = "AtomUI.City.Modularity.ModuleRegistrations";
+    private static readonly ConditionalWeakTable<
+        IApplicationHostBuilder,
+        FreezableApplicationHostBuilderCollection<ModuleRegistration>> Stores = new();
 
     public static void Add(IApplicationHostBuilder builder, ModuleRegistration registration)
     {
-        var registrations = GetOrCreateRegistrations(builder);
-
-        if (registrations.Any(existing => existing.ModuleType == registration.ModuleType))
-        {
-            return;
-        }
-
-        registrations.Add(registration);
+        Stores.GetOrCreateValue(builder).AddIfAbsent(
+            registration,
+            existing => existing.ModuleType == registration.ModuleType);
     }
 
-    public static IReadOnlyList<ModuleRegistration> GetRegistrations(IApplicationHostBuilder builder)
+    public static IReadOnlyList<ModuleRegistration> FreezeAndSnapshot(
+        IApplicationHostBuilder builder)
     {
-        return GetOrCreateRegistrations(builder).ToArray();
-    }
-
-    private static List<ModuleRegistration> GetOrCreateRegistrations(IApplicationHostBuilder builder)
-    {
-        if (builder.Properties.TryGetValue(Key, out var value) &&
-            value is List<ModuleRegistration> registrations)
-        {
-            return registrations;
-        }
-
-        registrations = [];
-        builder.Properties[Key] = registrations;
-
-        return registrations;
+        return Stores.GetOrCreateValue(builder).FreezeAndSnapshot();
     }
 }

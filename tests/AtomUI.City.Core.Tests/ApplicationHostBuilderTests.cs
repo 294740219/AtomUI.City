@@ -1,4 +1,6 @@
-using AtomUI.City.Hosting;
+using AtomUI.City.Core.Hosting;
+using AtomUI.City.Core.Lifecycle;
+using AtomUI.City.Core.Modularity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -77,5 +79,39 @@ public sealed class ApplicationHostBuilderTests
         Assert.Contains("only build once", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task BuildFreezesModuleAndLifecycleExtensionStores()
+    {
+        var builder = ApplicationHost.CreateBuilder();
+        builder.UseModule<LateModule>();
+        builder.UseModule<LateModule>();
+
+        await using var host = builder.Build();
+
+        Assert.Single(
+            host.Services.GetRequiredService<IModuleRegistry>().Modules,
+            descriptor => descriptor.ModuleType == typeof(LateModule));
+        Assert.Throws<InvalidOperationException>(() => builder.UseModule<LateModule>());
+        Assert.Throws<InvalidOperationException>(() =>
+            builder.ConfigureLifecycle(lifecycle =>
+                lifecycle.Use(static (_, next) => next())));
+    }
+
+    [Fact]
+    public void BuildFailureKeepsModuleAndLifecycleExtensionStoresFrozen()
+    {
+        var builder = ApplicationHost.CreateBuilder();
+        builder.ConfigureHost(_ => builder.UseModule<LateModule>());
+
+        var failure = Assert.Throws<InvalidOperationException>(() => builder.Build());
+
+        Assert.Contains("frozen after Build", failure.Message, StringComparison.Ordinal);
+        Assert.Throws<InvalidOperationException>(() => builder.UseModule<LateModule>());
+        Assert.Throws<InvalidOperationException>(() =>
+            builder.ConfigureLifecycle(static _ => { }));
+    }
+
     private sealed class TestService;
+
+    private sealed class LateModule : ModuleBase;
 }

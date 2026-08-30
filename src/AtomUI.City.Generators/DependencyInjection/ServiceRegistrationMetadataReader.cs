@@ -4,12 +4,12 @@ namespace AtomUI.City.Generators.DependencyInjection;
 
 public static class ServiceRegistrationMetadataReader
 {
-    private const string ExposeServicesAttributeName = "AtomUI.City.DependencyInjection.ExposeServicesAttribute";
-    private const string ScopedDependencyInterfaceName = "AtomUI.City.DependencyInjection.IScopedDependency";
-    private const string ScopedServiceAttributeName = "AtomUI.City.DependencyInjection.ScopedServiceAttribute";
-    private const string ServiceAttributeName = "AtomUI.City.DependencyInjection.ServiceAttribute";
-    private const string SingletonDependencyInterfaceName = "AtomUI.City.DependencyInjection.ISingletonDependency";
-    private const string TransientDependencyInterfaceName = "AtomUI.City.DependencyInjection.ITransientDependency";
+    private const string ExposeServicesAttributeName = "AtomUI.City.Core.DependencyInjection.ExposeServicesAttribute";
+    private const string ScopedDependencyInterfaceName = "AtomUI.City.Core.DependencyInjection.IScopedDependency";
+    private const string ScopedServiceAttributeName = "AtomUI.City.Core.DependencyInjection.ScopedServiceAttribute";
+    private const string ServiceAttributeName = "AtomUI.City.Core.DependencyInjection.ServiceAttribute";
+    private const string SingletonDependencyInterfaceName = "AtomUI.City.Core.DependencyInjection.ISingletonDependency";
+    private const string TransientDependencyInterfaceName = "AtomUI.City.Core.DependencyInjection.ITransientDependency";
 
     public static ServiceRegistrationMetadata? TryRead(INamedTypeSymbol type)
     {

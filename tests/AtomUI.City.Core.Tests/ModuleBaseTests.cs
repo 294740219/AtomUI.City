@@ -1,5 +1,5 @@
-using AtomUI.City.Hosting;
-using AtomUI.City.Modularity;
+using AtomUI.City.Core.Hosting;
+using AtomUI.City.Core.Modularity;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace AtomUI.City.Core.Tests;

@@ -1,4 +1,4 @@
-namespace AtomUI.City.Threading;
+namespace AtomUI.City.Core.Threading;
 
 public interface IUiDispatcher
 {

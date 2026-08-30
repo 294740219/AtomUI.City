@@ -1,6 +1,6 @@
-using AtomUI.City.Lifecycle;
+using AtomUI.City.Core.Lifecycle;
 
-namespace AtomUI.City.Hosting;
+namespace AtomUI.City.Core.Hosting;
 
 public interface IApplicationHost : IDisposable, IAsyncDisposable
 {

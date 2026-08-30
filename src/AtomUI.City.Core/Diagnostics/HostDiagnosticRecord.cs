@@ -1,7 +1,7 @@
 using System.Collections.ObjectModel;
-using AtomUI.City.Lifecycle;
+using AtomUI.City.Core.Lifecycle;
 
-namespace AtomUI.City.Diagnostics;
+namespace AtomUI.City.Core.Diagnostics;
 
 public sealed record HostDiagnosticRecord(
     string Code,

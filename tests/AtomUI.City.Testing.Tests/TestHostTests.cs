@@ -1,4 +1,4 @@
-using AtomUI.City.Hosting;
+using AtomUI.City.Core.Hosting;
 using AtomUI.City.Testing;
 
 namespace AtomUI.City.Testing.Tests;

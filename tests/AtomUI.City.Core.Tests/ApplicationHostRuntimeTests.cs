@@ -1,5 +1,5 @@
-using AtomUI.City.Diagnostics;
-using AtomUI.City.Hosting;
+using AtomUI.City.Core.Diagnostics;
+using AtomUI.City.Core.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -47,6 +47,17 @@ public sealed class ApplicationHostRuntimeTests
         var host = ApplicationHost.CreateBuilder().Build();
 
         await host.StartAsync();
+        await host.StopAsync();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => host.StartAsync());
+        await host.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task StopBeforeStartPermanentlyClosesTheHost()
+    {
+        var host = ApplicationHost.CreateBuilder().Build();
+
         await host.StopAsync();
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => host.StartAsync());

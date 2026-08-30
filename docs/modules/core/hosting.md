@@ -52,6 +52,39 @@
 - 不出现业务领域假设。
 - 不引入 `AtomUI.City.Presentation` 等禁止依赖。
 
+## Verified Runtime Baseline
+
+当前 Core Host 的规范化执行顺序如下：
+
+```text
+Build
+-> validate ApplicationHostOptions
+-> build module graph and configure module services
+-> build GenericHost
+-> create bounded diagnostics and HostScope
+
+StartAsync
+-> ApplicationStart middleware
+-> GenericHost.StartAsync
+-> create Application ServiceScope and ApplicationScope
+-> ConfigureContributions
+-> ModuleInitialize middleware and three initialization hooks
+-> ModuleStart middleware
+-> Running
+
+StopAsync
+-> ApplicationStop middleware
+-> cancel HostScope and descendants
+-> ModuleStop middleware and reverse module shutdown
+-> dispose Application ServiceScope
+-> GenericHost.StopAsync
+-> Stopped
+```
+
+并发 Start/Stop 合并到各自的单一事务。启动失败保持原异常、逆序补偿模块并进入 Faulted。停止调用方的 cancellation 只取消等待；内部使用 `ShutdownTimeout` 作为协作式 deadline，所有清理错误最终聚合。Stop-before-Start 保持 no-op，Stopped/Faulted Host 不允许重新启动。
+
+Core 在 Windows 默认禁用 GenericHost 的 EventLog provider 输出，避免普通桌面或 CLI 进程因系统事件日志权限覆盖原始启动异常；Console、Debug、EventSource 和应用显式配置的 provider 不受影响。
+
 ## 既有细化设计内容
 
 以下内容保留上一轮设计中的专题细节。后续修改必须与本页上方合同、Feature ID、API 行为、诊断和测试矩阵保持一致。

@@ -1,16 +1,18 @@
 using System.Collections;
-using AtomUI.City.Diagnostics;
-using AtomUI.City.Lifecycle;
-using AtomUI.City.Modularity;
-using AtomUI.City.Threading;
+using AtomUI.City.Core.Diagnostics;
+using AtomUI.City.Core.Lifecycle;
+using AtomUI.City.Core.Modularity;
+using AtomUI.City.Core.Threading;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.EventLog;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Primitives;
 
-namespace AtomUI.City.Hosting;
+namespace AtomUI.City.Core.Hosting;
 
 public sealed class ApplicationHostBuilder : IApplicationHostBuilder
 {
@@ -27,6 +29,12 @@ public sealed class ApplicationHostBuilder : IApplicationHostBuilder
     {
         _args = args.ToArray();
         _builder = Host.CreateApplicationBuilder(_args);
+
+        if (OperatingSystem.IsWindows())
+        {
+            _builder.Logging.AddFilter<EventLogLoggerProvider>(static _ => false);
+        }
+
         _configuration = new GuardedConfigurationManager(_builder.Configuration, ThrowIfBuilt);
         _properties = new GuardedDictionary<string, object?>(_propertiesStore, ThrowIfBuilt);
         _services = new GuardedServiceCollection(_builder.Services, ThrowIfBuilt);
@@ -65,40 +73,127 @@ public sealed class ApplicationHostBuilder : IApplicationHostBuilder
             throw new InvalidOperationException("Application host builder can only build once.");
         }
 
-        var hostOptions = CreateHostOptions();
-        var context = CreateApplicationContext(hostOptions);
-        var moduleRegistrations = ModuleRegistrationStore.GetRegistrations(this);
-
+        var buildDiagnostics = ApplicationHostBuilderDiagnosticsStore.GetOrCreate(this);
         _built = true;
+        var moduleRegistrations = ModuleRegistrationStore.FreezeAndSnapshot(this);
+        var lifecycleConfigurations = LifecycleConfigurationStore.FreezeAndSnapshot(this);
+        ModuleRegistry? moduleRegistry = null;
+        IHost? genericHost = null;
+        IHostDiagnostics? runtimeDiagnostics = null;
+        var buildStage = "Options";
 
-        var moduleRegistry = ModuleRegistry.Create(moduleRegistrations);
-        var buildDiagnostics = GetOrCreateBuildDiagnostics();
+        try
+        {
+            var hostOptions = CreateHostOptions();
+            ValidateHostOptions(hostOptions);
+            var context = CreateApplicationContext(hostOptions);
+            var lifecyclePipeline = LifecycleConfigurationStore.Build(lifecycleConfigurations);
 
-        _builder.Services.AddSingleton(context);
-        _builder.Services.AddSingleton<IApplicationContext>(context);
-        _builder.Services.AddSingleton(Options.Create(hostOptions));
-        _builder.Services.TryAddSingleton<IHostDiagnostics>(buildDiagnostics);
-        _builder.Services.TryAddSingleton<IUiDispatcher, UnavailableUiDispatcher>();
-        _builder.Services.TryAddSingleton<IModuleRegistry>(moduleRegistry);
+            buildStage = "ModuleGraph";
+            moduleRegistry = ModuleRegistry.Create(moduleRegistrations);
+            runtimeDiagnostics = GetRegisteredDiagnosticsInstance()
+                ?? new InMemoryHostDiagnostics(hostOptions.DiagnosticsCapacity);
 
-        moduleRegistry.ConfigureServicesAsync(context, _builder.Services).AsTask().GetAwaiter().GetResult();
+            _builder.Services.AddSingleton(context);
+            _builder.Services.AddSingleton<IApplicationContext>(context);
+            _builder.Services.AddSingleton(Options.Create(hostOptions));
+            _builder.Services.Configure<HostOptions>(options =>
+                options.ShutdownTimeout = hostOptions.ShutdownTimeout);
+            _builder.Services.TryAddSingleton<IHostDiagnostics>(runtimeDiagnostics);
+            _builder.Services.TryAddSingleton<IUiDispatcher, UnavailableUiDispatcher>();
+            _builder.Services.TryAddSingleton<IModuleRegistry>(moduleRegistry);
+            _builder.Services.TryAddSingleton(lifecyclePipeline);
 
-        var genericHost = _builder.Build();
+            buildStage = "ModuleServices";
+            moduleRegistry.ConfigureServicesAsync(context, _builder.Services)
+                .AsTask()
+                .GetAwaiter()
+                .GetResult();
 
-        context.Services = genericHost.Services;
-        var diagnostics = genericHost.Services.GetRequiredService<IHostDiagnostics>();
+            buildStage = "GenericHost";
+            genericHost = _builder.Build();
 
-        diagnostics.Write(new HostDiagnosticRecord(
-            HostDiagnosticIds.HostBuilt,
-            "Application host has been built.",
-            HostDiagnosticSeverity.Info));
+            context.Services = genericHost.Services;
+            var diagnostics = genericHost.Services.GetRequiredService<IHostDiagnostics>();
 
-        return new DefaultApplicationHost(
-            genericHost,
-            context,
-            diagnostics,
-            LifecycleScope.CreateRoot(LifecycleScopeKind.Host, "host"),
-            moduleRegistry);
+            WriteDiagnostic(diagnostics, new HostDiagnosticRecord(
+                HostDiagnosticIds.HostBuilt,
+                "Application host has been built.",
+                HostDiagnosticSeverity.Info));
+
+            if (!ReferenceEquals(buildDiagnostics, diagnostics))
+            {
+                WriteDiagnostic(buildDiagnostics, new HostDiagnosticRecord(
+                    HostDiagnosticIds.HostBuilt,
+                    "Application host has been built.",
+                    HostDiagnosticSeverity.Info));
+            }
+
+            return new DefaultApplicationHost(
+                genericHost,
+                context,
+                diagnostics,
+                LifecycleScope.CreateRoot(LifecycleScopeKind.Host, "host", diagnostics),
+                moduleRegistry,
+                lifecyclePipeline,
+                hostOptions);
+        }
+        catch (Exception exception)
+        {
+            var failure = new HostDiagnosticRecord(
+                HostDiagnosticIds.HostBuildFailed,
+                "Application host failed to build.",
+                HostDiagnosticSeverity.Error)
+            {
+                Context = new Dictionary<string, string?>
+                {
+                    ["stage"] = buildStage,
+                    ["exceptionType"] = exception.GetType().FullName,
+                    ["details"] = exception.Message,
+                },
+            };
+
+            WriteDiagnostic(buildDiagnostics, failure);
+
+            if (runtimeDiagnostics is not null && !ReferenceEquals(runtimeDiagnostics, buildDiagnostics))
+            {
+                WriteDiagnostic(runtimeDiagnostics, failure);
+            }
+
+            if (buildStage == "ModuleGraph")
+            {
+                WriteDiagnostic(buildDiagnostics, new HostDiagnosticRecord(
+                    HostDiagnosticIds.ModuleGraphFailed,
+                    "Module dependency graph failed to build.",
+                    HostDiagnosticSeverity.Error)
+                {
+                    Context = failure.Context,
+                });
+            }
+
+            try
+            {
+                genericHost?.Dispose();
+            }
+            catch
+            {
+                // Preserve the original build failure.
+            }
+
+            if (moduleRegistry is not null)
+            {
+                try
+                {
+                    moduleRegistry.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                }
+                catch
+                {
+                    // Preserve the original build failure.
+                }
+            }
+
+            throw;
+        }
     }
 
     private ApplicationHostOptions CreateHostOptions()
@@ -140,13 +235,36 @@ public sealed class ApplicationHostBuilder : IApplicationHostBuilder
         return context;
     }
 
-    private IHostDiagnostics GetOrCreateBuildDiagnostics()
+    private IHostDiagnostics? GetRegisteredDiagnosticsInstance()
     {
-        var existing = _builder.Services
+        return _builder.Services
             .LastOrDefault(descriptor => descriptor.ServiceType == typeof(IHostDiagnostics))
             ?.ImplementationInstance as IHostDiagnostics;
+    }
 
-        return existing ?? new InMemoryHostDiagnostics();
+    private static void ValidateHostOptions(ApplicationHostOptions options)
+    {
+        if (options.ShutdownTimeout <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options.ShutdownTimeout),
+                options.ShutdownTimeout,
+                "Shutdown timeout must be greater than zero.");
+        }
+
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(options.DiagnosticsCapacity);
+    }
+
+    private static void WriteDiagnostic(IHostDiagnostics diagnostics, HostDiagnosticRecord record)
+    {
+        try
+        {
+            diagnostics.Write(record);
+        }
+        catch
+        {
+            // Diagnostics must not change the build result.
+        }
     }
 
     private void ThrowIfBuilt()

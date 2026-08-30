@@ -11,20 +11,22 @@ Core 定义 Host 本体，所有运行时模块都通过 IApplicationHostBuilder
 - Builder: Created -> Configuring -> Built -> Frozen
 - Host: Created -> Starting -> Running -> Stopping -> Stopped -> Disposed
 - Host failure: Starting -> Faulted -> Stopping -> Stopped 或 Disposed
-- LifecycleScope: Active -> Disposing -> Disposed
+- LifecycleScope: Running -> Stopping -> Stopped/Faulted -> Disposing -> Disposed
 - Module: Declared -> ServicesConfigured -> Initialized -> Shutdown
 
 ## 生命周期流程
 
 - CreateBuilder 收集 options、module registration、service actions 和 middleware。
 - Build 创建 GenericHost、ApplicationContext、LifecycleScope root 和 diagnostics collector。
-- StartAsync 执行 module initialization、lifecycle middleware、host start diagnostics。
-- StopAsync 阻止新操作进入，取消未完成 operation，执行 module shutdown。
-- DisposeAsync 从 leaf scope 到 root scope 释放，释放异常进入 diagnostics。
+- StartAsync 依次执行 ApplicationStart、Generic Host、Application DI scope、module contribution/init/start，并在任一步失败时逆序补偿。
+- StopAsync 阻止新操作进入，取消 scope tree，逆序执行 module shutdown，释放 Application DI scope，最后停止 Generic Host。
+- DisposeAsync 从 leaf scope 到 root scope 释放；已提前释放的 child 会从 parent 脱离；释放异常进入 diagnostics 且不阻断同级清理。
+- Host 和 Scope 的并发 Start/Stop/Dispose 调用合并到同一事务；调用方取消只取消等待，不中断已经开始的共享 Stop 事务。
 
 ## Host Shutdown / 执行结束行为
 
 - Host 停止时阻止新操作进入。
+- Created 状态收到 StopAsync 后直接进入 Stopped，之后禁止重新 Start。
 - 取消未完成后台任务。
 - 从 leaf owner 到 root owner 释放资源。
 - 释放失败记录诊断并继续释放其他资源。

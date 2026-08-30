@@ -12,7 +12,7 @@ public sealed class ModuleMetadataReaderTests
     {
         var module = ReadSingleModule(
             """
-            using AtomUI.City.Modularity;
+            using AtomUI.City.Core.Modularity;
 
             namespace Sample.App;
 
@@ -33,7 +33,7 @@ public sealed class ModuleMetadataReaderTests
     {
         var module = ReadSingleModule(
             """
-            using AtomUI.City.Modularity;
+            using AtomUI.City.Core.Modularity;
 
             namespace Sample.App;
 
@@ -52,7 +52,7 @@ public sealed class ModuleMetadataReaderTests
     {
         var module = ReadSingleModule(
             """
-            using AtomUI.City.Modularity;
+            using AtomUI.City.Core.Modularity;
 
             namespace Sample.App;
 
@@ -120,7 +120,7 @@ public sealed class ModuleMetadataReaderTests
             .GetAssemblies()
             .Where(assembly => !assembly.IsDynamic && !string.IsNullOrWhiteSpace(assembly.Location))
             .Select(assembly => MetadataReference.CreateFromFile(assembly.Location))
-            .Concat([MetadataReference.CreateFromFile(typeof(AtomUI.City.Modularity.ModuleBase).Assembly.Location)])
+            .Concat([MetadataReference.CreateFromFile(typeof(AtomUI.City.Core.Modularity.ModuleBase).Assembly.Location)])
             .DistinctBy(reference => reference.Display)
             .ToArray();
 

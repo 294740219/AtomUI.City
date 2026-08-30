@@ -1,7 +1,7 @@
 using System.Collections;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace AtomUI.City.Modularity;
+namespace AtomUI.City.Core.Modularity;
 
 public sealed class ModuleServiceCollection : IServiceCollection
 {

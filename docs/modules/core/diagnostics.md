@@ -37,3 +37,7 @@
 ## 测试门禁
 
 `tests/AtomUI.City.Core.Tests` 必须断言当前源码诊断码；产品级目标诊断补齐后必须增加对应测试。
+
+## 容量边界
+
+默认 Host 使用 `ApplicationHostOptions.DiagnosticsCapacity` 创建有界 InMemoryHostDiagnostics，默认容量 1024。达到容量后丢弃最旧记录、保留最新记录，并通过 `DroppedCount` 暴露累计丢弃数。Build 失败诊断可在 builder 上通过 `GetBuildDiagnostics()` 读取。

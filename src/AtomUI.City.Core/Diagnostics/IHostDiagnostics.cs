@@ -1,4 +1,4 @@
-namespace AtomUI.City.Diagnostics;
+namespace AtomUI.City.Core.Diagnostics;
 
 public interface IHostDiagnostics
 {

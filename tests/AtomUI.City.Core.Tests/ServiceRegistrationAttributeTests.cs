@@ -1,4 +1,4 @@
-using AtomUI.City.DependencyInjection;
+using AtomUI.City.Core.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace AtomUI.City.Core.Tests;

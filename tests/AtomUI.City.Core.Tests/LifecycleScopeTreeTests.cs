@@ -1,9 +1,23 @@
-using AtomUI.City.Lifecycle;
+using AtomUI.City.Core.Diagnostics;
+using AtomUI.City.Core.Lifecycle;
 
 namespace AtomUI.City.Core.Tests;
 
 public sealed class LifecycleScopeTreeTests
 {
+    [Fact]
+    public async Task DisposedChildDetachesFromParentAndDoesNotBreakParentStop()
+    {
+        await using var root = LifecycleScope.CreateRoot(LifecycleScopeKind.Host, "host");
+        var child = root.CreateChild(LifecycleScopeKind.Operation, "completed-operation");
+
+        await child.DisposeAsync();
+        await root.StopAsync();
+
+        Assert.Empty(root.Children);
+        Assert.Equal(LifecycleScopeState.Stopped, root.State);
+    }
+
     [Fact]
     public void ScopeTreeModelsHostApplicationAndNavigationRuntimeBoundaries()
     {
@@ -110,5 +124,29 @@ public sealed class LifecycleScopeTreeTests
 
         Assert.DoesNotContain("Module", scopeKindNames);
         Assert.DoesNotContain("Plugin", scopeKindNames);
+    }
+
+    [Fact]
+    public async Task StopContinuesAcrossChildFailuresAndRecordsDiagnostics()
+    {
+        var diagnostics = new InMemoryHostDiagnostics();
+        var host = LifecycleScope.CreateRoot(LifecycleScopeKind.Host, "host", diagnostics);
+        var failing = host.CreateChild(LifecycleScopeKind.Operation, "failing");
+        var healthy = host.CreateChild(LifecycleScopeKind.Operation, "healthy");
+        using var registration = failing.CancellationToken.Register(
+            static () => throw new InvalidOperationException("cancel failed"));
+
+        await Assert.ThrowsAsync<AggregateException>(async () => await host.StopAsync());
+
+        Assert.Equal(LifecycleScopeState.Faulted, host.State);
+        Assert.Equal(LifecycleScopeState.Stopped, failing.State);
+        Assert.Equal(LifecycleScopeState.Stopped, healthy.State);
+        Assert.Contains(diagnostics.Records, record =>
+            record.Code == HostDiagnosticIds.LifecycleScopeCleanupFailed &&
+            record.ScopeId == "host");
+
+        await Assert.ThrowsAsync<AggregateException>(async () => await host.DisposeAsync());
+        Assert.Equal(LifecycleScopeState.Disposed, host.State);
+        Assert.Equal(LifecycleScopeState.Disposed, healthy.State);
     }
 }

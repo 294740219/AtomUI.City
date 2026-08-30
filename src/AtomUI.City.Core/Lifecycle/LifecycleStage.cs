@@ -1,4 +1,4 @@
-namespace AtomUI.City.Lifecycle;
+namespace AtomUI.City.Core.Lifecycle;
 
 public readonly record struct LifecycleStage
 {

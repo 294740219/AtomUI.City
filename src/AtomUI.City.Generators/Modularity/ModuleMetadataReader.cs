@@ -4,10 +4,10 @@ namespace AtomUI.City.Generators.Modularity;
 
 public static class ModuleMetadataReader
 {
-    private const string DependsOnAttributeName = "AtomUI.City.Modularity.DependsOnAttribute";
-    private const string ModuleAttributeName = "AtomUI.City.Modularity.ModuleAttribute";
-    private const string ModuleBaseName = "AtomUI.City.Modularity.ModuleBase";
-    private const string ModuleInterfaceName = "AtomUI.City.Modularity.IModule";
+    private const string DependsOnAttributeName = "AtomUI.City.Core.Modularity.DependsOnAttribute";
+    private const string ModuleAttributeName = "AtomUI.City.Core.Modularity.ModuleAttribute";
+    private const string ModuleBaseName = "AtomUI.City.Core.Modularity.ModuleBase";
+    private const string ModuleInterfaceName = "AtomUI.City.Core.Modularity.IModule";
 
     public static ModuleMetadata? TryRead(INamedTypeSymbol type)
     {

@@ -1,4 +1,4 @@
-using AtomUI.City.Hosting;
+using AtomUI.City.Core.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -35,6 +35,27 @@ public sealed class ApplicationHostOptionsTests
 
         Assert.Null(options.ApplicationName);
         Assert.Equal(TimeSpan.FromSeconds(30), options.ShutdownTimeout);
+        Assert.Equal(1024, options.DiagnosticsCapacity);
         Assert.False(options.AllowDynamicDiscovery);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void BuildRejectsInvalidDiagnosticsCapacity(int capacity)
+    {
+        var builder = ApplicationHost.CreateBuilder();
+        builder.ConfigureHost(options => options.DiagnosticsCapacity = capacity);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => builder.Build());
+    }
+
+    [Fact]
+    public void BuildRejectsNonPositiveShutdownTimeout()
+    {
+        var builder = ApplicationHost.CreateBuilder();
+        builder.ConfigureHost(options => options.ShutdownTimeout = TimeSpan.Zero);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => builder.Build());
     }
 }

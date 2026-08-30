@@ -1,4 +1,4 @@
-using AtomUI.City.Diagnostics;
+using AtomUI.City.Core.Diagnostics;
 using AtomUI.City.Presentation;
 using Microsoft.Extensions.DependencyInjection;
 

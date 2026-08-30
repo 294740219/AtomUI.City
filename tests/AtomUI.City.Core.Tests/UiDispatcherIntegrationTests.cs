@@ -1,6 +1,6 @@
-using AtomUI.City.Diagnostics;
-using AtomUI.City.Hosting;
-using AtomUI.City.Threading;
+using AtomUI.City.Core.Diagnostics;
+using AtomUI.City.Core.Hosting;
+using AtomUI.City.Core.Threading;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace AtomUI.City.Core.Tests;

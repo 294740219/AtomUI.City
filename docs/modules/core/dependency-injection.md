@@ -96,6 +96,8 @@ Host Root ServiceProvider 由 GenericHost 构建，承载框架核心服务、�
 
 Application ServiceScope 随 ApplicationScope 创建和释放，用于应用生命周期内的 scoped 服务。
 
+Host 启动后，`ConfigureContributions`、三个 application initialization hook 和 `OnApplicationShutdown` 接收同一个 Application ServiceScope provider。模块关闭完成后释放该 ServiceScope；`IApplicationHost.Services` 始终保持为 GenericHost root provider。
+
 Lifecycle-owned ServiceScope 由 RouteScope、ActivationScope、OperationScope 等运行时 Scope 按需创建和释放。
 
 Plugin ServiceProvider 是插件独立服务容器。插件不能修改 Host Root ServiceProvider。
@@ -106,7 +108,7 @@ Plugin ServiceProvider 是插件独立服务容器。插件不能修改 Host Roo
 - 插件模块只能注册到插件自己的 `IServiceCollection`。
 - 插件服务不能自动 fallback 到 Host Root ServiceProvider。
 - 插件需要访问 Host 能力时，只能通过 Host 显式暴露的 contract。
-- 不允许在模块服务配置阶段调用 `BuildServiceProvider()`。
+- 非测试 City 项目不允许直接调用 `BuildServiceProvider()`、`IServiceProviderFactory<T>.CreateServiceProvider` 或 Microsoft Generic Host 构建/启动入口；应用 Root Provider 只能由 City `ApplicationHost` 构建。
 - 不允许从 Root Provider 解析 scoped 服务。
 - 不允许服务实例把插件内部类型泄漏到 Host 长期持有对象中。
 - `ValidateScopes` 在开发和测试环境默认开启。

@@ -13,7 +13,7 @@ public sealed class ServiceRegistrationMetadataReaderTests
     {
         var registration = ReadSingleRegistration(
             """
-            using AtomUI.City.DependencyInjection;
+            using AtomUI.City.Core.DependencyInjection;
             using Microsoft.Extensions.DependencyInjection;
 
             namespace Sample.App;
@@ -40,7 +40,7 @@ public sealed class ServiceRegistrationMetadataReaderTests
     {
         var registration = ReadSingleRegistration(
             """
-            using AtomUI.City.DependencyInjection;
+            using AtomUI.City.Core.DependencyInjection;
 
             namespace Sample.App;
 
@@ -64,7 +64,7 @@ public sealed class ServiceRegistrationMetadataReaderTests
     {
         var registration = ReadSingleRegistration(
             """
-            using AtomUI.City.DependencyInjection;
+            using AtomUI.City.Core.DependencyInjection;
             using Microsoft.Extensions.DependencyInjection;
 
             namespace Sample.App;
@@ -88,7 +88,7 @@ public sealed class ServiceRegistrationMetadataReaderTests
     {
         var registration = ReadSingleRegistration(
             """
-            using AtomUI.City.DependencyInjection;
+            using AtomUI.City.Core.DependencyInjection;
 
             namespace Sample.App;
 
@@ -138,7 +138,7 @@ public sealed class ServiceRegistrationMetadataReaderTests
             .Select(assembly => MetadataReference.CreateFromFile(assembly.Location))
             .Concat(
                 [
-                    MetadataReference.CreateFromFile(typeof(AtomUI.City.Modularity.ModuleBase).Assembly.Location),
+                    MetadataReference.CreateFromFile(typeof(AtomUI.City.Core.Modularity.ModuleBase).Assembly.Location),
                     MetadataReference.CreateFromFile(typeof(ServiceLifetime).Assembly.Location),
                 ])
             .DistinctBy(reference => reference.Display)

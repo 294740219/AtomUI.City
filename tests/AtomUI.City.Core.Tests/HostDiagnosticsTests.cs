@@ -1,5 +1,6 @@
-using AtomUI.City.Diagnostics;
-using AtomUI.City.Hosting;
+using AtomUI.City.Core.Diagnostics;
+using AtomUI.City.Core.Hosting;
+using AtomUI.City.Core.Modularity;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace AtomUI.City.Core.Tests;
@@ -83,4 +84,39 @@ public sealed class HostDiagnosticsTests
             HostDiagnosticSeverity.Error));
         Assert.Equal("TEST001", diagnostics.Records[0].Code);
     }
+
+    [Fact]
+    public void BoundedDiagnosticsRetainNewestRecordsAndTrackDrops()
+    {
+        var diagnostics = new InMemoryHostDiagnostics(capacity: 2);
+
+        diagnostics.Write(new HostDiagnosticRecord("A", "first", HostDiagnosticSeverity.Info));
+        diagnostics.Write(new HostDiagnosticRecord("B", "second", HostDiagnosticSeverity.Info));
+        diagnostics.Write(new HostDiagnosticRecord("C", "third", HostDiagnosticSeverity.Info));
+
+        Assert.Equal(2, diagnostics.Capacity);
+        Assert.Equal(1, diagnostics.DroppedCount);
+        Assert.Equal(["B", "C"], diagnostics.Records.Select(record => record.Code));
+    }
+
+    [Fact]
+    public void BuildFailureCanBeInspectedFromBuilderDiagnostics()
+    {
+        var builder = ApplicationHost.CreateBuilder();
+        var diagnostics = builder.GetBuildDiagnostics();
+        builder.UseModule<MissingDependencyModule>();
+
+        Assert.Throws<InvalidOperationException>(() => builder.Build());
+
+        Assert.Contains(diagnostics.Records, record =>
+            record.Code == HostDiagnosticIds.HostBuildFailed &&
+            record.Context["stage"] == "ModuleGraph");
+        Assert.Contains(diagnostics.Records, record =>
+            record.Code == HostDiagnosticIds.ModuleGraphFailed);
+    }
+
+    [DependsOn(typeof(UnregisteredModule))]
+    private sealed class MissingDependencyModule : ModuleBase;
+
+    private sealed class UnregisteredModule : ModuleBase;
 }

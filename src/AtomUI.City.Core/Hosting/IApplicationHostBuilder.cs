@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace AtomUI.City.Hosting;
+namespace AtomUI.City.Core.Hosting;
 
 public interface IApplicationHostBuilder
 {

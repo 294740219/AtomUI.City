@@ -1,6 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 
-namespace AtomUI.City.DependencyInjection;
+namespace AtomUI.City.Core.DependencyInjection;
 
 internal sealed class ServiceRegistrationMetadata
 {

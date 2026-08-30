@@ -1,16 +1,19 @@
-using AtomUI.City.Diagnostics;
-using AtomUI.City.Hosting;
+using AtomUI.City.Core.Diagnostics;
+using AtomUI.City.Core.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace AtomUI.City.Modularity;
+namespace AtomUI.City.Core.Modularity;
 
-public sealed class ModuleRegistry : IModuleRegistry
+public sealed class ModuleRegistry : IModuleRegistry, IAsyncDisposable
 {
     private readonly IReadOnlyList<ModuleEntry> _orderedEntries;
+    private readonly object _syncRoot = new();
     private bool _contributionsConfigured;
+    private Task? _disposeTask;
+    private bool _disposed;
     private bool _initialized;
     private bool _servicesConfigured;
-    private bool _shutdown;
+    private Task? _shutdownTask;
 
     private ModuleRegistry(IReadOnlyList<ModuleEntry> orderedEntries)
     {
@@ -24,13 +27,24 @@ public sealed class ModuleRegistry : IModuleRegistry
     {
         ArgumentNullException.ThrowIfNull(registrations);
 
-        var entries = registrations
-            .Select(registration => new ModuleEntry(
-                CreateDescriptor(registration.ModuleType),
-                registration.Factory()))
-            .ToArray();
+        var entries = new List<ModuleEntry>(registrations.Count);
 
-        return new ModuleRegistry(OrderByDependencies(entries));
+        try
+        {
+            foreach (var registration in registrations)
+            {
+                entries.Add(new ModuleEntry(
+                    CreateDescriptor(registration.ModuleType),
+                    registration.Factory()));
+            }
+
+            return new ModuleRegistry(OrderByDependencies(entries));
+        }
+        catch
+        {
+            DisposeEntriesAfterBuildFailure(entries);
+            throw;
+        }
     }
 
     internal static ModuleRegistry CreateForTesting(IReadOnlyList<Type> moduleTypes)
@@ -53,6 +67,7 @@ public sealed class ModuleRegistry : IModuleRegistry
     {
         ArgumentNullException.ThrowIfNull(applicationContext);
         ArgumentNullException.ThrowIfNull(services);
+        ThrowIfDisposed();
 
         if (_servicesConfigured)
         {
@@ -64,35 +79,29 @@ public sealed class ModuleRegistry : IModuleRegistry
 
         try
         {
-            foreach (var entry in _orderedEntries)
-            {
-                await InvokeModuleAsync(
-                    entry,
-                    diagnostics,
-                    "PreConfigureServices",
-                    token => entry.Module.PreConfigureServicesAsync(context, token),
-                    cancellationToken).ConfigureAwait(false);
-            }
+            await ExecuteConfigurationStageAsync(
+                context,
+                diagnostics,
+                "PreConfigureServices",
+                static (module, moduleContext, token) =>
+                    module.PreConfigureServicesAsync(moduleContext, token),
+                cancellationToken).ConfigureAwait(false);
 
-            foreach (var entry in _orderedEntries)
-            {
-                await InvokeModuleAsync(
-                    entry,
-                    diagnostics,
-                    "ConfigureServices",
-                    token => entry.Module.ConfigureServicesAsync(context, token),
-                    cancellationToken).ConfigureAwait(false);
-            }
+            await ExecuteConfigurationStageAsync(
+                context,
+                diagnostics,
+                "ConfigureServices",
+                static (module, moduleContext, token) =>
+                    module.ConfigureServicesAsync(moduleContext, token),
+                cancellationToken).ConfigureAwait(false);
 
-            foreach (var entry in _orderedEntries)
-            {
-                await InvokeModuleAsync(
-                    entry,
-                    diagnostics,
-                    "PostConfigureServices",
-                    token => entry.Module.PostConfigureServicesAsync(context, token),
-                    cancellationToken).ConfigureAwait(false);
-            }
+            await ExecuteConfigurationStageAsync(
+                context,
+                diagnostics,
+                "PostConfigureServices",
+                static (module, moduleContext, token) =>
+                    module.PostConfigureServicesAsync(moduleContext, token),
+                cancellationToken).ConfigureAwait(false);
 
             _servicesConfigured = true;
         }
@@ -109,6 +118,7 @@ public sealed class ModuleRegistry : IModuleRegistry
     {
         ArgumentNullException.ThrowIfNull(applicationContext);
         ArgumentNullException.ThrowIfNull(services);
+        ThrowIfDisposed();
 
         if (_contributionsConfigured)
         {
@@ -120,6 +130,7 @@ public sealed class ModuleRegistry : IModuleRegistry
 
         foreach (var entry in _orderedEntries)
         {
+            entry.RuntimeEntered = true;
             await InvokeModuleAsync(
                 entry,
                 diagnostics,
@@ -138,6 +149,7 @@ public sealed class ModuleRegistry : IModuleRegistry
     {
         ArgumentNullException.ThrowIfNull(applicationContext);
         ArgumentNullException.ThrowIfNull(services);
+        ThrowIfDisposed();
 
         if (_initialized)
         {
@@ -147,40 +159,34 @@ public sealed class ModuleRegistry : IModuleRegistry
         var context = new ApplicationInitializationContext(applicationContext, services);
         var diagnostics = services.GetService<IHostDiagnostics>();
 
-        foreach (var entry in _orderedEntries)
-        {
-            await InvokeModuleAsync(
-                entry,
-                diagnostics,
-                "OnPreApplicationInitialization",
-                token => entry.Module.OnPreApplicationInitializationAsync(context, token),
-                cancellationToken).ConfigureAwait(false);
-        }
+        await ExecuteInitializationStageAsync(
+            context,
+            diagnostics,
+            "OnPreApplicationInitialization",
+            static (module, moduleContext, token) =>
+                module.OnPreApplicationInitializationAsync(moduleContext, token),
+            cancellationToken).ConfigureAwait(false);
 
-        foreach (var entry in _orderedEntries)
-        {
-            await InvokeModuleAsync(
-                entry,
-                diagnostics,
-                "OnApplicationInitialization",
-                token => entry.Module.OnApplicationInitializationAsync(context, token),
-                cancellationToken).ConfigureAwait(false);
-        }
+        await ExecuteInitializationStageAsync(
+            context,
+            diagnostics,
+            "OnApplicationInitialization",
+            static (module, moduleContext, token) =>
+                module.OnApplicationInitializationAsync(moduleContext, token),
+            cancellationToken).ConfigureAwait(false);
 
-        foreach (var entry in _orderedEntries)
-        {
-            await InvokeModuleAsync(
-                entry,
-                diagnostics,
-                "OnPostApplicationInitialization",
-                token => entry.Module.OnPostApplicationInitializationAsync(context, token),
-                cancellationToken).ConfigureAwait(false);
-        }
+        await ExecuteInitializationStageAsync(
+            context,
+            diagnostics,
+            "OnPostApplicationInitialization",
+            static (module, moduleContext, token) =>
+                module.OnPostApplicationInitializationAsync(moduleContext, token),
+            cancellationToken).ConfigureAwait(false);
 
         _initialized = true;
     }
 
-    public async ValueTask ShutdownAsync(
+    public ValueTask ShutdownAsync(
         ApplicationContext applicationContext,
         IServiceProvider services,
         CancellationToken cancellationToken = default)
@@ -188,23 +194,166 @@ public sealed class ModuleRegistry : IModuleRegistry
         ArgumentNullException.ThrowIfNull(applicationContext);
         ArgumentNullException.ThrowIfNull(services);
 
-        if (_shutdown || !_initialized)
+        lock (_syncRoot)
         {
-            return;
-        }
+            if (_shutdownTask is not null)
+            {
+                return new ValueTask(_shutdownTask);
+            }
 
-        _shutdown = true;
+            if (_disposed)
+            {
+                return ValueTask.CompletedTask;
+            }
+
+            _shutdownTask = ShutdownCoreAsync(applicationContext, services, cancellationToken);
+
+            return new ValueTask(_shutdownTask);
+        }
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        lock (_syncRoot)
+        {
+            if (_disposeTask is not null)
+            {
+                return new ValueTask(_disposeTask);
+            }
+
+            if (_disposed)
+            {
+                return ValueTask.CompletedTask;
+            }
+
+            _disposeTask = DisposeModulesCoreAsync(diagnostics: null);
+
+            return new ValueTask(_disposeTask);
+        }
+    }
+
+    private async Task ShutdownCoreAsync(
+        ApplicationContext applicationContext,
+        IServiceProvider services,
+        CancellationToken cancellationToken)
+    {
+        var failures = new List<Exception>();
         var context = new ApplicationShutdownContext(applicationContext, services);
         var diagnostics = services.GetService<IHostDiagnostics>();
 
         for (var index = _orderedEntries.Count - 1; index >= 0; index--)
         {
             var entry = _orderedEntries[index];
+
+            if (!entry.RuntimeEntered || entry.ShutdownAttempted)
+            {
+                continue;
+            }
+
+            entry.ShutdownAttempted = true;
+
+            try
+            {
+                await InvokeModuleAsync(
+                    entry,
+                    diagnostics,
+                    "OnApplicationShutdown",
+                    token => entry.Module.OnApplicationShutdownAsync(context, token),
+                    cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                AddFailure(failures, exception);
+            }
+        }
+
+        try
+        {
+            await DisposeModulesCoreAsync(diagnostics).ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            AddFailure(failures, exception);
+        }
+
+        ThrowIfFailures(failures, "One or more modules failed to shut down.");
+    }
+
+    private async Task DisposeModulesCoreAsync(IHostDiagnostics? diagnostics)
+    {
+        var failures = new List<Exception>();
+
+        for (var index = _orderedEntries.Count - 1; index >= 0; index--)
+        {
+            var entry = _orderedEntries[index];
+
+            if (entry.Disposed)
+            {
+                continue;
+            }
+
+            entry.Disposed = true;
+
+            try
+            {
+                switch (entry.Module)
+                {
+                    case IAsyncDisposable asyncDisposable:
+                        await asyncDisposable.DisposeAsync().ConfigureAwait(false);
+                        break;
+                    case IDisposable disposable:
+                        disposable.Dispose();
+                        break;
+                }
+            }
+            catch (Exception exception)
+            {
+                WriteModuleFailure(diagnostics, entry, "Dispose", exception);
+                AddFailure(failures, exception);
+            }
+        }
+
+        lock (_syncRoot)
+        {
+            _disposed = true;
+        }
+
+        ThrowIfFailures(failures, "One or more module instances failed to dispose.");
+    }
+
+    private async ValueTask ExecuteConfigurationStageAsync(
+        ServiceConfigurationContext context,
+        IHostDiagnostics? diagnostics,
+        string stage,
+        Func<IModule, ServiceConfigurationContext, CancellationToken, ValueTask> invoke,
+        CancellationToken cancellationToken)
+    {
+        foreach (var entry in _orderedEntries)
+        {
             await InvokeModuleAsync(
                 entry,
                 diagnostics,
-                "OnApplicationShutdown",
-                token => entry.Module.OnApplicationShutdownAsync(context, token),
+                stage,
+                token => invoke(entry.Module, context, token),
+                cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async ValueTask ExecuteInitializationStageAsync(
+        ApplicationInitializationContext context,
+        IHostDiagnostics? diagnostics,
+        string stage,
+        Func<IModule, ApplicationInitializationContext, CancellationToken, ValueTask> invoke,
+        CancellationToken cancellationToken)
+    {
+        foreach (var entry in _orderedEntries)
+        {
+            entry.RuntimeEntered = true;
+            await InvokeModuleAsync(
+                entry,
+                diagnostics,
+                stage,
+                token => invoke(entry.Module, context, token),
                 cancellationToken).ConfigureAwait(false);
         }
     }
@@ -317,12 +466,17 @@ public sealed class ModuleRegistry : IModuleRegistry
     {
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             await invoke(cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception exception)
         {
             WriteModuleFailure(diagnostics, entry, stage, exception);
-
             throw;
         }
     }
@@ -360,7 +514,75 @@ public sealed class ModuleRegistry : IModuleRegistry
         }
     }
 
-    private sealed record ModuleEntry(ModuleDescriptor Descriptor, IModule Module);
+    private void ThrowIfDisposed()
+    {
+        lock (_syncRoot)
+        {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(ModuleRegistry));
+            }
+        }
+    }
+
+    private static void AddFailure(ICollection<Exception> failures, Exception exception)
+    {
+        if (exception is AggregateException aggregateException)
+        {
+            foreach (var innerException in aggregateException.Flatten().InnerExceptions)
+            {
+                failures.Add(innerException);
+            }
+
+            return;
+        }
+
+        failures.Add(exception);
+    }
+
+    private static void ThrowIfFailures(IReadOnlyCollection<Exception> failures, string message)
+    {
+        if (failures.Count > 0)
+        {
+            throw new AggregateException(message, failures);
+        }
+    }
+
+    private static void DisposeEntriesAfterBuildFailure(IReadOnlyList<ModuleEntry> entries)
+    {
+        for (var index = entries.Count - 1; index >= 0; index--)
+        {
+            try
+            {
+                switch (entries[index].Module)
+                {
+                    case IAsyncDisposable asyncDisposable:
+                        asyncDisposable.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                        break;
+                    case IDisposable disposable:
+                        disposable.Dispose();
+                        break;
+                }
+            }
+            catch
+            {
+                // Preserve the module graph or construction failure.
+            }
+        }
+    }
+
+    private sealed class ModuleEntry(ModuleDescriptor descriptor, IModule module)
+    {
+        public ModuleDescriptor Descriptor { get; } = descriptor;
+
+        public IModule Module { get; } = module;
+
+        public bool RuntimeEntered { get; set; }
+
+        public bool ShutdownAttempted { get; set; }
+
+        public bool Disposed { get; set; }
+    }
 
     private enum ModuleVisitState
     {

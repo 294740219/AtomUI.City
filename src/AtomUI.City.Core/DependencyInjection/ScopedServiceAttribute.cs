@@ -1,6 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 
-namespace AtomUI.City.DependencyInjection;
+namespace AtomUI.City.Core.DependencyInjection;
 
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
 public sealed class ScopedServiceAttribute : Attribute

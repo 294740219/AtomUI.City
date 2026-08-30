@@ -1,6 +1,6 @@
-using AtomUI.City.Hosting;
+using AtomUI.City.Core.Hosting;
 
-namespace AtomUI.City.Modularity;
+namespace AtomUI.City.Core.Modularity;
 
 public sealed class ApplicationInitializationContext
 {

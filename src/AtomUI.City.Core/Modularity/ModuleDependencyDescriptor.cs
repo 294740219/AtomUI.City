@@ -1,4 +1,4 @@
-namespace AtomUI.City.Modularity;
+namespace AtomUI.City.Core.Modularity;
 
 public sealed class ModuleDependencyDescriptor
 {

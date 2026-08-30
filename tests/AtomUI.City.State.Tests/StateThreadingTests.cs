@@ -1,6 +1,6 @@
-using AtomUI.City.Diagnostics;
+using AtomUI.City.Core.Diagnostics;
 using AtomUI.City.State;
-using AtomUI.City.Threading;
+using AtomUI.City.Core.Threading;
 
 namespace AtomUI.City.State.Tests;
 

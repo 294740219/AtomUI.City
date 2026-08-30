@@ -1,5 +1,5 @@
 using AtomUI.City.Data;
-using AtomUI.City.Lifecycle;
+using AtomUI.City.Core.Lifecycle;
 
 namespace AtomUI.City.Data.Tests;
 

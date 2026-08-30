@@ -1,4 +1,4 @@
-namespace AtomUI.City.Modularity;
+namespace AtomUI.City.Core.Modularity;
 
 internal sealed class ModuleRegistration
 {

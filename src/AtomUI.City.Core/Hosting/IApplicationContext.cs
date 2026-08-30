@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Configuration;
 
-namespace AtomUI.City.Hosting;
+namespace AtomUI.City.Core.Hosting;
 
 public interface IApplicationContext
 {

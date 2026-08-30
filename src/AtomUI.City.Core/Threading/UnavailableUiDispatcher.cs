@@ -1,6 +1,6 @@
-using AtomUI.City.Diagnostics;
+using AtomUI.City.Core.Diagnostics;
 
-namespace AtomUI.City.Threading;
+namespace AtomUI.City.Core.Threading;
 
 public sealed class UnavailableUiDispatcher : IUiDispatcher
 {

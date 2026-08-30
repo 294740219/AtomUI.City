@@ -1,5 +1,5 @@
-using AtomUI.City.Hosting;
-using AtomUI.City.Lifecycle;
+using AtomUI.City.Core.Hosting;
+using AtomUI.City.Core.Lifecycle;
 
 namespace AtomUI.City.Core.Tests;
 

@@ -1,7 +1,7 @@
-using AtomUI.City.Hosting;
+using AtomUI.City.Core.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace AtomUI.City.Modularity;
+namespace AtomUI.City.Core.Modularity;
 
 public sealed class ServiceConfigurationContext
 {

@@ -1,7 +1,7 @@
 # AtomUI.City.Core
 
 文档等级：Level 3
-成熟度：Partially Implemented
+成熟度：Verified
 执行边界：Host runtime kernel
 程序集：`AtomUI.City.Core`
 源码：`src/AtomUI.City.Core`
@@ -46,6 +46,19 @@
 
 Core 定义 Host 本体，所有运行时模块都通过 IApplicationHostBuilder、LifecyclePipeline 和 ModuleBase 接入。
 
+## 命名空间
+
+Core 的 public API 必须使用与程序集一致的 `AtomUI.City.Core.*` 根命名空间：
+
+- `AtomUI.City.Core.Hosting`
+- `AtomUI.City.Core.Lifecycle`
+- `AtomUI.City.Core.Modularity`
+- `AtomUI.City.Core.DependencyInjection`
+- `AtomUI.City.Core.Diagnostics`
+- `AtomUI.City.Core.Threading`
+
+不得重新引入省略 `Core` 层级的扁平命名空间。
+
 ## 与 PluginSystem 的关系
 
 Core 不加载插件，但提供插件模块复用的 Module、Lifecycle 和 Diagnostics 基础合同。
@@ -71,6 +84,6 @@ Core 不加载插件，但提供插件模块复用的 Module、Lifecycle 和 Dia
 
 ## 当前成熟度状态
 
-Partially Implemented
+Verified
 
-该状态表示模块已有实现基线，但还需要按产品级合同补齐实现和测试。单个功能点状态以 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 为准。
+Core 的七个 Feature 已完成实现、单元/合同测试、Headless Console 进程测试、诊断断言和公共边界检查。Avalonia lifetime、generated module manifest 和插件 ContributionLease 的具体适配仍由 Presentation、Generators 和 PluginSystem 各自负责，不改变 Core 的 Verified 状态。

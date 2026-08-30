@@ -17,12 +17,24 @@
 
 以下 API 是 Phase 0 到 Phase 3 的产品级冻结范围。没有进入本节的 public 类型可以保留为支持类型，但不能在首批实现中被当作稳定产品 API 对外承诺。
 
+## 工业化新增合同
+
+| API | Feature | 合同 |
+| --- | --- | --- |
+| `ConfigureLifecycle(Action<LifecyclePipelineBuilder>)` | AUC-CORE-002 | Build 前按调用顺序收集 middleware；null builder/delegate 抛参数异常；Build 后调用因 builder frozen 失败。 |
+| `GetBuildDiagnostics()` | AUC-CORE-006 | 返回 builder 拥有的稳定 collector；Build 抛异常后仍可读取 AUCHOST101/105；collector 写入失败不能替换原始 Build 异常。 |
+| `ApplicationHostOptions.DiagnosticsCapacity` | AUC-CORE-006 | 默认 1024，Build 时必须大于零，否则抛 ArgumentOutOfRangeException。 |
+| `InMemoryHostDiagnostics(int capacity)` | AUC-CORE-006 | 有界 FIFO snapshot；容量满后丢弃最旧记录并增加 DroppedCount；无参构造保持原有无界行为。 |
+| `LifecycleScope.CreateRoot(kind, id, diagnostics)` | AUC-CORE-003 | root 和所有 child 共享 diagnostics sink；清理失败写 AUCHOST104 后继续其他 child；sink 异常被隔离。 |
+
+所有 Core public 类型的冻结命名空间以 `AtomUI.City.Core.*` 开头。旧的 `AtomUI.City.Hosting`、`AtomUI.City.Lifecycle` 等 Preview 命名空间不再构成 1.0 API。
+
 ### `ApplicationHost`
 
 | Field | Contract |
 | --- | --- |
 | Type | `ApplicationHost` |
-| Namespace | `AtomUI.City.Hosting` |
+| Namespace | `AtomUI.City.Core.Hosting` |
 | Assembly | `AtomUI.City.Core` |
 | Stability | Preview |
 | Feature | AUC-CORE-001 |
@@ -47,7 +59,7 @@
 | Field | Contract |
 | --- | --- |
 | Type | `ApplicationHostBuilder` |
-| Namespace | `AtomUI.City.Hosting` |
+| Namespace | `AtomUI.City.Core.Hosting` |
 | Assembly | `AtomUI.City.Core` |
 | Stability | Preview |
 | Feature | AUC-CORE-001 |
@@ -72,7 +84,7 @@
 | Field | Contract |
 | --- | --- |
 | Type | `IApplicationHost` |
-| Namespace | `AtomUI.City.Hosting` |
+| Namespace | `AtomUI.City.Core.Hosting` |
 | Assembly | `AtomUI.City.Core` |
 | Stability | Preview |
 | Feature | AUC-CORE-001, AUC-CORE-002 |
@@ -97,7 +109,7 @@
 | Field | Contract |
 | --- | --- |
 | Type | `IApplicationContext` |
-| Namespace | `AtomUI.City.Hosting` |
+| Namespace | `AtomUI.City.Core.Hosting` |
 | Assembly | `AtomUI.City.Core` |
 | Stability | Preview |
 | Feature | AUC-CORE-001 |
@@ -122,7 +134,7 @@
 | Field | Contract |
 | --- | --- |
 | Type | `LifecyclePipeline` |
-| Namespace | `AtomUI.City.Lifecycle` |
+| Namespace | `AtomUI.City.Core.Lifecycle` |
 | Assembly | `AtomUI.City.Core` |
 | Stability | Preview |
 | Feature | AUC-CORE-002 |
@@ -147,7 +159,7 @@
 | Field | Contract |
 | --- | --- |
 | Type | `LifecycleScope` |
-| Namespace | `AtomUI.City.Lifecycle` |
+| Namespace | `AtomUI.City.Core.Lifecycle` |
 | Assembly | `AtomUI.City.Core` |
 | Stability | Preview |
 | Feature | AUC-CORE-003 |
@@ -172,7 +184,7 @@
 | Field | Contract |
 | --- | --- |
 | Type | `ModuleBase` |
-| Namespace | `AtomUI.City.Modularity` |
+| Namespace | `AtomUI.City.Core.Modularity` |
 | Assembly | `AtomUI.City.Core` |
 | Stability | Preview |
 | Feature | AUC-CORE-004 |
@@ -197,7 +209,7 @@
 | Field | Contract |
 | --- | --- |
 | Type | `ModuleDescriptor` |
-| Namespace | `AtomUI.City.Modularity` |
+| Namespace | `AtomUI.City.Core.Modularity` |
 | Assembly | `AtomUI.City.Core` |
 | Stability | Preview |
 | Feature | AUC-CORE-004 |
@@ -222,7 +234,7 @@
 | Field | Contract |
 | --- | --- |
 | Type | `ModuleOrigin` |
-| Namespace | `AtomUI.City.Modularity` |
+| Namespace | `AtomUI.City.Core.Modularity` |
 | Assembly | `AtomUI.City.Core` |
 | Stability | Preview |
 | Feature | AUC-CORE-004 |
@@ -247,7 +259,7 @@
 | Field | Contract |
 | --- | --- |
 | Type | `ServiceConfigurationContext` |
-| Namespace | `AtomUI.City.Modularity` |
+| Namespace | `AtomUI.City.Core.Modularity` |
 | Assembly | `AtomUI.City.Core` |
 | Stability | Preview |
 | Feature | AUC-CORE-004 |
@@ -272,7 +284,7 @@
 | Field | Contract |
 | --- | --- |
 | Type | `ModuleServiceCollection` |
-| Namespace | `AtomUI.City.Modularity` |
+| Namespace | `AtomUI.City.Core.Modularity` |
 | Assembly | `AtomUI.City.Core` |
 | Stability | Preview |
 | Feature | AUC-CORE-004 |
@@ -285,7 +297,7 @@
 | Disposal | 无资源；Host Build 结束后 module 不应继续持有。 |
 | Nullability | service descriptor 不得为空。 |
 | Cancellation | 无取消语义。 |
-| Failure Behavior | 调用临时 provider 创建入口必须失败；阶段冻结后所有 mutating API 抛 `InvalidOperationException`。 |
+| Failure Behavior | City 提供的无参数、`validateScopes` 和 `ServiceProviderOptions` 临时 provider 入口必须抛 `InvalidOperationException`；生产项目中的其他 `BuildServiceProvider`、`IServiceProviderFactory<T>.CreateServiceProvider` 和 Microsoft Generic Host 构建/启动调用或引用由 `AUCANL0001` 阻止编译；阶段冻结后所有 mutating API 抛 `InvalidOperationException`。 |
 | Diagnostics | 触发 guard 时由 module lifecycle 记录 `AUCHOST106`。 |
 | Plugin Boundary | 插件 module 只能通过该 collection 注册受控服务，不能写 Host runtime provider。 |
 | AOT / Trimming | 不执行扫描，不依赖 dynamic code。 |
@@ -297,20 +309,20 @@
 | Field | Contract |
 | --- | --- |
 | Type | `ModuleServiceCollectionBuildGuardExtensions` |
-| Namespace | `AtomUI.City.Modularity` |
+| Namespace | `AtomUI.City.Core.Modularity` |
 | Assembly | `AtomUI.City.Core` |
 | Stability | Preview |
 | Feature | AUC-CORE-004 |
-| Purpose | 用更具体的 extension method 阻止 module service configuration 阶段创建临时 provider。 |
+| Purpose | 用更具体的 extension method 阻止 module service configuration 阶段通过常用微软 DI 调用形式创建临时 provider。 |
 | Owner | Module registry |
 | Created By | 静态扩展类型。 |
 | Lifetime | 编译期 API。 |
 | DI Lifetime | 不进入 DI。 |
 | Thread Safety | 无状态。 |
 | Disposal | 无释放。 |
-| Nullability | services 为 null 时抛 `ArgumentNullException`。 |
+| Nullability | services 为 null 时抛 `ArgumentNullException`；`ServiceProviderOptions` overload 的 options 为 null 时同样抛参数异常。 |
 | Cancellation | 无取消语义。 |
-| Failure Behavior | `BuildServiceProvider(ModuleServiceCollection)` 始终抛 `InvalidOperationException`。 |
+| Failure Behavior | 三个 `BuildServiceProvider(ModuleServiceCollection, ...)` 重载对非 null 参数始终抛 `InvalidOperationException`；显式强转、静态调用、方法引用、独立 `ServiceCollection`、service provider factory 和 Microsoft Generic Host 构建/启动入口由生产项目 Analyzer `AUCANL0001` 阻止编译。 |
 | Diagnostics | module registry 捕获异常后写 `AUCHOST106`。 |
 | Plugin Boundary | 插件 module 同样受 guard 约束。 |
 | AOT / Trimming | 静态扩展方法，不依赖 reflection。 |
@@ -322,7 +334,7 @@
 | Field | Contract |
 | --- | --- |
 | Type | `DependsOnAttribute` |
-| Namespace | `AtomUI.City.Modularity` |
+| Namespace | `AtomUI.City.Core.Modularity` |
 | Assembly | `AtomUI.City.Core` |
 | Stability | Preview |
 | Feature | AUC-CORE-004 |
@@ -347,7 +359,7 @@
 | Field | Contract |
 | --- | --- |
 | Type | `ServiceAttribute` |
-| Namespace | `AtomUI.City.DependencyInjection` |
+| Namespace | `AtomUI.City.Core.DependencyInjection` |
 | Assembly | `AtomUI.City.Core` |
 | Stability | Preview |
 | Feature | AUC-CORE-005 |
@@ -372,7 +384,7 @@
 | Field | Contract |
 | --- | --- |
 | Type | `ScopedServiceAttribute` |
-| Namespace | `AtomUI.City.DependencyInjection` |
+| Namespace | `AtomUI.City.Core.DependencyInjection` |
 | Assembly | `AtomUI.City.Core` |
 | Stability | Preview |
 | Feature | AUC-CORE-005 |
@@ -397,7 +409,7 @@
 | Field | Contract |
 | --- | --- |
 | Type | `ExposeServicesAttribute` |
-| Namespace | `AtomUI.City.DependencyInjection` |
+| Namespace | `AtomUI.City.Core.DependencyInjection` |
 | Assembly | `AtomUI.City.Core` |
 | Stability | Preview |
 | Feature | AUC-CORE-005 |
@@ -422,7 +434,7 @@
 | Field | Contract |
 | --- | --- |
 | Type | `IHostDiagnostics` |
-| Namespace | `AtomUI.City.Diagnostics` |
+| Namespace | `AtomUI.City.Core.Diagnostics` |
 | Assembly | `AtomUI.City.Core` |
 | Stability | Preview |
 | Feature | AUC-CORE-006 |
@@ -447,7 +459,7 @@
 | Field | Contract |
 | --- | --- |
 | Type | `HostDiagnosticRecord` |
-| Namespace | `AtomUI.City.Diagnostics` |
+| Namespace | `AtomUI.City.Core.Diagnostics` |
 | Assembly | `AtomUI.City.Core` |
 | Stability | Preview |
 | Feature | AUC-CORE-006 |
@@ -472,7 +484,7 @@
 | Field | Contract |
 | --- | --- |
 | Type | `HostDiagnosticIds` |
-| Namespace | `AtomUI.City.Diagnostics` |
+| Namespace | `AtomUI.City.Core.Diagnostics` |
 | Assembly | `AtomUI.City.Core` |
 | Stability | Preview |
 | Feature | AUC-CORE-006 |
@@ -497,7 +509,7 @@
 | Field | Contract |
 | --- | --- |
 | Type | `IUiDispatcher` |
-| Namespace | `AtomUI.City.Threading` |
+| Namespace | `AtomUI.City.Core.Threading` |
 | Assembly | `AtomUI.City.Core` |
 | Stability | Preview |
 | Feature | AUC-CORE-007 |
@@ -522,7 +534,7 @@
 | Field | Contract |
 | --- | --- |
 | Type | `UnavailableUiDispatcher` |
-| Namespace | `AtomUI.City.Threading` |
+| Namespace | `AtomUI.City.Core.Threading` |
 | Assembly | `AtomUI.City.Core` |
 | Stability | Preview |
 | Feature | AUC-CORE-007 |
@@ -694,11 +706,11 @@ Tests: LifecycleScopeTreeTests。
 Method: ModuleServiceCollectionBuildGuardExtensions.BuildServiceProvider
 Feature: AUC-CORE-004
 Purpose: 阻止 module service configuration 阶段创建临时 ServiceProvider。
-Parameters: services 不能为 null。
+Parameters: services 不能为 null；`ServiceProviderOptions` overload 的 options 不能为 null；validateScopes 不改变 guard 行为。
 Return: 无成功返回。
-Nullability: services 为 null 时抛 ArgumentNullException。
+Nullability: services 或 options 为 null 时抛 ArgumentNullException。
 Cancellation: 无。
-Exceptions or Result: 始终抛 InvalidOperationException，错误消息必须说明禁止创建 temporary service provider。
+Exceptions or Result: 三个 City overload 对有效参数始终抛 InvalidOperationException，错误消息必须说明禁止创建 temporary service provider；非测试 City 项目中的 City/微软 BuildServiceProvider、`IServiceProviderFactory<T>.CreateServiceProvider` 和 Microsoft Generic Host 构建/启动调用或方法引用产生 AUCANL0001 编译错误。
 Idempotency: 每次调用都失败，不产生副作用。
 Concurrency: 无共享状态。
 Side Effects: 不构建 provider，不解析任何服务。

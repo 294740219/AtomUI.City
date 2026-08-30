@@ -1,5 +1,5 @@
 using System.Reflection;
-using AtomUI.City.Hosting;
+using AtomUI.City.Core.Hosting;
 
 namespace AtomUI.City.Core.Tests;
 
@@ -27,5 +27,18 @@ public sealed class CoreAssemblyTests
         Assert.DoesNotContain("AtomUI.City.Cli", referenced);
         Assert.DoesNotContain("AtomUI.City.Templates", referenced);
         Assert.DoesNotContain("AtomUI.City.Testing", referenced);
+    }
+
+    [Fact]
+    public void ExportedTypesUseCoreRootNamespace()
+    {
+        var invalidTypes = typeof(ApplicationHost).Assembly
+            .GetExportedTypes()
+            .Where(type => type.Namespace is null ||
+                !type.Namespace.StartsWith("AtomUI.City.Core", StringComparison.Ordinal))
+            .Select(type => type.FullName)
+            .ToArray();
+
+        Assert.Empty(invalidTypes);
     }
 }

@@ -1,5 +1,5 @@
 using System.Reflection;
-using AtomUI.City.Diagnostics;
+using AtomUI.City.Core.Diagnostics;
 using AtomUI.City.State;
 
 namespace AtomUI.City.State.Tests;

@@ -1,4 +1,4 @@
-using AtomUI.City.Lifecycle;
+using AtomUI.City.Core.Lifecycle;
 
 namespace AtomUI.City.Core.Tests;
 

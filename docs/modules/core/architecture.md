@@ -42,9 +42,11 @@ AtomUI.City.Core 的架构目标是把模块职责变成可实现、可测试、
 
 - CreateBuilder 收集 options、module registration、service actions 和 middleware。
 - Build 创建 GenericHost、ApplicationContext、LifecycleScope root 和 diagnostics collector。
-- StartAsync 执行 module initialization、lifecycle middleware、host start diagnostics。
-- StopAsync 阻止新操作进入，取消未完成 operation，执行 module shutdown。
+- StartAsync 合并并发启动事务，依次启动 GenericHost、创建 Application ServiceScope 和 ApplicationScope、配置 contribution、执行 module initialization 和 lifecycle middleware。
+- StopAsync 合并并发停止事务，调用方 cancellation 只取消等待；内部按 shutdown deadline 取消 operation、逆序关闭模块、释放 Application ServiceScope 并停止 GenericHost。
 - DisposeAsync 从 leaf scope 到 root scope 释放，释放异常进入 diagnostics。
+
+启动失败时，Host 保留原始异常并进入 Faulted；已经进入运行阶段的模块按逆拓扑顺序补偿关闭。关闭和释放阶段记录所有失败、继续处理剩余 owner，最后通过 AggregateException 汇总。
 
 ## 失败矩阵
 
@@ -59,6 +61,8 @@ AtomUI.City.Core 的架构目标是把模块职责变成可实现、可测试、
 - Host start/stop 不允许全程序集运行时扫描。
 - Module descriptor 和 dependency graph 必须可由 generator 生成或缓存。
 - Diagnostics collector 不能在产品热路径无界增长。
+
+默认 Host diagnostics 容量为 1024，溢出时保留最新记录并累计 dropped count。直接创建的无参 InMemoryHostDiagnostics 保留原有无界测试/自定义行为。
 
 ## 运行时对象模型
 

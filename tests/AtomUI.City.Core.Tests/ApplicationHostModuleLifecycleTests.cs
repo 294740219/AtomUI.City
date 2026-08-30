@@ -1,6 +1,6 @@
-using AtomUI.City.Diagnostics;
-using AtomUI.City.Hosting;
-using AtomUI.City.Modularity;
+using AtomUI.City.Core.Diagnostics;
+using AtomUI.City.Core.Hosting;
+using AtomUI.City.Core.Modularity;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace AtomUI.City.Core.Tests;
@@ -83,6 +83,19 @@ public sealed class ApplicationHostModuleLifecycleTests
     }
 
     [Fact]
+    public void ModuleGraphFailureDisposesAlreadyCreatedModuleInstances()
+    {
+        DisposableBuildModule.Reset();
+        var builder = ApplicationHost.CreateBuilder();
+        builder.UseModule<DisposableBuildModule>();
+        builder.UseModule<MissingRequiredDependencyModule>();
+
+        Assert.Throws<InvalidOperationException>(() => builder.Build());
+
+        Assert.True(DisposableBuildModule.WasDisposed);
+    }
+
+    [Fact]
     public async Task OptionalDependencyCanBeMissing()
     {
         ModuleRecorder.Reset();
@@ -119,19 +132,30 @@ public sealed class ApplicationHostModuleLifecycleTests
     [Fact]
     public void ModuleConfigureServicesRejectsTemporaryProviderCreationAndRecordsDiagnostic()
     {
-        var diagnostics = new InMemoryHostDiagnostics();
-        var builder = ApplicationHost.CreateBuilder();
+        AssertTemporaryProviderCreationRejected<TemporaryProviderModule>();
+    }
 
-        builder.ConfigureServices(services => services.AddSingleton<IHostDiagnostics>(diagnostics));
-        builder.UseModule<TemporaryProviderModule>();
+    [Fact]
+    public void ModuleConfigureServicesRejectsTemporaryProviderCreationWithScopeValidation()
+    {
+        AssertTemporaryProviderCreationRejected<ValidateScopesTemporaryProviderModule>();
+    }
 
-        var exception = Assert.Throws<InvalidOperationException>(() => builder.Build());
+    [Fact]
+    public void ModuleConfigureServicesRejectsTemporaryProviderCreationWithOptions()
+    {
+        AssertTemporaryProviderCreationRejected<OptionsTemporaryProviderModule>();
+    }
 
-        Assert.Contains("temporary service provider", exception.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains(diagnostics.Records, record =>
-            record.Code == HostDiagnosticIds.ModuleLifecycleFailed &&
-            record.Context["moduleType"] == typeof(TemporaryProviderModule).FullName &&
-            record.Context["stage"] == "ConfigureServices");
+    [Fact]
+    public void ModuleServiceProviderGuardRejectsNullOptions()
+    {
+        var context = new ServiceConfigurationContext(
+            new ApplicationContext(),
+            new ServiceCollection());
+
+        Assert.Throws<ArgumentNullException>(() =>
+            context.Services.BuildServiceProvider(options: null!));
     }
 
     [Fact]
@@ -265,6 +289,26 @@ public sealed class ApplicationHostModuleLifecycleTests
         }
     }
 
+    private sealed class ValidateScopesTemporaryProviderModule : ModuleBase
+    {
+        public override void ConfigureServices(ServiceConfigurationContext context)
+        {
+            context.Services.BuildServiceProvider(validateScopes: true);
+        }
+    }
+
+    private sealed class OptionsTemporaryProviderModule : ModuleBase
+    {
+        public override void ConfigureServices(ServiceConfigurationContext context)
+        {
+            context.Services.BuildServiceProvider(new ServiceProviderOptions
+            {
+                ValidateOnBuild = true,
+                ValidateScopes = true,
+            });
+        }
+    }
+
     private sealed class FoundationModule : ModuleBase
     {
         public override void OnApplicationInitialization(ApplicationInitializationContext context)
@@ -298,6 +342,15 @@ public sealed class ApplicationHostModuleLifecycleTests
     }
 
     private sealed class CapturedService;
+
+    private sealed class DisposableBuildModule : ModuleBase, IDisposable
+    {
+        public static bool WasDisposed { get; private set; }
+
+        public static void Reset() => WasDisposed = false;
+
+        public void Dispose() => WasDisposed = true;
+    }
 
     private sealed class CapturedServicesModule : ModuleBase
     {
@@ -406,5 +459,23 @@ public sealed class ApplicationHostModuleLifecycleTests
         {
             RecordedCalls.Clear();
         }
+    }
+
+    private static void AssertTemporaryProviderCreationRejected<TModule>()
+        where TModule : IModule, new()
+    {
+        var diagnostics = new InMemoryHostDiagnostics();
+        var builder = ApplicationHost.CreateBuilder();
+
+        builder.ConfigureServices(services => services.AddSingleton<IHostDiagnostics>(diagnostics));
+        builder.UseModule<TModule>();
+
+        var exception = Assert.Throws<InvalidOperationException>(() => builder.Build());
+
+        Assert.Contains("temporary service provider", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(diagnostics.Records, record =>
+            record.Code == HostDiagnosticIds.ModuleLifecycleFailed &&
+            record.Context["moduleType"] == typeof(TModule).FullName &&
+            record.Context["stage"] == "ConfigureServices");
     }
 }

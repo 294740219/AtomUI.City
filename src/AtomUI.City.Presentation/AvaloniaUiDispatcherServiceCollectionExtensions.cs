@@ -1,5 +1,5 @@
-using AtomUI.City.Diagnostics;
-using AtomUI.City.Threading;
+using AtomUI.City.Core.Diagnostics;
+using AtomUI.City.Core.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 

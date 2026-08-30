@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
-using AtomUI.City.Diagnostics;
-using AtomUI.City.Threading;
+using AtomUI.City.Core.Diagnostics;
+using AtomUI.City.Core.Threading;
 
 namespace AtomUI.City.Presentation;
 

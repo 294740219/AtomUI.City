@@ -1,8 +1,8 @@
 using System.Windows.Input;
-using AtomUI.City.Diagnostics;
+using AtomUI.City.Core.Diagnostics;
 using AtomUI.City.Mvvm;
 using AtomUI.City.Presentation;
-using AtomUI.City.Threading;
+using AtomUI.City.Core.Threading;
 
 namespace AtomUI.City.Presentation.Tests;
 

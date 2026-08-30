@@ -1,5 +1,5 @@
 using AtomUI.City.EventBus;
-using AtomUI.City.Threading;
+using AtomUI.City.Core.Threading;
 
 namespace AtomUI.City.EventBus.Tests;
 

@@ -1,4 +1,4 @@
-using AtomUI.City.Modularity;
+using AtomUI.City.Core.Modularity;
 using AtomUI.City.Testing;
 
 namespace AtomUI.City.Testing.Tests;

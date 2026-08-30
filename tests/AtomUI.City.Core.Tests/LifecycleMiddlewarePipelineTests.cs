@@ -1,4 +1,4 @@
-using AtomUI.City.Lifecycle;
+using AtomUI.City.Core.Lifecycle;
 
 namespace AtomUI.City.Core.Tests;
 
@@ -87,5 +87,30 @@ public sealed class LifecycleMiddlewarePipelineTests
 
         Assert.True(context.IsShortCircuited);
         Assert.Equal(["short"], trace);
+    }
+
+    [Fact]
+    public async Task GuaranteedTerminalRunsEvenWhenCleanupTokenIsAlreadyCanceled()
+    {
+        var terminalCalled = false;
+        var pipeline = new LifecyclePipelineBuilder()
+            .Build(static _ => ValueTask.CompletedTask);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var context = new LifecycleContext(
+            LifecycleStages.ApplicationStop,
+            cancellationToken: cancellation.Token);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+            await pipeline.ExecuteAsync(
+                context,
+                _ =>
+                {
+                    terminalCalled = true;
+                    return ValueTask.CompletedTask;
+                },
+                guaranteeTerminal: true));
+
+        Assert.True(terminalCalled);
     }
 }
