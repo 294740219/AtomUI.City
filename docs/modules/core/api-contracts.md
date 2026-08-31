@@ -79,6 +79,8 @@
 | Breaking Change Rules | 修改冻结时机、默认 services、module graph 规则或 Build 失败策略属于 breaking change。 |
 | Tests | `ApplicationHostBuilderTests` 断言冻结、重复 Build、无效 options、诊断上下文。 |
 
+`ApplicationHostBuilder` 和 `IApplicationHostBuilder` 不公开可变 `IServiceCollection`。Root DI 的应用级配置只能通过 `ConfigureServices` 登记；Build 内部和模块上下文持有的 service collection 不得泄漏为长期可写引用。
+
 ### `IApplicationHost`
 
 | Field | Contract |
@@ -579,16 +581,16 @@ Tests: ApplicationHostBuilderTests。
 ```text
 Method: ApplicationHostBuilder.ConfigureServices
 Feature: AUC-CORE-001
-Purpose: 在 Build 前注册服务。
+Purpose: 在 Build 前登记应用级最终服务配置。
 Parameters: configureServices 不能为 null。
 Return: 当前 builder。
 Nullability: delegate 不能为 null。
 Cancellation: 无。
-Exceptions or Result: null delegate 抛 ArgumentNullException；Build 后调用抛 InvalidOperationException。
-Idempotency: Build 前多次调用按顺序追加注册。
+Exceptions or Result: null delegate 抛 ArgumentNullException；Build 后调用抛 InvalidOperationException；delegate 失败由 Build 原样抛出并记录 UserServices stage。
+Idempotency: Build 前多次调用按顺序登记，并在所有模块服务阶段完成后按相同顺序执行。
 Concurrency: 配置阶段不保证线程安全。
-Side Effects: 只修改 Build 前 service collection。
-Diagnostics: 如果注册导致 Build 失败，失败诊断包含注册阶段。
+Side Effects: 调用本身只登记 delegate；delegate 仅在 Build 的 UserServices 阶段修改 Root service collection。模块阶段失败时不执行。
+Diagnostics: delegate 导致 Build 失败时，失败诊断的 stage 为 UserServices。
 Tests: ApplicationHostBuilderTests。
 ```
 

@@ -34,6 +34,20 @@ Core 在 1.0 冻结前完成一次显式 breaking migration，程序集不变，
 
 仓库内生产模块、测试、模板、MSBuild contract 和 generator metadata 已同步迁移。1.0 发布后这些新命名空间进入常规兼容性承诺。
 
+## 1.0 Preview 服务配置入口收口
+
+`IApplicationHostBuilder.Services` 和 `ApplicationHostBuilder.Services` 在 1.0 冻结前移除。应用必须把直接集合修改迁移为延迟服务配置：
+
+```csharp
+// Before
+builder.Services.AddSingleton<AppService>();
+
+// After
+builder.ConfigureServices(services => services.AddSingleton<AppService>());
+```
+
+`ConfigureServices` delegate 从调用时立即执行改为 Build 时在全部模块服务阶段之后执行。依赖 delegate 立即副作用或立即异常的代码必须迁移到显式的普通方法；服务注册失败现在由 `Build()` 抛出并写入 `UserServices` stage 诊断。
+
 ## 本轮新增 API
 
 - `ConfigureLifecycle(Action<LifecyclePipelineBuilder>)`：注册 Host lifecycle middleware。

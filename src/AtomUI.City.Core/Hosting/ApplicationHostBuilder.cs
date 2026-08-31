@@ -19,10 +19,12 @@ public sealed class ApplicationHostBuilder : IApplicationHostBuilder
     private readonly string[] _args;
     private readonly HostApplicationBuilder _builder;
     private readonly List<Action<ApplicationHostOptions>> _configureHostActions = [];
+    private readonly List<Action<IServiceCollection>> _configureServicesActions = [];
     private readonly GuardedConfigurationManager _configuration;
     private readonly GuardedDictionary<string, object?> _properties;
     private readonly GuardedServiceCollection _services;
     private readonly Dictionary<string, object?> _propertiesStore = new(StringComparer.Ordinal);
+    private bool _applyingUserServices;
     private bool _built;
 
     internal ApplicationHostBuilder(string[] args)
@@ -37,10 +39,10 @@ public sealed class ApplicationHostBuilder : IApplicationHostBuilder
 
         _configuration = new GuardedConfigurationManager(_builder.Configuration, ThrowIfBuilt);
         _properties = new GuardedDictionary<string, object?>(_propertiesStore, ThrowIfBuilt);
-        _services = new GuardedServiceCollection(_builder.Services, ThrowIfBuilt);
+        _services = new GuardedServiceCollection(
+            _builder.Services,
+            () => _applyingUserServices);
     }
-
-    public IServiceCollection Services => _services;
 
     public IConfigurationManager Configuration => _configuration;
 
@@ -51,7 +53,7 @@ public sealed class ApplicationHostBuilder : IApplicationHostBuilder
         ArgumentNullException.ThrowIfNull(configureServices);
         ThrowIfBuilt();
 
-        configureServices(Services);
+        _configureServicesActions.Add(configureServices);
 
         return this;
     }
@@ -105,10 +107,13 @@ public sealed class ApplicationHostBuilder : IApplicationHostBuilder
             _builder.Services.TryAddSingleton(lifecyclePipeline);
 
             buildStage = "ModuleServices";
-            moduleRegistry.ConfigureServicesAsync(context, _builder.Services)
+            moduleRegistry.ConfigureServicesAsync(context, _builder.Services, buildDiagnostics)
                 .AsTask()
                 .GetAwaiter()
                 .GetResult();
+
+            buildStage = "UserServices";
+            ApplyUserServiceConfigurations();
 
             buildStage = "GenericHost";
             genericHost = _builder.Build();
@@ -208,6 +213,23 @@ public sealed class ApplicationHostBuilder : IApplicationHostBuilder
         return options;
     }
 
+    private void ApplyUserServiceConfigurations()
+    {
+        _applyingUserServices = true;
+
+        try
+        {
+            foreach (var configureServices in _configureServicesActions)
+            {
+                configureServices(_services);
+            }
+        }
+        finally
+        {
+            _applyingUserServices = false;
+        }
+    }
+
     private ApplicationContext CreateApplicationContext(ApplicationHostOptions hostOptions)
     {
         var applicationName = !string.IsNullOrWhiteSpace(hostOptions.ApplicationName)
@@ -277,31 +299,31 @@ public sealed class ApplicationHostBuilder : IApplicationHostBuilder
 
     private sealed class GuardedServiceCollection(
         IServiceCollection inner,
-        Action throwIfFrozen) : IServiceCollection
+        Func<bool> canMutate) : IServiceCollection
     {
         public ServiceDescriptor this[int index]
         {
             get => inner[index];
             set
             {
-                throwIfFrozen();
+                ThrowIfFrozen();
                 inner[index] = value;
             }
         }
 
         public int Count => inner.Count;
 
-        public bool IsReadOnly => inner.IsReadOnly;
+        public bool IsReadOnly => !canMutate() || inner.IsReadOnly;
 
         public void Add(ServiceDescriptor item)
         {
-            throwIfFrozen();
+            ThrowIfFrozen();
             inner.Add(item);
         }
 
         public void Clear()
         {
-            throwIfFrozen();
+            ThrowIfFrozen();
             inner.Clear();
         }
 
@@ -327,21 +349,30 @@ public sealed class ApplicationHostBuilder : IApplicationHostBuilder
 
         public void Insert(int index, ServiceDescriptor item)
         {
-            throwIfFrozen();
+            ThrowIfFrozen();
             inner.Insert(index, item);
         }
 
         public bool Remove(ServiceDescriptor item)
         {
-            throwIfFrozen();
+            ThrowIfFrozen();
 
             return inner.Remove(item);
         }
 
         public void RemoveAt(int index)
         {
-            throwIfFrozen();
+            ThrowIfFrozen();
             inner.RemoveAt(index);
+        }
+
+        private void ThrowIfFrozen()
+        {
+            if (!canMutate())
+            {
+                throw new InvalidOperationException(
+                    "Application services can only be modified while ConfigureServices callbacks are applied during Build.");
+            }
         }
 
         IEnumerator IEnumerable.GetEnumerator()

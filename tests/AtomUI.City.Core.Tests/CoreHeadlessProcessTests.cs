@@ -79,6 +79,22 @@ public sealed class CoreHeadlessProcessTests
         Assert.Contains("AUCHOST103", ReadStrings(result, "diagnostics"));
     }
 
+    [Fact]
+    public async Task HeadlessUserServicesRunAfterModuleDefaults()
+    {
+        var result = await RunScenarioAsync("service-ordering");
+
+        Assert.True(result.GetProperty("success").GetBoolean());
+        Assert.True(result.GetProperty("deferred").GetBoolean());
+        Assert.Equal("UserHeadlessOrderedService", result.GetProperty("resolvedType").GetString());
+        Assert.Equal(
+            ["ModuleHeadlessOrderedService", "UserHeadlessOrderedService"],
+            ReadStrings(result, "registeredTypes"));
+        Assert.Equal(
+            ["module:pre", "module:configure", "module:post", "user:first", "user:second"],
+            ReadStrings(result, "calls"));
+    }
+
     private static async Task<JsonElement> RunScenarioAsync(string scenario)
     {
         var repositoryRoot = FindRepositoryRoot();

@@ -5,8 +5,6 @@ namespace AtomUI.City.Core.Hosting;
 
 public interface IApplicationHostBuilder
 {
-    IServiceCollection Services { get; }
-
     IConfigurationManager Configuration { get; }
 
     IDictionary<string, object?> Properties { get; }

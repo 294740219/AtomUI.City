@@ -23,6 +23,7 @@ internal static class HeadlessTestScenarios
                 "run-cancellation" => await RunCancellationAsync(),
                 "concurrent-stop" => await RunConcurrentStopAsync(),
                 "reentrant-stop" => await RunReentrantStopAsync(),
+                "service-ordering" => await RunServiceOrderingAsync(),
                 _ => new { scenario, success = false, error = "unknown scenario" },
             };
 
@@ -296,6 +297,48 @@ internal static class HeadlessTestScenarios
         };
     }
 
+    private static async Task<object> RunServiceOrderingAsync()
+    {
+        HeadlessServiceOrderingModule.Reset();
+        var builder = CreateBuilder();
+        builder.UseModule<HeadlessServiceOrderingModule>();
+        builder.ConfigureServices(services =>
+        {
+            HeadlessServiceOrderingModule.Record("user:first");
+            services.AddSingleton<IHeadlessOrderedService, UserHeadlessOrderedService>();
+        });
+        builder.ConfigureServices(_ => HeadlessServiceOrderingModule.Record("user:second"));
+        var deferred = HeadlessServiceOrderingModule.Calls.Count == 0;
+        var host = builder.Build();
+        var resolvedType = host.Services.GetRequiredService<IHeadlessOrderedService>().GetType().Name;
+        var registeredTypes = host.Services
+            .GetServices<IHeadlessOrderedService>()
+            .Select(service => service.GetType().Name)
+            .ToArray();
+        await host.DisposeAsync();
+
+        var expectedCalls = new[]
+        {
+            "module:pre",
+            "module:configure",
+            "module:post",
+            "user:first",
+            "user:second",
+        };
+
+        return new
+        {
+            scenario = "service-ordering",
+            success = deferred &&
+                      resolvedType == nameof(UserHeadlessOrderedService) &&
+                      HeadlessServiceOrderingModule.Calls.SequenceEqual(expectedCalls),
+            deferred,
+            resolvedType,
+            registeredTypes,
+            calls = HeadlessServiceOrderingModule.Calls,
+        };
+    }
+
     private static IApplicationHostBuilder CreateBuilder()
     {
         var builder = ApplicationHost.CreateBuilder();
@@ -413,6 +456,39 @@ internal static class HeadlessTestScenarios
         private static TaskCompletionSource CreateCompletionSource()
         {
             return new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        }
+    }
+
+    private interface IHeadlessOrderedService;
+
+    private sealed class ModuleHeadlessOrderedService : IHeadlessOrderedService;
+
+    private sealed class UserHeadlessOrderedService : IHeadlessOrderedService;
+
+    private sealed class HeadlessServiceOrderingModule : ModuleBase
+    {
+        private static readonly List<string> RecordedCalls = [];
+
+        public static IReadOnlyList<string> Calls => RecordedCalls;
+
+        public static void Reset() => RecordedCalls.Clear();
+
+        public static void Record(string call) => RecordedCalls.Add(call);
+
+        public override void PreConfigureServices(ServiceConfigurationContext context)
+        {
+            Record("module:pre");
+        }
+
+        public override void ConfigureServices(ServiceConfigurationContext context)
+        {
+            Record("module:configure");
+            context.Services.AddSingleton<IHeadlessOrderedService, ModuleHeadlessOrderedService>();
+        }
+
+        public override void PostConfigureServices(ServiceConfigurationContext context)
+        {
+            Record("module:post");
         }
     }
 

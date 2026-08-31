@@ -60,6 +60,7 @@
 Build
 -> validate ApplicationHostOptions
 -> build module graph and configure module services
+-> apply deferred user ConfigureServices callbacks
 -> build GenericHost
 -> create bounded diagnostics and HostScope
 
@@ -222,10 +223,12 @@ var builder = ApplicationHost.CreateBuilder(args);
 - 持有 GenericHost builder。
 - 持有 AtomUI.City 构建期上下文。
 - 收集启动模块。
-- 收集配置动作。
+- 按调用顺序收集用户服务配置动作，并在所有模块服务阶段完成后执行。
 - 收集生命周期中间件。
 - 收集 framework feature descriptor。
 - 输出 `IApplicationHost`。
+
+Builder 不公开可立即修改的 `IServiceCollection`。应用和扩展方法必须通过 `ConfigureServices(Action<IServiceCollection>)` 登记最终服务配置；模块只能通过 `ServiceConfigurationContext.Services` 在自己的三个服务阶段内注册。
 
 #### IApplicationHost
 
@@ -302,6 +305,7 @@ await builder.Build().RunAsync();
 规则：
 
 - 扩展方法默认只收集配置、descriptor、服务注册或中间件。
+- `ConfigureServices` 只登记 delegate；delegate 在 Build 的 `UserServices` 阶段按登记顺序执行。
 - 扩展方法不得执行真实启动逻辑。
 - 扩展方法不得调用 `BuildServiceProvider()`。
 - 扩展方法不得启动线程、加载插件、创建 ViewModel 或触发导航。
@@ -450,6 +454,8 @@ ApplicationHost.CreateBuilder(args)
 原则：
 
 - Static Module 的服务注册必须发生在 GenericHost Build 之前。
+- 用户 `ConfigureServices` 在所有 Static Module 服务阶段成功后执行，并拥有 Root DI 的最终应用级配置权。
+- 模块服务阶段失败时不执行用户 `ConfigureServices`，避免产生部分应用配置副作用。
 - Build 后不允许普通 Module 或 Plugin 修改 Root ServiceProvider。
 - Plugin 服务必须进入自己的 ServiceScope。
 - Runtime 动态能力必须走 ContributionRegistry，而不是改 Root DI。

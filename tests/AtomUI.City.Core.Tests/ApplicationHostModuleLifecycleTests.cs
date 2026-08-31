@@ -464,10 +464,9 @@ public sealed class ApplicationHostModuleLifecycleTests
     private static void AssertTemporaryProviderCreationRejected<TModule>()
         where TModule : IModule, new()
     {
-        var diagnostics = new InMemoryHostDiagnostics();
         var builder = ApplicationHost.CreateBuilder();
+        var diagnostics = builder.GetBuildDiagnostics();
 
-        builder.ConfigureServices(services => services.AddSingleton<IHostDiagnostics>(diagnostics));
         builder.UseModule<TModule>();
 
         var exception = Assert.Throws<InvalidOperationException>(() => builder.Build());

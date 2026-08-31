@@ -122,10 +122,13 @@ PreConfigureServices(all modules)
 -> Generated service registration(all modules)
 -> ConfigureServices(all modules)
 -> PostConfigureServices(all modules)
+-> User ConfigureServices(in registration order)
 -> Build GenericHost
 ```
 
-这样自动注册先建立默认服务，模块的 `ConfigureServices` 可以显式覆盖或调整，`PostConfigureServices` 做最终校正。
+这样自动注册先建立默认服务，模块的 `ConfigureServices` 可以显式覆盖或调整，`PostConfigureServices` 完成模块内后置校正，应用级 `ConfigureServices` 最后追加、删除、替换或装饰 Root 服务。
+
+`IApplicationHostBuilder` 不公开可变 `Services` 属性。应用扩展方法必须调用 `builder.ConfigureServices(...)`，不能依赖立即修改底层 Generic Host service collection。
 
 插件模块流程：
 

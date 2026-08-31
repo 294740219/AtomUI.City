@@ -68,6 +68,37 @@ public sealed class ModuleRegistry : IModuleRegistry, IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(applicationContext);
         ArgumentNullException.ThrowIfNull(services);
+
+        await ConfigureServicesCoreAsync(
+            applicationContext,
+            services,
+            TryGetDiagnostics(services),
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    internal async ValueTask ConfigureServicesAsync(
+        ApplicationContext applicationContext,
+        IServiceCollection services,
+        IHostDiagnostics diagnostics,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(applicationContext);
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(diagnostics);
+
+        await ConfigureServicesCoreAsync(
+            applicationContext,
+            services,
+            diagnostics,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private async ValueTask ConfigureServicesCoreAsync(
+        ApplicationContext applicationContext,
+        IServiceCollection services,
+        IHostDiagnostics? diagnostics,
+        CancellationToken cancellationToken)
+    {
         ThrowIfDisposed();
 
         if (_servicesConfigured)
@@ -76,7 +107,6 @@ public sealed class ModuleRegistry : IModuleRegistry, IAsyncDisposable
         }
 
         var context = new ServiceConfigurationContext(applicationContext, services);
-        var diagnostics = TryGetDiagnostics(services);
 
         try
         {

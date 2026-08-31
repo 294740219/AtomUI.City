@@ -1,8 +1,10 @@
+using AtomUI.City.Core.Diagnostics;
 using AtomUI.City.Core.Hosting;
 using AtomUI.City.Core.Lifecycle;
 using AtomUI.City.Core.Modularity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace AtomUI.City.Core.Tests;
 
@@ -14,9 +16,15 @@ public sealed class ApplicationHostBuilderTests
         var builder = ApplicationHost.CreateBuilder(["--sample:enabled=true"]);
 
         Assert.IsAssignableFrom<IApplicationHostBuilder>(builder);
-        Assert.NotNull(builder.Services);
         Assert.NotNull(builder.Configuration);
         Assert.Equal("true", builder.Configuration["sample:enabled"]);
+    }
+
+    [Fact]
+    public void BuilderDoesNotExposeMutableServiceCollection()
+    {
+        Assert.Null(typeof(IApplicationHostBuilder).GetProperty("Services"));
+        Assert.Null(typeof(ApplicationHostBuilder).GetProperty("Services"));
     }
 
     [Fact]
@@ -35,6 +43,113 @@ public sealed class ApplicationHostBuilderTests
         Assert.Same(host.Context.Configuration, builder.Configuration);
         Assert.False(string.IsNullOrWhiteSpace(host.Context.ApplicationName));
         Assert.True(Directory.Exists(host.Context.ContentRootPath));
+    }
+
+    [Fact]
+    public async Task ConfigureServicesRunsAfterAllModuleServiceStagesInRegistrationOrder()
+    {
+        ServiceOrderingModule.Reset();
+        var builder = ApplicationHost.CreateBuilder();
+        builder.UseModule<ServiceOrderingModule>();
+        builder.ConfigureServices(services =>
+        {
+            ServiceOrderingModule.Record("UserServices:First");
+            services.AddSingleton<IOrderedService, UserOrderedService>();
+        });
+        builder.ConfigureServices(_ => ServiceOrderingModule.Record("UserServices:Second"));
+
+        Assert.Empty(ServiceOrderingModule.Calls);
+
+        await using var host = builder.Build();
+
+        Assert.Equal(
+            [
+                "Module:PreConfigureServices",
+                "Module:ConfigureServices",
+                "Module:PostConfigureServices",
+                "UserServices:First",
+                "UserServices:Second",
+            ],
+            ServiceOrderingModule.Calls);
+        Assert.IsType<UserOrderedService>(host.Services.GetRequiredService<IOrderedService>());
+        Assert.Collection(
+            host.Services.GetServices<IOrderedService>(),
+            service => Assert.IsType<ModuleOrderedService>(service),
+            service => Assert.IsType<UserOrderedService>(service));
+    }
+
+    [Fact]
+    public async Task ConfigureServicesCanRemoveAndReplaceModuleDefaults()
+    {
+        var builder = ApplicationHost.CreateBuilder();
+        builder.UseModule<ReplaceableServiceModule>();
+        builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IRemovableService>();
+            services.Replace(ServiceDescriptor.Singleton<IReplaceableService, UserReplaceableService>());
+        });
+
+        await using var host = builder.Build();
+
+        Assert.Null(host.Services.GetService<IRemovableService>());
+        Assert.IsType<UserReplaceableService>(host.Services.GetRequiredService<IReplaceableService>());
+        Assert.Single(host.Services.GetServices<IReplaceableService>());
+    }
+
+    [Fact]
+    public async Task UserServiceCollectionCapturedByCallbackIsFrozenAfterBuild()
+    {
+        IServiceCollection? capturedServices = null;
+        var builder = ApplicationHost.CreateBuilder();
+        builder.ConfigureServices(services =>
+        {
+            capturedServices = services;
+            services.AddSingleton<TestService>();
+        });
+
+        await using var host = builder.Build();
+
+        Assert.NotNull(capturedServices);
+        Assert.True(capturedServices.IsReadOnly);
+        Assert.Throws<InvalidOperationException>(() => capturedServices.AddSingleton<LateService>());
+    }
+
+    [Fact]
+    public void UserServiceFailureIsDiagnosedAndFreezesBuilder()
+    {
+        IServiceCollection? capturedServices = null;
+        var builder = ApplicationHost.CreateBuilder();
+        var diagnostics = builder.GetBuildDiagnostics();
+        builder.ConfigureServices(services =>
+        {
+            capturedServices = services;
+            throw new InvalidOperationException("user service configuration failed");
+        });
+
+        var failure = Assert.Throws<InvalidOperationException>(() => builder.Build());
+
+        Assert.Equal("user service configuration failed", failure.Message);
+        Assert.NotNull(capturedServices);
+        Assert.True(capturedServices.IsReadOnly);
+        Assert.Throws<InvalidOperationException>(() => capturedServices.AddSingleton<LateService>());
+        Assert.Throws<InvalidOperationException>(() =>
+            builder.ConfigureServices(services => services.AddSingleton<LateService>()));
+        Assert.Contains(diagnostics.Records, record =>
+            record.Code == HostDiagnosticIds.HostBuildFailed &&
+            record.Context["stage"] == "UserServices");
+    }
+
+    [Fact]
+    public void ModuleServiceFailureSkipsUserServiceCallbacks()
+    {
+        var userServicesCalled = false;
+        var builder = ApplicationHost.CreateBuilder();
+        builder.UseModule<FailingServiceModule>();
+        builder.ConfigureServices(_ => userServicesCalled = true);
+
+        Assert.Throws<InvalidOperationException>(() => builder.Build());
+
+        Assert.False(userServicesCalled);
     }
 
     [Fact]
@@ -58,8 +173,6 @@ public sealed class ApplicationHostBuilderTests
             builder.ConfigureServices(services => services.AddSingleton<TestService>()));
         Assert.Throws<InvalidOperationException>(() =>
             builder.ConfigureHost(options => options.ApplicationName = "changed"));
-        Assert.Throws<InvalidOperationException>(() =>
-            builder.Services.AddSingleton<TestService>());
         Assert.Throws<InvalidOperationException>(() =>
             builder.Properties["changed"] = true);
         Assert.Throws<InvalidOperationException>(() =>
@@ -111,7 +224,69 @@ public sealed class ApplicationHostBuilderTests
             builder.ConfigureLifecycle(static _ => { }));
     }
 
+    private interface IOrderedService;
+
+    private interface IRemovableService;
+
+    private interface IReplaceableService;
+
     private sealed class TestService;
 
+    private sealed class LateService;
+
+    private sealed class ModuleOrderedService : IOrderedService;
+
+    private sealed class UserOrderedService : IOrderedService;
+
+    private sealed class ModuleRemovableService : IRemovableService;
+
+    private sealed class ModuleReplaceableService : IReplaceableService;
+
+    private sealed class UserReplaceableService : IReplaceableService;
+
     private sealed class LateModule : ModuleBase;
+
+    private sealed class ServiceOrderingModule : ModuleBase
+    {
+        private static readonly List<string> RecordedCalls = [];
+
+        public static IReadOnlyList<string> Calls => RecordedCalls;
+
+        public static void Reset() => RecordedCalls.Clear();
+
+        public static void Record(string call) => RecordedCalls.Add(call);
+
+        public override void PreConfigureServices(ServiceConfigurationContext context)
+        {
+            Record("Module:PreConfigureServices");
+        }
+
+        public override void ConfigureServices(ServiceConfigurationContext context)
+        {
+            Record("Module:ConfigureServices");
+            context.Services.AddSingleton<IOrderedService, ModuleOrderedService>();
+        }
+
+        public override void PostConfigureServices(ServiceConfigurationContext context)
+        {
+            Record("Module:PostConfigureServices");
+        }
+    }
+
+    private sealed class ReplaceableServiceModule : ModuleBase
+    {
+        public override void ConfigureServices(ServiceConfigurationContext context)
+        {
+            context.Services.AddSingleton<IRemovableService, ModuleRemovableService>();
+            context.Services.AddSingleton<IReplaceableService, ModuleReplaceableService>();
+        }
+    }
+
+    private sealed class FailingServiceModule : ModuleBase
+    {
+        public override void ConfigureServices(ServiceConfigurationContext context)
+        {
+            throw new InvalidOperationException("module service configuration failed");
+        }
+    }
 }

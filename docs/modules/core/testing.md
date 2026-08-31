@@ -22,14 +22,14 @@ dotnet test tests/AtomUI.City.Core.Tests/AtomUI.City.Core.Tests.csproj --filter 
 dotnet test tests/AtomUI.City.Core.Tests/AtomUI.City.Core.Tests.csproj --no-build --filter "FullyQualifiedName~CoreHeadlessProcessTests"
 ```
 
-Headless 必须覆盖正常生命周期、启动失败补偿、关闭失败聚合、RunAsync cancellation 和并发/递归停止场景。
+Headless 必须覆盖正常生命周期、启动失败补偿、关闭失败聚合、RunAsync cancellation、并发/递归停止以及模块后用户服务覆盖场景。
 
 ## 产品级测试门禁
 
 | 必须证明的行为 | 最低测试要求 |
 | --- | --- |
 | Core 不允许引用 Avalonia、AtomUI、Roslyn、CLI、Templates 或 Testing 生产程序集。 | 至少一个明确测试断言，不能只断言流程成功。 |
-| ApplicationHostBuilder Build 后必须冻结服务注册入口。 | 至少一个明确测试断言，不能只断言流程成功。 |
+| ApplicationHostBuilder 必须延迟执行用户服务配置，并在 Build 成功或失败后冻结捕获的服务集合。 | 至少一个明确测试断言，不能只断言流程成功。 |
 | LifecyclePipeline stage 顺序必须稳定，同一 stage 内 middleware 顺序必须稳定。 | 至少一个明确测试断言，不能只断言流程成功。 |
 | StartAsync、StopAsync、DisposeAsync 和 Dispose 必须有明确幂等规则，Stopped 后再次 Start 必须失败。 | 至少一个明确测试断言，不能只断言流程成功。 |
 | 模块配置阶段禁止 BuildServiceProvider 和运行期服务解析。 | 至少一个明确测试断言，不能只断言流程成功。 |
@@ -39,7 +39,7 @@ Headless 必须覆盖正常生命周期、启动失败补偿、关闭失败聚�
 
 | Feature ID | Test Type | Test File | Required Assertions | Failure Paths | Status |
 | --- | --- | --- | --- | --- | --- |
-| AUC-CORE-001 | RuntimeLifecycle + Headless | ApplicationHostBuilderTests; ApplicationHostRuntimeTests; CoreHeadlessProcessTests | 断言 Build 冻结、Options 验证、Host 状态和真实进程启停。 | Build 失败诊断；Run cancellation 后完整清理。 | Verified |
+| AUC-CORE-001 | RuntimeLifecycle + Headless | ApplicationHostBuilderTests; ApplicationHostRuntimeTests; CoreHeadlessProcessTests | 断言模块后用户服务配置、覆盖顺序、Build 冻结、Options 验证、Host 状态和真实进程启停。 | UserServices 失败诊断；模块失败跳过用户 delegate；Run cancellation 后完整清理。 | Verified |
 | AUC-CORE-002 | RuntimeLifecycle + Headless | LifecycleMiddlewarePipelineTests; ApplicationHostIndustrialLifecycleTests; CoreHeadlessProcessTests | 断言 stage 顺序、Host 管线接入、并发事务共享、内部重入拒绝和 cleanup terminal 保证执行。 | middleware 异常、递归调用、取消和超时不跳过最小清理。 | Verified |
 | AUC-CORE-003 | RuntimeLifecycle | LifecycleScopeTreeTests | 断言 leaf-first、并发事务合并、锁外 cancellation callback、重入拒绝、故障隔离和诊断。 | child/cancellation callback 失败后继续清理其他 child。 | Verified |
 | AUC-CORE-004 | Unit + RuntimeLifecycle + Headless | ModuleBaseTests; ModuleDescriptorTests; ApplicationHostModuleLifecycleTests; ApplicationHostIndustrialLifecycleTests | 断言依赖排序、阶段顺序、Application scoped provider 和逆序关闭。 | Build 失败释放实例；部分初始化回滚；关闭失败聚合。 | Verified |
