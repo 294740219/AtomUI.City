@@ -31,4 +31,7 @@
 
 - 不在 UI 线程同步等待异步操作。
 - 不在 lock 内调用用户 handler、插件代码、dispatcher、transport 或外部 process。
+- Host、LifecycleScope 和 ModuleRegistry 只在 lock 内检查状态并发布唯一 lifecycle transaction Task；middleware、module hook、cancellation callback 和 dispose 必须在 lock 外执行。
+- lifecycle transaction Task 必须先于 Starting、Stopping 或 Disposing 状态对并发调用者可见；外部并发调用共享事务，事务内部对同一 owner 的公共 lifecycle API 重入必须快速失败。
+- 异步调用链使用可嵌套 invocation frame 识别递归；同步 cancellation callback 使用同步 frame 补偿其注册时捕获的 ExecutionContext。
 - 释放顺序从 leaf owner 到 parent owner。

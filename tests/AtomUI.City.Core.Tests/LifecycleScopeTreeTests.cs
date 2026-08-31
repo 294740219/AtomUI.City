@@ -106,6 +106,74 @@ public sealed class LifecycleScopeTreeTests
     }
 
     [Fact]
+    public async Task CancellationCallbackCanReadScopeStateFromAnotherThread()
+    {
+        var host = LifecycleScope.CreateRoot(LifecycleScopeKind.Host, "host");
+        using var readRequested = new ManualResetEventSlim();
+        var stateRead = new TaskCompletionSource<LifecycleScopeState>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var reader = Task.Run(() =>
+        {
+            readRequested.Wait();
+            stateRead.SetResult(host.State);
+        });
+        var callbackObservedState = false;
+        using var registration = host.CancellationToken.Register(() =>
+        {
+            readRequested.Set();
+            callbackObservedState = stateRead.Task.Wait(TimeSpan.FromSeconds(2));
+        });
+
+        await host.StopAsync();
+        await reader;
+
+        Assert.True(callbackObservedState);
+        Assert.Equal(LifecycleScopeState.Stopping, await stateRead.Task);
+        await host.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task RecursiveStopFromCancellationCallbackFailsFast()
+    {
+        var host = LifecycleScope.CreateRoot(LifecycleScopeKind.Host, "host");
+        Exception? recursiveFailure = null;
+        using var registration = host.CancellationToken.Register(() =>
+        {
+            recursiveFailure = Record.Exception(() =>
+            {
+                host.StopAsync().AsTask().GetAwaiter().GetResult();
+            });
+        });
+
+        await host.StopAsync();
+
+        var failure = Assert.IsType<InvalidOperationException>(recursiveFailure);
+        Assert.Contains("cannot be invoked recursively", failure.Message, StringComparison.Ordinal);
+        Assert.Equal(LifecycleScopeState.Stopped, host.State);
+        await host.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task RecursiveDisposeFromDisposedNotificationFailsFast()
+    {
+        var host = LifecycleScope.CreateRoot(LifecycleScopeKind.Host, "host");
+        Exception? recursiveFailure = null;
+        host.Disposed += (_, _) =>
+        {
+            recursiveFailure = Record.Exception(() =>
+            {
+                host.DisposeAsync();
+            });
+        };
+
+        await host.DisposeAsync();
+
+        var failure = Assert.IsType<InvalidOperationException>(recursiveFailure);
+        Assert.Contains("cannot be invoked recursively", failure.Message, StringComparison.Ordinal);
+        Assert.Equal(LifecycleScopeState.Disposed, host.State);
+    }
+
+    [Fact]
     public async Task DisposeIsIdempotent()
     {
         var host = LifecycleScope.CreateRoot(LifecycleScopeKind.Host, "host");

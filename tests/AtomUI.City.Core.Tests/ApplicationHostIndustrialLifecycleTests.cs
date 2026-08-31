@@ -145,6 +145,169 @@ public sealed class ApplicationHostIndustrialLifecycleTests
     }
 
     [Fact]
+    public async Task ConcurrentStopCallersShareOnePublishedTransaction()
+    {
+        BlockingShutdownModule.Reset();
+        var builder = ApplicationHost.CreateBuilder();
+        builder.UseModule<BlockingShutdownModule>();
+        builder.ConfigureHost(options => options.ShutdownTimeout = TimeSpan.FromSeconds(5));
+        await using var host = builder.Build();
+        await host.StartAsync();
+
+        var firstStop = host.StopAsync();
+        await BlockingShutdownModule.Entered.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        var secondStop = host.StopAsync();
+
+        Assert.Same(firstStop, secondStop);
+
+        BlockingShutdownModule.Release.SetResult();
+        await Task.WhenAll(firstStop, secondStop);
+        Assert.True(BlockingShutdownModule.Completed);
+    }
+
+    [Fact]
+    public async Task RecursiveStopFromStopMiddlewareFailsFastAndStillCleansUp()
+    {
+        IApplicationHost? host = null;
+        var builder = ApplicationHost.CreateBuilder();
+        builder.ConfigureLifecycle(lifecycle =>
+            lifecycle.Use(LifecycleStages.ApplicationStop, (_, next) =>
+            {
+                host!.StopAsync();
+                return next();
+            }));
+        builder.ConfigureServices(services =>
+        {
+            services.AddSingleton<HostedStopProbe>();
+            services.AddSingleton<IHostedService>(provider => provider.GetRequiredService<HostedStopProbe>());
+        });
+        host = builder.Build();
+        var hostedProbe = host.Services.GetRequiredService<HostedStopProbe>();
+        await host.StartAsync();
+
+        var failure = await Assert.ThrowsAsync<AggregateException>(() => host.StopAsync());
+
+        Assert.Contains(
+            failure.Flatten().InnerExceptions,
+            exception => exception is InvalidOperationException &&
+                         exception.Message.Contains("cannot be invoked recursively", StringComparison.Ordinal));
+        Assert.Equal(1, hostedProbe.StopCount);
+        Assert.Equal(LifecycleScopeState.Stopped, host.HostScope.State);
+        await Assert.ThrowsAsync<AggregateException>(async () => await host.DisposeAsync());
+    }
+
+    [Fact]
+    public async Task RecursiveStopFromApplicationStoppingCallbackFailsFast()
+    {
+        var builder = ApplicationHost.CreateBuilder();
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var applicationLifetime = host.Services.GetRequiredService<IHostApplicationLifetime>();
+        Exception? recursiveFailure = null;
+        using var registration = applicationLifetime.ApplicationStopping.Register(() =>
+            recursiveFailure = Record.Exception(() => host.StopAsync().GetAwaiter().GetResult()));
+
+        await host.StopAsync();
+
+        var failure = Assert.IsType<InvalidOperationException>(recursiveFailure);
+        Assert.Contains("cannot be invoked recursively", failure.Message, StringComparison.Ordinal);
+        Assert.Equal(LifecycleScopeState.Stopped, host.HostScope.State);
+    }
+
+    [Fact]
+    public async Task RecursiveStartFromStartMiddlewareFailsFastAndRollsBack()
+    {
+        IApplicationHost? host = null;
+        var builder = ApplicationHost.CreateBuilder();
+        builder.ConfigureLifecycle(lifecycle =>
+            lifecycle.Use(LifecycleStages.ApplicationStart, (_, next) =>
+            {
+                host!.StartAsync();
+                return next();
+            }));
+        host = builder.Build();
+
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => host.StartAsync());
+
+        Assert.Contains("cannot be invoked recursively", failure.Message, StringComparison.Ordinal);
+        await host.StopAsync();
+        await host.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task RecursiveDisposeFromStopMiddlewareFailsFastAndStillCleansUp()
+    {
+        IApplicationHost? host = null;
+        var builder = ApplicationHost.CreateBuilder();
+        builder.ConfigureLifecycle(lifecycle =>
+            lifecycle.Use(LifecycleStages.ApplicationStop, (_, next) =>
+            {
+                host!.DisposeAsync();
+                return next();
+            }));
+        builder.ConfigureServices(services =>
+        {
+            services.AddSingleton<HostedStopProbe>();
+            services.AddSingleton<IHostedService>(provider => provider.GetRequiredService<HostedStopProbe>());
+        });
+        host = builder.Build();
+        var hostedProbe = host.Services.GetRequiredService<HostedStopProbe>();
+        await host.StartAsync();
+
+        var failure = await Assert.ThrowsAsync<AggregateException>(() => host.StopAsync());
+
+        Assert.Contains(
+            failure.Flatten().InnerExceptions,
+            exception => exception is InvalidOperationException &&
+                         exception.Message.Contains("cannot be invoked recursively", StringComparison.Ordinal));
+        Assert.Equal(1, hostedProbe.StopCount);
+        await Assert.ThrowsAsync<AggregateException>(async () => await host.DisposeAsync());
+    }
+
+    [Fact]
+    public async Task RecursiveModuleRegistryShutdownFailsFastAndStillDisposesModules()
+    {
+        ReentrantShutdownModule.Reset();
+        var builder = ApplicationHost.CreateBuilder();
+        builder.UseModule<ReentrantShutdownModule>();
+        builder.ConfigureServices(services =>
+        {
+            services.AddSingleton<HostedStopProbe>();
+            services.AddSingleton<IHostedService>(provider => provider.GetRequiredService<HostedStopProbe>());
+        });
+        var host = builder.Build();
+        var hostedProbe = host.Services.GetRequiredService<HostedStopProbe>();
+        await host.StartAsync();
+
+        var failure = await Assert.ThrowsAsync<AggregateException>(() => host.StopAsync());
+
+        Assert.Contains(
+            failure.Flatten().InnerExceptions,
+            exception => exception is InvalidOperationException &&
+                         exception.Message.Contains("cannot be invoked recursively", StringComparison.Ordinal));
+        Assert.True(ReentrantShutdownModule.WasDisposed);
+        Assert.Equal(1, hostedProbe.StopCount);
+        await Assert.ThrowsAsync<AggregateException>(async () => await host.DisposeAsync());
+    }
+
+    [Fact]
+    public async Task RecursiveModuleRegistryDisposeFailsFastWithoutDuplicatingDisposal()
+    {
+        ReentrantRegistryDisposeModule.Reset();
+        var builder = ApplicationHost.CreateBuilder();
+        builder.UseModule<ReentrantRegistryDisposeModule>();
+        await using var host = builder.Build();
+        await host.StartAsync();
+
+        await host.StopAsync();
+
+        var failure = Assert.IsType<InvalidOperationException>(
+            ReentrantRegistryDisposeModule.RecursiveFailure);
+        Assert.Contains("cannot be invoked recursively", failure.Message, StringComparison.Ordinal);
+        Assert.Equal(1, ReentrantRegistryDisposeModule.DisposeCount);
+    }
+
+    [Fact]
     public async Task StopMiddlewareFailureDoesNotSkipRequiredCleanup()
     {
         var builder = ApplicationHost.CreateBuilder();
@@ -321,6 +484,55 @@ public sealed class ApplicationHostIndustrialLifecycleTests
         }
 
         public void Dispose() => WasDisposed = true;
+    }
+
+    private sealed class ReentrantShutdownModule : ModuleBase, IDisposable
+    {
+        public static bool WasDisposed { get; private set; }
+
+        public static void Reset() => WasDisposed = false;
+
+        public override async ValueTask OnApplicationShutdownAsync(
+            ApplicationShutdownContext context,
+            CancellationToken cancellationToken = default)
+        {
+            var registry = context.Services.GetRequiredService<IModuleRegistry>();
+            await registry.ShutdownAsync(
+                context.ApplicationContext,
+                context.Services,
+                cancellationToken);
+        }
+
+        public void Dispose() => WasDisposed = true;
+    }
+
+    private sealed class ReentrantRegistryDisposeModule : ModuleBase, IDisposable
+    {
+        private static IAsyncDisposable? _registry;
+
+        public static Exception? RecursiveFailure { get; private set; }
+
+        public static int DisposeCount { get; private set; }
+
+        public static void Reset()
+        {
+            _registry = null;
+            RecursiveFailure = null;
+            DisposeCount = 0;
+        }
+
+        public override void OnApplicationInitialization(ApplicationInitializationContext context)
+        {
+            _registry = Assert.IsAssignableFrom<IAsyncDisposable>(
+                context.Services.GetRequiredService<IModuleRegistry>());
+        }
+
+        public void Dispose()
+        {
+            DisposeCount++;
+            RecursiveFailure = Record.Exception(() =>
+                _registry!.DisposeAsync().AsTask().GetAwaiter().GetResult());
+        }
     }
 
     private static class RollbackRecorder

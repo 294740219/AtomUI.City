@@ -22,6 +22,7 @@ Core 定义 Host 本体，所有运行时模块都通过 IApplicationHostBuilder
 - StopAsync 阻止新操作进入，取消 scope tree，逆序执行 module shutdown，释放 Application DI scope，最后停止 Generic Host。
 - DisposeAsync 从 leaf scope 到 root scope 释放；已提前释放的 child 会从 parent 脱离；释放异常进入 diagnostics 且不阻断同级清理。
 - Host 和 Scope 的并发 Start/Stop/Dispose 调用合并到同一事务；调用方取消只取消等待，不中断已经开始的共享 Stop 事务。
+- lifecycle transaction 在内部锁中先发布 Task，再在锁外执行 middleware、module hook、cancellation callback 和 dispose；同一 owner 的内部递归调用快速失败，外部调用方继续共享事务。
 
 ## Host Shutdown / 执行结束行为
 

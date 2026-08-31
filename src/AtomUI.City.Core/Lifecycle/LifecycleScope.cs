@@ -114,25 +114,40 @@ public sealed class LifecycleScope : IDisposable, IAsyncDisposable
 
     public ValueTask StopAsync()
     {
+        LifecycleInvocationGuard.ThrowIfReentrant(this, LifecycleOperationKind.Stop);
+
+        return new ValueTask(GetOrStartStopTask());
+    }
+
+    private Task GetOrStartStopTask()
+    {
+        DeferredLifecycleOperation? operation = null;
+        Task stopTask;
+
         lock (_syncRoot)
         {
             ThrowIfDisposed();
 
             if (_stopTask is not null)
             {
-                return new ValueTask(_stopTask);
+                return _stopTask;
             }
 
             if (_state == LifecycleScopeState.Stopped)
             {
-                return ValueTask.CompletedTask;
+                _stopTask = Task.CompletedTask;
+                return _stopTask;
             }
 
+            operation = new DeferredLifecycleOperation();
+            _stopTask = operation.Task;
             _state = LifecycleScopeState.Stopping;
-            _stopTask = StopCoreAsync();
-
-            return new ValueTask(_stopTask);
+            stopTask = _stopTask;
         }
+
+        operation.Start(this, LifecycleOperationKind.Stop, StopCoreAsync);
+
+        return stopTask;
     }
 
     public void Dispose()
@@ -144,6 +159,11 @@ public sealed class LifecycleScope : IDisposable, IAsyncDisposable
 
     public ValueTask DisposeAsync()
     {
+        LifecycleInvocationGuard.ThrowIfReentrant(this, LifecycleOperationKind.Dispose);
+
+        DeferredLifecycleOperation? operation = null;
+        Task disposeTask;
+
         lock (_syncRoot)
         {
             if (_disposeTask is not null)
@@ -156,10 +176,14 @@ public sealed class LifecycleScope : IDisposable, IAsyncDisposable
                 return ValueTask.CompletedTask;
             }
 
-            _disposeTask = DisposeCoreAsync();
-
-            return new ValueTask(_disposeTask);
+            operation = new DeferredLifecycleOperation();
+            _disposeTask = operation.Task;
+            disposeTask = _disposeTask;
         }
+
+        operation.Start(this, LifecycleOperationKind.Dispose, DisposeCoreAsync);
+
+        return new ValueTask(disposeTask);
     }
 
     private async Task StopCoreAsync()
@@ -217,7 +241,7 @@ public sealed class LifecycleScope : IDisposable, IAsyncDisposable
 
         try
         {
-            await StopAsync().ConfigureAwait(false);
+            await GetOrStartStopTask().ConfigureAwait(false);
         }
         catch (Exception exception)
         {

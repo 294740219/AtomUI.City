@@ -60,8 +60,11 @@ internal sealed class DefaultApplicationHost : IApplicationHost
 
     public Task StartAsync(CancellationToken cancellationToken = default)
     {
+        LifecycleInvocationGuard.ThrowIfReentrant(this, LifecycleOperationKind.Start);
+
+        DeferredLifecycleOperation? operation = null;
+        CancellationTokenSource? startupCancellation = null;
         Task startTask;
-        var ownsStart = false;
 
         lock (_stateSync)
         {
@@ -72,14 +75,16 @@ internal sealed class DefaultApplicationHost : IApplicationHost
                 case ApplicationHostState.Running:
                     return Task.CompletedTask;
                 case ApplicationHostState.Starting:
-                    startTask = _startTask!;
+                    startTask = _startTask
+                        ?? throw new InvalidOperationException("Host start transaction was not published.");
                     break;
                 case ApplicationHostState.Created:
+                    startupCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    operation = new DeferredLifecycleOperation();
+                    _startupCancellation = startupCancellation;
+                    _startTask = operation.Task;
                     _state = ApplicationHostState.Starting;
-                    _startupCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                    _startTask = StartCoreAsync(_startupCancellation.Token);
                     startTask = _startTask;
-                    ownsStart = true;
                     break;
                 case ApplicationHostState.Stopping:
                 case ApplicationHostState.Stopped:
@@ -91,13 +96,28 @@ internal sealed class DefaultApplicationHost : IApplicationHost
             }
         }
 
-        return ownsStart || !cancellationToken.CanBeCanceled
+        operation?.Start(
+            this,
+            LifecycleOperationKind.Start,
+            () => StartCoreAsync(startupCancellation!.Token));
+
+        return operation is not null || !cancellationToken.CanBeCanceled
             ? startTask
             : startTask.WaitAsync(cancellationToken);
     }
 
     public Task StopAsync(CancellationToken cancellationToken = default)
     {
+        LifecycleInvocationGuard.ThrowIfReentrant(this, LifecycleOperationKind.Stop);
+
+        return GetOrStartStopTask(cancellationToken);
+    }
+
+    private Task GetOrStartStopTask(CancellationToken cancellationToken)
+    {
+        DeferredLifecycleOperation? operation = null;
+        CancellationTokenSource? startupCancellation = null;
+        Task? startTask = null;
         Task stopTask;
 
         lock (_stateSync)
@@ -115,23 +135,39 @@ internal sealed class DefaultApplicationHost : IApplicationHost
                     stopTask = _stopTask ?? Task.CompletedTask;
                     break;
                 case ApplicationHostState.Stopping:
-                    stopTask = _stopTask!;
+                    stopTask = _stopTask
+                        ?? throw new InvalidOperationException("Host stop transaction was not published.");
                     break;
                 case ApplicationHostState.Starting:
+                    startupCancellation = _startupCancellation
+                        ?? throw new InvalidOperationException("Host startup cancellation was not published.");
+                    startTask = _startTask
+                        ?? throw new InvalidOperationException("Host start transaction was not published.");
+                    operation = new DeferredLifecycleOperation();
+                    _stopTask = operation.Task;
                     _state = ApplicationHostState.Stopping;
-                    _startupCancellation?.Cancel();
-                    _stopTask = StopAfterStartAsync(_startTask!);
                     stopTask = _stopTask;
                     break;
                 case ApplicationHostState.Running:
                 case ApplicationHostState.Faulted:
+                    operation = new DeferredLifecycleOperation();
+                    _stopTask = operation.Task;
                     _state = ApplicationHostState.Stopping;
-                    _stopTask = StopCoreAsync();
                     stopTask = _stopTask;
                     break;
                 default:
                     throw new InvalidOperationException($"Application host cannot stop from state '{_state}'.");
             }
+        }
+
+        if (operation is not null)
+        {
+            operation.Start(
+                this,
+                LifecycleOperationKind.Stop,
+                startTask is null
+                    ? StopCoreAsync
+                    : () => StopAfterStartAsync(startTask, startupCancellation!));
         }
 
         return cancellationToken.CanBeCanceled
@@ -205,6 +241,11 @@ internal sealed class DefaultApplicationHost : IApplicationHost
 
     public ValueTask DisposeAsync()
     {
+        LifecycleInvocationGuard.ThrowIfReentrant(this, LifecycleOperationKind.Dispose);
+
+        DeferredLifecycleOperation? operation = null;
+        Task disposeTask;
+
         lock (_stateSync)
         {
             if (_disposeTask is not null)
@@ -217,10 +258,14 @@ internal sealed class DefaultApplicationHost : IApplicationHost
                 return ValueTask.CompletedTask;
             }
 
-            _disposeTask = DisposeCoreAsync();
-
-            return new ValueTask(_disposeTask);
+            operation = new DeferredLifecycleOperation();
+            _disposeTask = operation.Task;
+            disposeTask = _disposeTask;
         }
+
+        operation.Start(this, LifecycleOperationKind.Dispose, DisposeCoreAsync);
+
+        return new ValueTask(disposeTask);
     }
 
     private async Task StartCoreAsync(CancellationToken cancellationToken)
@@ -298,8 +343,21 @@ internal sealed class DefaultApplicationHost : IApplicationHost
             context.CancellationToken).ConfigureAwait(false);
     }
 
-    private async Task StopAfterStartAsync(Task startTask)
+    private async Task StopAfterStartAsync(
+        Task startTask,
+        CancellationTokenSource startupCancellation)
     {
+        var failures = new List<Exception>();
+
+        try
+        {
+            startupCancellation.Cancel(throwOnFirstException: false);
+        }
+        catch (Exception exception)
+        {
+            AddFailure(failures, exception);
+        }
+
         try
         {
             await startTask.ConfigureAwait(false);
@@ -309,7 +367,21 @@ internal sealed class DefaultApplicationHost : IApplicationHost
             // Startup reports its own failure and performs rollback.
         }
 
-        await StopCoreAsync().ConfigureAwait(false);
+        try
+        {
+            await StopCoreAsync().ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            AddFailure(failures, exception);
+        }
+
+        if (failures.Count > 0)
+        {
+            throw new AggregateException(
+                "Application host stop-after-start failed.",
+                failures).Flatten();
+        }
     }
 
     private async Task StopCoreAsync()
@@ -489,7 +561,13 @@ internal sealed class DefaultApplicationHost : IApplicationHost
         {
             try
             {
-                await _genericHost.StopAsync(cancellationToken).ConfigureAwait(false);
+                Task genericHostStop;
+                using (LifecycleInvocationGuard.EnterSynchronous(this, LifecycleOperationKind.Stop))
+                {
+                    genericHostStop = _genericHost.StopAsync(cancellationToken);
+                }
+
+                await genericHostStop.ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -539,7 +617,7 @@ internal sealed class DefaultApplicationHost : IApplicationHost
 
         try
         {
-            await StopAsync(CancellationToken.None).ConfigureAwait(false);
+            await GetOrStartStopTask(CancellationToken.None).ConfigureAwait(false);
         }
         catch (Exception exception)
         {

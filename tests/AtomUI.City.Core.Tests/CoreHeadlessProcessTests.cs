@@ -56,6 +56,29 @@ public sealed class CoreHeadlessProcessTests
         Assert.Contains("cancellation:shutdown", ReadStrings(result, "calls"));
     }
 
+    [Fact]
+    public async Task HeadlessConcurrentStopSharesOneTransaction()
+    {
+        var result = await RunScenarioAsync("concurrent-stop");
+
+        Assert.True(result.GetProperty("success").GetBoolean());
+        Assert.True(result.GetProperty("sharedTransaction").GetBoolean());
+        Assert.Equal(1, result.GetProperty("shutdownCount").GetInt32());
+        Assert.Equal("Disposed", result.GetProperty("hostScopeState").GetString());
+    }
+
+    [Fact]
+    public async Task HeadlessReentrantStopFailsFastAndStillCleansUp()
+    {
+        var result = await RunScenarioAsync("reentrant-stop");
+
+        Assert.True(result.GetProperty("success").GetBoolean());
+        Assert.True(result.GetProperty("recursiveFailure").GetBoolean());
+        Assert.Equal(1, result.GetProperty("hostedStopCount").GetInt32());
+        Assert.Equal("Stopped", result.GetProperty("hostScopeStateAfterStop").GetString());
+        Assert.Contains("AUCHOST103", ReadStrings(result, "diagnostics"));
+    }
+
     private static async Task<JsonElement> RunScenarioAsync(string scenario)
     {
         var repositoryRoot = FindRepositoryRoot();
@@ -79,6 +102,7 @@ public sealed class CoreHeadlessProcessTests
             CreateNoWindow = true,
         };
         startInfo.ArgumentList.Add(applicationPath);
+        startInfo.ArgumentList.Add("--test-scenario");
         startInfo.ArgumentList.Add(scenario);
 
         using var process = Process.Start(startInfo)

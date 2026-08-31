@@ -1,5 +1,6 @@
 using AtomUI.City.Core.Diagnostics;
 using AtomUI.City.Core.Hosting;
+using AtomUI.City.Core.Lifecycle;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace AtomUI.City.Core.Modularity;
@@ -193,6 +194,10 @@ public sealed class ModuleRegistry : IModuleRegistry, IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(applicationContext);
         ArgumentNullException.ThrowIfNull(services);
+        LifecycleInvocationGuard.ThrowIfReentrant(this, LifecycleOperationKind.Shutdown);
+
+        DeferredLifecycleOperation? operation = null;
+        Task shutdownTask;
 
         lock (_syncRoot)
         {
@@ -206,14 +211,26 @@ public sealed class ModuleRegistry : IModuleRegistry, IAsyncDisposable
                 return ValueTask.CompletedTask;
             }
 
-            _shutdownTask = ShutdownCoreAsync(applicationContext, services, cancellationToken);
-
-            return new ValueTask(_shutdownTask);
+            operation = new DeferredLifecycleOperation();
+            _shutdownTask = operation.Task;
+            shutdownTask = _shutdownTask;
         }
+
+        operation.Start(
+            this,
+            LifecycleOperationKind.Shutdown,
+            () => ShutdownCoreAsync(applicationContext, services, cancellationToken));
+
+        return new ValueTask(shutdownTask);
     }
 
     public ValueTask DisposeAsync()
     {
+        LifecycleInvocationGuard.ThrowIfReentrant(this, LifecycleOperationKind.Dispose);
+
+        DeferredLifecycleOperation? operation = null;
+        Task disposeTask;
+
         lock (_syncRoot)
         {
             if (_disposeTask is not null)
@@ -226,10 +243,17 @@ public sealed class ModuleRegistry : IModuleRegistry, IAsyncDisposable
                 return ValueTask.CompletedTask;
             }
 
-            _disposeTask = DisposeModulesCoreAsync(diagnostics: null);
-
-            return new ValueTask(_disposeTask);
+            operation = new DeferredLifecycleOperation();
+            _disposeTask = operation.Task;
+            disposeTask = _disposeTask;
         }
+
+        operation.Start(
+            this,
+            LifecycleOperationKind.Dispose,
+            () => DisposeModulesCoreAsync(diagnostics: null));
+
+        return new ValueTask(disposeTask);
     }
 
     private async Task ShutdownCoreAsync(

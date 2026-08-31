@@ -16,13 +16,13 @@
 dotnet test tests/AtomUI.City.Core.Tests/AtomUI.City.Core.Tests.csproj --filter "FullyQualifiedName!~CoreHeadlessProcessTests"
 ```
 
-第二轮执行无 UI Headless Console 进程测试。测试通过 `dotnet AtomUI.City.Core.HeadlessApp.dll <scenario>` 启动真实子进程，不加载 Avalonia 或 AtomUI：
+第二轮执行无 UI Headless Console 进程测试。测试通过 `dotnet AtomUI.City.Core.HeadlessApp.dll --test-scenario <scenario>` 启动真实子进程，不加载 Avalonia 或 AtomUI：
 
 ```text
 dotnet test tests/AtomUI.City.Core.Tests/AtomUI.City.Core.Tests.csproj --no-build --filter "FullyQualifiedName~CoreHeadlessProcessTests"
 ```
 
-Headless 必须覆盖正常生命周期、启动失败补偿、关闭失败聚合和 RunAsync cancellation 四个场景。
+Headless 必须覆盖正常生命周期、启动失败补偿、关闭失败聚合、RunAsync cancellation 和并发/递归停止场景。
 
 ## 产品级测试门禁
 
@@ -40,8 +40,8 @@ Headless 必须覆盖正常生命周期、启动失败补偿、关闭失败聚�
 | Feature ID | Test Type | Test File | Required Assertions | Failure Paths | Status |
 | --- | --- | --- | --- | --- | --- |
 | AUC-CORE-001 | RuntimeLifecycle + Headless | ApplicationHostBuilderTests; ApplicationHostRuntimeTests; CoreHeadlessProcessTests | 断言 Build 冻结、Options 验证、Host 状态和真实进程启停。 | Build 失败诊断；Run cancellation 后完整清理。 | Verified |
-| AUC-CORE-002 | RuntimeLifecycle + Headless | LifecycleMiddlewarePipelineTests; ApplicationHostIndustrialLifecycleTests; CoreHeadlessProcessTests | 断言 stage 顺序、Host 管线接入、cleanup terminal 保证执行。 | middleware 异常、取消和超时不跳过最小清理。 | Verified |
-| AUC-CORE-003 | RuntimeLifecycle | LifecycleScopeTreeTests | 断言 leaf-first、并发事务合并、故障隔离和诊断。 | child/cancellation callback 失败后继续清理其他 child。 | Verified |
+| AUC-CORE-002 | RuntimeLifecycle + Headless | LifecycleMiddlewarePipelineTests; ApplicationHostIndustrialLifecycleTests; CoreHeadlessProcessTests | 断言 stage 顺序、Host 管线接入、并发事务共享、内部重入拒绝和 cleanup terminal 保证执行。 | middleware 异常、递归调用、取消和超时不跳过最小清理。 | Verified |
+| AUC-CORE-003 | RuntimeLifecycle | LifecycleScopeTreeTests | 断言 leaf-first、并发事务合并、锁外 cancellation callback、重入拒绝、故障隔离和诊断。 | child/cancellation callback 失败后继续清理其他 child。 | Verified |
 | AUC-CORE-004 | Unit + RuntimeLifecycle + Headless | ModuleBaseTests; ModuleDescriptorTests; ApplicationHostModuleLifecycleTests; ApplicationHostIndustrialLifecycleTests | 断言依赖排序、阶段顺序、Application scoped provider 和逆序关闭。 | Build 失败释放实例；部分初始化回滚；关闭失败聚合。 | Verified |
 | AUC-CORE-005 | RuntimeLifecycle | ServiceRegistrationAttributeTests | 断言 lifetime、exposed services、AOT metadata 可读。 | 冲突 lifetime 或服务类型无效必须失败或诊断。 | Verified |
 | AUC-CORE-006 | RuntimeLifecycle | HostDiagnosticsTests | 断言现有诊断码、Build failure 读取、有界顺序和 dropped count。 | 诊断 collector 不可用不能中断 Host。 | Verified |

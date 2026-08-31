@@ -93,11 +93,11 @@
 | Created By | `ApplicationHostBuilder.Build`。 |
 | Lifetime | Created -> Starting -> Running -> Stopping -> Stopped -> Disposed；失败进入 Faulted 后必须可 Stop/Dispose。 |
 | DI Lifetime | Root object；不作为普通 scoped service 创建。 |
-| Thread Safety | `StartAsync` 并发调用必须串行或拒绝；`StopAsync` 并发调用合并为同一停止事务；查询上下文可并发读取。 |
+| Thread Safety | lifecycle transaction Task 在 lock 内先发布、在 lock 外执行；`StartAsync` 并发调用必须串行或拒绝；`StopAsync` 并发调用合并为同一停止事务；查询上下文可并发读取。 |
 | Disposal | `Dispose` 和 `DisposeAsync` 幂等；Dispose 后 mutating API 失败，immutable context 可读取。 |
 | Nullability | `CancellationToken` 可为默认值；返回值不得为空。 |
 | Cancellation | `StartAsync` 观察 token；`StopAsync` 的取消只影响等待，不跳过最小清理。 |
-| Failure Behavior | middleware、module initialization 或 shutdown 失败进入 diagnostics；Host 状态必须稳定；进入 Stopped 后再次 Start 抛 `InvalidOperationException`。 |
+| Failure Behavior | middleware、module initialization 或 shutdown 失败进入 diagnostics；Host 状态必须稳定；进入 Stopped 后再次 Start，以及同一 Host lifecycle 调用链中的 Start/Stop/Dispose 公共 API 重入，抛 `InvalidOperationException`。 |
 | Diagnostics | Start/Stop 写 `AUCHOST002`、`AUCHOST003` 和失败诊断。 |
 | Plugin Boundary | Host 停止时必须请求插件来源 owner 释放，但不直接加载插件程序集。 |
 | AOT / Trimming | Host 启动不执行默认程序集扫描。 |
@@ -168,7 +168,7 @@
 | Created By | Host、ModuleSystem 或上层运行时模块。 |
 | Lifetime | Active -> Disposing -> Disposed。 |
 | DI Lifetime | Scope object；可被对应 owner 持有，不注册为 root singleton。 |
-| Thread Safety | child 创建和 dispose 必须同步保护；读取状态可并发；mutating API 在 Disposing/Disposed 失败。 |
+| Thread Safety | child 创建和状态发布必须同步保护；真实 Stop/Dispose、cancellation callback 和 Disposed notification 在 lock 外执行；读取状态可并发；mutating API 在 Disposing/Disposed 失败。 |
 | Disposal | leaf-first；重复 Dispose 幂等；child 释放失败记录诊断并继续释放其他 child。 |
 | Nullability | scope id、kind、owner 不得为空。 |
 | Cancellation | Dispose 不启动新 operation；active operation 必须在 parent stop 时被取消。 |
@@ -656,9 +656,9 @@ Parameters: cancellationToken 控制等待，但不能跳过已经开始的最�
 Return: Host 停止后完成的 Task。
 Nullability: 返回 task 不能为空。
 Cancellation: 取消只影响可取消等待；清理失败必须写 diagnostics。
-Exceptions or Result: Dispose 后抛 ObjectDisposedException；shutdown 失败聚合并写 diagnostics。
+Exceptions or Result: Dispose 后抛 ObjectDisposedException；shutdown 失败聚合并写 diagnostics；同一 Host lifecycle 调用链中的递归 Stop 抛 InvalidOperationException，cleanup terminal 仍必须执行。
 Idempotency: Stopped 后重复调用不重新执行 shutdown。
-Concurrency: 并发调用由同一个停止事务处理。
+Concurrency: transaction Task 在 Stopping 可见前发布；外部并发调用由同一个停止事务处理，事务内部递归调用被拒绝。
 Side Effects: 取消 application 和 host scopes，成功时写 HostStopped。
 Diagnostics: 成功写 AUCHOST003；失败写 AUCHOST103。
 Tests: ApplicationHostRuntimeTests; ApplicationHostLifecycleIntegrationTests。
@@ -692,9 +692,9 @@ Parameters: 无。
 Return: scope 停止后完成的 ValueTask。
 Nullability: 返回 ValueTask 有效。
 Cancellation: Stop 会取消 scope token；不接受外部 cancellation。
-Exceptions or Result: 重复 Stop 是 no-op；child failure 在挂接 diagnostics sink 时写 diagnostics。
+Exceptions or Result: 重复 Stop 是 no-op；同一 scope lifecycle 调用链中的递归 Stop 抛 InvalidOperationException；child failure 在挂接 diagnostics sink 时写 diagnostics。
 Idempotency: 重复调用不改变顺序，也不重复取消。
-Concurrency: 并发调用由 scope lock 串行化。
+Concurrency: scope lock 只负责发布唯一 transaction Task；外部并发调用共享事务，取消回调和 child stop 在 lock 外执行。
 Side Effects: State 从 Running 变为 Stopping，再变为 Stopped。
 Diagnostics: child stop 或 dispose 失败写 AUCHOST104。
 Tests: LifecycleScopeTreeTests。
