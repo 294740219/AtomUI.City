@@ -15,6 +15,14 @@
 | `AUCHOST001` | HostBuilt | `src/AtomUI.City.Core/Diagnostics/HostDiagnosticIds.cs` |
 | `AUCHOST002` | HostStarted | `src/AtomUI.City.Core/Diagnostics/HostDiagnosticIds.cs` |
 | `AUCHOST003` | HostStopped | `src/AtomUI.City.Core/Diagnostics/HostDiagnosticIds.cs` |
+| `AUCHOST101` | HostBuildFailed | `src/AtomUI.City.Core/Diagnostics/HostDiagnosticIds.cs` |
+| `AUCHOST102` | HostStartFailed | `src/AtomUI.City.Core/Diagnostics/HostDiagnosticIds.cs` |
+| `AUCHOST103` | HostStopFailed | `src/AtomUI.City.Core/Diagnostics/HostDiagnosticIds.cs` |
+| `AUCHOST104` | LifecycleScopeCleanupFailed | `src/AtomUI.City.Core/Diagnostics/HostDiagnosticIds.cs` |
+| `AUCHOST105` | ModuleGraphFailed | `src/AtomUI.City.Core/Diagnostics/HostDiagnosticIds.cs` |
+| `AUCHOST106` | ModuleLifecycleFailed | `src/AtomUI.City.Core/Diagnostics/HostDiagnosticIds.cs` |
+| `AUCHOST107` | DispatcherUnavailable | `src/AtomUI.City.Core/Diagnostics/HostDiagnosticIds.cs` |
+| `AUCHOST108` | LifecycleMiddlewareFailed | `src/AtomUI.City.Core/Diagnostics/HostDiagnosticIds.cs` |
 
 ## 产品级必须诊断的失败
 
@@ -23,6 +31,8 @@
 - lifecycle middleware 抛异常：当前 stage 失败，Host 进入 Faulted 并执行清理。
 - Build 后继续注册服务：抛 InvalidOperationException 或返回失败 Result。
 - UnavailableUiDispatcher 被执行：返回调度失败，不触碰 UI。
+
+`AUCHOST108` 的 `Stage` 必须是失败时的 lifecycle stage，context 固定包含 `middlewareType`、`operationId` 和 `exceptionType`。对应 `AUCHOST102` 或 `AUCHOST103` Host 摘要记录使用同一个 `operationId`；启动失败后的 rollback 也沿用启动事务 id。正常 cancellation 不产生 `AUCHOST108`。
 
 ## 上下文字段
 

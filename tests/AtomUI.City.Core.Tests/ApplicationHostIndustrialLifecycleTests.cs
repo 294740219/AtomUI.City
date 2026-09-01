@@ -1,4 +1,5 @@
 using AtomUI.City.Core.Hosting;
+using AtomUI.City.Core.Diagnostics;
 using AtomUI.City.Core.Lifecycle;
 using AtomUI.City.Core.Modularity;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,7 +13,8 @@ public sealed class ApplicationHostIndustrialLifecycleTests
     public async Task LifecyclePipelineWrapsHostAndModuleTransactions()
     {
         var calls = new List<string>();
-        var builder = ApplicationHost.CreateBuilder();
+        var operationIds = new Dictionary<string, string>();
+        var builder = ApplicationHostTestBuilder.Create();
 
         builder.ConfigureLifecycle(lifecycle =>
         {
@@ -25,8 +27,9 @@ public sealed class ApplicationHostIndustrialLifecycleTests
                          LifecycleStages.ModuleStop,
                      })
             {
-                lifecycle.Use(stage, async (_, next) =>
+                lifecycle.Use(stage, async (context, next) =>
                 {
+                    operationIds[stage.Key] = context.OperationId;
                     calls.Add($"{stage.Key}:before");
                     await next();
                     calls.Add($"{stage.Key}:after");
@@ -55,13 +58,25 @@ public sealed class ApplicationHostIndustrialLifecycleTests
                 "Application.Stop:after",
             ],
             calls);
+        Assert.Equal(
+            operationIds[LifecycleStages.ApplicationStart.Key],
+            operationIds[LifecycleStages.ModuleInitialize.Key]);
+        Assert.Equal(
+            operationIds[LifecycleStages.ApplicationStart.Key],
+            operationIds[LifecycleStages.ModuleStart.Key]);
+        Assert.Equal(
+            operationIds[LifecycleStages.ApplicationStop.Key],
+            operationIds[LifecycleStages.ModuleStop.Key]);
+        Assert.NotEqual(
+            operationIds[LifecycleStages.ApplicationStart.Key],
+            operationIds[LifecycleStages.ApplicationStop.Key]);
     }
 
     [Fact]
     public async Task InitializationFailureRollsBackEnteredModulesInReverseOrder()
     {
         RollbackRecorder.Reset();
-        var builder = ApplicationHost.CreateBuilder();
+        var builder = ApplicationHostTestBuilder.Create();
         builder.UseModule<FailingApplicationModule>();
         builder.UseModule<FoundationModule>();
         var host = builder.Build();
@@ -78,10 +93,57 @@ public sealed class ApplicationHostIndustrialLifecycleTests
     }
 
     [Fact]
+    public async Task StartupMiddlewareFailureDiagnosticsShareOperationIdWithRollback()
+    {
+        string? startOperationId = null;
+        string? rollbackOperationId = null;
+        var builder = ApplicationHostTestBuilder.Create();
+        builder.ConfigureLifecycle(lifecycle =>
+        {
+            lifecycle.Use<StartupFailureMiddleware>(
+                LifecycleStages.ApplicationStart,
+                (context, _) =>
+                {
+                    startOperationId = context.OperationId;
+                    return ValueTask.FromException(
+                        new InvalidOperationException("startup middleware failed"));
+                });
+            lifecycle.Use<RollbackProbeMiddleware>(
+                LifecycleStages.ApplicationStop,
+                async (context, next) =>
+                {
+                    rollbackOperationId = context.OperationId;
+                    await next();
+                });
+        });
+        var host = builder.Build();
+        var diagnostics = host.Services.GetRequiredService<IHostDiagnostics>();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => host.StartAsync());
+
+        var middlewareFailure = Assert.Single(diagnostics.Records, record =>
+            record.Code == HostDiagnosticIds.LifecycleMiddlewareFailed);
+        var hostFailure = Assert.Single(diagnostics.Records, record =>
+            record.Code == HostDiagnosticIds.HostStartFailed);
+
+        Assert.False(string.IsNullOrWhiteSpace(startOperationId));
+        Assert.Equal(startOperationId, rollbackOperationId);
+        Assert.Equal(startOperationId, middlewareFailure.Context["operationId"]);
+        Assert.Equal(startOperationId, hostFailure.Context["operationId"]);
+        Assert.Equal(LifecycleStages.ApplicationStart, middlewareFailure.Stage);
+        Assert.Equal(
+            typeof(StartupFailureMiddleware).FullName,
+            middlewareFailure.Context["middlewareType"]);
+
+        await host.StopAsync();
+        await host.DisposeAsync();
+    }
+
+    [Fact]
     public async Task ShutdownContinuesAfterModuleFailuresAndStopsGenericHost()
     {
         ShutdownRecorder.Reset();
-        var builder = ApplicationHost.CreateBuilder();
+        var builder = ApplicationHostTestBuilder.Create();
         builder.UseModule<SecondFailingShutdownModule>();
         builder.UseModule<FirstFailingShutdownModule>();
         builder.ConfigureServices(services =>
@@ -106,7 +168,7 @@ public sealed class ApplicationHostIndustrialLifecycleTests
     public async Task ModuleContextsUseApplicationServiceScopeAndDisposeItOnStop()
     {
         ScopedModule.Reset();
-        var builder = ApplicationHost.CreateBuilder();
+        var builder = ApplicationHostTestBuilder.Create();
         builder.UseModule<ScopedModule>();
         builder.ConfigureServices(services => services.AddScoped<ScopedProbe>());
 
@@ -126,7 +188,7 @@ public sealed class ApplicationHostIndustrialLifecycleTests
     public async Task CancelingConcurrentStopWaitDoesNotCancelCleanupTransaction()
     {
         BlockingShutdownModule.Reset();
-        var builder = ApplicationHost.CreateBuilder();
+        var builder = ApplicationHostTestBuilder.Create();
         builder.UseModule<BlockingShutdownModule>();
         builder.ConfigureHost(options => options.ShutdownTimeout = TimeSpan.FromSeconds(5));
         await using var host = builder.Build();
@@ -148,10 +210,11 @@ public sealed class ApplicationHostIndustrialLifecycleTests
     public async Task ConcurrentStopCallersShareOnePublishedTransaction()
     {
         BlockingShutdownModule.Reset();
-        var builder = ApplicationHost.CreateBuilder();
+        var builder = ApplicationHostTestBuilder.Create();
         builder.UseModule<BlockingShutdownModule>();
         builder.ConfigureHost(options => options.ShutdownTimeout = TimeSpan.FromSeconds(5));
         await using var host = builder.Build();
+        var diagnostics = host.Services.GetRequiredService<IHostDiagnostics>();
         await host.StartAsync();
 
         var firstStop = host.StopAsync();
@@ -163,13 +226,16 @@ public sealed class ApplicationHostIndustrialLifecycleTests
         BlockingShutdownModule.Release.SetResult();
         await Task.WhenAll(firstStop, secondStop);
         Assert.True(BlockingShutdownModule.Completed);
+        var stopped = Assert.Single(diagnostics.Records, record =>
+            record.Code == HostDiagnosticIds.HostStopped);
+        Assert.False(string.IsNullOrWhiteSpace(stopped.Context["operationId"]));
     }
 
     [Fact]
     public async Task RecursiveStopFromStopMiddlewareFailsFastAndStillCleansUp()
     {
         IApplicationHost? host = null;
-        var builder = ApplicationHost.CreateBuilder();
+        var builder = ApplicationHostTestBuilder.Create();
         builder.ConfigureLifecycle(lifecycle =>
             lifecycle.Use(LifecycleStages.ApplicationStop, (_, next) =>
             {
@@ -199,7 +265,7 @@ public sealed class ApplicationHostIndustrialLifecycleTests
     [Fact]
     public async Task RecursiveStopFromApplicationStoppingCallbackFailsFast()
     {
-        var builder = ApplicationHost.CreateBuilder();
+        var builder = ApplicationHostTestBuilder.Create();
         await using var host = builder.Build();
         await host.StartAsync();
         var applicationLifetime = host.Services.GetRequiredService<IHostApplicationLifetime>();
@@ -218,7 +284,7 @@ public sealed class ApplicationHostIndustrialLifecycleTests
     public async Task RecursiveStartFromStartMiddlewareFailsFastAndRollsBack()
     {
         IApplicationHost? host = null;
-        var builder = ApplicationHost.CreateBuilder();
+        var builder = ApplicationHostTestBuilder.Create();
         builder.ConfigureLifecycle(lifecycle =>
             lifecycle.Use(LifecycleStages.ApplicationStart, (_, next) =>
             {
@@ -238,7 +304,7 @@ public sealed class ApplicationHostIndustrialLifecycleTests
     public async Task RecursiveDisposeFromStopMiddlewareFailsFastAndStillCleansUp()
     {
         IApplicationHost? host = null;
-        var builder = ApplicationHost.CreateBuilder();
+        var builder = ApplicationHostTestBuilder.Create();
         builder.ConfigureLifecycle(lifecycle =>
             lifecycle.Use(LifecycleStages.ApplicationStop, (_, next) =>
             {
@@ -268,7 +334,7 @@ public sealed class ApplicationHostIndustrialLifecycleTests
     public async Task RecursiveModuleRegistryShutdownFailsFastAndStillDisposesModules()
     {
         ReentrantShutdownModule.Reset();
-        var builder = ApplicationHost.CreateBuilder();
+        var builder = ApplicationHostTestBuilder.Create();
         builder.UseModule<ReentrantShutdownModule>();
         builder.ConfigureServices(services =>
         {
@@ -294,7 +360,7 @@ public sealed class ApplicationHostIndustrialLifecycleTests
     public async Task RecursiveModuleRegistryDisposeFailsFastWithoutDuplicatingDisposal()
     {
         ReentrantRegistryDisposeModule.Reset();
-        var builder = ApplicationHost.CreateBuilder();
+        var builder = ApplicationHostTestBuilder.Create();
         builder.UseModule<ReentrantRegistryDisposeModule>();
         await using var host = builder.Build();
         await host.StartAsync();
@@ -310,9 +376,9 @@ public sealed class ApplicationHostIndustrialLifecycleTests
     [Fact]
     public async Task StopMiddlewareFailureDoesNotSkipRequiredCleanup()
     {
-        var builder = ApplicationHost.CreateBuilder();
+        var builder = ApplicationHostTestBuilder.Create();
         builder.ConfigureLifecycle(lifecycle =>
-            lifecycle.Use(LifecycleStages.ApplicationStop, static (_, _) =>
+            lifecycle.Use<StopFailureMiddleware>(LifecycleStages.ApplicationStop, static (_, _) =>
                 ValueTask.FromException(new InvalidOperationException("stop middleware failed"))));
         builder.ConfigureServices(services =>
         {
@@ -320,6 +386,7 @@ public sealed class ApplicationHostIndustrialLifecycleTests
             services.AddSingleton<IHostedService>(provider => provider.GetRequiredService<HostedStopProbe>());
         });
         var host = builder.Build();
+        var diagnostics = host.Services.GetRequiredService<IHostDiagnostics>();
         var hostedProbe = host.Services.GetRequiredService<HostedStopProbe>();
         await host.StartAsync();
 
@@ -327,6 +394,17 @@ public sealed class ApplicationHostIndustrialLifecycleTests
 
         Assert.Equal(1, hostedProbe.StopCount);
         Assert.Equal(LifecycleScopeState.Stopped, host.HostScope.State);
+        var middlewareFailure = Assert.Single(diagnostics.Records, record =>
+            record.Code == HostDiagnosticIds.LifecycleMiddlewareFailed);
+        var hostFailure = Assert.Single(diagnostics.Records, record =>
+            record.Code == HostDiagnosticIds.HostStopFailed);
+        Assert.Equal(LifecycleStages.ApplicationStop, middlewareFailure.Stage);
+        Assert.Equal(
+            typeof(StopFailureMiddleware).FullName,
+            middlewareFailure.Context["middlewareType"]);
+        Assert.Equal(
+            middlewareFailure.Context["operationId"],
+            hostFailure.Context["operationId"]);
         await Assert.ThrowsAsync<AggregateException>(async () => await host.DisposeAsync());
     }
 
@@ -334,7 +412,7 @@ public sealed class ApplicationHostIndustrialLifecycleTests
     public async Task ShutdownTimeoutCancelsCooperativeModuleAndStillDisposesIt()
     {
         TimedShutdownModule.Reset();
-        var builder = ApplicationHost.CreateBuilder();
+        var builder = ApplicationHostTestBuilder.Create();
         builder.UseModule<TimedShutdownModule>();
         builder.ConfigureHost(options => options.ShutdownTimeout = TimeSpan.FromMilliseconds(50));
         var host = builder.Build();
@@ -485,6 +563,12 @@ public sealed class ApplicationHostIndustrialLifecycleTests
 
         public void Dispose() => WasDisposed = true;
     }
+
+    private sealed class StartupFailureMiddleware;
+
+    private sealed class RollbackProbeMiddleware;
+
+    private sealed class StopFailureMiddleware;
 
     private sealed class ReentrantShutdownModule : ModuleBase, IDisposable
     {

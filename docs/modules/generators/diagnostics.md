@@ -12,13 +12,16 @@
 
 | Current Code | Name | Source |
 | --- | --- | --- |
-| `AUCGEN001` | DynamicDiscoveryNotAllowed | `src/AtomUI.City.Generators/Diagnostics/GeneratorDiagnosticIds.cs` |
 | `AUCGEN002` | DuplicateModuleName | `src/AtomUI.City.Generators/Diagnostics/GeneratorDiagnosticIds.cs` |
 | `AUCGEN003` | CircularModuleDependency | `src/AtomUI.City.Generators/Diagnostics/GeneratorDiagnosticIds.cs` |
 | `AUCGEN004` | DuplicateRoute | `src/AtomUI.City.Generators/Diagnostics/GeneratorDiagnosticIds.cs` |
 | `AUCGEN005` | InvalidManifestInput | `src/AtomUI.City.Generators/Diagnostics/GeneratorDiagnosticIds.cs` |
 | `AUCGEN006` | DuplicatePresentationView | `src/AtomUI.City.Generators/Diagnostics/GeneratorDiagnosticIds.cs` |
+| `AUCGEN007` | MultipleApplicationModules | `src/AtomUI.City.Generators/Diagnostics/GeneratorDiagnosticIds.cs` |
+| `AUCGEN008` | InvalidGeneratedModule | `src/AtomUI.City.Generators/Diagnostics/GeneratorDiagnosticIds.cs` |
 | `AUCANL0001` | BuildServiceProviderNotAllowed | `src/AtomUI.City.Generators/Diagnostics/AnalyzerDiagnosticIds.cs` |
+
+`AUCGEN001` 在 1.0 Preview 中保留但不公开定义。原 `DynamicDiscoveryNotAllowed` 从未有对应输入和触发链；运行时动态发现未来作为独立 Feature 实现时，必须重新评审诊断合同。
 
 ## 产品级必须诊断的失败
 

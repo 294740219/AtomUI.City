@@ -105,7 +105,6 @@ tools/
 | `AtomUICityValidateManifests` | `true` | 是否校验 manifest。 |
 | `AtomUICityEnableAnalyzers` | `true` | 是否启用 analyzer。 |
 | `AtomUICitySourceGenerationMode` | `Strict` | `Strict`、`Compatible`、`Off`。 |
-| `AtomUICityAllowDynamicDiscovery` | `false` | 是否允许动态发现。 |
 | `AtomUICityStrictAot` | `false` | 是否启用严格 AOT 检查。 |
 | `AtomUICityPackagePlugin` | `false` | 是否打包插件。 |
 | `AtomUICityPackageApplication` | `false` | 是否打包应用。 |

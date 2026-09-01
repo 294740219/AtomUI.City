@@ -7,7 +7,8 @@ public sealed class ModuleMetadata
         string typeName,
         string? version,
         string? description,
-        IReadOnlyList<ModuleDependencyMetadata> dependencies)
+        IReadOnlyList<ModuleDependencyMetadata> dependencies,
+        bool isApplicationRoot = false)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -24,6 +25,7 @@ public sealed class ModuleMetadata
         Version = version;
         Description = description;
         Dependencies = Array.AsReadOnly((dependencies ?? throw new ArgumentNullException(nameof(dependencies))).ToArray());
+        IsApplicationRoot = isApplicationRoot;
     }
 
     public string Name { get; }
@@ -35,4 +37,6 @@ public sealed class ModuleMetadata
     public string? Description { get; }
 
     public IReadOnlyList<ModuleDependencyMetadata> Dependencies { get; }
+
+    public bool IsApplicationRoot { get; }
 }

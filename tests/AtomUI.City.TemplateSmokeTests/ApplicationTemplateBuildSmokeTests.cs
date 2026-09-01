@@ -73,6 +73,9 @@ public sealed class ApplicationTemplateBuildSmokeTests
         var program = File.ReadAllText(programPath);
         Assert.Contains("using AtomUI.City.Core.Hosting;", program, StringComparison.Ordinal);
         Assert.Contains("ApplicationHost.CreateBuilder(args)", program, StringComparison.Ordinal);
+        Assert.Contains("options.ApplicationId = \"Company.SalesClient\";", program, StringComparison.Ordinal);
+        Assert.Contains("options.ApplicationName = \"SalesClient\";", program, StringComparison.Ordinal);
+        Assert.Contains("await using var host = builder.Build();", program, StringComparison.Ordinal);
     }
 
     [Fact]

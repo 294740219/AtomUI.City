@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using AtomUI.City.Core.Hosting;
 
 namespace AtomUI.City.Core.Diagnostics;
@@ -14,18 +15,14 @@ public static class ApplicationHostBuilderDiagnosticsExtensions
 
 internal static class ApplicationHostBuilderDiagnosticsStore
 {
-    private const string Key = "AtomUI.City.Core.Diagnostics.BuildCollector";
+    private static readonly ConditionalWeakTable<
+        IApplicationHostBuilder,
+        InMemoryHostDiagnostics> Stores = new();
 
     public static IHostDiagnostics GetOrCreate(IApplicationHostBuilder builder)
     {
-        if (builder.Properties.TryGetValue(Key, out var value) && value is IHostDiagnostics diagnostics)
-        {
-            return diagnostics;
-        }
-
-        diagnostics = new InMemoryHostDiagnostics(1024);
-        builder.Properties[Key] = diagnostics;
-
-        return diagnostics;
+        return Stores.GetValue(
+            builder,
+            static _ => new InMemoryHostDiagnostics(1024));
     }
 }

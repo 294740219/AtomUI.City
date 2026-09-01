@@ -5,6 +5,12 @@ namespace AtomUI.City.Core.Tests;
 
 public sealed class CoreHeadlessProcessTests
 {
+#if DEBUG
+    private const string BuildConfiguration = "Debug";
+#else
+    private const string BuildConfiguration = "Release";
+#endif
+
     [Fact]
     public async Task HeadlessLifecycleRunsToCompletionWithoutUiRuntime()
     {
@@ -43,6 +49,28 @@ public sealed class CoreHeadlessProcessTests
         Assert.Equal(1, result.GetProperty("hostedStopCount").GetInt32());
         Assert.Equal(["second:shutdown", "first:shutdown"], ReadStrings(result, "calls"));
         Assert.Contains("AUCHOST103", ReadStrings(result, "diagnostics"));
+    }
+
+    [Fact]
+    public async Task HeadlessLifecycleFailureEmitsCorrelatedStructuredDiagnostics()
+    {
+        var result = await RunScenarioAsync("lifecycle-diagnostics");
+
+        Assert.True(result.GetProperty("success").GetBoolean());
+        Assert.Equal("Application.Stop", result.GetProperty("stage").GetString());
+        Assert.EndsWith(
+            "HeadlessStopFailureMiddleware",
+            result.GetProperty("middlewareType").GetString(),
+            StringComparison.Ordinal);
+        Assert.Matches("^[0-9a-f]{32}$", result.GetProperty("operationId").GetString()!);
+        Assert.Equal(
+            result.GetProperty("operationId").GetString(),
+            result.GetProperty("summaryOperationId").GetString());
+        Assert.Equal(
+            typeof(InvalidOperationException).FullName,
+            result.GetProperty("exceptionType").GetString());
+        Assert.Equal(1, result.GetProperty("hostedStopCount").GetInt32());
+        Assert.Equal("Stopped", result.GetProperty("hostScopeStateAfterStop").GetString());
     }
 
     [Fact]
@@ -95,6 +123,42 @@ public sealed class CoreHeadlessProcessTests
             ReadStrings(result, "calls"));
     }
 
+    [Fact]
+    public async Task HeadlessApplicationContextIsCompleteAndReadableAfterDisposal()
+    {
+        var result = await RunScenarioAsync("application-context");
+
+        Assert.True(result.GetProperty("success").GetBoolean());
+        Assert.Equal("AtomUI.City.Core.HeadlessApp", result.GetProperty("ApplicationId").GetString());
+        Assert.NotEqual(Guid.Empty, result.GetProperty("ApplicationInstanceId").GetGuid());
+        Assert.False(string.IsNullOrWhiteSpace(result.GetProperty("ApplicationVersion").GetString()));
+        Assert.True(Path.IsPathFullyQualified(result.GetProperty("ContentRootPath").GetString()!));
+        Assert.True(Path.IsPathFullyQualified(result.GetProperty("AppDataPath").GetString()!));
+        Assert.Equal(0, result.GetProperty("startupArgumentCount").GetInt32());
+    }
+
+    [Fact]
+    public async Task HeadlessGeneratedApplicationRootLoadsOnlyItsDependencyClosure()
+    {
+        var result = await RunScenarioAsync("generated-modules");
+
+        Assert.True(result.GetProperty("success").GetBoolean());
+        Assert.Equal(
+            ["GeneratedFoundationModule", "GeneratedApplicationModule"],
+            ReadStrings(result, "loadedModules"));
+        Assert.Equal(
+            [
+                "generated:foundation:configure",
+                "generated:application:configure",
+                "generated:foundation:initialize",
+                "generated:application:initialize",
+                "generated:application:shutdown",
+                "generated:foundation:shutdown",
+            ],
+            ReadStrings(result, "calls"));
+        Assert.Equal(0, result.GetProperty("unusedCreatedCount").GetInt32());
+    }
+
     private static async Task<JsonElement> RunScenarioAsync(string scenario)
     {
         var repositoryRoot = FindRepositoryRoot();
@@ -102,7 +166,7 @@ public sealed class CoreHeadlessProcessTests
             repositoryRoot,
             "output",
             "bin",
-            "Debug",
+            BuildConfiguration,
             "AtomUI.City.Core.HeadlessApp",
             "net10.0",
             "AtomUI.City.Core.HeadlessApp.dll");

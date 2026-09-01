@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Reflection;
 using AtomUI.City.Core.Diagnostics;
 using AtomUI.City.Core.Lifecycle;
 using AtomUI.City.Core.Modularity;
@@ -21,9 +22,7 @@ public sealed class ApplicationHostBuilder : IApplicationHostBuilder
     private readonly List<Action<ApplicationHostOptions>> _configureHostActions = [];
     private readonly List<Action<IServiceCollection>> _configureServicesActions = [];
     private readonly GuardedConfigurationManager _configuration;
-    private readonly GuardedDictionary<string, object?> _properties;
     private readonly GuardedServiceCollection _services;
-    private readonly Dictionary<string, object?> _propertiesStore = new(StringComparer.Ordinal);
     private bool _applyingUserServices;
     private bool _built;
 
@@ -38,15 +37,12 @@ public sealed class ApplicationHostBuilder : IApplicationHostBuilder
         }
 
         _configuration = new GuardedConfigurationManager(_builder.Configuration, ThrowIfBuilt);
-        _properties = new GuardedDictionary<string, object?>(_propertiesStore, ThrowIfBuilt);
         _services = new GuardedServiceCollection(
             _builder.Services,
             () => _applyingUserServices);
     }
 
     public IConfigurationManager Configuration => _configuration;
-
-    public IDictionary<string, object?> Properties => _properties;
 
     public IApplicationHostBuilder ConfigureServices(Action<IServiceCollection> configureServices)
     {
@@ -92,11 +88,13 @@ public sealed class ApplicationHostBuilder : IApplicationHostBuilder
             var lifecyclePipeline = LifecycleConfigurationStore.Build(lifecycleConfigurations);
 
             buildStage = "ModuleGraph";
-            moduleRegistry = ModuleRegistry.Create(moduleRegistrations);
+            var moduleCatalog = ModuleCatalog.LoadGenerated(Assembly.GetEntryAssembly());
+            var resolvedModuleRegistrations = moduleCatalog.Resolve(moduleRegistrations);
+
+            moduleRegistry = ModuleRegistry.Create(resolvedModuleRegistrations);
             runtimeDiagnostics = GetRegisteredDiagnosticsInstance()
                 ?? new InMemoryHostDiagnostics(hostOptions.DiagnosticsCapacity);
 
-            _builder.Services.AddSingleton(context);
             _builder.Services.AddSingleton<IApplicationContext>(context);
             _builder.Services.AddSingleton(Options.Create(hostOptions));
             _builder.Services.Configure<HostOptions>(options =>
@@ -118,7 +116,6 @@ public sealed class ApplicationHostBuilder : IApplicationHostBuilder
             buildStage = "GenericHost";
             genericHost = _builder.Build();
 
-            context.Services = genericHost.Services;
             var diagnostics = genericHost.Services.GetRequiredService<IHostDiagnostics>();
 
             WriteDiagnostic(diagnostics, new HostDiagnosticRecord(
@@ -232,29 +229,141 @@ public sealed class ApplicationHostBuilder : IApplicationHostBuilder
 
     private ApplicationContext CreateApplicationContext(ApplicationHostOptions hostOptions)
     {
-        var applicationName = !string.IsNullOrWhiteSpace(hostOptions.ApplicationName)
-            ? hostOptions.ApplicationName
+        var applicationId = GetRequiredExplicitValue(
+            hostOptions.ApplicationId,
+            nameof(hostOptions.ApplicationId));
+        var applicationName = hostOptions.ApplicationName is not null
+            ? GetRequiredExplicitValue(
+                hostOptions.ApplicationName,
+                nameof(hostOptions.ApplicationName))
             : string.IsNullOrWhiteSpace(_builder.Environment.ApplicationName)
-            ? "AtomUI.City.Application"
+            ? applicationId
             : _builder.Environment.ApplicationName;
-        var context = new ApplicationContext
-        {
-            ApplicationName = applicationName,
-            EnvironmentName = _builder.Environment.EnvironmentName,
-            ContentRootPath = _builder.Environment.ContentRootPath,
-            AppDataPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                applicationName),
-            StartupArguments = _args,
-            Configuration = Configuration,
-        };
+        ValidateApplicationName(applicationName);
 
-        foreach (var property in _propertiesStore)
+        var applicationVersion = ResolveApplicationVersion(hostOptions.ApplicationVersion);
+        var environmentName = GetRequiredValue(
+            _builder.Environment.EnvironmentName,
+            nameof(IApplicationContext.EnvironmentName));
+        var contentRootPath = NormalizeAbsolutePath(
+            _builder.Environment.ContentRootPath,
+            nameof(IApplicationContext.ContentRootPath));
+        var localApplicationData = NormalizeAbsolutePath(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            nameof(Environment.SpecialFolder.LocalApplicationData));
+        var appDataPath = NormalizeAbsolutePath(
+            Path.Combine(localApplicationData, applicationName),
+            nameof(IApplicationContext.AppDataPath));
+
+        return new ApplicationContext(
+            applicationId,
+            Guid.NewGuid(),
+            applicationName,
+            applicationVersion,
+            environmentName,
+            contentRootPath,
+            appDataPath,
+            _args);
+    }
+
+    private static string ResolveApplicationVersion(string? configuredVersion)
+    {
+        if (configuredVersion is not null)
         {
-            context.Properties[property.Key] = property.Value;
+            return GetRequiredExplicitValue(
+                configuredVersion,
+                nameof(ApplicationHostOptions.ApplicationVersion));
         }
 
-        return context;
+        var entryAssembly = Assembly.GetEntryAssembly();
+        var informationalVersion = entryAssembly?
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+            .InformationalVersion;
+
+        if (!string.IsNullOrWhiteSpace(informationalVersion))
+        {
+            return informationalVersion;
+        }
+
+        var assemblyVersion = entryAssembly?.GetName().Version?.ToString();
+
+        return GetRequiredValue(
+            assemblyVersion,
+            nameof(IApplicationContext.ApplicationVersion));
+    }
+
+    private static string GetRequiredExplicitValue(string? value, string fieldName)
+    {
+        var requiredValue = GetRequiredValue(value, fieldName);
+
+        if (!string.Equals(requiredValue, requiredValue.Trim(), StringComparison.Ordinal))
+        {
+            throw new ArgumentException(
+                $"{fieldName} cannot contain leading or trailing whitespace.",
+                fieldName);
+        }
+
+        return requiredValue;
+    }
+
+    private static string GetRequiredValue(string? value, string fieldName)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new InvalidOperationException($"{fieldName} is required.");
+        }
+
+        return value;
+    }
+
+    private static void ValidateApplicationName(string applicationName)
+    {
+        if (!string.Equals(applicationName, applicationName.Trim(), StringComparison.Ordinal) ||
+            applicationName is "." or ".." ||
+            applicationName.Contains('/') ||
+            applicationName.Contains('\\') ||
+            applicationName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 ||
+            OperatingSystem.IsWindows() &&
+            (applicationName.EndsWith('.') ||
+             IsWindowsReservedDeviceName(applicationName)))
+        {
+            throw new ArgumentException(
+                "ApplicationName must be a single valid directory name.",
+                nameof(ApplicationHostOptions.ApplicationName));
+        }
+    }
+
+    private static bool IsWindowsReservedDeviceName(string applicationName)
+    {
+        var stem = applicationName.Split('.', 2)[0];
+
+        if (stem.Equals("CON", StringComparison.OrdinalIgnoreCase) ||
+            stem.Equals("PRN", StringComparison.OrdinalIgnoreCase) ||
+            stem.Equals("AUX", StringComparison.OrdinalIgnoreCase) ||
+            stem.Equals("NUL", StringComparison.OrdinalIgnoreCase) ||
+            stem.Equals("CONIN$", StringComparison.OrdinalIgnoreCase) ||
+            stem.Equals("CONOUT$", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return stem.Length == 4 &&
+               stem[3] is >= '1' and <= '9' &&
+               (stem.StartsWith("COM", StringComparison.OrdinalIgnoreCase) ||
+                stem.StartsWith("LPT", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string NormalizeAbsolutePath(string? path, string fieldName)
+    {
+        var requiredPath = GetRequiredValue(path, fieldName);
+        var normalizedPath = Path.GetFullPath(requiredPath);
+
+        if (!Path.IsPathFullyQualified(normalizedPath))
+        {
+            throw new InvalidOperationException($"{fieldName} must resolve to an absolute path.");
+        }
+
+        return Path.TrimEndingDirectorySeparator(normalizedPath);
     }
 
     private IHostDiagnostics? GetRegisteredDiagnosticsInstance()

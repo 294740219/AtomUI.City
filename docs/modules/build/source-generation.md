@@ -151,7 +151,7 @@ output/artifacts/manifests/
 | 模式 | 行为 |
 |---|---|
 | `Strict` | AOT-first，禁止默认动态发现，问题尽量报错。 |
-| `Compatible` | 允许部分 opt-in 动态能力，输出 warning。 |
+| `Compatible` | 为未来明确声明的兼容能力预留；当前不启用运行时模块扫描。 |
 | `Off` | 关闭框架生成器，仅用于特殊调试。 |
 
 ### 7. 测试矩阵
@@ -161,5 +161,5 @@ output/artifacts/manifests/
 | generator 接入 | Build test | 引用 Build 后 generator 自动运行。 |
 | generated path | Build test | 产物进入 expected obj/output 路径。 |
 | incremental | Generator test | 输入不变不重新生成。 |
-| strict mode | Analyzer/Build | 动态发现报错。 |
+| strict mode | Analyzer/Build | 仅接受静态可生成输入；运行时发现另立 Feature 后补充门禁。 |
 | manifest output | Generator/Build | JSON manifest 生成稳定。 |

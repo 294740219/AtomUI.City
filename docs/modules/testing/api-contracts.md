@@ -41,6 +41,8 @@
 | Breaking Change Rules | 修改释放断言、diagnostics 记录结构或默认 services 属于 breaking change。 |
 | Tests | `TestHostTests` 断言 service、diagnostics、dispose、records 和未释放资源。 |
 
+`TestHost.ApplicationContext` 以 `IApplicationContext` 暴露不可变实例描述；`TestHost.Properties` 是 `UseProperty` 输入的结构只读快照，两者互不混合。
+
 ### `TestHostBuilder`
 
 | Field | Contract |
@@ -309,7 +311,7 @@
 | Field | Contract |
 | --- | --- |
 | Feature | AUC-TESTING-001 |
-| Purpose | 在 `Build` 前写入测试 Host 的 application property。 |
+| Purpose | 在 `Build` 前写入 TestHost 专用测试属性；该数据不进入 `IApplicationContext`。 |
 | Parameters | `key` 不能为空或空白；`value` 可以为 null。 |
 | Return | 当前 `TestHostBuilder`。 |
 | Nullability | `key` 不接受 null；`value` 接受 null。 |
@@ -360,7 +362,7 @@
 | Field | Contract |
 | --- | --- |
 | Feature | AUC-TESTING-001 |
-| Purpose | 冻结 builder，创建 `ApplicationContext`、临时目录、共享 diagnostics、fake dispatcher 和 deterministic scheduler。 |
+| Purpose | 冻结 builder，创建不可变 `IApplicationContext` 测试实现、只读 TestHost properties、临时目录、共享 diagnostics、fake dispatcher 和 deterministic scheduler。 |
 | Parameters | 无。 |
 | Return | 新的 `TestHost`。 |
 | Nullability | 返回值不能为空。 |
@@ -564,7 +566,7 @@
 | Field | Contract |
 | --- | --- |
 | Feature | AUC-TESTING-004 |
-| Purpose | 透传测试 Host property 到内部 `TestHostBuilder`。 |
+| Purpose | 透传测试属性到内部 `TestHostBuilder`，最终由 `TestHost.Properties` 只读暴露。 |
 | Parameters | `key` 不能为空或空白；`value` 可以为 null。 |
 | Return | 当前 `ModuleTestHostBuilder`。 |
 | Nullability | `key` 不接受 null；`value` 接受 null。 |
@@ -572,7 +574,7 @@
 | Exceptions or Result | 参数非法由内部 `TestHostBuilder` 抛出；Build 后调用抛 `InvalidOperationException`。 |
 | Idempotency | 同一 key 重复设置时，最后一次 Build 前设置生效。 |
 | Concurrency | 配置阶段不保证线程安全。 |
-| Side Effects | 修改内部 host builder pending properties。 |
+| Side Effects | 修改内部 host builder pending test properties，不修改 `IApplicationContext`。 |
 | Diagnostics | Build 前不写诊断。 |
 | Tests | `ModuleTestHostTests`。 |
 

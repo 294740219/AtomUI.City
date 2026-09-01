@@ -9,7 +9,7 @@ public sealed class ModuleBaseTests
     [Fact]
     public async Task AsyncLifecycleMethodsCallSynchronousConvenienceMethodsInOrder()
     {
-        var applicationContext = new ApplicationContext();
+        var applicationContext = ApplicationHostTestBuilder.CreateContext();
         var services = new ServiceCollection();
         var serviceProvider = services.BuildServiceProvider();
         var calls = new List<string>();
@@ -41,7 +41,7 @@ public sealed class ModuleBaseTests
     [Fact]
     public async Task DefaultLifecycleMethodsComplete()
     {
-        var applicationContext = new ApplicationContext();
+        var applicationContext = ApplicationHostTestBuilder.CreateContext();
         var services = new ServiceCollection();
         using var serviceProvider = services.BuildServiceProvider();
         var module = new EmptyModule();
@@ -74,7 +74,7 @@ public sealed class ModuleBaseTests
     [Fact]
     public async Task AsyncLifecycleMethodsObserveCancellationBeforeSynchronousConvenienceMethod()
     {
-        var applicationContext = new ApplicationContext();
+        var applicationContext = ApplicationHostTestBuilder.CreateContext();
         var services = new ServiceCollection();
         using var serviceProvider = services.BuildServiceProvider();
         using var cancellation = new CancellationTokenSource();

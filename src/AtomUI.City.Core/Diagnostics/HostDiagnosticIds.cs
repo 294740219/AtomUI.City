@@ -12,4 +12,5 @@ public static class HostDiagnosticIds
     public const string ModuleGraphFailed = "AUCHOST105";
     public const string ModuleLifecycleFailed = "AUCHOST106";
     public const string DispatcherUnavailable = "AUCHOST107";
+    public const string LifecycleMiddlewareFailed = "AUCHOST108";
 }

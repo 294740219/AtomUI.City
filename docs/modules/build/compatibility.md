@@ -21,6 +21,10 @@
 - `AtomUI.City.Build.props` 必须把 `IsTestProject` 暴露给 Analyzer，确保 `AUCANL0001` 不影响测试项目的独立 DI 装配。
 - `AUCANL0001` 的 Root Provider 所有权约束覆盖 Microsoft Generic Host 构建/启动入口；生产 City 项目必须通过 City `ApplicationHost` 构建应用 Host。
 
+## 1.0 Preview 动态发现属性撤回
+
+MSBuild 属性 `AtomUICityAllowDynamicDiscovery` 被移除。该属性此前未连接 generator、Analyzer 或 runtime，设置任何值都不会改变构建结果；运行时动态发现未来必须作为独立 Feature 完整交付后才能重新公开。
+
 ## 数据格式兼容
 
 - manifest、snapshot、generated output、CLI JSON、template variables 和 MSBuild properties 必须有版本或稳定字段说明。

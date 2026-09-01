@@ -7,20 +7,24 @@ public sealed class TestHost : IDisposable, IAsyncDisposable
     private bool _disposed;
 
     internal TestHost(
-        ApplicationContext applicationContext,
+        IApplicationContext applicationContext,
+        IReadOnlyDictionary<string, object?> properties,
         TestDirectory directory,
         FakeUiDispatcher dispatcher,
         DeterministicScheduler scheduler,
         TestDiagnostics diagnostics)
     {
         ApplicationContext = applicationContext;
+        Properties = properties;
         Directory = directory;
         Dispatcher = dispatcher;
         Scheduler = scheduler;
         Diagnostics = diagnostics;
     }
 
-    public ApplicationContext ApplicationContext { get; }
+    public IApplicationContext ApplicationContext { get; }
+
+    public IReadOnlyDictionary<string, object?> Properties { get; }
 
     public TestDirectory Directory { get; }
 

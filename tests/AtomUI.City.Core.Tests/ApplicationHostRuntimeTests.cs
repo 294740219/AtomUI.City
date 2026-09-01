@@ -10,7 +10,7 @@ public sealed class ApplicationHostRuntimeTests
     [Fact]
     public async Task StartAndStopAsyncAreIdempotentForHostedServices()
     {
-        var builder = ApplicationHost.CreateBuilder();
+        var builder = ApplicationHostTestBuilder.Create();
 
         builder.ConfigureServices(services =>
         {
@@ -31,20 +31,20 @@ public sealed class ApplicationHostRuntimeTests
     }
 
     [Fact]
-    public async Task ApplicationContextIsAvailableFromRuntimeServices()
+    public async Task ApplicationContextIsRegisteredOnlyByItsInterface()
     {
-        var builder = ApplicationHost.CreateBuilder();
+        var builder = ApplicationHostTestBuilder.Create();
 
         await using var host = builder.Build();
 
         Assert.Same(host.Context, host.Services.GetRequiredService<IApplicationContext>());
-        Assert.Same(host.Context, host.Services.GetRequiredService<ApplicationContext>());
+        Assert.Null(host.Services.GetService<ApplicationContext>());
     }
 
     [Fact]
     public async Task StartAfterStopIsRejectedAndDisposeStillSucceeds()
     {
-        var host = ApplicationHost.CreateBuilder().Build();
+        var host = ApplicationHostTestBuilder.Create().Build();
 
         await host.StartAsync();
         await host.StopAsync();
@@ -56,7 +56,7 @@ public sealed class ApplicationHostRuntimeTests
     [Fact]
     public async Task StopBeforeStartPermanentlyClosesTheHost()
     {
-        var host = ApplicationHost.CreateBuilder().Build();
+        var host = ApplicationHostTestBuilder.Create().Build();
 
         await host.StopAsync();
 
@@ -65,9 +65,24 @@ public sealed class ApplicationHostRuntimeTests
     }
 
     [Fact]
+    public async Task ApplicationContextRemainsReadableAfterHostDisposal()
+    {
+        var host = ApplicationHostTestBuilder.Create().Build();
+        var context = host.Context;
+        var applicationInstanceId = context.ApplicationInstanceId;
+
+        await host.DisposeAsync();
+
+        Assert.Equal(ApplicationHostTestBuilder.ApplicationId, context.ApplicationId);
+        Assert.Equal(applicationInstanceId, context.ApplicationInstanceId);
+        Assert.False(string.IsNullOrWhiteSpace(context.ApplicationVersion));
+        Assert.True(Path.IsPathFullyQualified(context.AppDataPath));
+    }
+
+    [Fact]
     public async Task StartupFailureIsRecordedAndHostCanBeDisposed()
     {
-        var builder = ApplicationHost.CreateBuilder();
+        var builder = ApplicationHostTestBuilder.Create();
 
         builder.ConfigureServices(services =>
         {
@@ -79,9 +94,13 @@ public sealed class ApplicationHostRuntimeTests
         await Assert.ThrowsAsync<InvalidOperationException>(() => host.StartAsync());
 
         var diagnostics = host.Services.GetRequiredService<IHostDiagnostics>();
-        Assert.Contains(diagnostics.Records, record =>
-            record.Code == HostDiagnosticIds.HostStartFailed &&
-            record.Context["exceptionType"] == typeof(InvalidOperationException).FullName);
+        var failure = Assert.Single(diagnostics.Records, record =>
+            record.Code == HostDiagnosticIds.HostStartFailed);
+        Assert.Equal(typeof(InvalidOperationException).FullName, failure.Context["exceptionType"]);
+        Assert.Equal("start", failure.Context["operation"]);
+        Assert.Matches("^[0-9a-f]{32}$", failure.Context["operationId"]!);
+        Assert.DoesNotContain(diagnostics.Records, record =>
+            record.Code == HostDiagnosticIds.LifecycleMiddlewareFailed);
 
         await host.StopAsync();
         await host.DisposeAsync();

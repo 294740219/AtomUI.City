@@ -19,11 +19,18 @@ public sealed class LifecycleContext
     public LifecycleContext(
         LifecycleStage stage,
         IServiceProvider? services = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? operationId = null)
     {
+        if (operationId is not null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(operationId, nameof(operationId));
+        }
+
         Stage = stage;
         Services = services ?? NullServiceProvider.Instance;
         CancellationToken = cancellationToken;
+        OperationId = operationId ?? Guid.NewGuid().ToString("N");
     }
 
     public LifecycleStage Stage { get; }
@@ -31,6 +38,8 @@ public sealed class LifecycleContext
     public IServiceProvider Services { get; }
 
     public CancellationToken CancellationToken { get; }
+
+    public string OperationId { get; }
 
     public IDictionary<object, object?> Items { get; } = new Dictionary<object, object?>();
 

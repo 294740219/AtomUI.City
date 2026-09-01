@@ -5,7 +5,7 @@ namespace AtomUI.City.Core.Modularity;
 public sealed class ApplicationInitializationContext
 {
     public ApplicationInitializationContext(
-        ApplicationContext applicationContext,
+        IApplicationContext applicationContext,
         IServiceProvider services)
     {
         ArgumentNullException.ThrowIfNull(applicationContext);
@@ -15,7 +15,7 @@ public sealed class ApplicationInitializationContext
         Services = services;
     }
 
-    public ApplicationContext ApplicationContext { get; }
+    public IApplicationContext ApplicationContext { get; }
 
     public IServiceProvider Services { get; }
 }

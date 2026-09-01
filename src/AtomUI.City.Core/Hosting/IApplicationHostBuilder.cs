@@ -7,8 +7,6 @@ public interface IApplicationHostBuilder
 {
     IConfigurationManager Configuration { get; }
 
-    IDictionary<string, object?> Properties { get; }
-
     IApplicationHostBuilder ConfigureServices(Action<IServiceCollection> configureServices);
 
     IApplicationHostBuilder ConfigureHost(Action<ApplicationHostOptions> configureOptions);

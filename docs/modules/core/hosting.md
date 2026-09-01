@@ -42,6 +42,7 @@
 | AUC-CORE-004 | Module Contract | ModuleAttributeTests; ModuleBaseTests; ModuleDescriptorTests |
 | AUC-CORE-005 | DI Registration Markers | ServiceRegistrationAttributeTests |
 | AUC-CORE-006 | Host Diagnostics | HostDiagnosticsTests |
+| AUC-CORE-008 | Generated Module Catalog | GeneratedModuleCatalogTests; AtomUICityIncrementalGeneratorModularityTests; CoreHeadlessProcessTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -59,6 +60,8 @@
 ```text
 Build
 -> validate ApplicationHostOptions
+-> create immutable IApplicationContext descriptor
+-> load generated Module Catalog and resolve startup roots
 -> build module graph and configure module services
 -> apply deferred user ConfigureServices callbacks
 -> build GenericHost
@@ -86,9 +89,9 @@ StopAsync
 
 Core 在 Windows 默认禁用 GenericHost 的 EventLog provider 输出，避免普通桌面或 CLI 进程因系统事件日志权限覆盖原始启动异常；Console、Debug、EventSource 和应用显式配置的 provider 不受影响。
 
-## 既有细化设计内容
+## 路线图设计内容
 
-以下内容保留上一轮设计中的专题细节。后续修改必须与本页上方合同、Feature ID、API 行为、诊断和测试矩阵保持一致。
+以下内容保留长期设计方向，但不自动构成当前 Core 合同。只有已经分配 Feature ID、登记到 `api-contracts.md` 并由 `testing.md` 验证的行为才属于已实现能力。自定义 `IApplicationLifetime`、通用 Contribution/ContributionLease、Core ErrorPolicy 和插件独立 ServiceProvider 编排当前均为 deferred；其中的“必须”只描述未来能力成立后的目标约束。
 
 ## AtomUI.City.Core Hosting 设计
 
@@ -98,7 +101,7 @@ Core 在 Windows 默认禁用 GenericHost 的 EventLog provider 输出，避免�
 
 Hosting 是 AtomUI.City 应用运行时的入口。
 
-它负责把 .NET GenericHost、Configuration、DependencyInjection、Logging、Options、ModuleSystem、Lifecycle、ContributionRegistry、PluginSystem、Presentation bridge 和 Diagnostics 串起来，形成 AtomUI.City 自己的应用框架启动模型。
+当前 Hosting 把 .NET GenericHost、Configuration、DependencyInjection、Logging、Options、ModuleSystem、Lifecycle 和 Diagnostics 串成应用启动模型。Contribution registry、PluginSystem 和 Presentation bridge 通过 Core Host contract 接入，但其领域对象和运行时编排不归 Core 所有。
 
 Hosting 的目标：
 
@@ -151,17 +154,15 @@ ApplicationHost
 -> IOptions
 ```
 
-GenericHost 负责成熟的 .NET 基础设施；AtomUI.City Host 负责自己的框架语义：
+GenericHost 负责成熟的 .NET 基础设施；当前 AtomUI.City Core Host 负责：
 
 - Application。
 - Module。
-- Plugin。
-- Contribution。
-- ContributionLease。
 - LifecycleScope。
-- ServiceScope。
+- Application ServiceScope。
 - Lifecycle middleware。
-- Desktop lifetime。
+
+Plugin、Contribution/Lease 和 Desktop lifetime 是其他模块通过 Host contract 接入的领域语义，不是当前 Core Host 自身持有的公共模型。
 
 允许提供 GenericHost 桥接入口，但不能绕开 AtomUI.City 的模块和生命周期约束。
 
@@ -176,13 +177,9 @@ GenericHost 负责成熟的 .NET 基础设施；AtomUI.City Host 负责自己的
 | `ApplicationHost` | 应用 Host 静态入口和默认实现。 |
 | `ApplicationHostBuilder` | 应用构建器，包装 GenericHost builder 和框架构建上下文。 |
 | `ApplicationHostOptions` | Host 级配置，例如环境、关闭超时、启动模块、动态能力策略。 |
-| `ApplicationContext` | 当前应用上下文。 |
-| `ApplicationLifetime` | 应用 lifetime 抽象。 |
 | `IApplicationHost` | Host 运行时接口。 |
 | `IApplicationHostBuilder` | Host 构建期接口。 |
-| `IApplicationContext` | 应用上下文接口。 |
-| `IApplicationLifetime` | 桌面应用 lifetime 抽象。 |
-| `IApplicationService` | Host 管理的应用服务或启动服务抽象。 |
+| `IApplicationContext` | 应用实例描述符接口，也是唯一公开 Context 合同。 |
 
 避免：
 
@@ -230,6 +227,8 @@ var builder = ApplicationHost.CreateBuilder(args);
 
 Builder 不公开可立即修改的 `IServiceCollection`。应用和扩展方法必须通过 `ConfigureServices(Action<IServiceCollection>)` 登记最终服务配置；模块只能通过 `ServiceConfigurationContext.Services` 在自己的三个服务阶段内注册。
 
+Builder 的 `Configuration` 只用于 Build 前组合配置源、读取构建期配置和配置 reload provider。运行时业务服务必须通过 DI 获取 `IConfiguration`、`IOptions<T>` 或 `IOptionsMonitor<T>`。Builder 不得注册到运行时 DI，也不得由业务服务长期持有；为该边界增加 Analyzer 属于后续 deferred item，不进入当前 Core 合同。
+
 #### IApplicationHost
 
 运行期对象。
@@ -248,30 +247,47 @@ ILifecycleScope ApplicationScope { get; }
 
 #### ApplicationContext
 
-建议包含：
+`IApplicationContext` 是 Host 在 Build 阶段一次性创建的应用实例描述符：
 
-- ApplicationName。
-- EnvironmentName。
-- ContentRootPath。
-- AppDataPath。
-- StartupArguments。
-- Configuration。
-- Services。
-- Host state。
-- Diagnostics context。
+```csharp
+public interface IApplicationContext
+{
+    string ApplicationId { get; }
+    Guid ApplicationInstanceId { get; }
+    string ApplicationName { get; }
+    string ApplicationVersion { get; }
+    string EnvironmentName { get; }
+    string ContentRootPath { get; }
+    string AppDataPath { get; }
+    IReadOnlyList<string> StartupArguments { get; }
+}
+```
 
-#### IApplicationLifetime
+合同：
 
-Core 定义抽象，Presentation 适配 Avalonia。
+- 所有字段在 Build 返回前完成计算，之后不可修改。
+- `ApplicationId` 是稳定、非本地化的产品标识，必须显式配置。
+- `ApplicationInstanceId` 每次 Build 唯一，用于区分同一产品的并发运行实例。
+- `ApplicationName` 是稳定、非本地化的可读名称，同时作为当前默认应用数据目录名；必须是单个有效目录段。
+- `ApplicationVersion` 优先使用显式配置，其次使用入口程序集 informational version，再回退 assembly version。
+- `ContentRootPath` 和 `AppDataPath` 必须是规范化绝对路径。当前 `AppDataPath` 为 `LocalApplicationData/ApplicationName`，Context 不负责创建目录。
+- `StartupArguments` 是调用方参数的只读防御性副本；默认诊断不得记录原始参数值。
+- Context 作为 `IApplicationContext` Singleton 注册；具体实现不是 public API。
+- Host Dispose 后仍允许读取 Context。
 
-职责：
+Context 不持有 `IConfiguration`、`IServiceProvider`、DI Scope、LifecycleScope、diagnostics、Host state 或任意 `Properties` 动态属性袋。这些运行时能力必须由 `IApplicationHost` 或专门的 DI 服务提供。
 
-- 通知 Host UI runtime 已准备。
-- 通知 Host 应用停止。
-- 支持桌面应用挂起/恢复。
-- 提供 shutdown cancellation。
+#### 跨平台应用目录（Deferred）
 
-Core 不引用 Avalonia lifetime 类型。
+当前只提供兼容字段 `AppDataPath`，默认使用 .NET `Environment.SpecialFolder.LocalApplicationData` 与 `ApplicationName` 拼接。本轮不增加 Roaming 路径，也不在 Context 构建时创建目录。
+
+生产级跨平台路径模型留作后续专题：按 data、config、cache、logs 等用途提供语义化路径服务，分别研究 Windows Local/Roaming、Linux XDG Base Directory 和 macOS Library 目录约定，同时明确目录创建、权限、迁移和兼容策略。该专题尚未冻结公开类型名称。
+
+#### 桌面 Application Lifetime 边界
+
+当前 Core 不定义 `IApplicationLifetime`。`IApplicationHost.RunAsync` 使用 Microsoft `IHostApplicationLifetime.ApplicationStopping` 等待 Generic Host 停止信号；Presentation 通过 City Host 的 Start/Stop 和该标准 lifetime 协调 Avalonia，不向 Core 引入 Avalonia 类型。
+
+如果未来需要统一 UI ready、挂起和恢复语义，必须先分配独立 Feature ID，并补齐 Core contract、Presentation adapter、取消语义和 Headless 测试，不能把候选名称 `IApplicationLifetime` 当作现有 API。
 
 ### 6. 扩展方法 DSL
 
@@ -295,7 +311,11 @@ var builder = ApplicationHost.CreateBuilder(args);
 
 builder
     .UseModule<AppModule>()
-    .ConfigureHost(options => { })
+    .ConfigureHost(options =>
+    {
+        options.ApplicationId = "Company.Product";
+        options.ApplicationName = "Product";
+    })
     .ConfigureLifecycle(lifecycle => { })
     .ConfigureServices(services => { });
 
@@ -349,9 +369,11 @@ Module 可以贡献：
 
 Plugin 可以携带自己的 Modules，这些插件模块也通过 Contribution 向 Host 贡献能力。
 
-### 8. Contribution 与 ContributionLease
+### 8. Contribution 与 ContributionLease（Deferred）
 
-所有可撤销能力都通过 Contribution 进入 Host。
+当前 Core 只调度 `ConfigureContributions` 模块钩子；`ContributionConfigurationContext` 仅提供应用描述和 Application ServiceScope provider，不提供通用 registry、request 或 lease API。Routing、Presentation、Localization 等模块拥有各自领域 registry/lease，PluginSystem 负责插件卸载时的跨领域编排。
+
+以下模型是未来统一贡献合同的候选设计，不属于 `AUC-CORE-001` 到 `AUC-CORE-008`：
 
 ```text
 Module or Plugin Module
@@ -369,7 +391,7 @@ RouteContribution("/sales")
   Lease = RouteContributionLease("/sales")
 ```
 
-Host 必须持有 ContributionLease，用于停用、卸载、关闭和诊断。
+如果未来由 Core 定义通用 ContributionLease，Host 才负责持有它并用于停用、卸载、关闭和诊断。
 
 ContributionLease 需要支持：
 
@@ -438,9 +460,12 @@ ApplicationHost.CreateBuilder(args)
 -> create GenericHost builder
 -> load configuration
 -> configure logging
+-> validate application identity, version and paths
+-> create immutable IApplicationContext descriptor
 -> register Core infrastructure
 -> collect startup modules
--> load generated module manifest
+-> load generated registrar from GeneratedModuleManifestAttribute
+-> build ModuleCatalog
 -> build module graph
 -> run module PreConfigureServices
 -> run module ConfigureServices
@@ -457,8 +482,7 @@ ApplicationHost.CreateBuilder(args)
 - 用户 `ConfigureServices` 在所有 Static Module 服务阶段成功后执行，并拥有 Root DI 的最终应用级配置权。
 - 模块服务阶段失败时不执行用户 `ConfigureServices`，避免产生部分应用配置副作用。
 - Build 后不允许普通 Module 或 Plugin 修改 Root ServiceProvider。
-- Plugin 服务必须进入自己的 ServiceScope。
-- Runtime 动态能力必须走 ContributionRegistry，而不是改 Root DI。
+- 插件独立 ServiceProvider、ServiceScope 和动态贡献 registry 由 PluginSystem 与能力模块定义，不属于当前 Core Host 实现。
 
 ### 11. Host 启动流程
 
@@ -543,7 +567,7 @@ Hosting 不负责解释：
 - EventBus handler。
 - Data client。
 
-这些贡献应由模块系统转换成 ContributionLease，并进入对应 registry。
+当前由各能力模块解释自己的贡献并决定是否返回领域 lease；Core 不把它们转换为通用 ContributionLease。统一转换和跨领域撤销属于后续独立 Feature。
 
 ### 14. Configuration 集成
 
@@ -601,7 +625,7 @@ builder.UseAtomUIPresentation(...);
 Presentation 扩展负责：
 
 - 注册 Avalonia/AtomUI 集成服务。
-- 适配 Avalonia lifetime 到 `IApplicationLifetime`。
+- 通过 City Host Start/Stop 与 Microsoft `IHostApplicationLifetime` 协调 Avalonia lifetime。
 - 提供 UI Dispatcher 实现。
 - 创建 PresentationScope。
 - 创建 WindowScope。
@@ -609,19 +633,18 @@ Presentation 扩展负责：
 - 提供 initial route 启动桥接。
 - 提供 View/ViewModel activation 接入。
 
-Hosting 只等待 `IApplicationLifetime` 信号，不直接操作 Avalonia 类型。
+Hosting 的 `RunAsync` 只等待 Microsoft `IHostApplicationLifetime.ApplicationStopping`，不直接操作 Avalonia 类型。
 
 ### 17. PluginSystem 集成边界
 
 Host 是插件运行的协调者，但插件加载细节属于 PluginSystem。
 
-Host 提供：
+Core Host 当前提供：
 
 - Host contract。
-- Contribution registry。
 - Lifecycle pipeline。
 - Diagnostics。
-- Stop/unload 调度。
+- Root ServiceProvider 冻结和应用停止边界。
 
 PluginSystem 负责：
 
@@ -629,9 +652,10 @@ PluginSystem 负责：
 - 元数据验证。
 - 依赖解析。
 - `AssemblyLoadContext`。
-- Plugin ServiceScope。
+- Plugin ServiceProvider / ServiceScope。
 - 插件模块图。
-- ContributionRequest。
+- 各领域 ContributionRequest/Lease 的协调与撤销。
+- Stop/unload 调度。
 - Unload diagnostics。
 
 Plugin 不能：
@@ -649,9 +673,9 @@ Hosting 必须 AOT-first。
 
 ```text
 Explicit registration
-Generated manifest
+GeneratedModuleManifestAttribute
 Generated registrar
-Strongly typed descriptor
+ModuleCatalog and strongly typed descriptor
 ```
 
 不默认：
@@ -675,18 +699,7 @@ builder.UseModule<AppModule>();
 builder.ScanAllAssemblies();
 ```
 
-如果提供动态发现：
-
-```csharp
-builder.EnableDynamicDiscovery();
-```
-
-必须满足：
-
-- Opt-in。
-- Analyzer warning。
-- AOT/trimming 诊断。
-- Strict mode 下可报错。
+Generated Module Catalog 不属于动态发现。当前冻结合同不提供 `EnableDynamicDiscovery()` 或 `ApplicationHostOptions.AllowDynamicDiscovery`；运行时扫描必须在独立 Feature 中完成 opt-in、Analyzer warning、AOT/trimming 诊断和 Strict mode 拒绝策略后才能公开。
 
 ### 19. 错误策略
 
@@ -709,16 +722,15 @@ builder.EnableDynamicDiscovery();
 
 Hosting 必须记录：
 
-- 应用名、环境、启动参数。
+- 应用 id、实例 id、应用名、版本和环境。
+- 启动参数是否存在或参数数量；默认不得记录原始参数值。
 - 配置来源。
 - 启动模块列表。
-- 生成 manifest 使用情况。
-- 动态发现是否启用。
+- generated registrar/catalog 使用情况。
 - 模块图。
 - GenericHost build 耗时。
 - HostScope / ApplicationScope / PresentationScope 创建释放。
-- ContributionLease 创建和撤销。
-- 插件停用/卸载状态。
+- 通用 ContributionLease 创建和撤销、插件停用/卸载状态属于对应 deferred Feature 或 PluginSystem 的诊断责任，不计入当前 Core Host 诊断合同。
 - Lifecycle middleware 执行顺序。
 - Startup / Stop 各阶段耗时。
 - Fatal / non-fatal 错误。
@@ -733,22 +745,23 @@ Testing 包后续要支持：
 - 注入测试模块。
 - 手动 Start/Stop。
 - 断言模块顺序。
-- 断言 ContributionLease 创建和撤销。
 - 断言 Scope 创建和释放顺序。
-- 断言插件 Contribution 对应 RouteScope 可反查。
-- 断言 dynamic discovery 在 strict AOT 模式下被拒绝或 warning。
+- 断言 generated module registrar 不扫描模块类型，动态发现公开 API 不得以 no-op 形式存在。
 - 断言 Stop 幂等。
 - 断言 Dispose 错误汇总。
+
+通用 ContributionLease 和插件 Contribution/Scope 反查测试必须在对应 Feature 分配并实现后加入，当前不作为 Core `Verified` 证据。
 
 ### 22. 开发者约束
 
 应用开发者应遵守：
 
 - 通过 `ApplicationHost.CreateBuilder(args)` 创建应用。
-- 通过 `UseModule<TModule>()` 显式注册启动模块。
+- 通过 `[ApplicationModule]` 声明 generated default root，或通过 `UseModule<TModule>()` 增加显式启动根。
 - 不直接绕过 AtomUI.City Host 修改运行时流程。
 - 不在扩展方法中执行真实运行时逻辑。
 - 不依赖默认程序集扫描。
 - 不在模块构造函数中启动任务或订阅事件。
 - 不在 Build 后修改 Root ServiceProvider。
+- 不把 Builder 注入运行时 DI，也不在业务服务中持有 Builder。
 - Presentation、Plugin、Routing 等能力通过对应扩展点接入。

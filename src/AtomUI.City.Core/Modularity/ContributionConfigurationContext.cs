@@ -5,7 +5,7 @@ namespace AtomUI.City.Core.Modularity;
 public sealed class ContributionConfigurationContext
 {
     public ContributionConfigurationContext(
-        ApplicationContext applicationContext,
+        IApplicationContext applicationContext,
         IServiceProvider services)
     {
         ArgumentNullException.ThrowIfNull(applicationContext);
@@ -15,7 +15,7 @@ public sealed class ContributionConfigurationContext
         Services = services;
     }
 
-    public ApplicationContext ApplicationContext { get; }
+    public IApplicationContext ApplicationContext { get; }
 
     public IServiceProvider Services { get; }
 }

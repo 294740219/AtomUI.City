@@ -8,14 +8,14 @@ public sealed class ServiceConfigurationContext
     private readonly PreConfigureActionStore _preConfigureActions;
 
     public ServiceConfigurationContext(
-        ApplicationContext applicationContext,
+        IApplicationContext applicationContext,
         IServiceCollection services)
         : this(applicationContext, services, new PreConfigureActionStore())
     {
     }
 
     internal ServiceConfigurationContext(
-        ApplicationContext applicationContext,
+        IApplicationContext applicationContext,
         IServiceCollection services,
         PreConfigureActionStore preConfigureActions)
     {
@@ -28,7 +28,7 @@ public sealed class ServiceConfigurationContext
         _preConfigureActions = preConfigureActions;
     }
 
-    public ApplicationContext ApplicationContext { get; }
+    public IApplicationContext ApplicationContext { get; }
 
     public ModuleServiceCollection Services { get; }
 

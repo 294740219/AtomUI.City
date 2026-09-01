@@ -26,7 +26,7 @@ internal sealed class DefaultApplicationHost : IApplicationHost
 
     public DefaultApplicationHost(
         IHost genericHost,
-        ApplicationContext context,
+        IApplicationContext context,
         IHostDiagnostics diagnostics,
         LifecycleScope hostScope,
         IModuleRegistry moduleRegistry,
@@ -270,12 +270,15 @@ internal sealed class DefaultApplicationHost : IApplicationHost
 
     private async Task StartCoreAsync(CancellationToken cancellationToken)
     {
+        var operationId = CreateOperationId();
+
         try
         {
             await ExecuteRequiredStageAsync(
                 LifecycleStages.ApplicationStart,
                 StartTransactionAsync,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken,
+                operationId).ConfigureAwait(false);
 
             lock (_stateSync)
             {
@@ -288,11 +291,14 @@ internal sealed class DefaultApplicationHost : IApplicationHost
             WriteDiagnostic(new HostDiagnosticRecord(
                 HostDiagnosticIds.HostStarted,
                 "Application host has started.",
-                HostDiagnosticSeverity.Info));
+                HostDiagnosticSeverity.Info)
+            {
+                Context = CreateOperationContext("start", operationId),
+            });
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            await RollbackStartupAsync().ConfigureAwait(false);
+            await RollbackStartupAsync(operationId).ConfigureAwait(false);
             TransitionStartupFailure();
             throw;
         }
@@ -303,10 +309,10 @@ internal sealed class DefaultApplicationHost : IApplicationHost
                 "Application host failed to start.",
                 HostDiagnosticSeverity.Error)
             {
-                Context = CreateExceptionContext(exception),
+                Context = CreateExceptionContext(exception, "start", operationId),
             });
 
-            await RollbackStartupAsync().ConfigureAwait(false);
+            await RollbackStartupAsync(operationId).ConfigureAwait(false);
             TransitionStartupFailure();
             throw;
         }
@@ -322,7 +328,7 @@ internal sealed class DefaultApplicationHost : IApplicationHost
         var applicationServices = _applicationServiceScope.ServiceProvider;
 
         await _moduleRegistry.ConfigureContributionsAsync(
-            (ApplicationContext)Context,
+            Context,
             applicationServices,
             context.CancellationToken).ConfigureAwait(false);
 
@@ -331,16 +337,18 @@ internal sealed class DefaultApplicationHost : IApplicationHost
             async stageContext =>
             {
                 await _moduleRegistry.InitializeAsync(
-                    (ApplicationContext)Context,
+                    Context,
                     applicationServices,
                     stageContext.CancellationToken).ConfigureAwait(false);
             },
-            context.CancellationToken).ConfigureAwait(false);
+            context.CancellationToken,
+            context.OperationId).ConfigureAwait(false);
 
         await ExecuteRequiredStageAsync(
             LifecycleStages.ModuleStart,
             static _ => ValueTask.CompletedTask,
-            context.CancellationToken).ConfigureAwait(false);
+            context.CancellationToken,
+            context.OperationId).ConfigureAwait(false);
     }
 
     private async Task StopAfterStartAsync(
@@ -386,12 +394,17 @@ internal sealed class DefaultApplicationHost : IApplicationHost
 
     private async Task StopCoreAsync()
     {
+        var operationId = CreateOperationId();
         var failures = new List<Exception>();
 
         if (!_cleanupCompleted)
         {
             using var timeout = new CancellationTokenSource(_options.ShutdownTimeout);
-            await StopTransactionAsync(timeout.Token, failures, isRollback: false).ConfigureAwait(false);
+            await StopTransactionAsync(
+                timeout.Token,
+                failures,
+                isRollback: false,
+                operationId: operationId).ConfigureAwait(false);
 
             if (timeout.IsCancellationRequested &&
                 !failures.Any(failure => failure is TimeoutException))
@@ -409,7 +422,10 @@ internal sealed class DefaultApplicationHost : IApplicationHost
         WriteDiagnostic(new HostDiagnosticRecord(
             HostDiagnosticIds.HostStopped,
             "Application host has stopped.",
-            HostDiagnosticSeverity.Info));
+            HostDiagnosticSeverity.Info)
+        {
+            Context = CreateOperationContext("stop", operationId),
+        });
 
         if (failures.Count > 0)
         {
@@ -427,6 +443,8 @@ internal sealed class DefaultApplicationHost : IApplicationHost
                     ["failureCount"] = aggregate.InnerExceptions.Count.ToString(
                         System.Globalization.CultureInfo.InvariantCulture),
                     ["exceptionType"] = aggregate.GetType().FullName,
+                    ["operation"] = "stop",
+                    ["operationId"] = operationId,
                 },
             });
 
@@ -434,7 +452,7 @@ internal sealed class DefaultApplicationHost : IApplicationHost
         }
     }
 
-    private async Task RollbackStartupAsync()
+    private async Task RollbackStartupAsync(string operationId)
     {
         if (_cleanupCompleted)
         {
@@ -443,7 +461,11 @@ internal sealed class DefaultApplicationHost : IApplicationHost
 
         var failures = new List<Exception>();
         using var timeout = new CancellationTokenSource(_options.ShutdownTimeout);
-        await StopTransactionAsync(timeout.Token, failures, isRollback: true).ConfigureAwait(false);
+        await StopTransactionAsync(
+            timeout.Token,
+            failures,
+            isRollback: true,
+            operationId: operationId).ConfigureAwait(false);
 
         foreach (var failure in failures)
         {
@@ -452,7 +474,7 @@ internal sealed class DefaultApplicationHost : IApplicationHost
                 "Application host startup rollback failed.",
                 HostDiagnosticSeverity.Error)
             {
-                Context = CreateExceptionContext(failure, "startupRollback"),
+                Context = CreateExceptionContext(failure, "startupRollback", operationId),
             });
         }
     }
@@ -460,12 +482,14 @@ internal sealed class DefaultApplicationHost : IApplicationHost
     private async Task StopTransactionAsync(
         CancellationToken cancellationToken,
         ICollection<Exception> failures,
-        bool isRollback)
+        bool isRollback,
+        string operationId)
     {
         var context = new LifecycleContext(
             LifecycleStages.ApplicationStop,
             _applicationServiceScope?.ServiceProvider ?? Services,
-            cancellationToken);
+            cancellationToken,
+            operationId);
 
         try
         {
@@ -473,9 +497,13 @@ internal sealed class DefaultApplicationHost : IApplicationHost
                 context,
                 async _ =>
                 {
-                    await ExecuteStopTerminalAsync(cancellationToken, failures).ConfigureAwait(false);
+                    await ExecuteStopTerminalAsync(
+                        cancellationToken,
+                        failures,
+                        operationId).ConfigureAwait(false);
                 },
-                guaranteeTerminal: true).ConfigureAwait(false);
+                guaranteeTerminal: true,
+                diagnostics: _diagnostics).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -496,7 +524,8 @@ internal sealed class DefaultApplicationHost : IApplicationHost
 
     private async Task ExecuteStopTerminalAsync(
         CancellationToken cancellationToken,
-        ICollection<Exception> failures)
+        ICollection<Exception> failures,
+        string operationId)
     {
         try
         {
@@ -510,7 +539,8 @@ internal sealed class DefaultApplicationHost : IApplicationHost
         var moduleStopContext = new LifecycleContext(
             LifecycleStages.ModuleStop,
             _applicationServiceScope?.ServiceProvider ?? Services,
-            cancellationToken);
+            cancellationToken,
+            operationId);
 
         try
         {
@@ -519,11 +549,12 @@ internal sealed class DefaultApplicationHost : IApplicationHost
                 async _ =>
                 {
                     await _moduleRegistry.ShutdownAsync(
-                        (ApplicationContext)Context,
+                        Context,
                         _applicationServiceScope?.ServiceProvider ?? Services,
                         cancellationToken).ConfigureAwait(false);
                 },
-                guaranteeTerminal: true).ConfigureAwait(false);
+                guaranteeTerminal: true,
+                diagnostics: _diagnostics).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -587,13 +618,15 @@ internal sealed class DefaultApplicationHost : IApplicationHost
     private async ValueTask ExecuteRequiredStageAsync(
         LifecycleStage stage,
         Func<LifecycleContext, ValueTask> terminal,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string operationId)
     {
         var terminalInvoked = false;
         var context = new LifecycleContext(
             stage,
             _applicationServiceScope?.ServiceProvider ?? Services,
-            cancellationToken);
+            cancellationToken,
+            operationId);
 
         await _lifecyclePipeline.ExecuteAsync(
             context,
@@ -602,7 +635,8 @@ internal sealed class DefaultApplicationHost : IApplicationHost
                 terminalInvoked = true;
                 await terminal(stageContext).ConfigureAwait(false);
             },
-            guaranteeTerminal: false).ConfigureAwait(false);
+            guaranteeTerminal: false,
+            diagnostics: _diagnostics).ConfigureAwait(false);
 
         if (!terminalInvoked)
         {
@@ -725,13 +759,31 @@ internal sealed class DefaultApplicationHost : IApplicationHost
 
     private static IReadOnlyDictionary<string, string?> CreateExceptionContext(
         Exception exception,
-        string? operation = null)
+        string operation,
+        string operationId)
     {
         return new Dictionary<string, string?>
         {
             ["exceptionType"] = exception.GetType().FullName,
             ["operation"] = operation,
+            ["operationId"] = operationId,
         };
+    }
+
+    private static IReadOnlyDictionary<string, string?> CreateOperationContext(
+        string operation,
+        string operationId)
+    {
+        return new Dictionary<string, string?>
+        {
+            ["operation"] = operation,
+            ["operationId"] = operationId,
+        };
+    }
+
+    private static string CreateOperationId()
+    {
+        return Guid.NewGuid().ToString("N");
     }
 
     private static void AddFailure(ICollection<Exception> failures, Exception exception)

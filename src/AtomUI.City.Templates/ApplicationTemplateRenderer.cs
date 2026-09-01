@@ -221,8 +221,14 @@ public sealed class ApplicationTemplateRenderer
             {
                 public static async Task<int> Main(string[] args)
                 {
-                    var host = ApplicationHost.CreateBuilder(args)
-                        .Build();
+                    var builder = ApplicationHost.CreateBuilder(args);
+                    builder.ConfigureHost(options =>
+                    {
+                        options.ApplicationId = "{{rootNamespace}}";
+                        options.ApplicationName = "{{options.AppName}}";
+                    });
+
+                    await using var host = builder.Build();
 
                     await host.RunAsync();
 

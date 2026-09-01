@@ -42,6 +42,7 @@
 | AUC-CORE-004 | Module Contract | ModuleAttributeTests; ModuleBaseTests; ModuleDescriptorTests |
 | AUC-CORE-005 | DI Registration Markers | ServiceRegistrationAttributeTests |
 | AUC-CORE-006 | Host Diagnostics | HostDiagnosticsTests |
+| AUC-CORE-008 | Generated Module Catalog | GeneratedModuleCatalogTests; AtomUICityIncrementalGeneratorModularityTests; CoreHeadlessProcessTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -52,9 +53,9 @@
 - 不出现业务领域假设。
 - 不引入 `AtomUI.City.Presentation` 等禁止依赖。
 
-## 既有细化设计内容
+## 路线图设计内容
 
-以下内容保留上一轮设计中的专题细节。后续修改必须与本页上方合同、Feature ID、API 行为、诊断和测试矩阵保持一致。
+以下内容同时记录已落地模块合同和长期设计方向。只有 `AUC-CORE-004`、`AUC-CORE-008`、`api-contracts.md` 与测试矩阵共同覆盖的行为属于当前合同。通用 Contribution/ContributionLease、插件服务隔离和插件卸载回滚尚未分配 Core Feature ID，相关段落均为 deferred 路线图。
 
 ## AtomUI.City.Core Modularity 设计
 
@@ -66,7 +67,7 @@ Module 是 AtomUI.City 应用能力组织的基本单位。
 
 Module 用于声明一组框架能力，包括服务注册、配置、路由、权限、本地化、事件处理、数据客户端、Presentation 资源、命令、诊断提供者和插件扩展点。
 
-Module 不是生命周期 Scope，不是 DI Scope，也不是 Plugin。Module 是应用组成单元和能力贡献方。运行时实例生命周期由 Lifecycle Scope 管理，模块贡献能力通过 Contribution 和 ContributionLease 进入 Host。
+Module 不是生命周期 Scope，不是 DI Scope，也不是 Plugin。Module 是应用组成单元和能力贡献方，运行时实例生命周期由 Lifecycle Scope 管理。当前 Core 只提供 `ConfigureContributions` 生命周期钩子，不定义通用 Contribution 或 ContributionLease。
 
 ```text
 Application
@@ -83,7 +84,7 @@ Application
 - 支持编译期生成模块清单和依赖图输入。
 - 支持启动期模块和插件模块共用同一套模块接口。
 - 支持模块服务注册、配置、初始化、启动、关闭。
-- 支持模块通过 Contribution 贡献可撤销能力。
+- 为未来按 Feature 引入可撤销 Contribution 保留模块钩子。
 - 保持 AOT/trimming/source generator 友好。
 - 保持 Core 不依赖 UI、MVVM、Routing、PluginSystem 的具体实现。
 
@@ -110,7 +111,7 @@ Modularity 不负责：
 | `ModuleAttribute` | 可选模块元数据。未指定 id 时使用模块类型全名。 |
 | `DependsOnAttribute` | 声明模块依赖，由 source generator 读取。 |
 | `ModuleDescriptor` | 模块不可变描述信息。 |
-| `ModuleManifest` | 编译期生成或插件包携带的模块清单。 |
+| `GeneratedModuleManifestAttribute` / `IModuleRegistrar` | Generator 发出的程序集入口和强类型模块登记合同。 |
 | `ModuleGraph` | 解析后的模块依赖图。 |
 | `ModuleCatalog` | 当前 Host 可见模块集合。 |
 | `ModuleRegistry` | 当前 Host 已加载模块状态和诊断信息。 |
@@ -263,14 +264,33 @@ public sealed partial class PresentationModule : Module
 
 模块依赖图由 source generator 在编译期建立输入。
 
+Generator 识别全部可生成模块并形成 `ModuleCatalog`，但运行时只激活启动根的依赖闭包。`ModuleCatalog` 表示可用模块，`ModuleRegistry` 表示当前 Host 实际创建并运行的模块，两者不得混用。
+
+应用可通过两种方式声明启动根：
+
+```csharp
+[ApplicationModule]
+[DependsOn(typeof(EditorModule))]
+public sealed class AppModule : ModuleBase
+{
+}
+
+// 可选：显式增加根模块；与 generated default root 重复时去重。
+builder.UseModule<AppModule>();
+```
+
+没有显式 `UseModule<TModule>()` 时，Host 使用 generated default root。每个应用程序集最多存在一个 `[ApplicationModule]`；测试或特殊 Host 可以通过多个 `UseModule<TModule>()` 组合多个显式根。
+
 编译期流程：
 
 ```text
 Find Module-derived types
 -> Read ModuleAttribute
 -> Read DependsOnAttribute
+-> Read ApplicationModuleAttribute
 -> Generate ModuleDescriptor
--> Generate ModuleManifest
+-> Generate IModuleRegistrar implementation
+-> Emit GeneratedModuleManifestAttribute
 -> Generate module dependency graph input
 -> Emit diagnostics
 ```
@@ -279,14 +299,16 @@ Find Module-derived types
 
 ```text
 ApplicationHost
--> Load generated ModuleManifest
--> Resolve startup modules
+-> Load registrar from GeneratedModuleManifestAttribute
+-> Build ModuleCatalog
+-> Merge generated default root and explicit UseModule roots
+-> Resolve startup dependency closure
 -> Validate ModuleGraph
 -> Topological sort
 -> Run module lifecycle
 ```
 
-默认不允许运行时扫描程序集寻找模块。动态发现只能作为 opt-in fallback，并必须输出 AOT/trimming 诊断。
+默认不允许运行时扫描程序集寻找模块。当前冻结合同不提供 dynamic discovery；未来只能作为 opt-in fallback，并必须在独立 Feature 中同时提供扫描边界、Analyzer 和 AOT/trimming 诊断。
 
 ### 9. 模块类型
 
@@ -304,7 +326,7 @@ ModuleDescriptor.Origin = Plugin
 ModuleDescriptor.Plugin = PluginDescriptor
 ```
 
-插件模块的生命周期、依赖、贡献方式与普通模块一致，但 Host 会套用插件隔离、ContributionLease 和卸载规则。
+`ModuleOrigin.Plugin` 和 plugin id 只表达 descriptor 来源。插件隔离、领域 ContributionLease 和卸载规则由 PluginSystem 与对应能力模块实现，不属于当前 Core ModuleRegistry 的 `Verified` 行为。
 
 ### 10. 生命周期阶段
 
@@ -327,7 +349,6 @@ Discovered
 
 ```text
 OnApplicationShutdown
--> Revoke contribution leases
 -> Dispose module resources
 -> Stopped
 ```
@@ -348,13 +369,13 @@ OnApplicationShutdown
 | `OnApplicationShutdown` | 应用关闭或插件停用时的模块关闭。 |
 
 `PreConfigureServices`、`ConfigureServices`、`PostConfigureServices` 发生在 ServiceProvider 构建前。
-`ConfigureContributions` 发生在 ServiceProvider 可用后，由 Host 统一校验并返回 ContributionLease。
+`ConfigureContributions` 发生在 ServiceProvider 可用后。当前 context 只暴露 `IApplicationContext` 和 Application ServiceScope provider；Core 不统一校验领域贡献，也不返回通用 ContributionLease。
 
 ### 12. DI 规则
 
 启动期模块可以注册 Root `IServiceCollection`，但只能发生在 ServiceProvider 构建前。
 
-插件模块不能修改 Host Root ServiceProvider。插件模块的服务注册进入插件服务上下文，并通过 Host contract 受控暴露。
+插件模块不能修改 Host Root ServiceProvider。插件服务上下文、隔离 Provider 和受控 Host contract 由 PluginSystem 负责；Core 当前只提供该不可修改约束和模块基础合同。
 
 模块规则：
 
@@ -364,9 +385,9 @@ OnApplicationShutdown
 - 服务覆盖必须可诊断。
 - 插件服务不能泄漏为 Host 长期持有实例。
 
-### 13. Contribution 规则
+### 13. Contribution 规则（Deferred）
 
-Module 不直接修改全局 registry。Module 通过 Contribution Request 声明能力，由 Host 校验后进入目标 registry，并返回 ContributionLease。
+当前不存在 Core 通用 Contribution Request、Registry 或 Lease。以下流程是未来统一贡献模型的候选设计；在独立 Feature 落地前，Module 只能调用各能力模块公开的领域注册 API，并遵守其撤销合同。
 
 ```text
 Module
@@ -388,7 +409,7 @@ Module
 - Diagnostics providers。
 - Plugin extension points。
 
-插件模块的所有运行时贡献必须可撤销。插件停用时 Host 按反向顺序撤销 ContributionLease。
+插件模块的运行时贡献必须遵守对应能力模块的可撤销合同；跨领域反向撤销顺序由 PluginSystem 编排，不由当前 Core Host 持有通用 Lease。
 
 ### 14. 错误策略
 
@@ -396,7 +417,7 @@ Module
 
 optional 模块失败：默认禁用该模块并记录 warning，是否继续由 Host policy 决定。
 
-插件模块失败：插件激活失败，已创建的 ContributionLease 必须回滚，插件服务上下文释放，主应用继续运行。
+插件模块激活失败后的领域 Lease 回滚和插件服务上下文释放属于 PluginSystem 的失败合同，不属于当前 Core ModuleRegistry。
 
 关闭失败：进入错误处理管线，继续尝试关闭后续模块并聚合诊断。
 
@@ -406,7 +427,7 @@ Modularity 默认 AOT-first。
 
 要求：
 
-- 模块发现依赖 source generator 生成清单。
+- 模块发现依赖 source generator 生成 registrar/catalog metadata。
 - 模块依赖图由编译期生成输入。
 - 模块工厂使用强类型生成代码。
 - Analyzer 检测重复 id、循环依赖、缺失依赖和动态扫描。
@@ -430,5 +451,4 @@ Testing 包应支持：
 - 模拟缺失依赖和循环依赖。
 - 驱动模块生命周期。
 - 断言服务配置阶段没有构建 ServiceProvider。
-- 断言 ContributionLease 创建和反向撤销。
-- 断言插件模块失败时能回滚。
+- 通用 ContributionLease 创建/反向撤销和插件模块回滚测试在对应 Feature 或 PluginSystem 中落地，不作为当前 Core Module Contract 的完成证据。

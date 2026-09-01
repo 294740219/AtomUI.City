@@ -39,11 +39,11 @@ public sealed class SourceGenerationTestKitTests
         var testCase = SourceGenerationTestCase
             .Create("module manifest")
             .AddSource("Module.cs", "public sealed class TestModule {}")
-            .ExpectDiagnostic("AUCGEN001");
+            .ExpectDiagnostic("AUCGEN002");
 
         Assert.Equal("module manifest", testCase.Name);
         Assert.Collection(testCase.Sources, source => Assert.Equal("Module.cs", source.Path));
-        Assert.Collection(testCase.ExpectedDiagnostics, diagnostic => Assert.Equal("AUCGEN001", diagnostic.Id));
+        Assert.Collection(testCase.ExpectedDiagnostics, diagnostic => Assert.Equal("AUCGEN002", diagnostic.Id));
     }
 
     [Fact]
@@ -52,7 +52,7 @@ public sealed class SourceGenerationTestKitTests
         var testCase = SourceGenerationTestCase
             .Create("module manifest")
             .AddSource("Module.cs", "public sealed class TestModule {}")
-            .ExpectDiagnostic("AUCGEN001");
+            .ExpectDiagnostic("AUCGEN002");
 
         var sources = Assert.IsAssignableFrom<IList<SourceFile>>(testCase.Sources);
         var expectedDiagnostics = Assert.IsAssignableFrom<IList<ExpectedDiagnostic>>(testCase.ExpectedDiagnostics);

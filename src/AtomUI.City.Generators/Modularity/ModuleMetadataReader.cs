@@ -5,6 +5,7 @@ namespace AtomUI.City.Generators.Modularity;
 public static class ModuleMetadataReader
 {
     private const string DependsOnAttributeName = "AtomUI.City.Core.Modularity.DependsOnAttribute";
+    private const string ApplicationModuleAttributeName = "AtomUI.City.Core.Modularity.ApplicationModuleAttribute";
     private const string ModuleAttributeName = "AtomUI.City.Core.Modularity.ModuleAttribute";
     private const string ModuleBaseName = "AtomUI.City.Core.Modularity.ModuleBase";
     private const string ModuleInterfaceName = "AtomUI.City.Core.Modularity.IModule";
@@ -31,7 +32,20 @@ public static class ModuleMetadataReader
             .Cast<ModuleDependencyMetadata>()
             .ToArray();
 
-        return new ModuleMetadata(name, typeName, version, description, dependencies);
+        var isApplicationRoot = type
+            .GetAttributes()
+            .Any(attribute => string.Equals(
+                GetAttributeTypeName(attribute),
+                ApplicationModuleAttributeName,
+                StringComparison.Ordinal));
+
+        return new ModuleMetadata(
+            name,
+            typeName,
+            version,
+            description,
+            dependencies,
+            isApplicationRoot);
     }
 
     private static bool IsModule(INamedTypeSymbol type)

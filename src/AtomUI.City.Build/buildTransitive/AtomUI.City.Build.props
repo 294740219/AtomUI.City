@@ -5,7 +5,6 @@
     <AtomUICityValidateManifests Condition="'$(AtomUICityValidateManifests)' == ''">true</AtomUICityValidateManifests>
     <AtomUICityEnableAnalyzers Condition="'$(AtomUICityEnableAnalyzers)' == ''">true</AtomUICityEnableAnalyzers>
     <AtomUICitySourceGenerationMode Condition="'$(AtomUICitySourceGenerationMode)' == ''">Strict</AtomUICitySourceGenerationMode>
-    <AtomUICityAllowDynamicDiscovery Condition="'$(AtomUICityAllowDynamicDiscovery)' == ''">false</AtomUICityAllowDynamicDiscovery>
     <AtomUICityStrictAot Condition="'$(AtomUICityStrictAot)' == ''">false</AtomUICityStrictAot>
     <AtomUICityPackagePlugin Condition="'$(AtomUICityPackagePlugin)' == ''">false</AtomUICityPackagePlugin>
     <AtomUICityPackageApplication Condition="'$(AtomUICityPackageApplication)' == ''">false</AtomUICityPackageApplication>

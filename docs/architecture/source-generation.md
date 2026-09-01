@@ -210,7 +210,6 @@ AUCGEN003
 <PropertyGroup>
   <AtomUICitySourceGenerationMode>Strict</AtomUICitySourceGenerationMode>
   <AtomUICityEmitManifests>true</AtomUICityEmitManifests>
-  <AtomUICityAllowDynamicDiscovery>false</AtomUICityAllowDynamicDiscovery>
 </PropertyGroup>
 ```
 
@@ -219,7 +218,7 @@ AUCGEN003
 | 模式 | 行为 |
 |---|---|
 | `Strict` | AOT-first，禁止默认动态发现，问题尽量报错。 |
-| `Compatible` | 允许部分 opt-in 动态能力，输出 warning。 |
+| `Compatible` | 为未来明确声明的兼容能力预留；当前不启用运行时模块扫描。 |
 | `Off` | 关闭框架生成器，仅用于特殊调试。 |
 
 ## 11. 运行时集成

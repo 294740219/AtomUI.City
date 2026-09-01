@@ -4,7 +4,9 @@ namespace AtomUI.City.Generators.Modularity;
 
 public static class ModuleDependencyGraphBuilder
 {
-    public static ModuleDependencyGraphResult Build(IReadOnlyList<ModuleMetadata> modules)
+    public static ModuleDependencyGraphResult Build(
+        IReadOnlyList<ModuleMetadata> modules,
+        ISet<string>? availableDependencyTypeNames = null)
     {
         if (modules is null)
         {
@@ -39,7 +41,9 @@ public static class ModuleDependencyGraphBuilder
         {
             foreach (var dependency in module.Dependencies)
             {
-                if (dependency.Optional || modulesByTypeName.ContainsKey(dependency.TypeName))
+                if (dependency.Optional ||
+                    modulesByTypeName.ContainsKey(dependency.TypeName) ||
+                    availableDependencyTypeNames?.Contains(dependency.TypeName) == true)
                 {
                     continue;
                 }

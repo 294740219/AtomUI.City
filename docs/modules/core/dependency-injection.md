@@ -52,9 +52,9 @@
 - 不出现业务领域假设。
 - 不引入 `AtomUI.City.Presentation` 等禁止依赖。
 
-## 既有细化设计内容
+## 路线图设计内容
 
-以下内容保留上一轮设计中的专题细节。后续修改必须与本页上方合同、Feature ID、API 行为、诊断和测试矩阵保持一致。
+当前 Core DI 合同覆盖 Root Provider 构建、Application ServiceScope、模块服务配置阶段和 `AUC-CORE-005` 的 registration markers。Plugin ServiceProvider、插件服务上下文、Host contract 白名单和 Contribution 服务来源尚未分配 Core Feature ID；这些内容属于 PluginSystem/能力模块路线图，不是当前 Core `Verified` 行为。
 
 ## AtomUI.City.Core Dependency Injection 设计
 
@@ -100,14 +100,13 @@ Host 启动后，`ConfigureContributions`、三个 application initialization ho
 
 Lifecycle-owned ServiceScope 由 RouteScope、ActivationScope、OperationScope 等运行时 Scope 按需创建和释放。
 
-Plugin ServiceProvider 是插件独立服务容器。插件不能修改 Host Root ServiceProvider。
+插件不能修改 Host Root ServiceProvider。独立 Plugin ServiceProvider 是 PluginSystem 的目标能力，当前 Core 不创建或持有该容器。
 
 ### 4. 核心规则
 
 - 启动期模块可以在 ServiceProvider 构建前注册 Root `IServiceCollection`。
-- 插件模块只能注册到插件自己的 `IServiceCollection`。
-- 插件服务不能自动 fallback 到 Host Root ServiceProvider。
-- 插件需要访问 Host 能力时，只能通过 Host 显式暴露的 contract。
+- 插件模块不得注册到 Host Root `IServiceCollection`；PluginSystem 负责为插件提供独立注册集合。
+- 插件 Provider fallback 和 Host contract 白名单策略由 PluginSystem 定义，Core 当前不实现该解析层。
 - 非测试 City 项目不允许直接调用 `BuildServiceProvider()`、`IServiceProviderFactory<T>.CreateServiceProvider` 或 Microsoft Generic Host 构建/启动入口；应用 Root Provider 只能由 City `ApplicationHost` 构建。
 - 不允许从 Root Provider 解析 scoped 服务。
 - 不允许服务实例把插件内部类型泄漏到 Host 长期持有对象中。
@@ -130,7 +129,7 @@ PreConfigureServices(all modules)
 
 `IApplicationHostBuilder` 不公开可变 `Services` 属性。应用扩展方法必须调用 `builder.ConfigureServices(...)`，不能依赖立即修改底层 Generic Host service collection。
 
-插件模块流程：
+插件模块目标流程（由 PluginSystem 实现）：
 
 ```text
 Create plugin IServiceCollection
@@ -140,7 +139,7 @@ Create plugin IServiceCollection
 -> Build plugin ServiceProvider
 ```
 
-插件服务容器释放前必须先撤销该插件产生的 ContributionLease，并关闭相关运行时 Scope。
+PluginSystem 释放插件服务容器前，必须按各能力模块合同撤销领域 Lease 并关闭相关运行时 Scope；Core 当前不持有通用 ContributionLease。
 
 ### 6. 自动服务注册
 
@@ -246,9 +245,9 @@ public sealed class CustomUserSession : IUserSession
 }
 ```
 
-### 10. Contribution 与服务来源
+### 10. Contribution 与服务来源（Deferred）
 
-每个 Contribution 必须记录服务来源：
+以下是未来跨模块 Contribution 服务来源合同的候选模型，当前 Core 不定义这些类型：
 
 ```text
 Contribution
@@ -269,7 +268,7 @@ RouteContribution("/sales")
   Services = SalesPlugin ServiceProvider
 ```
 
-插件停用时，Host 根据 Contribution 找到仍在运行的 RouteScope、ActivationScope、OperationScope，先取消和释放，再释放插件服务容器。
+插件停用时的 Scope 反查、取消和容器释放顺序由 PluginSystem 与 Routing/Presentation 等能力模块共同实现，不属于当前 Core Host。
 
 ### 11. 公共抽象建议
 
@@ -291,6 +290,5 @@ Testing 包应支持：
 - 断言模块服务注册顺序。
 - 断言自动注册生成结果。
 - 断言重复注册和覆盖诊断。
-- 断言插件不能解析未暴露 Host 服务。
-- 断言插件卸载后无服务实例残留。
+- 插件 Host contract 隔离和卸载后实例残留测试由 PluginSystem Feature 承担。
 - 断言 scoped 服务不会从 Root Provider 解析。

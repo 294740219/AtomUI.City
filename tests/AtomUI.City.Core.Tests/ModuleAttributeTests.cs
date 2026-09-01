@@ -38,5 +38,18 @@ public sealed class ModuleAttributeTests
         Assert.True(attribute.Optional);
     }
 
+    [Fact]
+    public void ApplicationModuleAttributeIsAClassOnlyNonInheritedMarker()
+    {
+        var usage = Assert.Single(
+            typeof(ApplicationModuleAttribute)
+                .GetCustomAttributes(typeof(AttributeUsageAttribute), inherit: false)
+                .Cast<AttributeUsageAttribute>());
+
+        Assert.Equal(AttributeTargets.Class, usage.ValidOn);
+        Assert.False(usage.AllowMultiple);
+        Assert.False(usage.Inherited);
+    }
+
     private sealed class DependencyModule : ModuleBase;
 }

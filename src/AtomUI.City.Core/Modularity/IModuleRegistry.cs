@@ -8,22 +8,22 @@ public interface IModuleRegistry
     IReadOnlyList<ModuleDescriptor> Modules { get; }
 
     ValueTask ConfigureServicesAsync(
-        ApplicationContext applicationContext,
+        IApplicationContext applicationContext,
         IServiceCollection services,
         CancellationToken cancellationToken = default);
 
     ValueTask ConfigureContributionsAsync(
-        ApplicationContext applicationContext,
+        IApplicationContext applicationContext,
         IServiceProvider services,
         CancellationToken cancellationToken = default);
 
     ValueTask InitializeAsync(
-        ApplicationContext applicationContext,
+        IApplicationContext applicationContext,
         IServiceProvider services,
         CancellationToken cancellationToken = default);
 
     ValueTask ShutdownAsync(
-        ApplicationContext applicationContext,
+        IApplicationContext applicationContext,
         IServiceProvider services,
         CancellationToken cancellationToken = default);
 }

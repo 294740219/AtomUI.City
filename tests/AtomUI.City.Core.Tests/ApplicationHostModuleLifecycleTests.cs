@@ -11,7 +11,7 @@ public sealed class ApplicationHostModuleLifecycleTests
     public async Task BuildAndStartRunModulesInDependencyOrderAndShutdownInReverseOrder()
     {
         ModuleRecorder.Reset();
-        var builder = ApplicationHost.CreateBuilder();
+        var builder = ApplicationHostTestBuilder.Create();
 
         builder
             .UseModule<AppModule>()
@@ -50,7 +50,7 @@ public sealed class ApplicationHostModuleLifecycleTests
     public async Task AsyncModuleInitializationStagesAreAwaited()
     {
         ModuleRecorder.Reset();
-        var builder = ApplicationHost.CreateBuilder();
+        var builder = ApplicationHostTestBuilder.Create();
 
         builder.UseModule<AsyncModule>();
 
@@ -72,7 +72,7 @@ public sealed class ApplicationHostModuleLifecycleTests
     [Fact]
     public void BuildFailsWhenRequiredDependencyIsMissing()
     {
-        var builder = ApplicationHost.CreateBuilder();
+        var builder = ApplicationHostTestBuilder.Create();
 
         builder.UseModule<MissingRequiredDependencyModule>();
 
@@ -83,23 +83,23 @@ public sealed class ApplicationHostModuleLifecycleTests
     }
 
     [Fact]
-    public void ModuleGraphFailureDisposesAlreadyCreatedModuleInstances()
+    public void ModuleGraphFailureDoesNotCreateModuleInstances()
     {
         DisposableBuildModule.Reset();
-        var builder = ApplicationHost.CreateBuilder();
+        var builder = ApplicationHostTestBuilder.Create();
         builder.UseModule<DisposableBuildModule>();
         builder.UseModule<MissingRequiredDependencyModule>();
 
         Assert.Throws<InvalidOperationException>(() => builder.Build());
 
-        Assert.True(DisposableBuildModule.WasDisposed);
+        Assert.False(DisposableBuildModule.WasDisposed);
     }
 
     [Fact]
     public async Task OptionalDependencyCanBeMissing()
     {
         ModuleRecorder.Reset();
-        var builder = ApplicationHost.CreateBuilder();
+        var builder = ApplicationHostTestBuilder.Create();
 
         builder.UseModule<MissingOptionalDependencyModule>();
 
@@ -113,7 +113,7 @@ public sealed class ApplicationHostModuleLifecycleTests
     [Fact]
     public async Task ModuleRegistryModulesRejectExternalListMutation()
     {
-        var builder = ApplicationHost.CreateBuilder();
+        var builder = ApplicationHostTestBuilder.Create();
         builder.UseModule<CoreModule>();
 
         await using var host = builder.Build();
@@ -151,7 +151,7 @@ public sealed class ApplicationHostModuleLifecycleTests
     public void ModuleServiceProviderGuardRejectsNullOptions()
     {
         var context = new ServiceConfigurationContext(
-            new ApplicationContext(),
+            ApplicationHostTestBuilder.CreateContext(),
             new ServiceCollection());
 
         Assert.Throws<ArgumentNullException>(() =>
@@ -162,7 +162,7 @@ public sealed class ApplicationHostModuleLifecycleTests
     public async Task ModuleShutdownRunsInReverseDependencyOrder()
     {
         ModuleRecorder.Reset();
-        var builder = ApplicationHost.CreateBuilder();
+        var builder = ApplicationHostTestBuilder.Create();
 
         builder
             .UseModule<FeatureModule>()
@@ -182,7 +182,7 @@ public sealed class ApplicationHostModuleLifecycleTests
     public void PreConfigureActionsRunInDependencyOrderBeforeConfigureServices()
     {
         ModuleRecorder.Reset();
-        var builder = ApplicationHost.CreateBuilder();
+        var builder = ApplicationHostTestBuilder.Create();
 
         builder
             .UseModule<ApplicationOptionsModule>()
@@ -198,7 +198,7 @@ public sealed class ApplicationHostModuleLifecycleTests
     public void ServiceConfigurationContextPreConfigureRejectsNullArguments()
     {
         var context = new ServiceConfigurationContext(
-            new ApplicationContext(),
+            ApplicationHostTestBuilder.CreateContext(),
             new ServiceCollection());
 
         Assert.Throws<ArgumentNullException>(() =>
@@ -214,7 +214,7 @@ public sealed class ApplicationHostModuleLifecycleTests
         var registry = ModuleRegistry.CreateForTesting([typeof(CapturedServicesModule)]);
         var services = new ServiceCollection();
 
-        await registry.ConfigureServicesAsync(new ApplicationContext(), services);
+        await registry.ConfigureServicesAsync(ApplicationHostTestBuilder.CreateContext(), services);
         var capturedServices = Assert.IsType<ModuleServiceCollection>(CapturedServicesModule.CapturedServices);
 
         Assert.Throws<InvalidOperationException>(() =>
@@ -464,7 +464,7 @@ public sealed class ApplicationHostModuleLifecycleTests
     private static void AssertTemporaryProviderCreationRejected<TModule>()
         where TModule : IModule, new()
     {
-        var builder = ApplicationHost.CreateBuilder();
+        var builder = ApplicationHostTestBuilder.Create();
         var diagnostics = builder.GetBuildDiagnostics();
 
         builder.UseModule<TModule>();

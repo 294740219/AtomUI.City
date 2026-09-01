@@ -9,22 +9,23 @@ public sealed class GeneratorDiagnosticTests
     [Fact]
     public void DiagnosticIdsUseAucgenPrefixAndThreeDigits()
     {
-        Assert.Equal("AUCGEN001", GeneratorDiagnosticIds.DynamicDiscoveryNotAllowed);
         Assert.Equal("AUCGEN002", GeneratorDiagnosticIds.DuplicateModuleName);
         Assert.Equal("AUCGEN003", GeneratorDiagnosticIds.CircularModuleDependency);
         Assert.Equal("AUCGEN004", GeneratorDiagnosticIds.DuplicateRoute);
         Assert.Equal("AUCGEN005", GeneratorDiagnosticIds.InvalidManifestInput);
         Assert.Equal("AUCGEN006", GeneratorDiagnosticIds.DuplicatePresentationView);
+        Assert.Equal("AUCGEN007", GeneratorDiagnosticIds.MultipleApplicationModules);
+        Assert.Equal("AUCGEN008", GeneratorDiagnosticIds.InvalidGeneratedModule);
     }
 
     [Fact]
     public void DiagnosticDefinitionsExposeStableMetadata()
     {
-        var definition = GeneratorDiagnostics.DynamicDiscoveryNotAllowed;
+        var definition = GeneratorDiagnostics.DuplicateModuleName;
 
-        Assert.Equal("AUCGEN001", definition.Id);
+        Assert.Equal("AUCGEN002", definition.Id);
         Assert.Equal(GeneratorDiagnosticSeverity.Error, definition.Severity);
-        Assert.Contains("dynamic discovery", definition.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("unique", definition.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -41,7 +42,7 @@ public sealed class GeneratorDiagnosticTests
         var diagnostics = Assert.IsAssignableFrom<IList<GeneratorDiagnosticDefinition>>(GeneratorDiagnostics.All);
 
         Assert.Throws<NotSupportedException>(() => diagnostics[0] = GeneratorDiagnostics.DuplicateModuleName);
-        Assert.Equal(GeneratorDiagnostics.DynamicDiscoveryNotAllowed, GeneratorDiagnostics.All[0]);
+        Assert.Equal(GeneratorDiagnostics.DuplicateModuleName, GeneratorDiagnostics.All[0]);
     }
 
     [Fact]

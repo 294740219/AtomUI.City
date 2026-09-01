@@ -41,4 +41,14 @@ public sealed class CoreAssemblyTests
 
         Assert.Empty(invalidTypes);
     }
+
+    [Fact]
+    public void ApplicationContextImplementationIsNotPublic()
+    {
+        var exportedTypes = typeof(ApplicationHost).Assembly.GetExportedTypes();
+
+        Assert.DoesNotContain(
+            exportedTypes,
+            type => type.FullName == "AtomUI.City.Core.Hosting.ApplicationContext");
+    }
 }

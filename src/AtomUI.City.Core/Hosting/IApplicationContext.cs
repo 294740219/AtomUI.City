@@ -1,10 +1,14 @@
-using Microsoft.Extensions.Configuration;
-
 namespace AtomUI.City.Core.Hosting;
 
 public interface IApplicationContext
 {
+    string ApplicationId { get; }
+
+    Guid ApplicationInstanceId { get; }
+
     string ApplicationName { get; }
+
+    string ApplicationVersion { get; }
 
     string EnvironmentName { get; }
 
@@ -13,10 +17,4 @@ public interface IApplicationContext
     string AppDataPath { get; }
 
     IReadOnlyList<string> StartupArguments { get; }
-
-    IConfiguration Configuration { get; }
-
-    IServiceProvider Services { get; }
-
-    IDictionary<string, object?> Properties { get; }
 }

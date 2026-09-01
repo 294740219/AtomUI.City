@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using AtomUI.City.Core.Hosting;
 
 namespace AtomUI.City.Testing;
@@ -42,20 +43,17 @@ public sealed class TestHostBuilder
     {
         ThrowIfBuilt();
 
-        var applicationContext = new ApplicationContext();
-
-        foreach (var property in _properties)
-        {
-            applicationContext.Properties[property.Key] = property.Value;
-        }
-
         var diagnostics = new TestDiagnostics();
         var directory = TestDirectory.Create(_directoryName ?? "host", _keepDirectoryOnDispose);
+        var applicationContext = new TestApplicationContext(directory);
+        var properties = new ReadOnlyDictionary<string, object?>(
+            new Dictionary<string, object?>(_properties, StringComparer.Ordinal));
 
         _built = true;
 
         return new TestHost(
             applicationContext,
+            properties,
             directory,
             new FakeUiDispatcher(diagnostics),
             new DeterministicScheduler(diagnostics),

@@ -20,6 +20,7 @@ public sealed class BuildAssemblyTests
         Assert.Contains("AtomUICityValidateManifests", BuildMsBuildContract.Properties);
         Assert.Contains("AtomUICityEnableAnalyzers", BuildMsBuildContract.Properties);
         Assert.Contains("AtomUICitySourceGenerationMode", BuildMsBuildContract.Properties);
+        Assert.DoesNotContain("AtomUICityAllowDynamicDiscovery", BuildMsBuildContract.Properties);
         Assert.Contains("AtomUICityPluginCapability", BuildMsBuildContract.Items);
         Assert.Contains("AtomUICityLanguagePackage", BuildMsBuildContract.Items);
         Assert.Contains("GenerateAtomUICityManifests", BuildMsBuildContract.Targets);

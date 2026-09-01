@@ -24,10 +24,20 @@
 | `ConfigureLifecycle(Action<LifecyclePipelineBuilder>)` | AUC-CORE-002 | Build 前按调用顺序收集 middleware；null builder/delegate 抛参数异常；Build 后调用因 builder frozen 失败。 |
 | `GetBuildDiagnostics()` | AUC-CORE-006 | 返回 builder 拥有的稳定 collector；Build 抛异常后仍可读取 AUCHOST101/105；collector 写入失败不能替换原始 Build 异常。 |
 | `ApplicationHostOptions.DiagnosticsCapacity` | AUC-CORE-006 | 默认 1024，Build 时必须大于零，否则抛 ArgumentOutOfRangeException。 |
+| `ApplicationHostOptions.ApplicationId` | AUC-CORE-001 | 必填、稳定、非本地化；null、空白或首尾空白导致 Build 在 Options 阶段失败。 |
+| `ApplicationHostOptions.ApplicationVersion` | AUC-CORE-001 | 可显式覆盖；未配置时依次读取入口程序集 informational version 和 assembly version，均不可用则 Build 失败。 |
+| `ApplicationModuleAttribute` | AUC-CORE-008 | 每个应用程序集最多声明一个默认启动根；Library 和 Plugin 不得用它替代各自入口合同。 |
+| `GeneratedModuleManifestAttribute` | AUC-CORE-008 | Generator 写入入口程序集，引用实现 `IModuleRegistrar` 的强类型 registrar；应用代码不直接构造。 |
+| `IModuleRegistrar.Register(IModuleRegistrarContext)` | AUC-CORE-008 | Build 冻结前同步登记不可变 descriptor、强类型 factory 和默认根；不得实例化模块或解析运行时服务。 |
+| `UseModule<TModule>()` | AUC-CORE-008 | 增加显式启动根；与 generated default root 重复时去重；生成 Catalog 缺失该类型时进入兼容 descriptor 路径。 |
 | `InMemoryHostDiagnostics(int capacity)` | AUC-CORE-006 | 有界 FIFO snapshot；容量满后丢弃最旧记录并增加 DroppedCount；无参构造保持原有无界行为。 |
 | `LifecycleScope.CreateRoot(kind, id, diagnostics)` | AUC-CORE-003 | root 和所有 child 共享 diagnostics sink；清理失败写 AUCHOST104 后继续其他 child；sink 异常被隔离。 |
+| `LifecycleContext.OperationId` | AUC-CORE-002 | 标识一次 Host lifecycle transaction；Start 的嵌套 stage 和启动回滚共享一个非空 id，独立 Stop 使用新 id。显式空白 id 被拒绝，未提供时生成 GUID `N` 格式字符串。 |
+| `LifecyclePipelineBuilder.Use<TMiddleware>(...)` | AUC-CORE-002 | `TMiddleware` 只提供稳定诊断身份，不改变 delegate 执行或 DI 激活语义；原有 `Use(...)` 继续兼容并从 delegate 声明类型尽力推断身份。 |
 
 所有 Core public 类型的冻结命名空间以 `AtomUI.City.Core.*` 开头。旧的 `AtomUI.City.Hosting`、`AtomUI.City.Lifecycle` 等 Preview 命名空间不再构成 1.0 API。
+
+`ApplicationHostOptions.AllowDynamicDiscovery` 不进入 1.0 Preview 合同。Generated Module Catalog 是编译期静态发现，不是运行时 dynamic discovery；后者必须在独立 Feature 中同时定义扫描边界、AOT/trimming 诊断和 Strict/Compatible 策略后才能重新公开。
 
 ### `ApplicationHost`
 
@@ -115,21 +125,23 @@
 | Assembly | `AtomUI.City.Core` |
 | Stability | Preview |
 | Feature | AUC-CORE-001 |
-| Purpose | 暴露应用 id、环境、root scope、diagnostics 和服务访问上下文。 |
+| Purpose | 暴露当前应用实例的不可变身份、版本、环境、路径和启动参数描述。 |
 | Owner | Application Host |
 | Created By | Host Build 阶段。 |
 | Lifetime | 随 Host 创建，Host Dispose 后只允许读取 immutable descriptor。 |
 | DI Lifetime | Singleton。 |
 | Thread Safety | immutable 字段可并发读取；mutable runtime state 必须由专门服务管理。 |
 | Disposal | 不单独释放；随 Host 释放。 |
-| Nullability | `ApplicationId`、`EnvironmentName`、`RootScope` 不得为空。 |
+| Nullability | 所有 string 字段不得为 null 或空白；`ApplicationInstanceId` 不得为 `Guid.Empty`；集合不得为 null。 |
 | Cancellation | 无取消语义。 |
-| Failure Behavior | 缺失必填上下文时 Build 失败。 |
+| Failure Behavior | 缺失 ApplicationId、无法解析版本、非法 ApplicationName 或无法得到绝对路径时 Build 失败。 |
 | Diagnostics | Build 失败诊断包含缺失字段名。 |
 | Plugin Boundary | 插件只可读取 Host 暴露的共享 context，不能获得 Host 内部可变对象。 |
 | AOT / Trimming | Context 字段不依赖动态类型发现。 |
 | Breaking Change Rules | 删除字段、改变字段含义或把可读字段改为延迟失败属于 breaking change。 |
-| Tests | `ApplicationHostRuntimeTests` 断言 root scope、diagnostics 和 context 可读取。 |
+| Tests | `ApplicationHostBuilderTests` 和 `ApplicationHostRuntimeTests` 断言字段来源、不可变性、实例唯一性、DI 注册和 Dispose 后读取。 |
+
+公开字段固定为：`ApplicationId`、`ApplicationInstanceId`、`ApplicationName`、`ApplicationVersion`、`EnvironmentName`、`ContentRootPath`、`AppDataPath`、`StartupArguments`。Context 不得暴露 `Configuration`、`Services`、Scope、Diagnostics、Host state 或 `Properties`。
 
 ### `LifecyclePipeline`
 
@@ -150,7 +162,7 @@
 | Nullability | stage、context、middleware delegate 不得为空。 |
 | Cancellation | 每个 middleware 调用前后观察 token；取消不得跳过 cleanup stage。 |
 | Failure Behavior | middleware 异常进入 Faulted，错误聚合后继续必要清理。 |
-| Diagnostics | 失败诊断包含 stage、middleware type、operationId。 |
+| Diagnostics | middleware 失败写 `AUCHOST108`，强类型 `Stage` 和 context 必须包含 `middlewareType`、`operationId`、`exceptionType`；同一异常只归因到实际失败 middleware 一次，terminal 异常不得误报为 middleware 失败。正常 cancellation 不写该错误，diagnostics sink 失败不得替换原始异常。 |
 | Plugin Boundary | 插件 middleware 必须绑定 owner；插件停用时撤销后不再执行。 |
 | AOT / Trimming | middleware 来源优先显式注册或 generated manifest。 |
 | Breaking Change Rules | 修改 stage 顺序、同 stage 排序、异常聚合或取消语义属于 breaking change。 |
@@ -168,7 +180,7 @@
 | Purpose | 表达 application、module、plugin contribution、route、activation 和 operation 的所有权树。 |
 | Owner | Parent scope 或 Host root |
 | Created By | Host、ModuleSystem 或上层运行时模块。 |
-| Lifetime | Active -> Disposing -> Disposed。 |
+| Lifetime | 创建完成后立即处于 Running；停止时 Running -> Stopping -> Stopped/Faulted；释放时 Stopped/Faulted -> Disposing -> Disposed。 |
 | DI Lifetime | Scope object；可被对应 owner 持有，不注册为 root singleton。 |
 | Thread Safety | child 创建和状态发布必须同步保护；真实 Stop/Dispose、cancellation callback 和 Disposed notification 在 lock 外执行；读取状态可并发；mutating API 在 Disposing/Disposed 失败。 |
 | Disposal | leaf-first；重复 Dispose 幂等；child 释放失败记录诊断并继续释放其他 child。 |
@@ -180,6 +192,8 @@
 | AOT / Trimming | scope 不保存插件私有类型作为 Host 长期 key。 |
 | Breaking Change Rules | 修改释放顺序、幂等行为或 Dispose 后访问规则属于 breaking change。 |
 | Tests | `LifecycleScopeTreeTests` 断言 leaf-first、parent-child 状态、重复释放和失败诊断。 |
+
+`LifecycleScope` 当前只产生 `Running`、`Stopping`、`Stopped`、`Faulted`、`Disposing` 和 `Disposed`。`LifecycleScopeState` 中的 `Created`、`Starting`、`CancelRequested` 和 `UnloadPending` 是保留枚举值，当前状态机不会产生，调用方不得依赖这些值处理当前运行时行为。
 
 ### `ModuleBase`
 
@@ -356,6 +370,81 @@
 | Breaking Change Rules | 修改构造参数、allow multiple 规则或继承语义属于 breaking change。 |
 | Tests | `ModuleAttributeTests` 断言 attribute metadata 和无效依赖。 |
 
+### `ApplicationModuleAttribute`
+
+| Field | Contract |
+| --- | --- |
+| Type | `ApplicationModuleAttribute` |
+| Namespace | `AtomUI.City.Core.Modularity` |
+| Assembly | `AtomUI.City.Core` |
+| Stability | Preview |
+| Feature | AUC-CORE-008 |
+| Purpose | 声明可执行应用程序集的唯一 generated default root。 |
+| Owner | Application executable project |
+| Created By | 应用模块源码。 |
+| Lifetime | 编译期 metadata；Host Build 时转为 root type。 |
+| DI Lifetime | 不进入 DI。 |
+| Thread Safety | Attribute metadata 只读。 |
+| Disposal | 无释放。 |
+| Nullability | 无参数。 |
+| Cancellation | 无取消语义。 |
+| Failure Behavior | 非 IModule 类型、Library/Plugin 中使用、多个默认根或不可生成工厂产生 `AUCGEN007/008` 编译错误。 |
+| Diagnostics | 诊断定位到被标记的模块声明。 |
+| Plugin Boundary | Library 和 Plugin 不得声明应用默认根。 |
+| AOT / Trimming | 仅由 generator 读取，不进行运行时程序集扫描。 |
+| Breaking Change Rules | 修改唯一根、目标程序集或继承规则属于 breaking change。 |
+| Tests | `ModuleAttributeTests; AtomUICityIncrementalGeneratorModularityTests`。 |
+
+### `GeneratedModuleManifestAttribute`
+
+| Field | Contract |
+| --- | --- |
+| Type | `GeneratedModuleManifestAttribute` |
+| Namespace | `AtomUI.City.Core.Modularity` |
+| Assembly | `AtomUI.City.Core` |
+| Stability | Preview |
+| Feature | AUC-CORE-008 |
+| Purpose | 把入口程序集连接到 generated registrar。 |
+| Owner | AtomUI.City.Generators |
+| Created By | Source generator；应用代码不直接构造。 |
+| Lifetime | Assembly metadata，进程生命周期内只读。 |
+| DI Lifetime | 不进入 DI。 |
+| Thread Safety | Attribute metadata 只读。 |
+| Disposal | 无释放。 |
+| Nullability | registrarType 不得为 null。 |
+| Cancellation | 无取消语义。 |
+| Failure Behavior | registrar 类型非法或无法构造时 Host Build 在 ModuleGraph 阶段失败。 |
+| Diagnostics | Build 失败写 `AUCHOST101/105`。 |
+| Plugin Boundary | 插件入口使用插件合同，不用它声明应用根。 |
+| AOT / Trimming | registrarType 保留 public parameterless constructor。 |
+| Breaking Change Rules | 修改 AttributeUsage、构造参数或 registrar 可达性合同属于 breaking change。 |
+| Tests | `GeneratedModuleCatalogTests; CoreHeadlessProcessTests; NativeAOT headless run`。 |
+
+### `IModuleRegistrar` / `IModuleRegistrarContext`
+
+| Field | Contract |
+| --- | --- |
+| Type | `IModuleRegistrar`; `IModuleRegistrarContext` |
+| Namespace | `AtomUI.City.Core.Modularity` |
+| Assembly | `AtomUI.City.Core` |
+| Stability | Preview generated-code contract |
+| Feature | AUC-CORE-008 |
+| Purpose | 同步登记不可变 ModuleDescriptor、强类型 factory 和默认根。 |
+| Owner | Generated registrar / Host ModuleCatalog |
+| Created By | Generator / Host Build。 |
+| Lifetime | 仅 Host Build 的 ModuleGraph 阶段有效；解析后冻结。 |
+| DI Lifetime | 不进入 DI。 |
+| Thread Safety | 单线程 Build 配置合同，不保证并发写。 |
+| Disposal | 无释放；不得创建模块实例。 |
+| Nullability | context、descriptor、factory、root type 不得为 null。 |
+| Cancellation | 同步短执行，不接受取消。 |
+| Failure Behavior | 重复 id、冲突 descriptor、非法 root/registrar 或冻结后登记确定性失败。 |
+| Diagnostics | 异常由 Host Build 记录为 ModuleGraph failure。 |
+| Plugin Boundary | application registrar 可聚合引用程序集 registrar，但 Library registrar 不得增加应用根。 |
+| AOT / Trimming | 生成代码直接 `new TModule()`；不得通过反射构造模块。 |
+| Breaking Change Rules | 修改 Register 签名、登记顺序或冻结语义属于 breaking change。 |
+| Tests | `ModuleRegistrarSourceBuilderTests; AtomUICityIncrementalGeneratorModularityTests; GeneratedModuleCatalogTests`。 |
+
 ### `ServiceAttribute`
 
 | Field | Contract |
@@ -500,7 +589,7 @@
 | Nullability | 诊断码常量不得为空。 |
 | Cancellation | 无取消语义。 |
 | Failure Behavior | 诊断码不能复用；废弃必须保留迁移说明。 |
-| Diagnostics | 当前稳定码：`AUCHOST001`、`AUCHOST002`、`AUCHOST003`；Phase 1 目标失败码：`AUCHOST101` 到 `AUCHOST107`。 |
+| Diagnostics | 当前已实现并进入兼容合同的诊断码：`AUCHOST001` 到 `AUCHOST003`、`AUCHOST101` 到 `AUCHOST108`；名称、触发语义和必需 context 见 `diagnostics.md` 与 `compatibility.md`。 |
 | Plugin Boundary | plugin 相关 Host 诊断使用独立 code 或 context，不复用普通 Host code。 |
 | AOT / Trimming | 常量不依赖运行时生成。 |
 | Breaking Change Rules | 删除、复用或改变诊断码语义属于 breaking change。 |
@@ -625,9 +714,27 @@ Cancellation: 无。
 Exceptions or Result: 重复 Build 或 module graph 非法抛 InvalidOperationException；module 配置异常写入 diagnostics 后重新抛出。
 Idempotency: Build 只允许成功一次，后续调用必须失败。
 Concurrency: Build 必须外部串行。
-Side Effects: 冻结 Services、Configuration、Properties 和注册方法；成功时写 HostBuilt。
+Side Effects: 冻结 Services、Configuration 和注册方法；创建不可变 IApplicationContext；成功时写 HostBuilt。
 Diagnostics: 成功写 AUCHOST001；失败写 AUCHOST101。
 Tests: ApplicationHostBuilderTests; HostDiagnosticsTests。
+```
+
+### `ApplicationHostBuilderModularityExtensions.UseModule<TModule>`
+
+```text
+Method: ApplicationHostBuilderModularityExtensions.UseModule<TModule>
+Feature: AUC-CORE-008
+Purpose: 在 generated default root 之外显式增加一个启动根。
+Parameters: builder 不能为 null；TModule 必须实现 IModule 且具有 parameterless constructor。
+Return: 当前 IApplicationHostBuilder。
+Nullability: builder 为 null 时抛 ArgumentNullException。
+Cancellation: 无。
+Exceptions or Result: Build 后调用因 builder frozen 失败；缺失 required dependency 在 ModuleGraph 阶段失败。
+Idempotency: 同一 TModule 重复登记，或与 generated root 重复时去重。
+Concurrency: 配置阶段不保证并发调用安全。
+Side Effects: 仅登记强类型 factory 和显式 root；模块实例到 Host Build 验证 graph 后才创建。
+Diagnostics: ModuleGraph 失败写 AUCHOST101/105。
+Tests: ApplicationHostBuilderTests; GeneratedModuleCatalogTests; CoreHeadlessProcessTests。
 ```
 
 ### `IApplicationHost.StartAsync`
@@ -789,7 +896,6 @@ Tests: ApplicationHostModuleLifecycleTests。
 | `HostDiagnosticSeverity` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `IHostDiagnostics` | 关键 contract | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `InMemoryHostDiagnostics` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
-| `ApplicationContext` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `ApplicationHost` | 关键 contract | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `ApplicationHostBuilder` | 关键 contract | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `ApplicationHostOptions` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
@@ -806,6 +912,10 @@ Tests: ApplicationHostModuleLifecycleTests。
 | `LifecycleStageArea` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `LifecycleStages` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `ApplicationHostBuilderModularityExtensions` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `ApplicationModuleAttribute` | 关键 contract | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `GeneratedModuleManifestAttribute` | generated contract | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `IModuleRegistrar` | generated contract | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `IModuleRegistrarContext` | generated contract | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `ApplicationInitializationContext` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `ApplicationShutdownContext` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `ContributionConfigurationContext` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |

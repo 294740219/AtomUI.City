@@ -52,9 +52,9 @@
 - 不出现业务领域假设。
 - 不引入 `AtomUI.City.Presentation` 等禁止依赖。
 
-## 既有细化设计内容
+## 路线图设计内容
 
-以下内容保留上一轮设计中的专题细节。后续修改必须与本页上方合同、Feature ID、API 行为、诊断和测试矩阵保持一致。
+当前 1.0 合同仅包含 `AUC-CORE-006` 定义的 `IHostDiagnostics`、`HostDiagnosticRecord` 和 `HostDiagnosticIds`，以及各已验证 Feature 明确登记的失败行为。以下统一 ErrorPolicy、业务 DiagnosticContext 和 Error Pipeline 是 1.0 之后的路线图，不是当前 Core contract；其中的“必须”只描述未来 Feature 的候选约束。
 
 ## AtomUI.City.Core Errors and Diagnostics 设计
 
@@ -103,9 +103,9 @@ Disposal
 
 取消不是错误。`OperationCanceledException` 默认映射为 `Canceled` 结果，不进入失败统计，除非取消本身违反生命周期规则。
 
-### 4. ErrorPolicy
+### 4. ErrorPolicy（Deferred）
 
-Core 提供默认 `ErrorPolicy`，并允许 Host 配置替换或扩展。
+当前 Core 不提供 `ErrorPolicy`。未来若立项，应提供可替换或扩展的默认策略，并先完成 Feature ID、API 卡、兼容性和测试设计。
 
 默认策略：
 
@@ -172,9 +172,9 @@ Logging 是输出目标之一。Core 诊断记录应能进入：
 - 插件卸载诊断
 - 后续遥测适配层
 
-### 7. Error Pipeline
+### 7. Error Pipeline（Deferred）
 
-Lifecycle 已经有 middleware 机制，Error 也应走 pipeline。
+以下 Error Pipeline 是候选设计，当前 Lifecycle middleware 不隐式提供错误处理中间件：
 
 ```text
 ErrorContext
@@ -240,7 +240,11 @@ Source Generator / Analyzer 负责构建期诊断，例如：
 - Scope 释放失败。
 - Lease 撤销失败。
 
-### 11. 公共抽象建议
+### 11. 后续版本业务诊断（Deferred）
+
+当前 1.0 合同只承诺 `IHostDiagnostics`、`HostDiagnosticRecord` 和 `HostDiagnosticIds` 承载 Host、Lifecycle、Module 等框架级诊断。应用业务代码不应把 `IHostDiagnostics` 当作通用日志或业务故障接口，`IApplicationContext` 也不暴露 Diagnostics。
+
+以下抽象保留为 1.0 之后的 deferred design item。本轮不分配实现 Feature ID、不进入 1.0 发布门禁；未来立项时必须重新完成 public contract、错误策略、日志/遥测适配、AOT contract 和测试设计：
 
 | 类型 | 职责 |
 |---|---|
@@ -253,9 +257,11 @@ Source Generator / Analyzer 负责构建期诊断，例如：
 | `IDiagnosticContextAccessor` | 当前诊断上下文访问器。 |
 | `AggregateLifecycleException` | 生命周期释放阶段聚合异常。 |
 
-### 12. 测试策略
+后续专题还必须确定 `ILogger`、内存 sink、文件日志 Provider 和远程遥测之间的组合与故障隔离；Core 不直接决定文件路径、滚动策略或保留周期。
 
-Testing 包应支持：
+### 12. Deferred Feature 测试策略
+
+对应 Feature 立项后，Testing 包应支持：
 
 - 捕获 DiagnosticRecord。
 - 断言 ErrorPolicy 结果。

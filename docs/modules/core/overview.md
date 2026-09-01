@@ -1,7 +1,7 @@
 # AtomUI.City.Core
 
 文档等级：Level 3
-成熟度：Verified
+成熟度：Partially Implemented
 执行边界：Host runtime kernel
 程序集：`AtomUI.City.Core`
 源码：`src/AtomUI.City.Core`
@@ -61,7 +61,7 @@ Core 的 public API 必须使用与程序集一致的 `AtomUI.City.Core.*` 根�
 
 ## 与 PluginSystem 的关系
 
-Core 不加载插件，但提供插件模块复用的 Module、Lifecycle 和 Diagnostics 基础合同。
+Core 不加载插件，也不创建插件独立 ServiceProvider 或通用 ContributionLease。Core 只提供插件模块可复用的 Module、Lifecycle 和 Diagnostics 基础合同，并保证应用 Root ServiceProvider 在 Build 后不可修改；插件发现、隔离服务容器、贡献撤销和卸载编排由 PluginSystem 负责。
 
 ## 与 Testing 的关系
 
@@ -84,6 +84,8 @@ Core 不加载插件，但提供插件模块复用的 Module、Lifecycle 和 Dia
 
 ## 当前成熟度状态
 
-Verified
+Partially Implemented
 
-Core 的七个 Feature 已完成实现、单元/合同测试、Headless Console 进程测试、诊断断言和公共边界检查。Avalonia lifetime、generated module manifest 和插件 ContributionLease 的具体适配仍由 Presentation、Generators 和 PluginSystem 各自负责，不改变 Core 的 Verified 状态。
+`AUC-CORE-001` 到 `AUC-CORE-008` 已分别达到 `Verified`，包括 Host、Lifecycle、Scope、Module、DI markers、Host diagnostics、UI dispatcher contract 和 Generated Module Catalog。Generator 生成强类型 registrar，Core 通过 `GeneratedModuleManifestAttribute` 和 `ModuleCatalog` 在 Build 阶段消费，不再把未定义的 `ModuleManifest` 数据类型作为当前合同。
+
+模块整体仍为 `Partially Implemented`：自定义桌面 `IApplicationLifetime`、跨模块通用 Contribution/ContributionLease、ErrorPolicy/业务诊断管线以及插件独立 ServiceProvider 编排均未分配 Core Feature ID，也不属于当前 Core 1.0 合同。详细设计中保留的相关内容是后续路线图，不能用 Core Feature 的 `Verified` 状态推导其已经实现。

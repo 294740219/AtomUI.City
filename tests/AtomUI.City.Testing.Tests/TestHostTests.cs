@@ -13,8 +13,11 @@ public sealed class TestHostTests
             .UseProperty("environment", "test")
             .Build();
 
-        Assert.IsType<ApplicationContext>(host.ApplicationContext);
-        Assert.Equal("test", host.ApplicationContext.Properties["environment"]);
+        Assert.IsAssignableFrom<IApplicationContext>(host.ApplicationContext);
+        Assert.Equal("AtomUI.City.Testing.TestHost", host.ApplicationContext.ApplicationId);
+        Assert.Equal("Testing", host.ApplicationContext.EnvironmentName);
+        Assert.Equal("test", host.Properties["environment"]);
+        Assert.False(Directory.Exists(host.ApplicationContext.AppDataPath));
         Assert.True(Directory.Exists(host.Directory.RootPath));
         Assert.NotNull(host.Dispatcher);
         Assert.NotNull(host.Scheduler);
@@ -33,7 +36,10 @@ public sealed class TestHostTests
         Assert.Throws<InvalidOperationException>(() => builder.UseDirectoryName("next"));
         Assert.Throws<InvalidOperationException>(() => builder.KeepDirectoryOnDispose());
         Assert.Throws<InvalidOperationException>(() => builder.Build());
-        Assert.Equal("test", host.ApplicationContext.Properties["environment"]);
+        Assert.Equal("test", host.Properties["environment"]);
+
+        var properties = Assert.IsAssignableFrom<IDictionary<string, object?>>(host.Properties);
+        Assert.Throws<NotSupportedException>(() => properties["environment"] = "changed");
     }
 
     [Fact]

@@ -20,14 +20,21 @@ internal static class HeadlessTestScenarios
                 "lifecycle" => await RunLifecycleAsync(),
                 "startup-failure" => await RunStartupFailureAsync(),
                 "shutdown-failure" => await RunShutdownFailureAsync(),
+                "lifecycle-diagnostics" => await RunLifecycleDiagnosticsAsync(),
                 "run-cancellation" => await RunCancellationAsync(),
                 "concurrent-stop" => await RunConcurrentStopAsync(),
                 "reentrant-stop" => await RunReentrantStopAsync(),
                 "service-ordering" => await RunServiceOrderingAsync(),
+                "application-context" => await RunApplicationContextAsync(),
+                "generated-modules" => await RunGeneratedModulesAsync(),
                 _ => new { scenario, success = false, error = "unknown scenario" },
             };
 
-            Console.WriteLine(JsonSerializer.Serialize(result));
+            Console.WriteLine(result is GeneratedModulesScenarioResult generatedModules
+                ? JsonSerializer.Serialize(
+                    generatedModules,
+                    HeadlessJsonSerializerContext.Default.GeneratedModulesScenarioResult)
+                : JsonSerializer.Serialize(result));
             return 0;
         }
         catch (Exception exception)
@@ -41,6 +48,29 @@ internal static class HeadlessTestScenarios
             }));
             return 1;
         }
+    }
+
+    private static async Task<GeneratedModulesScenarioResult> RunGeneratedModulesAsync()
+    {
+        GeneratedHeadlessRecorder.Reset();
+        var builder = CreateBuilder();
+        var host = builder.Build();
+        var loadedModules = host.Services
+            .GetRequiredService<IModuleRegistry>()
+            .Modules
+            .Select(module => module.ModuleType.Name)
+            .ToArray();
+
+        await host.StartAsync();
+        await host.StopAsync();
+        await host.DisposeAsync();
+
+        return new GeneratedModulesScenarioResult(
+            "generated-modules",
+            true,
+            GeneratedHeadlessRecorder.Calls.ToArray(),
+            loadedModules,
+            GeneratedUnusedModule.CreatedCount);
     }
 
     private static async Task<object> RunLifecycleAsync()
@@ -172,6 +202,72 @@ internal static class HeadlessTestScenarios
             hostedStopCount = hostedProbe.StopCount,
             hostScopeState = host.HostScope.State.ToString(),
             diagnostics = diagnostics.Records.Select(record => record.Code).ToArray(),
+        };
+    }
+
+    private static async Task<object> RunLifecycleDiagnosticsAsync()
+    {
+        var builder = CreateBuilder();
+        builder.ConfigureLifecycle(lifecycle =>
+            lifecycle.Use<HeadlessStopFailureMiddleware>(
+                LifecycleStages.ApplicationStop,
+                static (_, _) => ValueTask.FromException(
+                    new InvalidOperationException("headless lifecycle middleware failed"))));
+        builder.ConfigureServices(services =>
+        {
+            services.AddSingleton<HostedProbe>();
+            services.AddSingleton<IHostedService>(provider => provider.GetRequiredService<HostedProbe>());
+        });
+        var host = builder.Build();
+        var diagnostics = host.Services.GetRequiredService<IHostDiagnostics>();
+        var hostedProbe = host.Services.GetRequiredService<HostedProbe>();
+        await host.StartAsync();
+        AggregateException? stopFailure = null;
+
+        try
+        {
+            await host.StopAsync();
+        }
+        catch (AggregateException exception)
+        {
+            stopFailure = exception.Flatten();
+        }
+
+        var hostScopeStateAfterStop = host.HostScope.State.ToString();
+        var middlewareFailure = diagnostics.Records.Single(record =>
+            record.Code == HostDiagnosticIds.LifecycleMiddlewareFailed);
+        var hostFailure = diagnostics.Records.Single(record =>
+            record.Code == HostDiagnosticIds.HostStopFailed);
+
+        try
+        {
+            await host.DisposeAsync();
+        }
+        catch (AggregateException)
+        {
+            // Disposal observes the same failed stop transaction after final cleanup.
+        }
+
+        var operationId = middlewareFailure.Context["operationId"];
+        var summaryOperationId = hostFailure.Context["operationId"];
+
+        return new
+        {
+            scenario = "lifecycle-diagnostics",
+            success = stopFailure?.InnerExceptions.Any(exception =>
+                          exception is InvalidOperationException &&
+                          exception.Message == "headless lifecycle middleware failed") == true &&
+                      hostedProbe.StopCount == 1 &&
+                      hostScopeStateAfterStop == LifecycleScopeState.Stopped.ToString() &&
+                      !string.IsNullOrWhiteSpace(operationId) &&
+                      operationId == summaryOperationId,
+            stage = middlewareFailure.Stage?.Key,
+            middlewareType = middlewareFailure.Context["middlewareType"],
+            operationId,
+            summaryOperationId,
+            exceptionType = middlewareFailure.Context["exceptionType"],
+            hostedStopCount = hostedProbe.StopCount,
+            hostScopeStateAfterStop,
         };
     }
 
@@ -339,10 +435,52 @@ internal static class HeadlessTestScenarios
         };
     }
 
+    private static async Task<object> RunApplicationContextAsync()
+    {
+        var host = CreateBuilder().Build();
+        var context = host.Context;
+        var expectedAppDataPath = Path.GetFullPath(Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            context.ApplicationName));
+        var pathComparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+
+        await host.StartAsync();
+        await host.StopAsync();
+        await host.DisposeAsync();
+
+        return new
+        {
+            scenario = "application-context",
+            success = context.ApplicationId == "AtomUI.City.Core.HeadlessApp" &&
+                      context.ApplicationInstanceId != Guid.Empty &&
+                      !string.IsNullOrWhiteSpace(context.ApplicationVersion) &&
+                      Path.IsPathFullyQualified(context.ContentRootPath) &&
+                      string.Equals(
+                          Path.TrimEndingDirectorySeparator(expectedAppDataPath),
+                          context.AppDataPath,
+                          pathComparison),
+            context.ApplicationId,
+            context.ApplicationInstanceId,
+            context.ApplicationName,
+            context.ApplicationVersion,
+            context.EnvironmentName,
+            context.ContentRootPath,
+            context.AppDataPath,
+            startupArgumentCount = context.StartupArguments.Count,
+        };
+    }
+
     private static IApplicationHostBuilder CreateBuilder()
     {
         var builder = ApplicationHost.CreateBuilder();
-        builder.ConfigureHost(options => options.ShutdownTimeout = TimeSpan.FromSeconds(5));
+        builder.ConfigureHost(options =>
+        {
+            options.ApplicationId = "AtomUI.City.Core.HeadlessApp";
+            options.ApplicationName = "AtomUI.City.Core.HeadlessApp";
+            options.ShutdownTimeout = TimeSpan.FromSeconds(5);
+        });
         builder.ConfigureServices(services =>
             services.AddLogging(logging => logging.ClearProviders()));
         return builder;
@@ -458,6 +596,8 @@ internal static class HeadlessTestScenarios
             return new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         }
     }
+
+    private sealed class HeadlessStopFailureMiddleware;
 
     private interface IHeadlessOrderedService;
 

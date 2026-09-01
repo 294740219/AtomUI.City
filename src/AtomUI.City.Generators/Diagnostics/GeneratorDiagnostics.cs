@@ -5,12 +5,6 @@ namespace AtomUI.City.Generators.Diagnostics;
 
 public static class GeneratorDiagnostics
 {
-    public static readonly GeneratorDiagnosticDefinition DynamicDiscoveryNotAllowed = new GeneratorDiagnosticDefinition(
-        GeneratorDiagnosticIds.DynamicDiscoveryNotAllowed,
-        "Dynamic discovery is not allowed",
-        "Runtime dynamic discovery is not allowed in strict source generation mode.",
-        GeneratorDiagnosticSeverity.Error);
-
     public static readonly GeneratorDiagnosticDefinition DuplicateModuleName = new GeneratorDiagnosticDefinition(
         GeneratorDiagnosticIds.DuplicateModuleName,
         "Duplicate module name",
@@ -41,14 +35,27 @@ public static class GeneratorDiagnostics
         "A view model can only have one presentation view for each view key.",
         GeneratorDiagnosticSeverity.Error);
 
+    public static readonly GeneratorDiagnosticDefinition MultipleApplicationModules = new GeneratorDiagnosticDefinition(
+        GeneratorDiagnosticIds.MultipleApplicationModules,
+        "Multiple application modules",
+        "An application compilation can declare only one ApplicationModule.",
+        GeneratorDiagnosticSeverity.Error);
+
+    public static readonly GeneratorDiagnosticDefinition InvalidGeneratedModule = new GeneratorDiagnosticDefinition(
+        GeneratorDiagnosticIds.InvalidGeneratedModule,
+        "Module cannot be generated",
+        "A generated module does not satisfy the module catalog or application-root contract.",
+        GeneratorDiagnosticSeverity.Error);
+
     public static IReadOnlyList<GeneratorDiagnosticDefinition> All { get; } = Array.AsReadOnly(new[]
     {
-        DynamicDiscoveryNotAllowed,
         DuplicateModuleName,
         CircularModuleDependency,
         DuplicateRoute,
         InvalidManifestInput,
         DuplicatePresentationView,
+        MultipleApplicationModules,
+        InvalidGeneratedModule,
     });
 
     public static Diagnostic CreateRoslynDiagnostic(

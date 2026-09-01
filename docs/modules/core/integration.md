@@ -12,7 +12,9 @@
 | Provider Module | Consumer Module | Contract | Direction | Lifecycle | Threading | Failure Behavior | Tests |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Core / Hosting | AtomUI.City.Core | Core 定义 Host 本体，所有运行时模块都通过 IApplicationHostBuilder、LifecyclePipeline 和 ModuleBase 接入。 | Core -> Module 或执行边界 -> Module | 见 lifecycle.md | 见 threading.md | 启动/执行失败必须有 Result、异常或诊断。 | tests/AtomUI.City.Core.Tests |
-| PluginSystem | AtomUI.City.Core | Core 不加载插件，但提供插件模块复用的 Module、Lifecycle 和 Diagnostics 基础合同。 | Plugin owner/manifest -> Module | load/enable/disable/unload 或 package/template/generator 边界 | 插件后台任务必须可取消 | 贡献撤销失败必须隔离。 | tests/AtomUI.City.Core.Tests |
+| Generators | AtomUI.City.Core | Generator 发出 `GeneratedModuleManifestAttribute` 和强类型 `IModuleRegistrar`；Core Build 消费 registrar 并建立 `ModuleCatalog`。 | Generated assembly metadata -> Core Build | Build 前生成，Build 阶段一次性读取 | Registrar 同步执行，不运行模块业务代码 | 非法 registrar 或 catalog 冲突导致 Build 失败并写 Host 诊断。 | Generator tests; GeneratedModuleCatalogTests |
+| AtomUI.City.Core | Presentation | Core 提供 City Host Start/Stop、Microsoft `IHostApplicationLifetime` 集成点和 `IUiDispatcher` 抽象；Presentation 消费这些合同并协调 Avalonia runtime。 | Core contracts -> Presentation | UI runtime 启停边界 | UI 工作通过 IUiDispatcher | 适配失败由 Presentation 诊断，不改变 Core Host contract。 | Presentation integration tests |
+| AtomUI.City.Core | PluginSystem | Core 提供 Module、Lifecycle、Diagnostics 和 Root Provider 冻结约束；PluginSystem 消费这些合同，并拥有插件发现、隔离服务容器、领域贡献撤销和卸载编排。 | Core contracts -> PluginSystem | load/enable/disable/unload | 插件后台任务必须可取消 | 插件隔离或撤销失败由 PluginSystem 诊断并隔离。 | PluginSystem tests |
 | Testing | AtomUI.City.Core | Feature ID 和产品合同测试。 | Testing -> Module | 构造 -> 执行 -> 断言 -> 释放 | fake dispatcher / deterministic scheduler / snapshot | 测试失败阻止完成状态。 | tests/AtomUI.City.Core.Tests |
 
 ## 集成硬约束

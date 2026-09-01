@@ -21,16 +21,18 @@ public sealed class ApplicationHostBuilderTests
     }
 
     [Fact]
-    public void BuilderDoesNotExposeMutableServiceCollection()
+    public void BuilderDoesNotExposeMutableServiceCollectionOrProperties()
     {
         Assert.Null(typeof(IApplicationHostBuilder).GetProperty("Services"));
         Assert.Null(typeof(ApplicationHostBuilder).GetProperty("Services"));
+        Assert.Null(typeof(IApplicationHostBuilder).GetProperty("Properties"));
+        Assert.Null(typeof(ApplicationHostBuilder).GetProperty("Properties"));
     }
 
     [Fact]
     public async Task BuildCreatesApplicationHostWithServicesAndContext()
     {
-        var builder = ApplicationHost.CreateBuilder(["--mode=test"]);
+        var builder = ApplicationHostTestBuilder.Create(["--mode=test"]);
 
         builder.ConfigureServices(services => services.AddSingleton<TestService>());
 
@@ -38,18 +40,20 @@ public sealed class ApplicationHostBuilderTests
 
         Assert.IsAssignableFrom<IApplicationHost>(host);
         Assert.IsType<TestService>(host.Services.GetRequiredService<TestService>());
-        Assert.Same(host.Services, host.Context.Services);
         Assert.Equal(["--mode=test"], host.Context.StartupArguments);
-        Assert.Same(host.Context.Configuration, builder.Configuration);
-        Assert.False(string.IsNullOrWhiteSpace(host.Context.ApplicationName));
-        Assert.True(Directory.Exists(host.Context.ContentRootPath));
+        Assert.Equal("test", host.Services.GetRequiredService<IConfiguration>()["mode"]);
+        Assert.Equal(ApplicationHostTestBuilder.ApplicationId, host.Context.ApplicationId);
+        Assert.Equal(ApplicationHostTestBuilder.ApplicationName, host.Context.ApplicationName);
+        Assert.NotEqual(Guid.Empty, host.Context.ApplicationInstanceId);
+        Assert.False(string.IsNullOrWhiteSpace(host.Context.ApplicationVersion));
+        Assert.True(Path.IsPathFullyQualified(host.Context.ContentRootPath));
     }
 
     [Fact]
     public async Task ConfigureServicesRunsAfterAllModuleServiceStagesInRegistrationOrder()
     {
         ServiceOrderingModule.Reset();
-        var builder = ApplicationHost.CreateBuilder();
+        var builder = ApplicationHostTestBuilder.Create();
         builder.UseModule<ServiceOrderingModule>();
         builder.ConfigureServices(services =>
         {
@@ -81,7 +85,7 @@ public sealed class ApplicationHostBuilderTests
     [Fact]
     public async Task ConfigureServicesCanRemoveAndReplaceModuleDefaults()
     {
-        var builder = ApplicationHost.CreateBuilder();
+        var builder = ApplicationHostTestBuilder.Create();
         builder.UseModule<ReplaceableServiceModule>();
         builder.ConfigureServices(services =>
         {
@@ -100,7 +104,7 @@ public sealed class ApplicationHostBuilderTests
     public async Task UserServiceCollectionCapturedByCallbackIsFrozenAfterBuild()
     {
         IServiceCollection? capturedServices = null;
-        var builder = ApplicationHost.CreateBuilder();
+        var builder = ApplicationHostTestBuilder.Create();
         builder.ConfigureServices(services =>
         {
             capturedServices = services;
@@ -118,7 +122,7 @@ public sealed class ApplicationHostBuilderTests
     public void UserServiceFailureIsDiagnosedAndFreezesBuilder()
     {
         IServiceCollection? capturedServices = null;
-        var builder = ApplicationHost.CreateBuilder();
+        var builder = ApplicationHostTestBuilder.Create();
         var diagnostics = builder.GetBuildDiagnostics();
         builder.ConfigureServices(services =>
         {
@@ -143,7 +147,7 @@ public sealed class ApplicationHostBuilderTests
     public void ModuleServiceFailureSkipsUserServiceCallbacks()
     {
         var userServicesCalled = false;
-        var builder = ApplicationHost.CreateBuilder();
+        var builder = ApplicationHostTestBuilder.Create();
         builder.UseModule<FailingServiceModule>();
         builder.ConfigureServices(_ => userServicesCalled = true);
 
@@ -155,7 +159,7 @@ public sealed class ApplicationHostBuilderTests
     [Fact]
     public async Task StartupArgumentsRejectExternalListMutation()
     {
-        await using var host = ApplicationHost.CreateBuilder(["--mode=test"]).Build();
+        await using var host = ApplicationHostTestBuilder.Create(["--mode=test"]).Build();
         var arguments = Assert.IsAssignableFrom<IList<string>>(host.Context.StartupArguments);
 
         Assert.Throws<NotSupportedException>(() => arguments[0] = "--mode=changed");
@@ -163,9 +167,46 @@ public sealed class ApplicationHostBuilderTests
     }
 
     [Fact]
+    public async Task StartupArgumentsAreCopiedBeforeBuild()
+    {
+        var source = new[] { "--mode=original" };
+        var builder = ApplicationHostTestBuilder.Create(source);
+        source[0] = "--mode=changed";
+
+        await using var host = builder.Build();
+
+        Assert.Equal("--mode=original", host.Context.StartupArguments[0]);
+    }
+
+    [Fact]
+    public void ApplicationContextPublicContractContainsOnlyImmutableDescriptorFields()
+    {
+        var propertyNames = typeof(IApplicationContext)
+            .GetProperties()
+            .Select(property => property.Name)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal(
+            new[]
+            {
+                "AppDataPath",
+                "ApplicationId",
+                "ApplicationInstanceId",
+                "ApplicationName",
+                "ApplicationVersion",
+                "ContentRootPath",
+                "EnvironmentName",
+                "StartupArguments",
+            },
+            propertyNames);
+        Assert.All(typeof(IApplicationContext).GetProperties(), property => Assert.False(property.CanWrite));
+    }
+
+    [Fact]
     public async Task BuildFreezesPublicBuilderMutationEntrypoints()
     {
-        var builder = ApplicationHost.CreateBuilder();
+        var builder = ApplicationHostTestBuilder.Create();
 
         await using var host = builder.Build();
 
@@ -174,8 +215,6 @@ public sealed class ApplicationHostBuilderTests
         Assert.Throws<InvalidOperationException>(() =>
             builder.ConfigureHost(options => options.ApplicationName = "changed"));
         Assert.Throws<InvalidOperationException>(() =>
-            builder.Properties["changed"] = true);
-        Assert.Throws<InvalidOperationException>(() =>
             builder.Configuration.AddInMemoryCollection(
                 new Dictionary<string, string?> { ["changed"] = "true" }));
     }
@@ -183,7 +222,7 @@ public sealed class ApplicationHostBuilderTests
     [Fact]
     public async Task BuildCanOnlyRunOnce()
     {
-        var builder = ApplicationHost.CreateBuilder();
+        var builder = ApplicationHostTestBuilder.Create();
 
         await using var host = builder.Build();
 
@@ -195,7 +234,7 @@ public sealed class ApplicationHostBuilderTests
     [Fact]
     public async Task BuildFreezesModuleAndLifecycleExtensionStores()
     {
-        var builder = ApplicationHost.CreateBuilder();
+        var builder = ApplicationHostTestBuilder.Create();
         builder.UseModule<LateModule>();
         builder.UseModule<LateModule>();
 
@@ -213,7 +252,7 @@ public sealed class ApplicationHostBuilderTests
     [Fact]
     public void BuildFailureKeepsModuleAndLifecycleExtensionStoresFrozen()
     {
-        var builder = ApplicationHost.CreateBuilder();
+        var builder = ApplicationHostTestBuilder.Create();
         builder.ConfigureHost(_ => builder.UseModule<LateModule>());
 
         var failure = Assert.Throws<InvalidOperationException>(() => builder.Build());

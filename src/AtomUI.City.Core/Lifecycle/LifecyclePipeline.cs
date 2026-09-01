@@ -1,12 +1,14 @@
+using AtomUI.City.Core.Diagnostics;
+
 namespace AtomUI.City.Core.Lifecycle;
 
 public sealed class LifecyclePipeline
 {
-    private readonly IReadOnlyList<LifecycleMiddleware> _middleware;
+    private readonly IReadOnlyList<LifecycleMiddlewareRegistration> _middleware;
     private readonly Func<LifecycleContext, ValueTask> _terminalHandler;
 
     internal LifecyclePipeline(
-        IReadOnlyList<LifecycleMiddleware> middleware,
+        IReadOnlyList<LifecycleMiddlewareRegistration> middleware,
         Func<LifecycleContext, ValueTask> terminalHandler)
     {
         _middleware = middleware;
@@ -23,13 +25,16 @@ public sealed class LifecyclePipeline
     internal async ValueTask ExecuteAsync(
         LifecycleContext context,
         Func<LifecycleContext, ValueTask> terminalHandler,
-        bool guaranteeTerminal)
+        bool guaranteeTerminal,
+        IHostDiagnostics? diagnostics = null)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(terminalHandler);
 
         var terminalInvoked = false;
         Exception? pipelineFailure = null;
+        var attributedFailures = new HashSet<Exception>(ReferenceEqualityComparer.Instance);
+        var terminalFailures = new HashSet<Exception>(ReferenceEqualityComparer.Instance);
 
         try
         {
@@ -78,6 +83,15 @@ public sealed class LifecyclePipeline
                 return;
             }
 
+            var registration = _middleware[index];
+
+            if (registration.Stage is { } stage && context.Stage != stage)
+            {
+                await InvokeAsync(index + 1).ConfigureAwait(false);
+                context.CancellationToken.ThrowIfCancellationRequested();
+                return;
+            }
+
             var nextInvoked = false;
 
             async ValueTask Next()
@@ -91,7 +105,22 @@ public sealed class LifecyclePipeline
                 await InvokeAsync(index + 1).ConfigureAwait(false);
             }
 
-            await _middleware[index](context, Next).ConfigureAwait(false);
+            try
+            {
+                await registration.Handler(context, Next).ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                if (!IsExpectedCancellation(exception) &&
+                    !terminalFailures.Contains(exception) &&
+                    attributedFailures.Add(exception))
+                {
+                    WriteMiddlewareFailure(diagnostics, context, registration, exception);
+                }
+
+                throw;
+            }
+
             context.CancellationToken.ThrowIfCancellationRequested();
         }
 
@@ -108,12 +137,61 @@ public sealed class LifecyclePipeline
             }
 
             terminalInvoked = true;
-            await terminalHandler(context).ConfigureAwait(false);
+
+            try
+            {
+                await terminalHandler(context).ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                terminalFailures.Add(exception);
+                throw;
+            }
 
             if (observeCancellation)
             {
                 context.CancellationToken.ThrowIfCancellationRequested();
             }
+        }
+
+        bool IsExpectedCancellation(Exception exception)
+        {
+            return exception is OperationCanceledException &&
+                   context.CancellationToken.IsCancellationRequested;
+        }
+    }
+
+    private static void WriteMiddlewareFailure(
+        IHostDiagnostics? diagnostics,
+        LifecycleContext context,
+        LifecycleMiddlewareRegistration registration,
+        Exception exception)
+    {
+        if (diagnostics is null)
+        {
+            return;
+        }
+
+        try
+        {
+            diagnostics.Write(new HostDiagnosticRecord(
+                HostDiagnosticIds.LifecycleMiddlewareFailed,
+                "Lifecycle middleware execution failed.",
+                HostDiagnosticSeverity.Error,
+                Stage: context.Stage)
+            {
+                Context = new Dictionary<string, string?>
+                {
+                    ["middlewareType"] = registration.MiddlewareType.FullName
+                                         ?? registration.MiddlewareType.Name,
+                    ["operationId"] = context.OperationId,
+                    ["exceptionType"] = exception.GetType().FullName,
+                },
+            });
+        }
+        catch
+        {
+            // Diagnostics must not replace the original lifecycle failure.
         }
     }
 }

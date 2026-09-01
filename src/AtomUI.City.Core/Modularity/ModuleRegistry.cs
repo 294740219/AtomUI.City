@@ -34,9 +34,20 @@ public sealed class ModuleRegistry : IModuleRegistry, IAsyncDisposable
         {
             foreach (var registration in registrations)
             {
-                entries.Add(new ModuleEntry(
-                    CreateDescriptor(registration.ModuleType),
-                    registration.Factory()));
+                var descriptor = registration.Descriptor
+                    ?? throw new InvalidOperationException(
+                        $"Module '{registration.ModuleType.FullName}' does not have a resolved descriptor.");
+                var module = registration.Factory()
+                    ?? throw new InvalidOperationException(
+                        $"Module factory for '{descriptor.ModuleType.FullName}' returned null.");
+
+                entries.Add(new ModuleEntry(descriptor, module));
+
+                if (!descriptor.ModuleType.IsInstanceOfType(module))
+                {
+                    throw new InvalidOperationException(
+                        $"Module factory for '{descriptor.ModuleType.FullName}' returned '{module.GetType().FullName}'.");
+                }
             }
 
             return new ModuleRegistry(OrderByDependencies(entries));
@@ -54,7 +65,7 @@ public sealed class ModuleRegistry : IModuleRegistry, IAsyncDisposable
 
         var registrations = moduleTypes
             .Select(moduleType => new ModuleRegistration(
-                moduleType,
+                ModuleDescriptorFactory.CreateFromAttributes(moduleType),
                 () => (IModule)Activator.CreateInstance(moduleType)!))
             .ToArray();
 
@@ -62,7 +73,7 @@ public sealed class ModuleRegistry : IModuleRegistry, IAsyncDisposable
     }
 
     public async ValueTask ConfigureServicesAsync(
-        ApplicationContext applicationContext,
+        IApplicationContext applicationContext,
         IServiceCollection services,
         CancellationToken cancellationToken = default)
     {
@@ -77,7 +88,7 @@ public sealed class ModuleRegistry : IModuleRegistry, IAsyncDisposable
     }
 
     internal async ValueTask ConfigureServicesAsync(
-        ApplicationContext applicationContext,
+        IApplicationContext applicationContext,
         IServiceCollection services,
         IHostDiagnostics diagnostics,
         CancellationToken cancellationToken = default)
@@ -94,7 +105,7 @@ public sealed class ModuleRegistry : IModuleRegistry, IAsyncDisposable
     }
 
     private async ValueTask ConfigureServicesCoreAsync(
-        ApplicationContext applicationContext,
+        IApplicationContext applicationContext,
         IServiceCollection services,
         IHostDiagnostics? diagnostics,
         CancellationToken cancellationToken)
@@ -143,7 +154,7 @@ public sealed class ModuleRegistry : IModuleRegistry, IAsyncDisposable
     }
 
     public async ValueTask ConfigureContributionsAsync(
-        ApplicationContext applicationContext,
+        IApplicationContext applicationContext,
         IServiceProvider services,
         CancellationToken cancellationToken = default)
     {
@@ -174,7 +185,7 @@ public sealed class ModuleRegistry : IModuleRegistry, IAsyncDisposable
     }
 
     public async ValueTask InitializeAsync(
-        ApplicationContext applicationContext,
+        IApplicationContext applicationContext,
         IServiceProvider services,
         CancellationToken cancellationToken = default)
     {
@@ -218,7 +229,7 @@ public sealed class ModuleRegistry : IModuleRegistry, IAsyncDisposable
     }
 
     public ValueTask ShutdownAsync(
-        ApplicationContext applicationContext,
+        IApplicationContext applicationContext,
         IServiceProvider services,
         CancellationToken cancellationToken = default)
     {
@@ -287,7 +298,7 @@ public sealed class ModuleRegistry : IModuleRegistry, IAsyncDisposable
     }
 
     private async Task ShutdownCoreAsync(
-        ApplicationContext applicationContext,
+        IApplicationContext applicationContext,
         IServiceProvider services,
         CancellationToken cancellationToken)
     {
@@ -410,26 +421,6 @@ public sealed class ModuleRegistry : IModuleRegistry, IAsyncDisposable
                 token => invoke(entry.Module, context, token),
                 cancellationToken).ConfigureAwait(false);
         }
-    }
-
-    private static ModuleDescriptor CreateDescriptor(Type moduleType)
-    {
-        var attribute = moduleType
-            .GetCustomAttributes(typeof(ModuleAttribute), inherit: false)
-            .OfType<ModuleAttribute>()
-            .SingleOrDefault();
-        var dependencies = moduleType
-            .GetCustomAttributes(typeof(DependsOnAttribute), inherit: false)
-            .OfType<DependsOnAttribute>()
-            .Select(attribute => new ModuleDependencyDescriptor(attribute.ModuleType, attribute.Optional))
-            .ToArray();
-
-        return new ModuleDescriptor(
-            attribute?.Name ?? moduleType.FullName ?? moduleType.Name,
-            moduleType,
-            attribute?.Version,
-            attribute?.Description,
-            dependencies);
     }
 
     private static IReadOnlyList<ModuleEntry> OrderByDependencies(IReadOnlyList<ModuleEntry> entries)

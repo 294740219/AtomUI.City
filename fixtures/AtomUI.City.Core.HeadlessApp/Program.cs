@@ -12,6 +12,11 @@ internal static class Program
         }
 
         var builder = ApplicationHost.CreateBuilder(args);
+        builder.ConfigureHost(options =>
+        {
+            options.ApplicationId = "AtomUI.City.Core.HeadlessApp";
+            options.ApplicationName = "AtomUI.City.Core.HeadlessApp";
+        });
         await using var host = builder.Build();
 
         Console.WriteLine("Starting...");

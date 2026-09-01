@@ -10,7 +10,7 @@ public sealed class UiDispatcherIntegrationTests
     [Fact]
     public async Task ApplicationHostRegistersUnavailableUiDispatcherByDefault()
     {
-        await using var host = ApplicationHost.CreateBuilder().Build();
+        await using var host = ApplicationHostTestBuilder.Create().Build();
 
         var dispatcher = host.Services.GetRequiredService<IUiDispatcher>();
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
@@ -47,7 +47,7 @@ public sealed class UiDispatcherIntegrationTests
     public async Task ApplicationHostAllowsUiDispatcherReplacementBeforeBuild()
     {
         var dispatcher = new InlineUiDispatcher();
-        var builder = ApplicationHost.CreateBuilder();
+        var builder = ApplicationHostTestBuilder.Create();
 
         builder.ConfigureServices(services => services.AddSingleton<IUiDispatcher>(dispatcher));
 

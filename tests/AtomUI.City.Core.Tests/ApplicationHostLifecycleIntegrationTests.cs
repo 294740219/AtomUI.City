@@ -8,7 +8,7 @@ public sealed class ApplicationHostLifecycleIntegrationTests
     [Fact]
     public async Task HostStartAndStopManageHostAndApplicationScopes()
     {
-        await using var host = ApplicationHost.CreateBuilder().Build();
+        await using var host = ApplicationHostTestBuilder.Create().Build();
 
         Assert.Equal(LifecycleScopeKind.Host, host.HostScope.Kind);
         Assert.Equal(LifecycleScopeState.Running, host.HostScope.State);

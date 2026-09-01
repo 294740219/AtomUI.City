@@ -8,7 +8,7 @@ namespace AtomUI.City.Core.Tests;
 public sealed class HostDiagnosticsTests
 {
     [Fact]
-    public void HostDiagnosticIdsIncludePhaseOneFailureCodes()
+    public void HostDiagnosticIdsMatchDocumentedCatalog()
     {
         Assert.Equal("AUCHOST001", HostDiagnosticIds.HostBuilt);
         Assert.Equal("AUCHOST002", HostDiagnosticIds.HostStarted);
@@ -20,6 +20,7 @@ public sealed class HostDiagnosticsTests
         Assert.Equal("AUCHOST105", HostDiagnosticIds.ModuleGraphFailed);
         Assert.Equal("AUCHOST106", HostDiagnosticIds.ModuleLifecycleFailed);
         Assert.Equal("AUCHOST107", HostDiagnosticIds.DispatcherUnavailable);
+        Assert.Equal("AUCHOST108", HostDiagnosticIds.LifecycleMiddlewareFailed);
     }
 
     [Fact]
@@ -48,7 +49,7 @@ public sealed class HostDiagnosticsTests
     [Fact]
     public async Task ApplicationHostRegistersDiagnosticsAndRecordsHostLifecycleEvents()
     {
-        await using var host = ApplicationHost.CreateBuilder().Build();
+        await using var host = ApplicationHostTestBuilder.Create().Build();
         var diagnostics = host.Services.GetRequiredService<IHostDiagnostics>();
 
         Assert.Contains(diagnostics.Records, record => record.Code == HostDiagnosticIds.HostBuilt);
@@ -102,7 +103,7 @@ public sealed class HostDiagnosticsTests
     [Fact]
     public void BuildFailureCanBeInspectedFromBuilderDiagnostics()
     {
-        var builder = ApplicationHost.CreateBuilder();
+        var builder = ApplicationHostTestBuilder.Create();
         var diagnostics = builder.GetBuildDiagnostics();
         builder.UseModule<MissingDependencyModule>();
 

@@ -9,7 +9,6 @@ public static class BuildMsBuildContract
         "AtomUICityValidateManifests",
         "AtomUICityEnableAnalyzers",
         "AtomUICitySourceGenerationMode",
-        "AtomUICityAllowDynamicDiscovery",
         "AtomUICityStrictAot",
         "AtomUICityPackagePlugin",
         "AtomUICityPackageApplication",

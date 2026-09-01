@@ -92,6 +92,7 @@ public sealed class SourceGeneratorProjectStructureTests
         Assert.Contains(
             buildProps.Descendants("CompilerVisibleProperty"),
             property => property.Attribute("Include")?.Value == "IsTestProject");
+        Assert.Empty(buildProps.Descendants("AtomUICityAllowDynamicDiscovery"));
 
         var packedItems = buildProject
             .Descendants("None")

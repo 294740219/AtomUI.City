@@ -91,6 +91,7 @@
 
 ```csharp
 var host = TestHost.CreateBuilder()
+    .UseProperty("scenario", "module-start")
     .UseConfiguration(values => { })
     .UseModule<TestModule>()
     .UseRoutingTesting()
@@ -98,6 +99,8 @@ var host = TestHost.CreateBuilder()
     .UsePluginTesting()
     .Build();
 ```
+
+`UseProperty` 只构造 `TestHost.Properties` 的只读测试数据快照，不向生产 `IApplicationContext` 注入动态字段。测试 Context 与生产合同一致，只包含不可变应用实例描述字段。
 
 命名可以在实现阶段调整，但设计要求保持 builder 风格，符合 .NET 扩展方法习惯。
 

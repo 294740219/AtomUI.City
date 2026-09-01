@@ -1,49 +1,55 @@
-using Microsoft.Extensions.Configuration;
-
 namespace AtomUI.City.Core.Hosting;
 
-public sealed class ApplicationContext : IApplicationContext
+internal sealed class ApplicationContext : IApplicationContext
 {
-    private IReadOnlyList<string> _startupArguments = Array.AsReadOnly(Array.Empty<string>());
-
-    private sealed class NullServiceProvider : IServiceProvider
+    public ApplicationContext(
+        string applicationId,
+        Guid applicationInstanceId,
+        string applicationName,
+        string applicationVersion,
+        string environmentName,
+        string contentRootPath,
+        string appDataPath,
+        IReadOnlyList<string> startupArguments)
     {
-        public static readonly NullServiceProvider Instance = new();
+        ArgumentException.ThrowIfNullOrWhiteSpace(applicationId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(applicationName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(applicationVersion);
+        ArgumentException.ThrowIfNullOrWhiteSpace(environmentName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(contentRootPath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(appDataPath);
+        ArgumentNullException.ThrowIfNull(startupArguments);
 
-        private NullServiceProvider()
+        if (applicationInstanceId == Guid.Empty)
         {
+            throw new ArgumentException(
+                "Application instance id cannot be empty.",
+                nameof(applicationInstanceId));
         }
 
-        public object? GetService(Type serviceType)
-        {
-            return null;
-        }
+        ApplicationId = applicationId;
+        ApplicationInstanceId = applicationInstanceId;
+        ApplicationName = applicationName;
+        ApplicationVersion = applicationVersion;
+        EnvironmentName = environmentName;
+        ContentRootPath = contentRootPath;
+        AppDataPath = appDataPath;
+        StartupArguments = Array.AsReadOnly(startupArguments.ToArray());
     }
 
-    public string ApplicationName { get; internal set; } = "AtomUI.City.Application";
+    public string ApplicationId { get; }
 
-    public string EnvironmentName { get; internal set; } = "Production";
+    public Guid ApplicationInstanceId { get; }
 
-    public string ContentRootPath { get; internal set; } = Directory.GetCurrentDirectory();
+    public string ApplicationName { get; }
 
-    public string AppDataPath { get; internal set; } = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "AtomUI.City.Application");
+    public string ApplicationVersion { get; }
 
-    public IReadOnlyList<string> StartupArguments
-    {
-        get => _startupArguments;
-        internal set
-        {
-            ArgumentNullException.ThrowIfNull(value);
+    public string EnvironmentName { get; }
 
-            _startupArguments = Array.AsReadOnly(value.ToArray());
-        }
-    }
+    public string ContentRootPath { get; }
 
-    public IConfiguration Configuration { get; internal set; } = new ConfigurationBuilder().Build();
+    public string AppDataPath { get; }
 
-    public IServiceProvider Services { get; internal set; } = NullServiceProvider.Instance;
-
-    public IDictionary<string, object?> Properties { get; } = new Dictionary<string, object?>();
+    public IReadOnlyList<string> StartupArguments { get; }
 }

@@ -4,7 +4,7 @@ namespace AtomUI.City.Core.Modularity;
 
 public sealed class ModuleContext
 {
-    public ModuleContext(string name, ApplicationContext applicationContext)
+    public ModuleContext(string name, IApplicationContext applicationContext)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(applicationContext);
@@ -15,5 +15,5 @@ public sealed class ModuleContext
 
     public string Name { get; }
 
-    public ApplicationContext ApplicationContext { get; }
+    public IApplicationContext ApplicationContext { get; }
 }
