@@ -172,7 +172,7 @@ public sealed class EngineeringGateTests
     }
 
     [Fact]
-    public void PublicApiScriptFallsBackWhenRipgrepIsUnavailable()
+    public void PublicApiScriptBuildsAndPacksCoreAgainstItsApiBaseline()
     {
         var repositoryRoot = RepositoryPaths.FindRepositoryRoot();
         var scriptPath = Path.Combine(repositoryRoot, EngineeringScriptsDirectoryName, "check-public-api.sh");
@@ -181,9 +181,61 @@ public sealed class EngineeringGateTests
 
         var script = File.ReadAllText(scriptPath);
 
-        Assert.Contains("command -v rg", script, StringComparison.Ordinal);
-        Assert.Contains("find src -name '*.cs' -print0", script, StringComparison.Ordinal);
-        Assert.Contains("xargs -0 grep", script, StringComparison.Ordinal);
+        Assert.Contains("PublicAPI.Shipped.txt", script, StringComparison.Ordinal);
+        Assert.Contains("PublicAPI.Unshipped.txt", script, StringComparison.Ordinal);
+        Assert.Contains("dotnet restore", script, StringComparison.Ordinal);
+        Assert.Contains("dotnet build", script, StringComparison.Ordinal);
+        Assert.Contains("dotnet pack", script, StringComparison.Ordinal);
+        Assert.Contains("TreatWarningsAsErrors", script, StringComparison.Ordinal);
+        Assert.Contains("AtomUI.City.Core.sourcelink.json", script, StringComparison.Ordinal);
+        Assert.Contains("https://raw.githubusercontent.com/", script, StringComparison.Ordinal);
+        Assert.Contains("git rev-parse HEAD", script, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PackageMetadataUsesUpstreamProjectAndSourceControlledRepositoryUrl()
+    {
+        var repositoryRoot = RepositoryPaths.FindRepositoryRoot();
+        var packageMetadataPath = Path.Combine(repositoryRoot, "build", "PackageMetaInfo.props");
+        var packageMetadata = File.ReadAllText(packageMetadataPath);
+
+        Assert.Contains(
+            "<ProjectUrl>https://github.com/AtomUI/AtomUI.City</ProjectUrl>",
+            packageMetadata,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("<RepositoryUrl>", packageMetadata, StringComparison.Ordinal);
+        Assert.Contains("<PublishRepositoryUrl>true</PublishRepositoryUrl>", packageMetadata, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CoreFeatureStatusesStaySynchronized()
+    {
+        var repositoryRoot = RepositoryPaths.FindRepositoryRoot();
+        var features = File.ReadAllText(Path.Combine(repositoryRoot, "docs", "modules", "core", "features.md"));
+        var testing = File.ReadAllText(Path.Combine(repositoryRoot, "docs", "modules", "core", "testing.md"));
+        var expectedIds = Enumerable.Range(1, 8)
+            .Select(number => $"AUC-CORE-{number:D3}")
+            .ToArray();
+
+        var indexStatuses = ReadStatuses(
+            features,
+            "^\\| (?<id>AUC-CORE-\\d{3}) \\| [^|]+ \\| (?<status>[^ |]+) \\|");
+        var detailStatuses = ReadStatuses(
+            features,
+            "^Feature ID: `(?<id>AUC-CORE-\\d{3})`\\r?\\nStatus: (?<status>\\S+)$");
+        var testingStatuses = ReadStatuses(
+            testing,
+            "^\\| (?<id>AUC-CORE-\\d{3}) \\|.*\\| (?<status>[^ |]+) \\|$");
+
+        Assert.Equal(expectedIds, indexStatuses.Keys.Order(StringComparer.Ordinal));
+        Assert.Equal(expectedIds, detailStatuses.Keys.Order(StringComparer.Ordinal));
+        Assert.Equal(expectedIds, testingStatuses.Keys.Order(StringComparer.Ordinal));
+
+        foreach (var featureId in expectedIds)
+        {
+            Assert.Equal(indexStatuses[featureId], detailStatuses[featureId]);
+            Assert.Equal(indexStatuses[featureId], testingStatuses[featureId]);
+        }
     }
 
     [Fact]
@@ -238,5 +290,17 @@ public sealed class EngineeringGateTests
         {
             yield return $"{relativePath}: {match.Groups["value"].Value}";
         }
+    }
+
+    private static IReadOnlyDictionary<string, string> ReadStatuses(string content, string pattern)
+    {
+        return Regex.Matches(
+                content,
+                pattern,
+                RegexOptions.CultureInvariant | RegexOptions.Multiline)
+            .ToDictionary(
+                match => match.Groups["id"].Value,
+                match => match.Groups["status"].Value,
+                StringComparer.Ordinal);
     }
 }

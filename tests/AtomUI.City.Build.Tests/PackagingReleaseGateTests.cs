@@ -73,6 +73,38 @@ public sealed class PackagingReleaseGateTests
     }
 
     [Fact]
+    public void CorePublicApiGateUsesFrozenBaselineAnalyzersAndPackageValidation()
+    {
+        var repositoryRoot = RepositoryPaths.FindRepositoryRoot();
+        var centralPackages = XDocument.Load(Path.Combine(repositoryRoot, "Directory.Packages.props"));
+        var coreProject = XDocument.Load(Path.Combine(repositoryRoot, "src", "AtomUI.City.Core", "AtomUI.City.Core.csproj"));
+        var coreProperties = ReadProperties(coreProject);
+        var shippedApiPath = Path.Combine(repositoryRoot, "src", "AtomUI.City.Core", "PublicAPI.Shipped.txt");
+        var unshippedApiPath = Path.Combine(repositoryRoot, "src", "AtomUI.City.Core", "PublicAPI.Unshipped.txt");
+
+        var analyzerVersion = centralPackages
+            .Descendants("PackageVersion")
+            .Single(reference => reference.Attribute("Include")?.Value == "Microsoft.CodeAnalysis.PublicApiAnalyzers")
+            .Attribute("Version")?.Value;
+        var analyzerReference = coreProject
+            .Descendants("PackageReference")
+            .Single(reference => reference.Attribute("Include")?.Value == "Microsoft.CodeAnalysis.PublicApiAnalyzers");
+
+        Assert.False(string.IsNullOrWhiteSpace(analyzerVersion));
+        Assert.Equal("all", analyzerReference.Attribute("PrivateAssets")?.Value);
+        Assert.Equal("true", coreProperties["EnablePackageValidation"]);
+        Assert.Equal("true", coreProperties["EnableStrictModeForCompatibleFrameworksInPackage"]);
+        Assert.Contains("CS1591", coreProperties["WarningsAsErrors"], StringComparison.Ordinal);
+        Assert.Contains("RS0016", coreProperties["WarningsAsErrors"], StringComparison.Ordinal);
+        Assert.Contains("RS0017", coreProperties["WarningsAsErrors"], StringComparison.Ordinal);
+        Assert.True(File.Exists(shippedApiPath));
+        Assert.True(File.Exists(unshippedApiPath));
+        Assert.Contains(
+            File.ReadLines(shippedApiPath),
+            line => !string.IsNullOrWhiteSpace(line) && !line.StartsWith('#'));
+    }
+
+    [Fact]
     public void GeneratorPackageSuppressesDependenciesWhenPacking()
     {
         var repositoryRoot = RepositoryPaths.FindRepositoryRoot();
@@ -166,10 +198,14 @@ public sealed class PackagingReleaseGateTests
         Assert.Contains("Plugin API compatibility", releaseNotesScript, StringComparison.Ordinal);
 
         var publicApiScript = File.ReadAllText(publicApiScriptPath);
-        Assert.Contains("output/public-api", publicApiScript, StringComparison.Ordinal);
-        Assert.Contains("public-api.txt", publicApiScript, StringComparison.Ordinal);
-        Assert.Contains("GenerateDocumentationFile", publicApiScript, StringComparison.Ordinal);
-        Assert.Contains("xml", publicApiScript, StringComparison.Ordinal);
+        Assert.Contains("PublicAPI.Shipped.txt", publicApiScript, StringComparison.Ordinal);
+        Assert.Contains("PublicAPI.Unshipped.txt", publicApiScript, StringComparison.Ordinal);
+        Assert.Contains("Microsoft.CodeAnalysis.PublicApiAnalyzers", publicApiScript, StringComparison.Ordinal);
+        Assert.Contains("dotnet restore", publicApiScript, StringComparison.Ordinal);
+        Assert.Contains("dotnet build", publicApiScript, StringComparison.Ordinal);
+        Assert.Contains("dotnet pack", publicApiScript, StringComparison.Ordinal);
+        Assert.Contains("EnablePackageValidation", publicApiScript, StringComparison.Ordinal);
+        Assert.Contains("AtomUI.City.Core.xml", publicApiScript, StringComparison.Ordinal);
     }
 
     [Fact]

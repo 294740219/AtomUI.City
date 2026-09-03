@@ -6,8 +6,7 @@
     <Authors>$(Author)</Authors>
     <Description>AtomUI.City is a full-stack application framework for Avalonia and AtomUI applications.</Description>
     <PackageTags>avalonia;AtomUI;full-stack;framework;desktop</PackageTags>
-    <ProjectUrl>https://github.com/AtomUI/AtomUICity</ProjectUrl>
-    <RepositoryUrl>https://github.com/AtomUI/AtomUICity</RepositoryUrl>
+    <ProjectUrl>https://github.com/AtomUI/AtomUI.City</ProjectUrl>
     <Company>Qinware Technologies Ltd.</Company>
     <Copyright>Copyright (c) 2018-2026, Qinware Technologies Co.,Ltd., All Rights Reserved.</Copyright>
     <PackageLicenseExpression>LGPL-3.0-only</PackageLicenseExpression>

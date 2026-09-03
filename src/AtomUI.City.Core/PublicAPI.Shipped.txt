@@ -1,0 +1,352 @@
+#nullable enable
+AtomUI.City.Core.DependencyInjection.ExposeServicesAttribute
+AtomUI.City.Core.DependencyInjection.ExposeServicesAttribute.ExposeServicesAttribute(params System.Type![]! serviceTypes) -> void
+AtomUI.City.Core.DependencyInjection.ExposeServicesAttribute.ServiceTypes.get -> System.Type![]!
+AtomUI.City.Core.DependencyInjection.GeneratedServiceManifestAttribute
+AtomUI.City.Core.DependencyInjection.GeneratedServiceManifestAttribute.GeneratedServiceManifestAttribute(System.Type! registrarType) -> void
+AtomUI.City.Core.DependencyInjection.GeneratedServiceManifestAttribute.RegistrarType.get -> System.Type!
+AtomUI.City.Core.DependencyInjection.IScopedDependency
+AtomUI.City.Core.DependencyInjection.IServiceRegistrar
+AtomUI.City.Core.DependencyInjection.IServiceRegistrar.Register(AtomUI.City.Core.DependencyInjection.IServiceRegistrarContext! context) -> void
+AtomUI.City.Core.DependencyInjection.IServiceRegistrarContext
+AtomUI.City.Core.DependencyInjection.IServiceRegistrarContext.Register(System.Type! ownerModuleType, System.Action<Microsoft.Extensions.DependencyInjection.IServiceCollection!>! registration) -> void
+AtomUI.City.Core.DependencyInjection.IServiceRegistrarContext.RegisterRegistrar(System.Type! registrarType, System.Func<AtomUI.City.Core.DependencyInjection.IServiceRegistrar!>! registrarFactory) -> void
+AtomUI.City.Core.DependencyInjection.ISingletonDependency
+AtomUI.City.Core.DependencyInjection.ITransientDependency
+AtomUI.City.Core.DependencyInjection.ScopedServiceAttribute
+AtomUI.City.Core.DependencyInjection.ScopedServiceAttribute.Key.get -> string?
+AtomUI.City.Core.DependencyInjection.ScopedServiceAttribute.Key.set -> void
+AtomUI.City.Core.DependencyInjection.ScopedServiceAttribute.Lifetime.get -> Microsoft.Extensions.DependencyInjection.ServiceLifetime
+AtomUI.City.Core.DependencyInjection.ScopedServiceAttribute.Replace.get -> bool
+AtomUI.City.Core.DependencyInjection.ScopedServiceAttribute.Replace.set -> void
+AtomUI.City.Core.DependencyInjection.ScopedServiceAttribute.ScopedServiceAttribute(params System.Type![]! serviceTypes) -> void
+AtomUI.City.Core.DependencyInjection.ScopedServiceAttribute.ServiceTypes.get -> System.Type![]!
+AtomUI.City.Core.DependencyInjection.ScopedServiceAttribute.TryAdd.get -> bool
+AtomUI.City.Core.DependencyInjection.ScopedServiceAttribute.TryAdd.set -> void
+AtomUI.City.Core.DependencyInjection.ServiceAttribute
+AtomUI.City.Core.DependencyInjection.ServiceAttribute.Key.get -> string?
+AtomUI.City.Core.DependencyInjection.ServiceAttribute.Key.set -> void
+AtomUI.City.Core.DependencyInjection.ServiceAttribute.Lifetime.get -> Microsoft.Extensions.DependencyInjection.ServiceLifetime
+AtomUI.City.Core.DependencyInjection.ServiceAttribute.Replace.get -> bool
+AtomUI.City.Core.DependencyInjection.ServiceAttribute.Replace.set -> void
+AtomUI.City.Core.DependencyInjection.ServiceAttribute.ServiceAttribute(Microsoft.Extensions.DependencyInjection.ServiceLifetime lifetime) -> void
+AtomUI.City.Core.DependencyInjection.ServiceAttribute.TryAdd.get -> bool
+AtomUI.City.Core.DependencyInjection.ServiceAttribute.TryAdd.set -> void
+AtomUI.City.Core.DependencyInjection.ServiceRegistrationOwnerAttribute
+AtomUI.City.Core.DependencyInjection.ServiceRegistrationOwnerAttribute.ServiceRegistrationOwnerAttribute() -> void
+AtomUI.City.Core.Diagnostics.ApplicationHostBuilderDiagnosticsExtensions
+AtomUI.City.Core.Diagnostics.HostDiagnosticIds
+AtomUI.City.Core.Diagnostics.HostDiagnosticRecord
+AtomUI.City.Core.Diagnostics.HostDiagnosticRecord.<Clone>$() -> AtomUI.City.Core.Diagnostics.HostDiagnosticRecord!
+AtomUI.City.Core.Diagnostics.HostDiagnosticRecord.Code.get -> string!
+AtomUI.City.Core.Diagnostics.HostDiagnosticRecord.Code.init -> void
+AtomUI.City.Core.Diagnostics.HostDiagnosticRecord.Context.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string?>!
+AtomUI.City.Core.Diagnostics.HostDiagnosticRecord.Context.init -> void
+AtomUI.City.Core.Diagnostics.HostDiagnosticRecord.Deconstruct(out string! code, out string! message, out AtomUI.City.Core.Diagnostics.HostDiagnosticSeverity severity, out string? scopeId, out AtomUI.City.Core.Lifecycle.LifecycleStage? stage) -> void
+AtomUI.City.Core.Diagnostics.HostDiagnosticRecord.Equals(AtomUI.City.Core.Diagnostics.HostDiagnosticRecord? other) -> bool
+AtomUI.City.Core.Diagnostics.HostDiagnosticRecord.HostDiagnosticRecord(string! Code, string! Message, AtomUI.City.Core.Diagnostics.HostDiagnosticSeverity Severity, string? ScopeId = null, AtomUI.City.Core.Lifecycle.LifecycleStage? Stage = null) -> void
+AtomUI.City.Core.Diagnostics.HostDiagnosticRecord.Message.get -> string!
+AtomUI.City.Core.Diagnostics.HostDiagnosticRecord.Message.init -> void
+AtomUI.City.Core.Diagnostics.HostDiagnosticRecord.ScopeId.get -> string?
+AtomUI.City.Core.Diagnostics.HostDiagnosticRecord.ScopeId.init -> void
+AtomUI.City.Core.Diagnostics.HostDiagnosticRecord.Severity.get -> AtomUI.City.Core.Diagnostics.HostDiagnosticSeverity
+AtomUI.City.Core.Diagnostics.HostDiagnosticRecord.Severity.init -> void
+AtomUI.City.Core.Diagnostics.HostDiagnosticRecord.Stage.get -> AtomUI.City.Core.Lifecycle.LifecycleStage?
+AtomUI.City.Core.Diagnostics.HostDiagnosticRecord.Stage.init -> void
+AtomUI.City.Core.Diagnostics.HostDiagnosticSeverity
+AtomUI.City.Core.Diagnostics.HostDiagnosticSeverity.Error = 3 -> AtomUI.City.Core.Diagnostics.HostDiagnosticSeverity
+AtomUI.City.Core.Diagnostics.HostDiagnosticSeverity.Info = 1 -> AtomUI.City.Core.Diagnostics.HostDiagnosticSeverity
+AtomUI.City.Core.Diagnostics.HostDiagnosticSeverity.Trace = 0 -> AtomUI.City.Core.Diagnostics.HostDiagnosticSeverity
+AtomUI.City.Core.Diagnostics.HostDiagnosticSeverity.Warning = 2 -> AtomUI.City.Core.Diagnostics.HostDiagnosticSeverity
+AtomUI.City.Core.Diagnostics.IHostDiagnostics
+AtomUI.City.Core.Diagnostics.IHostDiagnostics.Complete() -> void
+AtomUI.City.Core.Diagnostics.IHostDiagnostics.Records.get -> System.Collections.Generic.IReadOnlyList<AtomUI.City.Core.Diagnostics.HostDiagnosticRecord!>!
+AtomUI.City.Core.Diagnostics.IHostDiagnostics.Write(AtomUI.City.Core.Diagnostics.HostDiagnosticRecord! record) -> void
+AtomUI.City.Core.Diagnostics.InMemoryHostDiagnostics
+AtomUI.City.Core.Diagnostics.InMemoryHostDiagnostics.Capacity.get -> int?
+AtomUI.City.Core.Diagnostics.InMemoryHostDiagnostics.Complete() -> void
+AtomUI.City.Core.Diagnostics.InMemoryHostDiagnostics.Dispose() -> void
+AtomUI.City.Core.Diagnostics.InMemoryHostDiagnostics.DroppedCount.get -> long
+AtomUI.City.Core.Diagnostics.InMemoryHostDiagnostics.InMemoryHostDiagnostics() -> void
+AtomUI.City.Core.Diagnostics.InMemoryHostDiagnostics.InMemoryHostDiagnostics(int capacity) -> void
+AtomUI.City.Core.Diagnostics.InMemoryHostDiagnostics.Records.get -> System.Collections.Generic.IReadOnlyList<AtomUI.City.Core.Diagnostics.HostDiagnosticRecord!>!
+AtomUI.City.Core.Diagnostics.InMemoryHostDiagnostics.Write(AtomUI.City.Core.Diagnostics.HostDiagnosticRecord! record) -> void
+AtomUI.City.Core.Hosting.ApplicationHost
+AtomUI.City.Core.Hosting.ApplicationHostOptions
+AtomUI.City.Core.Hosting.ApplicationHostOptions.ApplicationHostOptions() -> void
+AtomUI.City.Core.Hosting.ApplicationHostOptions.ApplicationId.get -> string?
+AtomUI.City.Core.Hosting.ApplicationHostOptions.ApplicationId.set -> void
+AtomUI.City.Core.Hosting.ApplicationHostOptions.ApplicationName.get -> string?
+AtomUI.City.Core.Hosting.ApplicationHostOptions.ApplicationName.set -> void
+AtomUI.City.Core.Hosting.ApplicationHostOptions.ApplicationVersion.get -> string?
+AtomUI.City.Core.Hosting.ApplicationHostOptions.ApplicationVersion.set -> void
+AtomUI.City.Core.Hosting.ApplicationHostOptions.DiagnosticsCapacity.get -> int
+AtomUI.City.Core.Hosting.ApplicationHostOptions.DiagnosticsCapacity.set -> void
+AtomUI.City.Core.Hosting.ApplicationHostOptions.ShutdownTimeout.get -> System.TimeSpan
+AtomUI.City.Core.Hosting.ApplicationHostOptions.ShutdownTimeout.set -> void
+AtomUI.City.Core.Hosting.IApplicationContext
+AtomUI.City.Core.Hosting.IApplicationContext.AppDataPath.get -> string!
+AtomUI.City.Core.Hosting.IApplicationContext.ApplicationId.get -> string!
+AtomUI.City.Core.Hosting.IApplicationContext.ApplicationInstanceId.get -> System.Guid
+AtomUI.City.Core.Hosting.IApplicationContext.ApplicationName.get -> string!
+AtomUI.City.Core.Hosting.IApplicationContext.ApplicationVersion.get -> string!
+AtomUI.City.Core.Hosting.IApplicationContext.ContentRootPath.get -> string!
+AtomUI.City.Core.Hosting.IApplicationContext.EnvironmentName.get -> string!
+AtomUI.City.Core.Hosting.IApplicationContext.StartupArguments.get -> System.Collections.Generic.IReadOnlyList<string!>!
+AtomUI.City.Core.Hosting.IApplicationHost
+AtomUI.City.Core.Hosting.IApplicationHost.ApplicationScope.get -> AtomUI.City.Core.Lifecycle.LifecycleScope?
+AtomUI.City.Core.Hosting.IApplicationHost.Context.get -> AtomUI.City.Core.Hosting.IApplicationContext!
+AtomUI.City.Core.Hosting.IApplicationHost.HostScope.get -> AtomUI.City.Core.Lifecycle.LifecycleScope!
+AtomUI.City.Core.Hosting.IApplicationHost.RunAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+AtomUI.City.Core.Hosting.IApplicationHost.Services.get -> System.IServiceProvider!
+AtomUI.City.Core.Hosting.IApplicationHost.StartAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+AtomUI.City.Core.Hosting.IApplicationHost.StopAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+AtomUI.City.Core.Hosting.IApplicationHostBuilder
+AtomUI.City.Core.Hosting.IApplicationHostBuilder.Build() -> AtomUI.City.Core.Hosting.IApplicationHost!
+AtomUI.City.Core.Hosting.IApplicationHostBuilder.Configuration.get -> Microsoft.Extensions.Configuration.IConfigurationManager!
+AtomUI.City.Core.Hosting.IApplicationHostBuilder.ConfigureHost(System.Action<AtomUI.City.Core.Hosting.ApplicationHostOptions!>! configureOptions) -> AtomUI.City.Core.Hosting.IApplicationHostBuilder!
+AtomUI.City.Core.Hosting.IApplicationHostBuilder.ConfigureServices(System.Action<Microsoft.Extensions.DependencyInjection.IServiceCollection!>! configureServices) -> AtomUI.City.Core.Hosting.IApplicationHostBuilder!
+AtomUI.City.Core.Lifecycle.ApplicationHostBuilderLifecycleExtensions
+AtomUI.City.Core.Lifecycle.LifecycleContext
+AtomUI.City.Core.Lifecycle.LifecycleContext.CancellationToken.get -> System.Threading.CancellationToken
+AtomUI.City.Core.Lifecycle.LifecycleContext.IsShortCircuited.get -> bool
+AtomUI.City.Core.Lifecycle.LifecycleContext.Items.get -> System.Collections.Generic.IDictionary<object!, object?>!
+AtomUI.City.Core.Lifecycle.LifecycleContext.LifecycleContext(AtomUI.City.Core.Lifecycle.LifecycleStage stage, System.IServiceProvider? services = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken), string? operationId = null) -> void
+AtomUI.City.Core.Lifecycle.LifecycleContext.OperationId.get -> string!
+AtomUI.City.Core.Lifecycle.LifecycleContext.Services.get -> System.IServiceProvider!
+AtomUI.City.Core.Lifecycle.LifecycleContext.ShortCircuit() -> void
+AtomUI.City.Core.Lifecycle.LifecycleContext.Stage.get -> AtomUI.City.Core.Lifecycle.LifecycleStage
+AtomUI.City.Core.Lifecycle.LifecycleMiddleware
+AtomUI.City.Core.Lifecycle.LifecycleNext
+AtomUI.City.Core.Lifecycle.LifecyclePipeline
+AtomUI.City.Core.Lifecycle.LifecyclePipeline.ExecuteAsync(AtomUI.City.Core.Lifecycle.LifecycleContext! context) -> System.Threading.Tasks.ValueTask
+AtomUI.City.Core.Lifecycle.LifecyclePipelineBuilder
+AtomUI.City.Core.Lifecycle.LifecyclePipelineBuilder.Build(System.Func<AtomUI.City.Core.Lifecycle.LifecycleContext!, System.Threading.Tasks.ValueTask>! terminalHandler) -> AtomUI.City.Core.Lifecycle.LifecyclePipeline!
+AtomUI.City.Core.Lifecycle.LifecyclePipelineBuilder.LifecyclePipelineBuilder() -> void
+AtomUI.City.Core.Lifecycle.LifecyclePipelineBuilder.Use(AtomUI.City.Core.Lifecycle.LifecycleMiddleware! middleware) -> AtomUI.City.Core.Lifecycle.LifecyclePipelineBuilder!
+AtomUI.City.Core.Lifecycle.LifecyclePipelineBuilder.Use(AtomUI.City.Core.Lifecycle.LifecycleStage stage, AtomUI.City.Core.Lifecycle.LifecycleMiddleware! middleware) -> AtomUI.City.Core.Lifecycle.LifecyclePipelineBuilder!
+AtomUI.City.Core.Lifecycle.LifecyclePipelineBuilder.Use<TMiddleware>(AtomUI.City.Core.Lifecycle.LifecycleMiddleware! middleware) -> AtomUI.City.Core.Lifecycle.LifecyclePipelineBuilder!
+AtomUI.City.Core.Lifecycle.LifecyclePipelineBuilder.Use<TMiddleware>(AtomUI.City.Core.Lifecycle.LifecycleStage stage, AtomUI.City.Core.Lifecycle.LifecycleMiddleware! middleware) -> AtomUI.City.Core.Lifecycle.LifecyclePipelineBuilder!
+AtomUI.City.Core.Lifecycle.LifecycleScope
+AtomUI.City.Core.Lifecycle.LifecycleScope.CancellationToken.get -> System.Threading.CancellationToken
+AtomUI.City.Core.Lifecycle.LifecycleScope.Children.get -> System.Collections.Generic.IReadOnlyList<AtomUI.City.Core.Lifecycle.LifecycleScope!>!
+AtomUI.City.Core.Lifecycle.LifecycleScope.CreateChild(AtomUI.City.Core.Lifecycle.LifecycleScopeKind kind, string! id) -> AtomUI.City.Core.Lifecycle.LifecycleScope!
+AtomUI.City.Core.Lifecycle.LifecycleScope.Dispose() -> void
+AtomUI.City.Core.Lifecycle.LifecycleScope.DisposeAsync() -> System.Threading.Tasks.ValueTask
+AtomUI.City.Core.Lifecycle.LifecycleScope.Id.get -> string!
+AtomUI.City.Core.Lifecycle.LifecycleScope.Kind.get -> AtomUI.City.Core.Lifecycle.LifecycleScopeKind
+AtomUI.City.Core.Lifecycle.LifecycleScope.Parent.get -> AtomUI.City.Core.Lifecycle.LifecycleScope?
+AtomUI.City.Core.Lifecycle.LifecycleScope.State.get -> AtomUI.City.Core.Lifecycle.LifecycleScopeState
+AtomUI.City.Core.Lifecycle.LifecycleScope.StopAsync() -> System.Threading.Tasks.ValueTask
+AtomUI.City.Core.Lifecycle.LifecycleScopeKind
+AtomUI.City.Core.Lifecycle.LifecycleScopeKind.Activation = 6 -> AtomUI.City.Core.Lifecycle.LifecycleScopeKind
+AtomUI.City.Core.Lifecycle.LifecycleScopeKind.Application = 1 -> AtomUI.City.Core.Lifecycle.LifecycleScopeKind
+AtomUI.City.Core.Lifecycle.LifecycleScopeKind.Host = 0 -> AtomUI.City.Core.Lifecycle.LifecycleScopeKind
+AtomUI.City.Core.Lifecycle.LifecycleScopeKind.Navigation = 4 -> AtomUI.City.Core.Lifecycle.LifecycleScopeKind
+AtomUI.City.Core.Lifecycle.LifecycleScopeKind.Operation = 8 -> AtomUI.City.Core.Lifecycle.LifecycleScopeKind
+AtomUI.City.Core.Lifecycle.LifecycleScopeKind.Presentation = 2 -> AtomUI.City.Core.Lifecycle.LifecycleScopeKind
+AtomUI.City.Core.Lifecycle.LifecycleScopeKind.Route = 5 -> AtomUI.City.Core.Lifecycle.LifecycleScopeKind
+AtomUI.City.Core.Lifecycle.LifecycleScopeKind.State = 7 -> AtomUI.City.Core.Lifecycle.LifecycleScopeKind
+AtomUI.City.Core.Lifecycle.LifecycleScopeKind.Subscription = 9 -> AtomUI.City.Core.Lifecycle.LifecycleScopeKind
+AtomUI.City.Core.Lifecycle.LifecycleScopeKind.Window = 3 -> AtomUI.City.Core.Lifecycle.LifecycleScopeKind
+AtomUI.City.Core.Lifecycle.LifecycleScopeState
+AtomUI.City.Core.Lifecycle.LifecycleScopeState.CancelRequested = 3 -> AtomUI.City.Core.Lifecycle.LifecycleScopeState
+AtomUI.City.Core.Lifecycle.LifecycleScopeState.Created = 0 -> AtomUI.City.Core.Lifecycle.LifecycleScopeState
+AtomUI.City.Core.Lifecycle.LifecycleScopeState.Disposed = 9 -> AtomUI.City.Core.Lifecycle.LifecycleScopeState
+AtomUI.City.Core.Lifecycle.LifecycleScopeState.Disposing = 8 -> AtomUI.City.Core.Lifecycle.LifecycleScopeState
+AtomUI.City.Core.Lifecycle.LifecycleScopeState.Faulted = 6 -> AtomUI.City.Core.Lifecycle.LifecycleScopeState
+AtomUI.City.Core.Lifecycle.LifecycleScopeState.Running = 2 -> AtomUI.City.Core.Lifecycle.LifecycleScopeState
+AtomUI.City.Core.Lifecycle.LifecycleScopeState.Starting = 1 -> AtomUI.City.Core.Lifecycle.LifecycleScopeState
+AtomUI.City.Core.Lifecycle.LifecycleScopeState.Stopped = 5 -> AtomUI.City.Core.Lifecycle.LifecycleScopeState
+AtomUI.City.Core.Lifecycle.LifecycleScopeState.Stopping = 4 -> AtomUI.City.Core.Lifecycle.LifecycleScopeState
+AtomUI.City.Core.Lifecycle.LifecycleScopeState.UnloadPending = 7 -> AtomUI.City.Core.Lifecycle.LifecycleScopeState
+AtomUI.City.Core.Lifecycle.LifecycleStage
+AtomUI.City.Core.Lifecycle.LifecycleStage.Area.get -> AtomUI.City.Core.Lifecycle.LifecycleStageArea
+AtomUI.City.Core.Lifecycle.LifecycleStage.AreaName.get -> string!
+AtomUI.City.Core.Lifecycle.LifecycleStage.Equals(AtomUI.City.Core.Lifecycle.LifecycleStage other) -> bool
+AtomUI.City.Core.Lifecycle.LifecycleStage.Key.get -> string!
+AtomUI.City.Core.Lifecycle.LifecycleStage.LifecycleStage() -> void
+AtomUI.City.Core.Lifecycle.LifecycleStage.LifecycleStage(AtomUI.City.Core.Lifecycle.LifecycleStageArea area, string! name) -> void
+AtomUI.City.Core.Lifecycle.LifecycleStage.Name.get -> string!
+AtomUI.City.Core.Lifecycle.LifecycleStageArea
+AtomUI.City.Core.Lifecycle.LifecycleStageArea.Activation = 4 -> AtomUI.City.Core.Lifecycle.LifecycleStageArea
+AtomUI.City.Core.Lifecycle.LifecycleStageArea.Application = 0 -> AtomUI.City.Core.Lifecycle.LifecycleStageArea
+AtomUI.City.Core.Lifecycle.LifecycleStageArea.Error = 6 -> AtomUI.City.Core.Lifecycle.LifecycleStageArea
+AtomUI.City.Core.Lifecycle.LifecycleStageArea.Module = 1 -> AtomUI.City.Core.Lifecycle.LifecycleStageArea
+AtomUI.City.Core.Lifecycle.LifecycleStageArea.Operation = 5 -> AtomUI.City.Core.Lifecycle.LifecycleStageArea
+AtomUI.City.Core.Lifecycle.LifecycleStageArea.Plugin = 2 -> AtomUI.City.Core.Lifecycle.LifecycleStageArea
+AtomUI.City.Core.Lifecycle.LifecycleStageArea.Route = 3 -> AtomUI.City.Core.Lifecycle.LifecycleStageArea
+AtomUI.City.Core.Lifecycle.LifecycleStages
+AtomUI.City.Core.Modularity.ApplicationHostBuilderModularityExtensions
+AtomUI.City.Core.Modularity.ApplicationInitializationContext
+AtomUI.City.Core.Modularity.ApplicationInitializationContext.ApplicationContext.get -> AtomUI.City.Core.Hosting.IApplicationContext!
+AtomUI.City.Core.Modularity.ApplicationInitializationContext.ApplicationInitializationContext(AtomUI.City.Core.Hosting.IApplicationContext! applicationContext, System.IServiceProvider! services) -> void
+AtomUI.City.Core.Modularity.ApplicationInitializationContext.Services.get -> System.IServiceProvider!
+AtomUI.City.Core.Modularity.ApplicationModuleAttribute
+AtomUI.City.Core.Modularity.ApplicationModuleAttribute.ApplicationModuleAttribute() -> void
+AtomUI.City.Core.Modularity.ApplicationShutdownContext
+AtomUI.City.Core.Modularity.ApplicationShutdownContext.ApplicationContext.get -> AtomUI.City.Core.Hosting.IApplicationContext!
+AtomUI.City.Core.Modularity.ApplicationShutdownContext.ApplicationShutdownContext(AtomUI.City.Core.Hosting.IApplicationContext! applicationContext, System.IServiceProvider! services) -> void
+AtomUI.City.Core.Modularity.ApplicationShutdownContext.Services.get -> System.IServiceProvider!
+AtomUI.City.Core.Modularity.ContributionConfigurationContext
+AtomUI.City.Core.Modularity.ContributionConfigurationContext.ApplicationContext.get -> AtomUI.City.Core.Hosting.IApplicationContext!
+AtomUI.City.Core.Modularity.ContributionConfigurationContext.ContributionConfigurationContext(AtomUI.City.Core.Hosting.IApplicationContext! applicationContext, System.IServiceProvider! services) -> void
+AtomUI.City.Core.Modularity.ContributionConfigurationContext.Services.get -> System.IServiceProvider!
+AtomUI.City.Core.Modularity.DependsOnAttribute
+AtomUI.City.Core.Modularity.DependsOnAttribute.DependsOnAttribute(System.Type! moduleType) -> void
+AtomUI.City.Core.Modularity.DependsOnAttribute.ModuleType.get -> System.Type!
+AtomUI.City.Core.Modularity.DependsOnAttribute.Optional.get -> bool
+AtomUI.City.Core.Modularity.DependsOnAttribute.Optional.set -> void
+AtomUI.City.Core.Modularity.GeneratedModuleManifestAttribute
+AtomUI.City.Core.Modularity.GeneratedModuleManifestAttribute.GeneratedModuleManifestAttribute(System.Type! registrarType) -> void
+AtomUI.City.Core.Modularity.GeneratedModuleManifestAttribute.RegistrarType.get -> System.Type!
+AtomUI.City.Core.Modularity.IModule
+AtomUI.City.Core.Modularity.IModule.ConfigureContributionsAsync(AtomUI.City.Core.Modularity.ContributionConfigurationContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+AtomUI.City.Core.Modularity.IModule.ConfigureServices(AtomUI.City.Core.Modularity.ServiceConfigurationContext! context) -> void
+AtomUI.City.Core.Modularity.IModule.OnApplicationInitializationAsync(AtomUI.City.Core.Modularity.ApplicationInitializationContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+AtomUI.City.Core.Modularity.IModule.OnApplicationShutdownAsync(AtomUI.City.Core.Modularity.ApplicationShutdownContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+AtomUI.City.Core.Modularity.IModule.OnPostApplicationInitializationAsync(AtomUI.City.Core.Modularity.ApplicationInitializationContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+AtomUI.City.Core.Modularity.IModule.OnPreApplicationInitializationAsync(AtomUI.City.Core.Modularity.ApplicationInitializationContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+AtomUI.City.Core.Modularity.IModule.PostConfigureServices(AtomUI.City.Core.Modularity.ServiceConfigurationContext! context) -> void
+AtomUI.City.Core.Modularity.IModule.PreConfigureServices(AtomUI.City.Core.Modularity.ServiceConfigurationContext! context) -> void
+AtomUI.City.Core.Modularity.IModuleRegistrar
+AtomUI.City.Core.Modularity.IModuleRegistrar.Register(AtomUI.City.Core.Modularity.IModuleRegistrarContext! context) -> void
+AtomUI.City.Core.Modularity.IModuleRegistrarContext
+AtomUI.City.Core.Modularity.IModuleRegistrarContext.AddApplicationRoot(System.Type! moduleType) -> void
+AtomUI.City.Core.Modularity.IModuleRegistrarContext.Register(AtomUI.City.Core.Modularity.ModuleDescriptor! descriptor, System.Func<AtomUI.City.Core.Modularity.IModule!>! factory) -> void
+AtomUI.City.Core.Modularity.IModuleRegistry
+AtomUI.City.Core.Modularity.IModuleRegistry.Modules.get -> System.Collections.Generic.IReadOnlyList<AtomUI.City.Core.Modularity.ModuleDescriptor!>!
+AtomUI.City.Core.Modularity.ModuleAttribute
+AtomUI.City.Core.Modularity.ModuleAttribute.Description.get -> string?
+AtomUI.City.Core.Modularity.ModuleAttribute.Description.set -> void
+AtomUI.City.Core.Modularity.ModuleAttribute.ModuleAttribute() -> void
+AtomUI.City.Core.Modularity.ModuleAttribute.ModuleAttribute(string! name) -> void
+AtomUI.City.Core.Modularity.ModuleAttribute.Name.get -> string?
+AtomUI.City.Core.Modularity.ModuleAttribute.Version.get -> string?
+AtomUI.City.Core.Modularity.ModuleAttribute.Version.set -> void
+AtomUI.City.Core.Modularity.ModuleBase
+AtomUI.City.Core.Modularity.ModuleBase.ModuleBase() -> void
+AtomUI.City.Core.Modularity.ModuleContext
+AtomUI.City.Core.Modularity.ModuleContext.ApplicationContext.get -> AtomUI.City.Core.Hosting.IApplicationContext!
+AtomUI.City.Core.Modularity.ModuleContext.ModuleContext(string! name, AtomUI.City.Core.Hosting.IApplicationContext! applicationContext) -> void
+AtomUI.City.Core.Modularity.ModuleContext.Name.get -> string!
+AtomUI.City.Core.Modularity.ModuleDependencyDescriptor
+AtomUI.City.Core.Modularity.ModuleDependencyDescriptor.ModuleDependencyDescriptor(System.Type! moduleType, bool optional) -> void
+AtomUI.City.Core.Modularity.ModuleDependencyDescriptor.ModuleType.get -> System.Type!
+AtomUI.City.Core.Modularity.ModuleDependencyDescriptor.Optional.get -> bool
+AtomUI.City.Core.Modularity.ModuleDescriptor
+AtomUI.City.Core.Modularity.ModuleDescriptor.Dependencies.get -> System.Collections.Generic.IReadOnlyList<AtomUI.City.Core.Modularity.ModuleDependencyDescriptor!>!
+AtomUI.City.Core.Modularity.ModuleDescriptor.Description.get -> string?
+AtomUI.City.Core.Modularity.ModuleDescriptor.ModuleDescriptor(string! name, System.Type! moduleType, string? version, string? description, System.Collections.Generic.IReadOnlyList<AtomUI.City.Core.Modularity.ModuleDependencyDescriptor!>! dependencies) -> void
+AtomUI.City.Core.Modularity.ModuleDescriptor.ModuleDescriptor(string! name, System.Type! moduleType, string? version, string? description, System.Collections.Generic.IReadOnlyList<AtomUI.City.Core.Modularity.ModuleDependencyDescriptor!>! dependencies, AtomUI.City.Core.Modularity.ModuleOrigin origin, string? pluginId) -> void
+AtomUI.City.Core.Modularity.ModuleDescriptor.ModuleType.get -> System.Type!
+AtomUI.City.Core.Modularity.ModuleDescriptor.Name.get -> string!
+AtomUI.City.Core.Modularity.ModuleDescriptor.Origin.get -> AtomUI.City.Core.Modularity.ModuleOrigin
+AtomUI.City.Core.Modularity.ModuleDescriptor.PluginId.get -> string?
+AtomUI.City.Core.Modularity.ModuleDescriptor.Version.get -> string?
+AtomUI.City.Core.Modularity.ModuleOrigin
+AtomUI.City.Core.Modularity.ModuleOrigin.Application = 0 -> AtomUI.City.Core.Modularity.ModuleOrigin
+AtomUI.City.Core.Modularity.ModuleOrigin.Plugin = 1 -> AtomUI.City.Core.Modularity.ModuleOrigin
+AtomUI.City.Core.Modularity.ModuleServiceCollection
+AtomUI.City.Core.Modularity.ModuleServiceCollection.Add(Microsoft.Extensions.DependencyInjection.ServiceDescriptor! item) -> void
+AtomUI.City.Core.Modularity.ModuleServiceCollection.Clear() -> void
+AtomUI.City.Core.Modularity.ModuleServiceCollection.Contains(Microsoft.Extensions.DependencyInjection.ServiceDescriptor! item) -> bool
+AtomUI.City.Core.Modularity.ModuleServiceCollection.CopyTo(Microsoft.Extensions.DependencyInjection.ServiceDescriptor![]! array, int arrayIndex) -> void
+AtomUI.City.Core.Modularity.ModuleServiceCollection.Count.get -> int
+AtomUI.City.Core.Modularity.ModuleServiceCollection.GetEnumerator() -> System.Collections.Generic.IEnumerator<Microsoft.Extensions.DependencyInjection.ServiceDescriptor!>!
+AtomUI.City.Core.Modularity.ModuleServiceCollection.IndexOf(Microsoft.Extensions.DependencyInjection.ServiceDescriptor! item) -> int
+AtomUI.City.Core.Modularity.ModuleServiceCollection.Insert(int index, Microsoft.Extensions.DependencyInjection.ServiceDescriptor! item) -> void
+AtomUI.City.Core.Modularity.ModuleServiceCollection.IsReadOnly.get -> bool
+AtomUI.City.Core.Modularity.ModuleServiceCollection.Remove(Microsoft.Extensions.DependencyInjection.ServiceDescriptor! item) -> bool
+AtomUI.City.Core.Modularity.ModuleServiceCollection.RemoveAt(int index) -> void
+AtomUI.City.Core.Modularity.ModuleServiceCollection.this[int index].get -> Microsoft.Extensions.DependencyInjection.ServiceDescriptor!
+AtomUI.City.Core.Modularity.ModuleServiceCollection.this[int index].set -> void
+AtomUI.City.Core.Modularity.ModuleServiceCollectionBuildGuardExtensions
+AtomUI.City.Core.Modularity.ServiceConfigurationContext
+AtomUI.City.Core.Modularity.ServiceConfigurationContext.ApplicationContext.get -> AtomUI.City.Core.Hosting.IApplicationContext!
+AtomUI.City.Core.Modularity.ServiceConfigurationContext.ExecutePreConfigure<TOptions>(TOptions! options) -> void
+AtomUI.City.Core.Modularity.ServiceConfigurationContext.PreConfigure<TOptions>(System.Action<TOptions!>! configure) -> void
+AtomUI.City.Core.Modularity.ServiceConfigurationContext.ServiceConfigurationContext(AtomUI.City.Core.Hosting.IApplicationContext! applicationContext, Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> void
+AtomUI.City.Core.Modularity.ServiceConfigurationContext.Services.get -> AtomUI.City.Core.Modularity.ModuleServiceCollection!
+AtomUI.City.Core.Threading.IUiDispatcher
+AtomUI.City.Core.Threading.IUiDispatcher.CheckAccess() -> bool
+AtomUI.City.Core.Threading.IUiDispatcher.InvokeAsync(System.Action! callback) -> System.Threading.Tasks.ValueTask
+AtomUI.City.Core.Threading.IUiDispatcher.InvokeAsync(System.Action! callback, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+AtomUI.City.Core.Threading.IUiDispatcher.InvokeAsync<T>(System.Func<T>! callback) -> System.Threading.Tasks.ValueTask<T>
+AtomUI.City.Core.Threading.IUiDispatcher.InvokeAsync<T>(System.Func<T>! callback, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<T>
+AtomUI.City.Core.Threading.IUiDispatcher.PostAsync(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask>! callback, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+AtomUI.City.Core.Threading.UnavailableUiDispatcher
+AtomUI.City.Core.Threading.UnavailableUiDispatcher.CheckAccess() -> bool
+AtomUI.City.Core.Threading.UnavailableUiDispatcher.InvokeAsync(System.Action! callback) -> System.Threading.Tasks.ValueTask
+AtomUI.City.Core.Threading.UnavailableUiDispatcher.InvokeAsync(System.Action! callback, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+AtomUI.City.Core.Threading.UnavailableUiDispatcher.InvokeAsync<T>(System.Func<T>! callback) -> System.Threading.Tasks.ValueTask<T>
+AtomUI.City.Core.Threading.UnavailableUiDispatcher.InvokeAsync<T>(System.Func<T>! callback, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<T>
+AtomUI.City.Core.Threading.UnavailableUiDispatcher.PostAsync(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask>! callback, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+AtomUI.City.Core.Threading.UnavailableUiDispatcher.UnavailableUiDispatcher() -> void
+const AtomUI.City.Core.Diagnostics.HostDiagnosticIds.DispatcherUnavailable = "AUCHOST107" -> string!
+const AtomUI.City.Core.Diagnostics.HostDiagnosticIds.HostBuildCleanupFailed = "AUCHOST109" -> string!
+const AtomUI.City.Core.Diagnostics.HostDiagnosticIds.HostBuildFailed = "AUCHOST101" -> string!
+const AtomUI.City.Core.Diagnostics.HostDiagnosticIds.HostBuilt = "AUCHOST001" -> string!
+const AtomUI.City.Core.Diagnostics.HostDiagnosticIds.HostStarted = "AUCHOST002" -> string!
+const AtomUI.City.Core.Diagnostics.HostDiagnosticIds.HostStartFailed = "AUCHOST102" -> string!
+const AtomUI.City.Core.Diagnostics.HostDiagnosticIds.HostStopFailed = "AUCHOST103" -> string!
+const AtomUI.City.Core.Diagnostics.HostDiagnosticIds.HostStopped = "AUCHOST003" -> string!
+const AtomUI.City.Core.Diagnostics.HostDiagnosticIds.LifecycleMiddlewareFailed = "AUCHOST108" -> string!
+const AtomUI.City.Core.Diagnostics.HostDiagnosticIds.LifecycleScopeCleanupFailed = "AUCHOST104" -> string!
+const AtomUI.City.Core.Diagnostics.HostDiagnosticIds.ModuleGraphFailed = "AUCHOST105" -> string!
+const AtomUI.City.Core.Diagnostics.HostDiagnosticIds.ModuleLifecycleFailed = "AUCHOST106" -> string!
+override AtomUI.City.Core.Diagnostics.HostDiagnosticRecord.Equals(object? obj) -> bool
+override AtomUI.City.Core.Diagnostics.HostDiagnosticRecord.GetHashCode() -> int
+override AtomUI.City.Core.Diagnostics.HostDiagnosticRecord.ToString() -> string!
+override AtomUI.City.Core.Lifecycle.LifecycleStage.GetHashCode() -> int
+static AtomUI.City.Core.Diagnostics.ApplicationHostBuilderDiagnosticsExtensions.GetBuildDiagnostics(this AtomUI.City.Core.Hosting.IApplicationHostBuilder! builder) -> AtomUI.City.Core.Diagnostics.IHostDiagnostics!
+static AtomUI.City.Core.Diagnostics.HostDiagnosticRecord.operator !=(AtomUI.City.Core.Diagnostics.HostDiagnosticRecord? left, AtomUI.City.Core.Diagnostics.HostDiagnosticRecord? right) -> bool
+static AtomUI.City.Core.Diagnostics.HostDiagnosticRecord.operator ==(AtomUI.City.Core.Diagnostics.HostDiagnosticRecord? left, AtomUI.City.Core.Diagnostics.HostDiagnosticRecord? right) -> bool
+static AtomUI.City.Core.Hosting.ApplicationHost.CreateBuilder(string![]? args = null) -> AtomUI.City.Core.Hosting.IApplicationHostBuilder!
+static AtomUI.City.Core.Lifecycle.ApplicationHostBuilderLifecycleExtensions.ConfigureLifecycle(this AtomUI.City.Core.Hosting.IApplicationHostBuilder! builder, System.Action<AtomUI.City.Core.Lifecycle.LifecyclePipelineBuilder!>! configure) -> AtomUI.City.Core.Hosting.IApplicationHostBuilder!
+static AtomUI.City.Core.Lifecycle.LifecycleScope.CreateRoot(AtomUI.City.Core.Lifecycle.LifecycleScopeKind kind, string! id) -> AtomUI.City.Core.Lifecycle.LifecycleScope!
+static AtomUI.City.Core.Lifecycle.LifecycleScope.CreateRoot(AtomUI.City.Core.Lifecycle.LifecycleScopeKind kind, string! id, AtomUI.City.Core.Diagnostics.IHostDiagnostics! diagnostics) -> AtomUI.City.Core.Lifecycle.LifecycleScope!
+static AtomUI.City.Core.Lifecycle.LifecycleStage.operator !=(AtomUI.City.Core.Lifecycle.LifecycleStage left, AtomUI.City.Core.Lifecycle.LifecycleStage right) -> bool
+static AtomUI.City.Core.Lifecycle.LifecycleStage.operator ==(AtomUI.City.Core.Lifecycle.LifecycleStage left, AtomUI.City.Core.Lifecycle.LifecycleStage right) -> bool
+static AtomUI.City.Core.Lifecycle.LifecycleStages.All.get -> System.Collections.Generic.IReadOnlyList<AtomUI.City.Core.Lifecycle.LifecycleStage>!
+static AtomUI.City.Core.Modularity.ApplicationHostBuilderModularityExtensions.UseModule<TModule>(this AtomUI.City.Core.Hosting.IApplicationHostBuilder! builder) -> AtomUI.City.Core.Hosting.IApplicationHostBuilder!
+static AtomUI.City.Core.Modularity.ModuleServiceCollectionBuildGuardExtensions.BuildServiceProvider(this AtomUI.City.Core.Modularity.ModuleServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.ServiceProvider!
+static AtomUI.City.Core.Modularity.ModuleServiceCollectionBuildGuardExtensions.BuildServiceProvider(this AtomUI.City.Core.Modularity.ModuleServiceCollection! services, bool validateScopes) -> Microsoft.Extensions.DependencyInjection.ServiceProvider!
+static AtomUI.City.Core.Modularity.ModuleServiceCollectionBuildGuardExtensions.BuildServiceProvider(this AtomUI.City.Core.Modularity.ModuleServiceCollection! services, Microsoft.Extensions.DependencyInjection.ServiceProviderOptions! options) -> Microsoft.Extensions.DependencyInjection.ServiceProvider!
+static readonly AtomUI.City.Core.Lifecycle.LifecycleStages.ActivationActivate -> AtomUI.City.Core.Lifecycle.LifecycleStage
+static readonly AtomUI.City.Core.Lifecycle.LifecycleStages.ActivationDeactivate -> AtomUI.City.Core.Lifecycle.LifecycleStage
+static readonly AtomUI.City.Core.Lifecycle.LifecycleStages.ApplicationResume -> AtomUI.City.Core.Lifecycle.LifecycleStage
+static readonly AtomUI.City.Core.Lifecycle.LifecycleStages.ApplicationStart -> AtomUI.City.Core.Lifecycle.LifecycleStage
+static readonly AtomUI.City.Core.Lifecycle.LifecycleStages.ApplicationStop -> AtomUI.City.Core.Lifecycle.LifecycleStage
+static readonly AtomUI.City.Core.Lifecycle.LifecycleStages.ApplicationSuspend -> AtomUI.City.Core.Lifecycle.LifecycleStage
+static readonly AtomUI.City.Core.Lifecycle.LifecycleStages.ErrorHandle -> AtomUI.City.Core.Lifecycle.LifecycleStage
+static readonly AtomUI.City.Core.Lifecycle.LifecycleStages.ModuleInitialize -> AtomUI.City.Core.Lifecycle.LifecycleStage
+static readonly AtomUI.City.Core.Lifecycle.LifecycleStages.ModuleStart -> AtomUI.City.Core.Lifecycle.LifecycleStage
+static readonly AtomUI.City.Core.Lifecycle.LifecycleStages.ModuleStop -> AtomUI.City.Core.Lifecycle.LifecycleStage
+static readonly AtomUI.City.Core.Lifecycle.LifecycleStages.OperationCancel -> AtomUI.City.Core.Lifecycle.LifecycleStage
+static readonly AtomUI.City.Core.Lifecycle.LifecycleStages.OperationExecute -> AtomUI.City.Core.Lifecycle.LifecycleStage
+static readonly AtomUI.City.Core.Lifecycle.LifecycleStages.OperationFail -> AtomUI.City.Core.Lifecycle.LifecycleStage
+static readonly AtomUI.City.Core.Lifecycle.LifecycleStages.PluginActivate -> AtomUI.City.Core.Lifecycle.LifecycleStage
+static readonly AtomUI.City.Core.Lifecycle.LifecycleStages.PluginDeactivate -> AtomUI.City.Core.Lifecycle.LifecycleStage
+static readonly AtomUI.City.Core.Lifecycle.LifecycleStages.PluginLoad -> AtomUI.City.Core.Lifecycle.LifecycleStage
+static readonly AtomUI.City.Core.Lifecycle.LifecycleStages.PluginUnload -> AtomUI.City.Core.Lifecycle.LifecycleStage
+static readonly AtomUI.City.Core.Lifecycle.LifecycleStages.RouteEnter -> AtomUI.City.Core.Lifecycle.LifecycleStage
+static readonly AtomUI.City.Core.Lifecycle.LifecycleStages.RouteLeave -> AtomUI.City.Core.Lifecycle.LifecycleStage
+static readonly AtomUI.City.Core.Lifecycle.LifecycleStages.RouteNavigate -> AtomUI.City.Core.Lifecycle.LifecycleStage
+virtual AtomUI.City.Core.Lifecycle.LifecycleMiddleware.Invoke(AtomUI.City.Core.Lifecycle.LifecycleContext! context, AtomUI.City.Core.Lifecycle.LifecycleNext! next) -> System.Threading.Tasks.ValueTask
+virtual AtomUI.City.Core.Lifecycle.LifecycleNext.Invoke() -> System.Threading.Tasks.ValueTask
+virtual AtomUI.City.Core.Modularity.ModuleBase.ConfigureContributions(AtomUI.City.Core.Modularity.ContributionConfigurationContext! context) -> void
+virtual AtomUI.City.Core.Modularity.ModuleBase.ConfigureContributionsAsync(AtomUI.City.Core.Modularity.ContributionConfigurationContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+virtual AtomUI.City.Core.Modularity.ModuleBase.ConfigureServices(AtomUI.City.Core.Modularity.ServiceConfigurationContext! context) -> void
+virtual AtomUI.City.Core.Modularity.ModuleBase.OnApplicationInitialization(AtomUI.City.Core.Modularity.ApplicationInitializationContext! context) -> void
+virtual AtomUI.City.Core.Modularity.ModuleBase.OnApplicationInitializationAsync(AtomUI.City.Core.Modularity.ApplicationInitializationContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+virtual AtomUI.City.Core.Modularity.ModuleBase.OnApplicationShutdown(AtomUI.City.Core.Modularity.ApplicationShutdownContext! context) -> void
+virtual AtomUI.City.Core.Modularity.ModuleBase.OnApplicationShutdownAsync(AtomUI.City.Core.Modularity.ApplicationShutdownContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+virtual AtomUI.City.Core.Modularity.ModuleBase.OnPostApplicationInitialization(AtomUI.City.Core.Modularity.ApplicationInitializationContext! context) -> void
+virtual AtomUI.City.Core.Modularity.ModuleBase.OnPostApplicationInitializationAsync(AtomUI.City.Core.Modularity.ApplicationInitializationContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+virtual AtomUI.City.Core.Modularity.ModuleBase.OnPreApplicationInitialization(AtomUI.City.Core.Modularity.ApplicationInitializationContext! context) -> void
+virtual AtomUI.City.Core.Modularity.ModuleBase.OnPreApplicationInitializationAsync(AtomUI.City.Core.Modularity.ApplicationInitializationContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+virtual AtomUI.City.Core.Modularity.ModuleBase.PostConfigureServices(AtomUI.City.Core.Modularity.ServiceConfigurationContext! context) -> void
+virtual AtomUI.City.Core.Modularity.ModuleBase.PreConfigureServices(AtomUI.City.Core.Modularity.ServiceConfigurationContext! context) -> void
+~override AtomUI.City.Core.Lifecycle.LifecycleStage.Equals(object obj) -> bool
+~override AtomUI.City.Core.Lifecycle.LifecycleStage.ToString() -> string
