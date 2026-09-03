@@ -3,8 +3,14 @@ using AtomUI.City.Core.Hosting;
 
 namespace AtomUI.City.Core.Diagnostics;
 
+/// <summary>
+/// Represents application host builder diagnostics extensions.
+/// </summary>
 public static class ApplicationHostBuilderDiagnosticsExtensions
 {
+    /// <summary>
+    /// Executes the get build diagnostics operation.
+    /// </summary>
     public static IHostDiagnostics GetBuildDiagnostics(this IApplicationHostBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);

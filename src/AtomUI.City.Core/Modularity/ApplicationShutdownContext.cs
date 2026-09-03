@@ -2,8 +2,14 @@ using AtomUI.City.Core.Hosting;
 
 namespace AtomUI.City.Core.Modularity;
 
+/// <summary>
+/// Represents application shutdown context.
+/// </summary>
 public sealed class ApplicationShutdownContext
 {
+    /// <summary>
+    /// Initializes a new instance of the application shutdown context class.
+    /// </summary>
     public ApplicationShutdownContext(
         IApplicationContext applicationContext,
         IServiceProvider services)
@@ -15,7 +21,13 @@ public sealed class ApplicationShutdownContext
         Services = services;
     }
 
+    /// <summary>
+    /// Gets the application context value.
+    /// </summary>
     public IApplicationContext ApplicationContext { get; }
 
+    /// <summary>
+    /// Gets the services value.
+    /// </summary>
     public IServiceProvider Services { get; }
 }

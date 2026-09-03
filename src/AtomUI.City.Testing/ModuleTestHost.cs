@@ -38,35 +38,35 @@ public sealed class ModuleTestHost : IDisposable, IAsyncDisposable
 
         foreach (var module in Modules)
         {
-            await InvokeModuleStageAsync(
+            InvokeModuleStage(
                 module,
                 "PreConfigureServices",
                 "AUCTEST301",
-                () => module.Module.PreConfigureServicesAsync(
-                    CreateServiceConfigurationContext(),
-                    cancellationToken)).ConfigureAwait(false);
+                () => module.Module.PreConfigureServices(
+                    CreateServiceConfigurationContext()),
+                cancellationToken);
         }
 
         foreach (var module in Modules)
         {
-            await InvokeModuleStageAsync(
+            InvokeModuleStage(
                 module,
                 "ConfigureServices",
                 "AUCTEST301",
-                () => module.Module.ConfigureServicesAsync(
-                    CreateServiceConfigurationContext(),
-                    cancellationToken)).ConfigureAwait(false);
+                () => module.Module.ConfigureServices(
+                    CreateServiceConfigurationContext()),
+                cancellationToken);
         }
 
         foreach (var module in Modules)
         {
-            await InvokeModuleStageAsync(
+            InvokeModuleStage(
                 module,
                 "PostConfigureServices",
                 "AUCTEST301",
-                () => module.Module.PostConfigureServicesAsync(
-                    CreateServiceConfigurationContext(),
-                    cancellationToken)).ConfigureAwait(false);
+                () => module.Module.PostConfigureServices(
+                    CreateServiceConfigurationContext()),
+                cancellationToken);
         }
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -208,6 +208,33 @@ public sealed class ModuleTestHost : IDisposable, IAsyncDisposable
             await invoke().ConfigureAwait(false);
         }
         catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            _host.Diagnostics.Add(
+                diagnosticCode,
+                $"Module '{module.Name}' ({module.Module.GetType().FullName}) failed during {stage}: {exception.GetType().FullName}.");
+
+            throw;
+        }
+    }
+
+    private void InvokeModuleStage(
+        ModuleTestRecord module,
+        string stage,
+        string diagnosticCode,
+        Action invoke,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            invoke();
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
         }

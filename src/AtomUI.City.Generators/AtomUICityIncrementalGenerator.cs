@@ -1,5 +1,6 @@
 using System.Text;
 using AtomUI.City.Generators.Common;
+using AtomUI.City.Generators.DependencyInjection;
 using AtomUI.City.Generators.Diagnostics;
 using AtomUI.City.Generators.Modularity;
 using AtomUI.City.Generators.Presentation;
@@ -17,11 +18,323 @@ public sealed class AtomUICityIncrementalGenerator : IIncrementalGenerator
         "AtomUI.City.Core.Modularity.ApplicationModuleAttribute";
     private const string GeneratedModuleManifestAttributeName =
         "AtomUI.City.Core.Modularity.GeneratedModuleManifestAttribute";
+    private const string GeneratedServiceManifestAttributeName =
+        "AtomUI.City.Core.DependencyInjection.GeneratedServiceManifestAttribute";
+    private const string ServiceRegistrationOwnerAttributeName =
+        "AtomUI.City.Core.DependencyInjection.ServiceRegistrationOwnerAttribute";
+    private const string ModuleInterfaceName = "AtomUI.City.Core.Modularity.IModule";
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
+        InitializeDependencyInjection(context);
         InitializeModularity(context);
         InitializePresentation(context);
+    }
+
+    private static void InitializeDependencyInjection(IncrementalGeneratorInitializationContext context)
+    {
+        var candidates = context.SyntaxProvider
+            .CreateSyntaxProvider(
+                static (node, _) => node is ClassDeclarationSyntax,
+                static (syntaxContext, _) => ReadServiceCandidate(syntaxContext))
+            .Where(static candidate => candidate is not null)
+            .Collect();
+
+        context.RegisterSourceOutput(
+            context.CompilationProvider.Combine(candidates),
+            static (sourceContext, value) =>
+            {
+                var compilation = value.Left;
+                var allCandidates = value.Right.Where(candidate => candidate is not null).Select(candidate => candidate!).ToArray();
+                var services = allCandidates
+                    .Where(candidate => candidate.Registration is not null)
+                    .GroupBy(candidate => candidate.TypeName, StringComparer.Ordinal)
+                    .Select(group => group.First())
+                    .ToArray();
+                var owners = allCandidates
+                    .Where(candidate => candidate.IsOwner)
+                    .GroupBy(candidate => candidate.TypeName, StringComparer.Ordinal)
+                    .Select(group => group.First())
+                    .ToArray();
+                var referencedRegistrars = ReadReferencedServiceRegistrarTypeNames(compilation);
+                var invalidDeclarations = allCandidates
+                    .Where(candidate => candidate.Registration is null && candidate.Issues.Count > 0)
+                    .ToArray();
+
+                if (invalidDeclarations.Length > 0)
+                {
+                    foreach (var candidate in invalidDeclarations)
+                    {
+                        foreach (var issue in candidate.Issues)
+                        {
+                            ReportInvalidService(sourceContext, candidate.Location, issue);
+                        }
+                    }
+                    return;
+                }
+
+                if (services.Length == 0 && referencedRegistrars.Count == 0)
+                {
+                    return;
+                }
+
+                var invalid = false;
+                if (services.Length > 0 && owners.Length != 1)
+                {
+                    invalid = true;
+                    var target = owners.FirstOrDefault()?.Location ?? services.First().Location;
+                    ReportInvalidService(sourceContext, target,
+                        owners.Length == 0
+                            ? "An assembly containing generated services must declare exactly one module with ServiceRegistrationOwner."
+                            : "An assembly containing generated services cannot declare more than one ServiceRegistrationOwner.");
+                }
+
+                if (owners.Length == 1 && !owners[0].ImplementsModule)
+                {
+                    invalid = true;
+                    ReportInvalidService(sourceContext, owners[0].Location,
+                        $"Service registration owner '{owners[0].TypeName}' must implement IModule.");
+                }
+
+                foreach (var service in services)
+                {
+                    var registration = service.Registration!;
+                    foreach (var issue in service.Issues)
+                    {
+                        invalid = true;
+                        ReportInvalidService(sourceContext, service.Location, issue);
+                    }
+
+                    if (registration.Replace && registration.TryAdd)
+                    {
+                        invalid = true;
+                        ReportInvalidService(sourceContext, service.Location,
+                            $"Service '{service.TypeName}' cannot use Replace and TryAdd together.");
+                    }
+
+                    if (registration.IsDisposable && registration.ExposedServiceTypeNames.Count > 1)
+                    {
+                        invalid = true;
+                        ReportInvalidService(sourceContext, service.Location,
+                            $"Disposable service '{service.TypeName}' cannot expose multiple service contracts because forwarding registrations would make disposal ownership ambiguous.");
+                    }
+                }
+
+                var manifest = ServiceRegistrationManifestBuilder.Build(services.Select(service => service.Registration!).ToArray());
+                foreach (var diagnostic in manifest.Diagnostics)
+                {
+                    invalid = true;
+                    var location = services.FirstOrDefault(service => string.Equals(service.TypeName, diagnostic.Target, StringComparison.Ordinal))?.Location;
+                    sourceContext.ReportDiagnostic(GeneratorDiagnostics.CreateRoslynDiagnostic(
+                        GeneratorFeature.DependencyInjection, diagnostic, location));
+                }
+
+                if (invalid)
+                {
+                    return;
+                }
+
+                var assemblyName = string.IsNullOrWhiteSpace(compilation.AssemblyName) ? "Assembly" : compilation.AssemblyName!;
+                var source = ServiceRegistrarSourceBuilder.Build(
+                    assemblyName,
+                    owners.SingleOrDefault()?.TypeName,
+                    manifest.Manifest.Registrations,
+                    referencedRegistrars);
+                sourceContext.AddSource(
+                    GeneratedCodeNames.CreateHintName(GeneratorFeature.DependencyInjection, assemblyName, "Services"),
+                    SourceText.From(source, Encoding.UTF8));
+            });
+    }
+
+    private static ServiceGenerationCandidate? ReadServiceCandidate(GeneratorSyntaxContext context)
+    {
+        if (context.SemanticModel.GetDeclaredSymbol(context.Node) is not INamedTypeSymbol symbol)
+        {
+            return null;
+        }
+
+        var registration = ServiceRegistrationMetadataReader.TryRead(symbol);
+        var attributes = symbol.GetAttributes();
+        var isOwner = attributes.Any(attribute => string.Equals(
+            attribute.AttributeClass?.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
+            ServiceRegistrationOwnerAttributeName,
+            StringComparison.Ordinal));
+        var issues = ValidateServiceDeclaration(symbol, attributes, registration);
+        if (isOwner && (symbol.IsAbstract || symbol.IsStatic || symbol.Arity > 0 || !IsAccessible(symbol)))
+        {
+            issues = issues.Concat([$"Service registration owner '{symbol.Name}' must be a non-abstract, non-generic accessible class."]).ToArray();
+        }
+
+        if (registration is null && !isOwner && issues.Count == 0)
+        {
+            return null;
+        }
+
+        return new ServiceGenerationCandidate(
+            symbol.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
+            registration,
+            isOwner,
+            symbol.AllInterfaces.Any(@interface => string.Equals(
+                @interface.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat), ModuleInterfaceName, StringComparison.Ordinal)),
+            symbol.Locations.FirstOrDefault(),
+            issues);
+    }
+
+    private static IReadOnlyList<string> ValidateServiceDeclaration(
+        INamedTypeSymbol symbol,
+        IReadOnlyList<AttributeData> attributes,
+        ServiceRegistrationMetadata? registration)
+    {
+        const string serviceAttribute = "AtomUI.City.Core.DependencyInjection.ServiceAttribute";
+        const string scopedAttribute = "AtomUI.City.Core.DependencyInjection.ScopedServiceAttribute";
+        const string exposeAttribute = "AtomUI.City.Core.DependencyInjection.ExposeServicesAttribute";
+        var issues = new List<string>();
+        var serviceAttributes = attributes.Where(attribute => HasAttributeName(attribute, serviceAttribute)).ToArray();
+        var scopedAttributes = attributes.Where(attribute => HasAttributeName(attribute, scopedAttribute)).ToArray();
+        var exposeAttributes = attributes.Where(attribute => HasAttributeName(attribute, exposeAttribute)).ToArray();
+        var markerLifetimes = symbol.AllInterfaces
+            .Select(@interface => @interface.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat))
+            .Where(name => name is "AtomUI.City.Core.DependencyInjection.ISingletonDependency" or
+                "AtomUI.City.Core.DependencyInjection.IScopedDependency" or
+                "AtomUI.City.Core.DependencyInjection.ITransientDependency")
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
+        if (serviceAttributes.Length > 0 && scopedAttributes.Length > 0)
+        {
+            issues.Add($"Service '{symbol.Name}' cannot use ServiceAttribute and ScopedServiceAttribute together.");
+        }
+
+        if (markerLifetimes.Length > 1)
+        {
+            issues.Add($"Service '{symbol.Name}' implements conflicting dependency lifetime markers.");
+        }
+
+        if (registration is null && exposeAttributes.Length > 0 && serviceAttributes.Length == 0 && scopedAttributes.Length == 0 && markerLifetimes.Length == 0)
+        {
+            issues.Add($"Service '{symbol.Name}' uses ExposeServicesAttribute without a service declaration or dependency marker.");
+        }
+
+        foreach (var attribute in serviceAttributes)
+        {
+            if (attribute.ConstructorArguments.Length == 0 ||
+                attribute.ConstructorArguments[0].Value is not int lifetime ||
+                lifetime is < 0 or > 2)
+            {
+                issues.Add($"Service '{symbol.Name}' declares an unknown ServiceLifetime value.");
+            }
+        }
+
+        foreach (var attribute in scopedAttributes.Concat(exposeAttributes))
+        {
+            if (attribute.ConstructorArguments.Length == 0)
+            {
+                continue;
+            }
+
+            var serviceTypes = attribute.ConstructorArguments[0];
+            if (serviceTypes.IsNull ||
+                serviceTypes.Kind != TypedConstantKind.Array ||
+                serviceTypes.Values.IsDefault)
+            {
+                issues.Add($"Service '{symbol.Name}' contains a null or invalid exposed service type.");
+                continue;
+            }
+
+            foreach (var value in serviceTypes.Values)
+            {
+                if (value.Value is not INamedTypeSymbol exposedType)
+                {
+                    issues.Add($"Service '{symbol.Name}' contains a null or invalid exposed service type.");
+                    continue;
+                }
+
+                if (!IsAssignableTo(symbol, exposedType))
+                {
+                    issues.Add($"Service '{symbol.Name}' is not assignable to exposed contract '{exposedType.Name}'.");
+                }
+            }
+        }
+
+        if (registration is null &&
+            issues.Count == 0 &&
+            (serviceAttributes.Length > 0 || scopedAttributes.Length > 0 || markerLifetimes.Length > 0))
+        {
+            issues.Add($"Service '{symbol.Name}' must be a concrete class that can be generated.");
+        }
+
+        if (registration is not null)
+        {
+            if (symbol.IsAbstract || symbol.IsStatic || symbol.Arity > 0 || !IsAccessible(symbol))
+            {
+                issues.Add($"Service '{symbol.Name}' must be a non-abstract, non-generic accessible class.");
+            }
+
+            if (registration.Key is not null && string.IsNullOrWhiteSpace(registration.Key))
+            {
+                issues.Add($"Service '{symbol.Name}' cannot declare an empty registration key.");
+            }
+        }
+
+        return issues;
+    }
+
+    private static bool HasAttributeName(AttributeData attribute, string expected) => string.Equals(
+        attribute.AttributeClass?.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat), expected, StringComparison.Ordinal);
+
+    private static bool IsAssignableTo(INamedTypeSymbol implementation, INamedTypeSymbol contract)
+    {
+        if (SymbolEqualityComparer.Default.Equals(implementation, contract) ||
+            implementation.AllInterfaces.Any(@interface => SymbolEqualityComparer.Default.Equals(@interface, contract)))
+        {
+            return true;
+        }
+
+        for (var current = implementation.BaseType; current is not null; current = current.BaseType)
+        {
+            if (SymbolEqualityComparer.Default.Equals(current, contract))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static IReadOnlyList<string> ReadReferencedServiceRegistrarTypeNames(Compilation compilation)
+    {
+        var registrarTypes = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var reference in compilation.References)
+        {
+            if (compilation.GetAssemblyOrModuleSymbol(reference) is not IAssemblySymbol assembly)
+            {
+                continue;
+            }
+
+            foreach (var attribute in assembly.GetAttributes())
+            {
+                if (string.Equals(
+                        attribute.AttributeClass?.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
+                        GeneratedServiceManifestAttributeName,
+                        StringComparison.Ordinal) &&
+                    attribute.ConstructorArguments.Length > 0 &&
+                    attribute.ConstructorArguments[0].Value is INamedTypeSymbol registrarType &&
+                    registrarType.DeclaredAccessibility == Accessibility.Public)
+                {
+                    registrarTypes.Add(registrarType.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat));
+                }
+            }
+        }
+
+        return registrarTypes.OrderBy(name => name, StringComparer.Ordinal).ToArray();
+    }
+
+    private static void ReportInvalidService(SourceProductionContext context, Location? location, string message)
+    {
+        context.ReportDiagnostic(GeneratorDiagnostics.CreateRoslynDiagnostic(
+            GeneratorFeature.DependencyInjection,
+            new GeneratorDiagnostic(GeneratorDiagnostics.InvalidManifestInput, message),
+            location));
     }
 
     private static void InitializeModularity(IncrementalGeneratorInitializationContext context)
@@ -365,5 +678,31 @@ public sealed class AtomUICityIncrementalGenerator : IIncrementalGenerator
                 string.Equals(view.ViewTypeName, diagnostic.Target, StringComparison.Ordinal) ||
                 string.Equals(view.ViewModelTypeName, diagnostic.Target, StringComparison.Ordinal))
             ?.Location;
+    }
+
+    private sealed class ServiceGenerationCandidate
+    {
+        public ServiceGenerationCandidate(
+            string typeName,
+            ServiceRegistrationMetadata? registration,
+            bool isOwner,
+            bool implementsModule,
+            Location? location,
+            IReadOnlyList<string> issues)
+        {
+            TypeName = typeName;
+            Registration = registration;
+            IsOwner = isOwner;
+            ImplementsModule = implementsModule;
+            Location = location;
+            Issues = issues;
+        }
+
+        public string TypeName { get; }
+        public ServiceRegistrationMetadata? Registration { get; }
+        public bool IsOwner { get; }
+        public bool ImplementsModule { get; }
+        public Location? Location { get; }
+        public IReadOnlyList<string> Issues { get; }
     }
 }

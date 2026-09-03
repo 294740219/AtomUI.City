@@ -2,6 +2,9 @@ using AtomUI.City.Core.Diagnostics;
 
 namespace AtomUI.City.Core.Lifecycle;
 
+/// <summary>
+/// Represents lifecycle pipeline.
+/// </summary>
 public sealed class LifecyclePipeline
 {
     private readonly IReadOnlyList<LifecycleMiddlewareRegistration> _middleware;
@@ -15,6 +18,9 @@ public sealed class LifecyclePipeline
         _terminalHandler = terminalHandler;
     }
 
+    /// <summary>
+    /// Executes the execute async operation.
+    /// </summary>
     public ValueTask ExecuteAsync(LifecycleContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -35,6 +41,7 @@ public sealed class LifecyclePipeline
         Exception? pipelineFailure = null;
         var attributedFailures = new HashSet<Exception>(ReferenceEqualityComparer.Instance);
         var terminalFailures = new HashSet<Exception>(ReferenceEqualityComparer.Instance);
+        var transaction = new LifecyclePipelineTransaction();
 
         try
         {
@@ -58,6 +65,8 @@ public sealed class LifecyclePipeline
                     : new AggregateException(pipelineFailure, terminalFailure);
             }
         }
+
+        transaction.Complete();
 
         if (pipelineFailure is not null)
         {
@@ -92,33 +101,49 @@ public sealed class LifecyclePipeline
                 return;
             }
 
-            var nextInvoked = false;
-
-            async ValueTask Next()
-            {
-                if (nextInvoked)
-                {
-                    throw new InvalidOperationException("Lifecycle middleware can invoke next only once.");
-                }
-
-                nextInvoked = true;
-                await InvokeAsync(index + 1).ConfigureAwait(false);
-            }
+            var next = new LifecycleNextInvocation(
+                transaction,
+                () => InvokeAsync(index + 1));
+            Exception? handlerFailure = null;
 
             try
             {
-                await registration.Handler(context, Next).ConfigureAwait(false);
+                await registration.Handler(context, next.InvokeAsync).ConfigureAwait(false);
             }
             catch (Exception exception)
             {
-                if (!IsExpectedCancellation(exception) &&
-                    !terminalFailures.Contains(exception) &&
-                    attributedFailures.Add(exception))
+                handlerFailure = exception;
+            }
+
+            var nextCompletion = await next.CloseAsync().ConfigureAwait(false);
+            var contractFailure = nextCompletion.Escaped
+                ? new InvalidOperationException(
+                    "Lifecycle middleware must await or return next before completing.")
+                : null;
+            var failure = CombineFailures(
+                contractFailure,
+                handlerFailure,
+                nextCompletion.Failure);
+
+            if (failure is not null)
+            {
+                var attributableFailure = contractFailure ?? handlerFailure;
+
+                if (attributableFailure is not null &&
+                    !IsExpectedCancellation(attributableFailure) &&
+                    !terminalFailures.Contains(attributableFailure) &&
+                    attributedFailures.Add(attributableFailure))
                 {
-                    WriteMiddlewareFailure(diagnostics, context, registration, exception);
+                    WriteMiddlewareFailure(
+                        diagnostics,
+                        context,
+                        registration,
+                        attributableFailure);
                 }
 
-                throw;
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo
+                    .Capture(failure)
+                    .Throw();
             }
 
             context.CancellationToken.ThrowIfCancellationRequested();
@@ -160,6 +185,146 @@ public sealed class LifecyclePipeline
                    context.CancellationToken.IsCancellationRequested;
         }
     }
+
+    private static Exception? CombineFailures(params Exception?[] candidates)
+    {
+        var failures = new List<Exception>(candidates.Length);
+
+        foreach (var candidate in candidates)
+        {
+            if (candidate is null || failures.Any(existing => ReferenceEquals(existing, candidate)))
+            {
+                continue;
+            }
+
+            failures.Add(candidate);
+        }
+
+        return failures.Count switch
+        {
+            0 => null,
+            1 => failures[0],
+            _ => new AggregateException(
+                "Lifecycle middleware and its downstream continuation both failed.",
+                failures).Flatten(),
+        };
+    }
+
+    private sealed class LifecyclePipelineTransaction
+    {
+        private int _completed;
+
+        public bool IsActive => Volatile.Read(ref _completed) == 0;
+
+        public void Complete()
+        {
+            Interlocked.Exchange(ref _completed, 1);
+        }
+    }
+
+    private sealed class LifecycleNextInvocation
+    {
+        private const int Available = 0;
+        private const int Invoked = 1;
+        private const int Closed = 2;
+
+        private readonly LifecyclePipelineTransaction _transaction;
+        private readonly Func<ValueTask> _continuation;
+        private readonly TaskCompletionSource<Task> _taskPublished = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _state;
+
+        public LifecycleNextInvocation(
+            LifecyclePipelineTransaction transaction,
+            Func<ValueTask> continuation)
+        {
+            _transaction = transaction;
+            _continuation = continuation;
+        }
+
+        public ValueTask InvokeAsync()
+        {
+            if (!_transaction.IsActive)
+            {
+                return ValueTask.FromException(CreateExpiredException());
+            }
+
+            var previousState = Interlocked.CompareExchange(
+                ref _state,
+                Invoked,
+                Available);
+
+            if (previousState != Available)
+            {
+                return ValueTask.FromException(previousState == Closed
+                    ? CreateExpiredException()
+                    : new InvalidOperationException(
+                        "Lifecycle middleware can invoke next only once."));
+            }
+
+            Task continuationTask;
+
+            if (!_transaction.IsActive)
+            {
+                continuationTask = Task.FromException(CreateExpiredException());
+            }
+            else
+            {
+                try
+                {
+                    continuationTask = _continuation().AsTask();
+                }
+                catch (Exception exception)
+                {
+                    continuationTask = Task.FromException(exception);
+                }
+            }
+
+            _taskPublished.TrySetResult(continuationTask);
+            return new ValueTask(continuationTask);
+        }
+
+        public async ValueTask<LifecycleNextCompletion> CloseAsync()
+        {
+            var previousState = Interlocked.Exchange(ref _state, Closed);
+
+            if (previousState == Available)
+            {
+                return default;
+            }
+
+            if (previousState == Closed)
+            {
+                throw new InvalidOperationException(
+                    "Lifecycle middleware next invocation was already closed.");
+            }
+
+            var continuationTask = await _taskPublished.Task.ConfigureAwait(false);
+            var escaped = !continuationTask.IsCompleted;
+            Exception? failure = null;
+
+            try
+            {
+                await continuationTask.ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                failure = exception;
+            }
+
+            return new LifecycleNextCompletion(escaped, failure);
+        }
+
+        private static InvalidOperationException CreateExpiredException()
+        {
+            return new InvalidOperationException(
+                "Lifecycle middleware cannot invoke next after its invocation has completed.");
+        }
+    }
+
+    private readonly record struct LifecycleNextCompletion(
+        bool Escaped,
+        Exception? Failure);
 
     private static void WriteMiddlewareFailure(
         IHostDiagnostics? diagnostics,

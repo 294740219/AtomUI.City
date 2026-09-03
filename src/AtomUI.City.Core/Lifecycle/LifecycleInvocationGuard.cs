@@ -4,6 +4,9 @@ internal enum LifecycleOperationKind
 {
     Start,
     Stop,
+    ConfigureServices,
+    ConfigureContributions,
+    Initialize,
     Shutdown,
     Dispose,
 }

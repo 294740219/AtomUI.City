@@ -1,5 +1,8 @@
 namespace AtomUI.City.Core.Lifecycle;
 
+/// <summary>
+/// Represents lifecycle context.
+/// </summary>
 public sealed class LifecycleContext
 {
     private sealed class NullServiceProvider : IServiceProvider
@@ -16,12 +19,17 @@ public sealed class LifecycleContext
         }
     }
 
+    /// <summary>
+    /// Initializes a new instance of the lifecycle context class.
+    /// </summary>
     public LifecycleContext(
         LifecycleStage stage,
         IServiceProvider? services = null,
         CancellationToken cancellationToken = default,
         string? operationId = null)
     {
+        stage.ThrowIfInvalid(nameof(stage));
+
         if (operationId is not null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(operationId, nameof(operationId));
@@ -33,18 +41,39 @@ public sealed class LifecycleContext
         OperationId = operationId ?? Guid.NewGuid().ToString("N");
     }
 
+    /// <summary>
+    /// Gets the stage value.
+    /// </summary>
     public LifecycleStage Stage { get; }
 
+    /// <summary>
+    /// Gets the services value.
+    /// </summary>
     public IServiceProvider Services { get; }
 
+    /// <summary>
+    /// Gets the cancellation token value.
+    /// </summary>
     public CancellationToken CancellationToken { get; }
 
+    /// <summary>
+    /// Gets the operation id value.
+    /// </summary>
     public string OperationId { get; }
 
+    /// <summary>
+    /// Gets the items value.
+    /// </summary>
     public IDictionary<object, object?> Items { get; } = new Dictionary<object, object?>();
 
+    /// <summary>
+    /// Gets or sets the is short circuited value.
+    /// </summary>
     public bool IsShortCircuited { get; private set; }
 
+    /// <summary>
+    /// Executes the short circuit operation.
+    /// </summary>
     public void ShortCircuit()
     {
         IsShortCircuited = true;

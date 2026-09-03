@@ -19,7 +19,10 @@ public static class ServiceRegistrationMetadataReader
         }
 
         var implementationTypeName = GetTypeName(type);
-        var serviceDeclaration = ReadServiceDeclaration(type);
+        if (!TryReadServiceDeclaration(type, out var serviceDeclaration))
+        {
+            return null;
+        }
 
         if (serviceDeclaration is null)
         {
@@ -31,7 +34,13 @@ public static class ServiceRegistrationMetadataReader
             return null;
         }
 
-        var exposedServiceTypeNames = ReadExposedServiceTypeNames(type)
+        var exposedAttributeServiceTypeNames = ReadExposedServiceTypeNames(type);
+        if (exposedAttributeServiceTypeNames is null)
+        {
+            return null;
+        }
+
+        var exposedServiceTypeNames = exposedAttributeServiceTypeNames
             .Concat(serviceDeclaration.ExposedServiceTypeNames)
             .Distinct(StringComparer.Ordinal)
             .ToArray();
@@ -47,10 +56,15 @@ public static class ServiceRegistrationMetadataReader
             exposedServiceTypeNames,
             serviceDeclaration.Replace,
             serviceDeclaration.TryAdd,
-            serviceDeclaration.Key);
+            serviceDeclaration.Key,
+            type.AllInterfaces.Any(@interface =>
+                string.Equals(GetTypeName(@interface), "System.IDisposable", StringComparison.Ordinal) ||
+                string.Equals(GetTypeName(@interface), "System.IAsyncDisposable", StringComparison.Ordinal)));
     }
 
-    private static ServiceDeclaration? ReadServiceDeclaration(INamedTypeSymbol type)
+    private static bool TryReadServiceDeclaration(
+        INamedTypeSymbol type,
+        out ServiceDeclaration? declaration)
     {
         foreach (var attribute in type.GetAttributes())
         {
@@ -58,26 +72,43 @@ public static class ServiceRegistrationMetadataReader
 
             if (string.Equals(attributeName, ServiceAttributeName, StringComparison.Ordinal))
             {
-                return new ServiceDeclaration(
-                    ReadLifetime(attribute),
+                var lifetime = ReadLifetime(attribute);
+                if (lifetime is null)
+                {
+                    declaration = null;
+                    return false;
+                }
+
+                declaration = new ServiceDeclaration(
+                    lifetime.Value,
                     [],
                     ReadNamedBoolean(attribute, "Replace"),
                     ReadNamedBoolean(attribute, "TryAdd"),
                     ReadNamedString(attribute, "Key"));
+                return true;
             }
 
             if (string.Equals(attributeName, ScopedServiceAttributeName, StringComparison.Ordinal))
             {
-                return new ServiceDeclaration(
+                var exposedServiceTypeNames = ReadConstructorServiceTypes(attribute);
+                if (exposedServiceTypeNames is null)
+                {
+                    declaration = null;
+                    return false;
+                }
+
+                declaration = new ServiceDeclaration(
                     ServiceRegistrationLifetime.Scoped,
-                    ReadConstructorServiceTypes(attribute),
+                    exposedServiceTypeNames,
                     ReadNamedBoolean(attribute, "Replace"),
                     ReadNamedBoolean(attribute, "TryAdd"),
                     ReadNamedString(attribute, "Key"));
+                return true;
             }
         }
 
-        return null;
+        declaration = null;
+        return true;
     }
 
     private static ServiceDeclaration? ReadMarkerInterfaceDeclaration(INamedTypeSymbol type)
@@ -105,16 +136,28 @@ public static class ServiceRegistrationMetadataReader
         return null;
     }
 
-    private static IReadOnlyList<string> ReadExposedServiceTypeNames(INamedTypeSymbol type)
+    private static IReadOnlyList<string>? ReadExposedServiceTypeNames(INamedTypeSymbol type)
     {
-        return type
-            .GetAttributes()
-            .Where(attribute => string.Equals(GetAttributeTypeName(attribute), ExposeServicesAttributeName, StringComparison.Ordinal))
-            .SelectMany(ReadConstructorServiceTypes)
-            .ToArray();
+        var serviceTypeNames = new List<string>();
+        foreach (var attribute in type.GetAttributes().Where(attribute =>
+                     string.Equals(
+                         GetAttributeTypeName(attribute),
+                         ExposeServicesAttributeName,
+                         StringComparison.Ordinal)))
+        {
+            var attributeServiceTypeNames = ReadConstructorServiceTypes(attribute);
+            if (attributeServiceTypeNames is null)
+            {
+                return null;
+            }
+
+            serviceTypeNames.AddRange(attributeServiceTypeNames);
+        }
+
+        return serviceTypeNames;
     }
 
-    private static IReadOnlyList<string> ReadConstructorServiceTypes(AttributeData attribute)
+    private static IReadOnlyList<string>? ReadConstructorServiceTypes(AttributeData attribute)
     {
         if (attribute.ConstructorArguments.Length == 0)
         {
@@ -124,21 +167,38 @@ public static class ServiceRegistrationMetadataReader
         return ReadTypeNames(attribute.ConstructorArguments[0]);
     }
 
-    private static IReadOnlyList<string> ReadTypeNames(TypedConstant constant)
+    private static IReadOnlyList<string>? ReadTypeNames(TypedConstant constant)
     {
+        if (constant.IsNull)
+        {
+            return null;
+        }
+
         if (constant.Kind == TypedConstantKind.Array)
         {
-            return constant
-                .Values
-                .Select(ReadTypeName)
-                .Where(typeName => typeName is not null)
-                .Cast<string>()
-                .ToArray();
+            if (constant.Values.IsDefault)
+            {
+                return null;
+            }
+
+            var typeNames = new List<string>(constant.Values.Length);
+            foreach (var value in constant.Values)
+            {
+                var typeName = ReadTypeName(value);
+                if (typeName is null)
+                {
+                    return null;
+                }
+
+                typeNames.Add(typeName);
+            }
+
+            return typeNames;
         }
 
         var singleTypeName = ReadTypeName(constant);
 
-        return singleTypeName is null ? [] : [singleTypeName];
+        return singleTypeName is null ? null : [singleTypeName];
     }
 
     private static string? ReadTypeName(TypedConstant constant)
@@ -146,11 +206,11 @@ public static class ServiceRegistrationMetadataReader
         return constant.Value is INamedTypeSymbol type ? GetTypeName(type) : null;
     }
 
-    private static ServiceRegistrationLifetime ReadLifetime(AttributeData attribute)
+    private static ServiceRegistrationLifetime? ReadLifetime(AttributeData attribute)
     {
         if (attribute.ConstructorArguments.Length == 0)
         {
-            return ServiceRegistrationLifetime.Transient;
+            return null;
         }
 
         var value = attribute.ConstructorArguments[0].Value;
@@ -159,7 +219,8 @@ public static class ServiceRegistrationMetadataReader
         {
             0 => ServiceRegistrationLifetime.Singleton,
             1 => ServiceRegistrationLifetime.Scoped,
-            _ => ServiceRegistrationLifetime.Transient,
+            2 => ServiceRegistrationLifetime.Transient,
+            _ => null,
         };
     }
 

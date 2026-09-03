@@ -12,7 +12,7 @@ internal sealed class DefaultApplicationHost : IApplicationHost
     private readonly IHostDiagnostics _diagnostics;
     private readonly IHost _genericHost;
     private readonly LifecyclePipeline _lifecyclePipeline;
-    private readonly IModuleRegistry _moduleRegistry;
+    private readonly IModuleLifecycleController _moduleLifecycle;
     private readonly ApplicationHostOptions _options;
     private readonly object _stateSync = new();
     private IServiceScope? _applicationServiceScope;
@@ -29,7 +29,7 @@ internal sealed class DefaultApplicationHost : IApplicationHost
         IApplicationContext context,
         IHostDiagnostics diagnostics,
         LifecycleScope hostScope,
-        IModuleRegistry moduleRegistry,
+        IModuleLifecycleController moduleLifecycle,
         LifecyclePipeline lifecyclePipeline,
         ApplicationHostOptions options)
     {
@@ -37,13 +37,13 @@ internal sealed class DefaultApplicationHost : IApplicationHost
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(diagnostics);
         ArgumentNullException.ThrowIfNull(hostScope);
-        ArgumentNullException.ThrowIfNull(moduleRegistry);
+        ArgumentNullException.ThrowIfNull(moduleLifecycle);
         ArgumentNullException.ThrowIfNull(lifecyclePipeline);
         ArgumentNullException.ThrowIfNull(options);
 
         _genericHost = genericHost;
         _diagnostics = diagnostics;
-        _moduleRegistry = moduleRegistry;
+        _moduleLifecycle = moduleLifecycle;
         _lifecyclePipeline = lifecyclePipeline;
         _options = options;
         Context = context;
@@ -127,8 +127,9 @@ internal sealed class DefaultApplicationHost : IApplicationHost
             switch (_state)
             {
                 case ApplicationHostState.Created:
-                    _state = ApplicationHostState.Stopped;
-                    _stopTask = Task.CompletedTask;
+                    operation = new DeferredLifecycleOperation();
+                    _stopTask = operation.Task;
+                    _state = ApplicationHostState.Stopping;
                     stopTask = _stopTask;
                     break;
                 case ApplicationHostState.Stopped:
@@ -296,10 +297,16 @@ internal sealed class DefaultApplicationHost : IApplicationHost
                 Context = CreateOperationContext("start", operationId),
             });
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException exception) when (cancellationToken.IsCancellationRequested)
         {
-            await RollbackStartupAsync(operationId).ConfigureAwait(false);
+            var rollbackFailures = await RollbackStartupAsync(operationId).ConfigureAwait(false);
             TransitionStartupFailure();
+
+            if (rollbackFailures.Count > 0)
+            {
+                throw CreateStartupRollbackFailure(exception, rollbackFailures);
+            }
+
             throw;
         }
         catch (Exception exception)
@@ -312,8 +319,14 @@ internal sealed class DefaultApplicationHost : IApplicationHost
                 Context = CreateExceptionContext(exception, "start", operationId),
             });
 
-            await RollbackStartupAsync(operationId).ConfigureAwait(false);
+            var rollbackFailures = await RollbackStartupAsync(operationId).ConfigureAwait(false);
             TransitionStartupFailure();
+
+            if (rollbackFailures.Count > 0)
+            {
+                throw CreateStartupRollbackFailure(exception, rollbackFailures);
+            }
+
             throw;
         }
     }
@@ -327,7 +340,7 @@ internal sealed class DefaultApplicationHost : IApplicationHost
         ApplicationScope = HostScope.CreateChild(LifecycleScopeKind.Application, "application");
         var applicationServices = _applicationServiceScope.ServiceProvider;
 
-        await _moduleRegistry.ConfigureContributionsAsync(
+        await _moduleLifecycle.ConfigureContributionsAsync(
             Context,
             applicationServices,
             context.CancellationToken).ConfigureAwait(false);
@@ -336,7 +349,7 @@ internal sealed class DefaultApplicationHost : IApplicationHost
             LifecycleStages.ModuleInitialize,
             async stageContext =>
             {
-                await _moduleRegistry.InitializeAsync(
+                await _moduleLifecycle.InitializeAsync(
                     Context,
                     applicationServices,
                     stageContext.CancellationToken).ConfigureAwait(false);
@@ -452,11 +465,11 @@ internal sealed class DefaultApplicationHost : IApplicationHost
         }
     }
 
-    private async Task RollbackStartupAsync(string operationId)
+    private async Task<IReadOnlyList<Exception>> RollbackStartupAsync(string operationId)
     {
         if (_cleanupCompleted)
         {
-            return;
+            return [];
         }
 
         var failures = new List<Exception>();
@@ -477,6 +490,17 @@ internal sealed class DefaultApplicationHost : IApplicationHost
                 Context = CreateExceptionContext(failure, "startupRollback", operationId),
             });
         }
+
+        return Array.AsReadOnly(failures.ToArray());
+    }
+
+    private static AggregateException CreateStartupRollbackFailure(
+        Exception startupFailure,
+        IReadOnlyList<Exception> rollbackFailures)
+    {
+        return new AggregateException(
+            "Application host startup failed and rollback was incomplete.",
+            new[] { startupFailure }.Concat(rollbackFailures));
     }
 
     private async Task StopTransactionAsync(
@@ -548,7 +572,7 @@ internal sealed class DefaultApplicationHost : IApplicationHost
                 moduleStopContext,
                 async _ =>
                 {
-                    await _moduleRegistry.ShutdownAsync(
+                    await _moduleLifecycle.ShutdownAsync(
                         Context,
                         _applicationServiceScope?.ServiceProvider ?? Services,
                         cancellationToken).ConfigureAwait(false);
@@ -621,7 +645,7 @@ internal sealed class DefaultApplicationHost : IApplicationHost
         CancellationToken cancellationToken,
         string operationId)
     {
-        var terminalInvoked = false;
+        var terminalCompleted = false;
         var context = new LifecycleContext(
             stage,
             _applicationServiceScope?.ServiceProvider ?? Services,
@@ -632,16 +656,16 @@ internal sealed class DefaultApplicationHost : IApplicationHost
             context,
             async stageContext =>
             {
-                terminalInvoked = true;
                 await terminal(stageContext).ConfigureAwait(false);
+                terminalCompleted = true;
             },
             guaranteeTerminal: false,
             diagnostics: _diagnostics).ConfigureAwait(false);
 
-        if (!terminalInvoked)
+        if (!terminalCompleted)
         {
             throw new InvalidOperationException(
-                $"Lifecycle stage '{stage}' was short-circuited before its required terminal operation.");
+                $"Lifecycle stage '{stage}' did not complete its required terminal operation.");
         }
     }
 
@@ -658,16 +682,13 @@ internal sealed class DefaultApplicationHost : IApplicationHost
             AddFailure(failures, exception);
         }
 
-        if (_moduleRegistry is IAsyncDisposable asyncModuleRegistry)
+        try
         {
-            try
-            {
-                await asyncModuleRegistry.DisposeAsync().ConfigureAwait(false);
-            }
-            catch (Exception exception)
-            {
-                AddFailure(failures, exception);
-            }
+            await _moduleLifecycle.DisposeAsync().ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            AddFailure(failures, exception);
         }
 
         if (_applicationServiceScope is not null)
@@ -718,11 +739,25 @@ internal sealed class DefaultApplicationHost : IApplicationHost
             _state = ApplicationHostState.Disposed;
         }
 
+        CompleteDiagnostics();
+
         if (failures.Count > 0)
         {
             throw new AggregateException(
                 "One or more application host disposal stages failed.",
                 failures).Flatten();
+        }
+    }
+
+    private void CompleteDiagnostics()
+    {
+        try
+        {
+            _diagnostics.Complete();
+        }
+        catch
+        {
+            // A diagnostics sink must never interrupt Host cleanup.
         }
     }
 
@@ -792,13 +827,21 @@ internal sealed class DefaultApplicationHost : IApplicationHost
         {
             foreach (var innerException in aggregateException.Flatten().InnerExceptions)
             {
-                failures.Add(innerException);
+                AddFailureOnce(failures, innerException);
             }
 
             return;
         }
 
-        failures.Add(exception);
+        AddFailureOnce(failures, exception);
+    }
+
+    private static void AddFailureOnce(ICollection<Exception> failures, Exception exception)
+    {
+        if (!failures.Any(existing => ReferenceEquals(existing, exception)))
+        {
+            failures.Add(exception);
+        }
     }
 
     private enum ApplicationHostState

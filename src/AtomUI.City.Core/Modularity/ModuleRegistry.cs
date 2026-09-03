@@ -5,16 +5,17 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace AtomUI.City.Core.Modularity;
 
-public sealed class ModuleRegistry : IModuleRegistry, IAsyncDisposable
+internal sealed class ModuleRegistry : IModuleLifecycleController
 {
+    private static readonly TimeSpan DefaultBuildCleanupTimeout = TimeSpan.FromSeconds(30);
     private readonly IReadOnlyList<ModuleEntry> _orderedEntries;
     private readonly object _syncRoot = new();
-    private bool _contributionsConfigured;
-    private Task? _disposeTask;
-    private bool _disposed;
-    private bool _initialized;
-    private bool _servicesConfigured;
-    private Task? _shutdownTask;
+    private Task? _activePhaseTask;
+    private Task? _configureContributionsTask;
+    private Task? _configureServicesTask;
+    private Task? _initializeTask;
+    private ModuleRegistryState _state = ModuleRegistryState.Created;
+    private Task? _terminalTask;
 
     private ModuleRegistry(IReadOnlyList<ModuleEntry> orderedEntries)
     {
@@ -24,15 +25,26 @@ public sealed class ModuleRegistry : IModuleRegistry, IAsyncDisposable
 
     public IReadOnlyList<ModuleDescriptor> Modules { get; }
 
-    internal static ModuleRegistry Create(IReadOnlyList<ModuleRegistration> registrations)
+    internal static ModuleRegistry Create(
+        ValidatedModuleGraph graph,
+        IHostDiagnostics? diagnostics = null,
+        TimeSpan? buildCleanupTimeout = null)
     {
-        ArgumentNullException.ThrowIfNull(registrations);
+        ArgumentNullException.ThrowIfNull(graph);
+        var cleanupTimeout = buildCleanupTimeout ?? DefaultBuildCleanupTimeout;
+        if (cleanupTimeout <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(buildCleanupTimeout),
+                cleanupTimeout,
+                "Build cleanup timeout must be greater than zero.");
+        }
 
-        var entries = new List<ModuleEntry>(registrations.Count);
+        var entries = new List<ModuleEntry>(graph.OrderedRegistrations.Count);
 
         try
         {
-            foreach (var registration in registrations)
+            foreach (var registration in graph.OrderedRegistrations)
             {
                 var descriptor = registration.Descriptor
                     ?? throw new InvalidOperationException(
@@ -50,16 +62,29 @@ public sealed class ModuleRegistry : IModuleRegistry, IAsyncDisposable
                 }
             }
 
-            return new ModuleRegistry(OrderByDependencies(entries));
+            return new ModuleRegistry(Array.AsReadOnly(entries.ToArray()));
         }
-        catch
+        catch (Exception exception)
         {
-            DisposeEntriesAfterBuildFailure(entries);
+            var cleanupFailures = DisposeEntriesAfterBuildFailure(
+                entries,
+                diagnostics,
+                new BuildCleanupDeadline(cleanupTimeout));
+            if (cleanupFailures.Count > 0)
+            {
+                throw new AggregateException(
+                    "Module registry creation failed and one or more module instances failed to clean up.",
+                    new[] { exception }.Concat(cleanupFailures));
+            }
+
             throw;
         }
     }
 
-    internal static ModuleRegistry CreateForTesting(IReadOnlyList<Type> moduleTypes)
+    internal static ModuleRegistry CreateForTesting(
+        IReadOnlyList<Type> moduleTypes,
+        IHostDiagnostics? diagnostics = null,
+        TimeSpan? buildCleanupTimeout = null)
     {
         ArgumentNullException.ThrowIfNull(moduleTypes);
 
@@ -69,10 +94,13 @@ public sealed class ModuleRegistry : IModuleRegistry, IAsyncDisposable
                 () => (IModule)Activator.CreateInstance(moduleType)!))
             .ToArray();
 
-        return Create(registrations);
+        return Create(
+            ModuleGraphValidator.Validate(registrations),
+            diagnostics,
+            buildCleanupTimeout);
     }
 
-    public async ValueTask ConfigureServicesAsync(
+    public void ConfigureServices(
         IApplicationContext applicationContext,
         IServiceCollection services,
         CancellationToken cancellationToken = default)
@@ -80,93 +108,187 @@ public sealed class ModuleRegistry : IModuleRegistry, IAsyncDisposable
         ArgumentNullException.ThrowIfNull(applicationContext);
         ArgumentNullException.ThrowIfNull(services);
 
-        await ConfigureServicesCoreAsync(
+        RunConfigureServicesTransaction(
             applicationContext,
             services,
             TryGetDiagnostics(services),
-            cancellationToken).ConfigureAwait(false);
+            generatedServices: null,
+            cancellationToken);
     }
 
-    internal async ValueTask ConfigureServicesAsync(
+    public void ConfigureServices(
         IApplicationContext applicationContext,
         IServiceCollection services,
         IHostDiagnostics diagnostics,
+        Action<IServiceCollection>? generatedServices = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(applicationContext);
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(diagnostics);
 
-        await ConfigureServicesCoreAsync(
+        RunConfigureServicesTransaction(
             applicationContext,
             services,
             diagnostics,
-            cancellationToken).ConfigureAwait(false);
+            generatedServices,
+            cancellationToken);
     }
 
-    private async ValueTask ConfigureServicesCoreAsync(
+    private void RunConfigureServicesTransaction(
         IApplicationContext applicationContext,
         IServiceCollection services,
         IHostDiagnostics? diagnostics,
+        Action<IServiceCollection>? generatedServices,
         CancellationToken cancellationToken)
     {
-        ThrowIfDisposed();
+        LifecycleInvocationGuard.ThrowIfReentrant(this, LifecycleOperationKind.ConfigureServices);
 
-        if (_servicesConfigured)
+        DeferredLifecycleOperation? operation = null;
+        Task configureServicesTask;
+
+        lock (_syncRoot)
         {
-            return;
+            ThrowIfTerminatingOrDisposed();
+
+            if (_configureServicesTask is not null)
+            {
+                if (!_configureServicesTask.IsCompleted)
+                {
+                    throw new InvalidOperationException(
+                        "Module service configuration is synchronous and does not support concurrent callers.");
+                }
+
+                configureServicesTask = _configureServicesTask;
+            }
+            else
+            {
+                EnsureCanEnterPhase(ModuleRegistryState.Created, "configure services");
+
+                operation = new DeferredLifecycleOperation();
+                _configureServicesTask = operation.Task;
+                _activePhaseTask = operation.Task;
+                _state = ModuleRegistryState.ConfiguringServices;
+                configureServicesTask = operation.Task;
+            }
         }
 
+        if (operation is not null)
+        {
+            operation.Start(
+                this,
+                LifecycleOperationKind.ConfigureServices,
+                () => RunPhaseAsync(
+                    configureServicesTask,
+                    ModuleRegistryState.ConfiguringServices,
+                    ModuleRegistryState.ServicesConfigured,
+                    () => ConfigureServicesCoreAsync(
+                        applicationContext,
+                        services,
+                        diagnostics,
+                        generatedServices,
+                        cancellationToken)));
+        }
+
+        configureServicesTask.GetAwaiter().GetResult();
+    }
+
+    private Task ConfigureServicesCoreAsync(
+        IApplicationContext applicationContext,
+        IServiceCollection services,
+        IHostDiagnostics? diagnostics,
+        Action<IServiceCollection>? generatedServices,
+        CancellationToken cancellationToken)
+    {
         var context = new ServiceConfigurationContext(applicationContext, services);
 
         try
         {
-            await ExecuteConfigurationStageAsync(
+            ExecuteConfigurationStage(
                 context,
                 diagnostics,
                 "PreConfigureServices",
                 static (module, moduleContext, token) =>
-                    module.PreConfigureServicesAsync(moduleContext, token),
-                cancellationToken).ConfigureAwait(false);
+                    module.PreConfigureServices(moduleContext),
+                cancellationToken);
 
-            await ExecuteConfigurationStageAsync(
+            generatedServices?.Invoke(services);
+
+            ExecuteConfigurationStage(
                 context,
                 diagnostics,
                 "ConfigureServices",
                 static (module, moduleContext, token) =>
-                    module.ConfigureServicesAsync(moduleContext, token),
-                cancellationToken).ConfigureAwait(false);
+                    module.ConfigureServices(moduleContext),
+                cancellationToken);
 
-            await ExecuteConfigurationStageAsync(
+            ExecuteConfigurationStage(
                 context,
                 diagnostics,
                 "PostConfigureServices",
                 static (module, moduleContext, token) =>
-                    module.PostConfigureServicesAsync(moduleContext, token),
-                cancellationToken).ConfigureAwait(false);
+                    module.PostConfigureServices(moduleContext),
+                cancellationToken);
 
-            _servicesConfigured = true;
         }
         finally
         {
             context.Services.Freeze();
         }
+
+        return Task.CompletedTask;
     }
 
-    public async ValueTask ConfigureContributionsAsync(
+    public ValueTask ConfigureContributionsAsync(
         IApplicationContext applicationContext,
         IServiceProvider services,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(applicationContext);
         ArgumentNullException.ThrowIfNull(services);
-        ThrowIfDisposed();
+        LifecycleInvocationGuard.ThrowIfReentrant(this, LifecycleOperationKind.ConfigureContributions);
 
-        if (_contributionsConfigured)
+        DeferredLifecycleOperation? operation = null;
+        Task configureContributionsTask;
+
+        lock (_syncRoot)
         {
-            return;
+            ThrowIfTerminatingOrDisposed();
+
+            if (_configureContributionsTask is not null)
+            {
+                return new ValueTask(_configureContributionsTask);
+            }
+
+            EnsureCanEnterPhase(ModuleRegistryState.ServicesConfigured, "configure contributions");
+
+            operation = new DeferredLifecycleOperation();
+            _configureContributionsTask = operation.Task;
+            _activePhaseTask = operation.Task;
+            _state = ModuleRegistryState.ConfiguringContributions;
+            configureContributionsTask = operation.Task;
         }
 
+        operation.Start(
+            this,
+            LifecycleOperationKind.ConfigureContributions,
+            () => RunPhaseAsync(
+                configureContributionsTask,
+                ModuleRegistryState.ConfiguringContributions,
+                ModuleRegistryState.ContributionsConfigured,
+                () => ConfigureContributionsCoreAsync(
+                    applicationContext,
+                    services,
+                    cancellationToken)));
+
+        return new ValueTask(configureContributionsTask);
+    }
+
+    private async Task ConfigureContributionsCoreAsync(
+        IApplicationContext applicationContext,
+        IServiceProvider services,
+        CancellationToken cancellationToken)
+    {
         var context = new ContributionConfigurationContext(applicationContext, services);
         var diagnostics = services.GetService<IHostDiagnostics>();
 
@@ -181,23 +303,55 @@ public sealed class ModuleRegistry : IModuleRegistry, IAsyncDisposable
                 cancellationToken).ConfigureAwait(false);
         }
 
-        _contributionsConfigured = true;
     }
 
-    public async ValueTask InitializeAsync(
+    public ValueTask InitializeAsync(
         IApplicationContext applicationContext,
         IServiceProvider services,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(applicationContext);
         ArgumentNullException.ThrowIfNull(services);
-        ThrowIfDisposed();
+        LifecycleInvocationGuard.ThrowIfReentrant(this, LifecycleOperationKind.Initialize);
 
-        if (_initialized)
+        DeferredLifecycleOperation? operation = null;
+        Task initializeTask;
+
+        lock (_syncRoot)
         {
-            return;
+            ThrowIfTerminatingOrDisposed();
+
+            if (_initializeTask is not null)
+            {
+                return new ValueTask(_initializeTask);
+            }
+
+            EnsureCanEnterPhase(ModuleRegistryState.ContributionsConfigured, "initialize");
+
+            operation = new DeferredLifecycleOperation();
+            _initializeTask = operation.Task;
+            _activePhaseTask = operation.Task;
+            _state = ModuleRegistryState.Initializing;
+            initializeTask = operation.Task;
         }
 
+        operation.Start(
+            this,
+            LifecycleOperationKind.Initialize,
+            () => RunPhaseAsync(
+                initializeTask,
+                ModuleRegistryState.Initializing,
+                ModuleRegistryState.Initialized,
+                () => InitializeCoreAsync(applicationContext, services, cancellationToken)));
+
+        return new ValueTask(initializeTask);
+    }
+
+    private async Task InitializeCoreAsync(
+        IApplicationContext applicationContext,
+        IServiceProvider services,
+        CancellationToken cancellationToken)
+    {
         var context = new ApplicationInitializationContext(applicationContext, services);
         var diagnostics = services.GetService<IHostDiagnostics>();
 
@@ -225,7 +379,6 @@ public sealed class ModuleRegistry : IModuleRegistry, IAsyncDisposable
                 module.OnPostApplicationInitializationAsync(moduleContext, token),
             cancellationToken).ConfigureAwait(false);
 
-        _initialized = true;
     }
 
     public ValueTask ShutdownAsync(
@@ -238,63 +391,187 @@ public sealed class ModuleRegistry : IModuleRegistry, IAsyncDisposable
         LifecycleInvocationGuard.ThrowIfReentrant(this, LifecycleOperationKind.Shutdown);
 
         DeferredLifecycleOperation? operation = null;
-        Task shutdownTask;
+        Task? activePhaseTask;
+        Task terminalTask;
 
         lock (_syncRoot)
         {
-            if (_shutdownTask is not null)
+            if (_terminalTask is not null)
             {
-                return new ValueTask(_shutdownTask);
-            }
-
-            if (_disposed)
-            {
-                return ValueTask.CompletedTask;
+                return new ValueTask(_terminalTask);
             }
 
             operation = new DeferredLifecycleOperation();
-            _shutdownTask = operation.Task;
-            shutdownTask = _shutdownTask;
+            _terminalTask = operation.Task;
+            activePhaseTask = _activePhaseTask;
+            _state = ModuleRegistryState.Terminating;
+            terminalTask = operation.Task;
         }
 
         operation.Start(
             this,
             LifecycleOperationKind.Shutdown,
-            () => ShutdownCoreAsync(applicationContext, services, cancellationToken));
+            () => RunTerminalAsync(
+                activePhaseTask,
+                () => ShutdownCoreAsync(applicationContext, services, cancellationToken)));
 
-        return new ValueTask(shutdownTask);
+        return new ValueTask(terminalTask);
     }
 
-    public ValueTask DisposeAsync()
+    public ValueTask DisposeAsync() => DisposeAsyncCore(diagnostics: null);
+
+    internal ValueTask DisposeAsync(IHostDiagnostics diagnostics)
+    {
+        ArgumentNullException.ThrowIfNull(diagnostics);
+        return DisposeAsyncCore(diagnostics);
+    }
+
+    internal void DisposeAfterBuildFailure(
+        IHostDiagnostics diagnostics,
+        BuildCleanupDeadline cleanupDeadline)
+    {
+        ArgumentNullException.ThrowIfNull(diagnostics);
+        ArgumentNullException.ThrowIfNull(cleanupDeadline);
+        var failures = new List<Exception>();
+
+        for (var index = _orderedEntries.Count - 1; index >= 0; index--)
+        {
+            var entry = _orderedEntries[index];
+            if (entry.Disposed)
+            {
+                continue;
+            }
+
+            entry.Disposed = true;
+            try
+            {
+                switch (entry.Module)
+                {
+                    case IAsyncDisposable asyncDisposable:
+                        cleanupDeadline.Run(
+                            asyncDisposable.DisposeAsync,
+                            $"Module '{entry.Descriptor.ModuleType.FullName}' DisposeAsync");
+                        break;
+                    case IDisposable disposable:
+                        disposable.Dispose();
+                        break;
+                }
+            }
+            catch (Exception exception)
+            {
+                WriteModuleFailure(diagnostics, entry, "Dispose", exception);
+                AddFailure(failures, exception);
+            }
+        }
+
+        lock (_syncRoot)
+        {
+            _state = ModuleRegistryState.Disposed;
+        }
+
+        ThrowIfFailures(failures, "One or more module instances failed to dispose during build rollback.");
+    }
+
+    private ValueTask DisposeAsyncCore(IHostDiagnostics? diagnostics)
     {
         LifecycleInvocationGuard.ThrowIfReentrant(this, LifecycleOperationKind.Dispose);
 
         DeferredLifecycleOperation? operation = null;
-        Task disposeTask;
+        Task? activePhaseTask;
+        Task terminalTask;
 
         lock (_syncRoot)
         {
-            if (_disposeTask is not null)
+            if (_terminalTask is not null)
             {
-                return new ValueTask(_disposeTask);
-            }
-
-            if (_disposed)
-            {
-                return ValueTask.CompletedTask;
+                return new ValueTask(_terminalTask);
             }
 
             operation = new DeferredLifecycleOperation();
-            _disposeTask = operation.Task;
-            disposeTask = _disposeTask;
+            _terminalTask = operation.Task;
+            activePhaseTask = _activePhaseTask;
+            _state = ModuleRegistryState.Terminating;
+            terminalTask = operation.Task;
         }
 
         operation.Start(
             this,
             LifecycleOperationKind.Dispose,
-            () => DisposeModulesCoreAsync(diagnostics: null));
+            () => RunTerminalAsync(
+                activePhaseTask,
+                () => DisposeModulesCoreAsync(diagnostics)));
 
-        return new ValueTask(disposeTask);
+        return new ValueTask(terminalTask);
+    }
+
+    private async Task RunPhaseAsync(
+        Task phaseTask,
+        ModuleRegistryState executingState,
+        ModuleRegistryState completedState,
+        Func<Task> execute)
+    {
+        try
+        {
+            await execute().ConfigureAwait(false);
+
+            lock (_syncRoot)
+            {
+                if (_state == executingState)
+                {
+                    _state = completedState;
+                }
+            }
+        }
+        catch
+        {
+            lock (_syncRoot)
+            {
+                if (_state == executingState)
+                {
+                    _state = ModuleRegistryState.Faulted;
+                }
+            }
+
+            throw;
+        }
+        finally
+        {
+            lock (_syncRoot)
+            {
+                if (ReferenceEquals(_activePhaseTask, phaseTask))
+                {
+                    _activePhaseTask = null;
+                }
+            }
+        }
+    }
+
+    private async Task RunTerminalAsync(Task? activePhaseTask, Func<Task> terminate)
+    {
+        if (activePhaseTask is not null)
+        {
+            try
+            {
+                await activePhaseTask.ConfigureAwait(false);
+            }
+            catch
+            {
+                // The phase caller observes its own failure. Terminal cleanup still proceeds.
+            }
+        }
+
+        try
+        {
+            await terminate().ConfigureAwait(false);
+        }
+        finally
+        {
+            lock (_syncRoot)
+            {
+                _state = ModuleRegistryState.Disposed;
+                _activePhaseTask = null;
+            }
+        }
     }
 
     private async Task ShutdownCoreAsync(
@@ -378,29 +655,24 @@ public sealed class ModuleRegistry : IModuleRegistry, IAsyncDisposable
             }
         }
 
-        lock (_syncRoot)
-        {
-            _disposed = true;
-        }
-
         ThrowIfFailures(failures, "One or more module instances failed to dispose.");
     }
 
-    private async ValueTask ExecuteConfigurationStageAsync(
+    private void ExecuteConfigurationStage(
         ServiceConfigurationContext context,
         IHostDiagnostics? diagnostics,
         string stage,
-        Func<IModule, ServiceConfigurationContext, CancellationToken, ValueTask> invoke,
+        Action<IModule, ServiceConfigurationContext, CancellationToken> invoke,
         CancellationToken cancellationToken)
     {
         foreach (var entry in _orderedEntries)
         {
-            await InvokeModuleAsync(
+            InvokeModule(
                 entry,
                 diagnostics,
                 stage,
                 token => invoke(entry.Module, context, token),
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken);
         }
     }
 
@@ -423,78 +695,6 @@ public sealed class ModuleRegistry : IModuleRegistry, IAsyncDisposable
         }
     }
 
-    private static IReadOnlyList<ModuleEntry> OrderByDependencies(IReadOnlyList<ModuleEntry> entries)
-    {
-        var entriesByType = entries.ToDictionary(entry => entry.Descriptor.ModuleType);
-        var duplicateId = entries
-            .GroupBy(entry => entry.Descriptor.Name, StringComparer.Ordinal)
-            .FirstOrDefault(group => group.Count() > 1);
-
-        if (duplicateId is not null)
-        {
-            throw new InvalidOperationException(
-                $"Duplicate module id '{duplicateId.Key}' declared by {string.Join(", ", duplicateId.Select(entry => entry.Descriptor.ModuleType.FullName))}.");
-        }
-
-        var ordered = new List<ModuleEntry>();
-        var visitStates = new Dictionary<Type, ModuleVisitState>();
-        var path = new Stack<Type>();
-
-        foreach (var entry in entries)
-        {
-            Visit(entry, entriesByType, visitStates, ordered, path);
-        }
-
-        return ordered;
-    }
-
-    private static void Visit(
-        ModuleEntry entry,
-        IReadOnlyDictionary<Type, ModuleEntry> entriesByType,
-        IDictionary<Type, ModuleVisitState> visitStates,
-        ICollection<ModuleEntry> ordered,
-        Stack<Type> path)
-    {
-        if (visitStates.TryGetValue(entry.Descriptor.ModuleType, out var state))
-        {
-            if (state == ModuleVisitState.Visited)
-            {
-                return;
-            }
-
-            var cyclePath = path
-                .Reverse()
-                .SkipWhile(type => type != entry.Descriptor.ModuleType)
-                .Append(entry.Descriptor.ModuleType)
-                .Select(type => type.FullName);
-
-            throw new InvalidOperationException(
-                $"Module dependency graph contains a cycle: {string.Join(" -> ", cyclePath)}.");
-        }
-
-        visitStates.Add(entry.Descriptor.ModuleType, ModuleVisitState.Visiting);
-        path.Push(entry.Descriptor.ModuleType);
-
-        foreach (var dependency in entry.Descriptor.Dependencies)
-        {
-            if (entriesByType.TryGetValue(dependency.ModuleType, out var dependencyEntry))
-            {
-                Visit(dependencyEntry, entriesByType, visitStates, ordered, path);
-                continue;
-            }
-
-            if (!dependency.Optional)
-            {
-                throw new InvalidOperationException(
-                    $"Module '{entry.Descriptor.ModuleType.FullName}' depends on missing module '{dependency.ModuleType.FullName}'.");
-            }
-        }
-
-        visitStates[entry.Descriptor.ModuleType] = ModuleVisitState.Visited;
-        path.Pop();
-        ordered.Add(entry);
-    }
-
     private static IHostDiagnostics? TryGetDiagnostics(IServiceCollection services)
     {
         return services
@@ -513,6 +713,30 @@ public sealed class ModuleRegistry : IModuleRegistry, IAsyncDisposable
         {
             cancellationToken.ThrowIfCancellationRequested();
             await invoke(cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            WriteModuleFailure(diagnostics, entry, stage, exception);
+            throw;
+        }
+    }
+
+    private static void InvokeModule(
+        ModuleEntry entry,
+        IHostDiagnostics? diagnostics,
+        string stage,
+        Action<CancellationToken> invoke,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            invoke(cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -559,14 +783,21 @@ public sealed class ModuleRegistry : IModuleRegistry, IAsyncDisposable
         }
     }
 
-    private void ThrowIfDisposed()
+    private void EnsureCanEnterPhase(ModuleRegistryState expectedState, string operation)
     {
-        lock (_syncRoot)
+        if (_state != expectedState)
         {
-            if (_disposed)
-            {
-                throw new ObjectDisposedException(nameof(ModuleRegistry));
-            }
+            throw new InvalidOperationException(
+                $"Module registry cannot {operation} from state '{_state}'.");
+        }
+    }
+
+    private void ThrowIfTerminatingOrDisposed()
+    {
+        if (_terminalTask is not null ||
+            _state is ModuleRegistryState.Terminating or ModuleRegistryState.Disposed)
+        {
+            throw new ObjectDisposedException(nameof(ModuleRegistry));
         }
     }
 
@@ -593,26 +824,87 @@ public sealed class ModuleRegistry : IModuleRegistry, IAsyncDisposable
         }
     }
 
-    private static void DisposeEntriesAfterBuildFailure(IReadOnlyList<ModuleEntry> entries)
+    private static IReadOnlyList<Exception> DisposeEntriesAfterBuildFailure(
+        IReadOnlyList<ModuleEntry> entries,
+        IHostDiagnostics? diagnostics,
+        BuildCleanupDeadline cleanupDeadline)
     {
+        var failures = new List<Exception>();
+
         for (var index = entries.Count - 1; index >= 0; index--)
         {
+            var entry = entries[index];
+
             try
             {
-                switch (entries[index].Module)
+                switch (entry.Module)
                 {
                     case IAsyncDisposable asyncDisposable:
-                        asyncDisposable.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                        cleanupDeadline.Run(
+                            asyncDisposable.DisposeAsync,
+                            $"Module '{entry.Descriptor.ModuleType.FullName}' DisposeAsync");
                         break;
                     case IDisposable disposable:
                         disposable.Dispose();
                         break;
                 }
             }
-            catch
+            catch (Exception exception)
             {
-                // Preserve the module graph or construction failure.
+                failures.Add(exception);
+                WriteModuleFailure(diagnostics, entry, "ConstructionRollbackDispose", exception);
+                WriteBuildCleanupFailure(
+                    diagnostics,
+                    entry,
+                    exception,
+                    cleanupDeadline.Timeout);
             }
+        }
+
+        return failures;
+    }
+
+    private static void WriteBuildCleanupFailure(
+        IHostDiagnostics? diagnostics,
+        ModuleEntry entry,
+        Exception exception,
+        TimeSpan cleanupTimeout)
+    {
+        if (diagnostics is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var context = new Dictionary<string, string?>
+            {
+                ["buildStage"] = "ModuleGraph",
+                ["resourceKind"] = "Module",
+                ["moduleId"] = entry.Descriptor.Name,
+                ["moduleType"] = entry.Descriptor.ModuleType.FullName,
+                ["exceptionType"] = exception.GetType().FullName,
+                ["details"] = exception.Message,
+            };
+            if (exception is AsyncCleanupTimeoutException timeoutException)
+            {
+                context["cleanupTimeout"] = cleanupTimeout.ToString();
+                context["remainingWaitTimeout"] = timeoutException.WaitTimeout.ToString();
+                context["cleanupStarted"] = timeoutException.CleanupStarted.ToString();
+                context["cleanupMayStillBeRunning"] = timeoutException.CleanupStarted.ToString();
+            }
+
+            diagnostics.Write(new HostDiagnosticRecord(
+                HostDiagnosticIds.HostBuildCleanupFailed,
+                "A module failed to clean up after module registry creation failed.",
+                HostDiagnosticSeverity.Error)
+            {
+                Context = context,
+            });
+        }
+        catch
+        {
+            // Diagnostics must not replace the original construction or cleanup failures.
         }
     }
 
@@ -629,9 +921,17 @@ public sealed class ModuleRegistry : IModuleRegistry, IAsyncDisposable
         public bool Disposed { get; set; }
     }
 
-    private enum ModuleVisitState
+    private enum ModuleRegistryState
     {
-        Visiting,
-        Visited,
+        Created,
+        ConfiguringServices,
+        ServicesConfigured,
+        ConfiguringContributions,
+        ContributionsConfigured,
+        Initializing,
+        Initialized,
+        Terminating,
+        Faulted,
+        Disposed,
     }
 }

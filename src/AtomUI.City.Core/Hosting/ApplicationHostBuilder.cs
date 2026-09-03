@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Reflection;
+using AtomUI.City.Core.DependencyInjection;
 using AtomUI.City.Core.Diagnostics;
 using AtomUI.City.Core.Lifecycle;
 using AtomUI.City.Core.Modularity;
@@ -15,7 +16,7 @@ using Microsoft.Extensions.Primitives;
 
 namespace AtomUI.City.Core.Hosting;
 
-public sealed class ApplicationHostBuilder : IApplicationHostBuilder
+internal sealed class ApplicationHostBuilder : IApplicationHostBuilder
 {
     private readonly string[] _args;
     private readonly HostApplicationBuilder _builder;
@@ -36,7 +37,10 @@ public sealed class ApplicationHostBuilder : IApplicationHostBuilder
             _builder.Logging.AddFilter<EventLogLoggerProvider>(static _ => false);
         }
 
-        _configuration = new GuardedConfigurationManager(_builder.Configuration, ThrowIfBuilt);
+        _configuration = new GuardedConfigurationManager(
+            _builder.Configuration,
+            ThrowIfBuilt,
+            () => !_built);
         _services = new GuardedServiceCollection(
             _builder.Services,
             () => _applyingUserServices);
@@ -78,11 +82,12 @@ public sealed class ApplicationHostBuilder : IApplicationHostBuilder
         ModuleRegistry? moduleRegistry = null;
         IHost? genericHost = null;
         IHostDiagnostics? runtimeDiagnostics = null;
+        ApplicationHostOptions? hostOptions = null;
         var buildStage = "Options";
 
         try
         {
-            var hostOptions = CreateHostOptions();
+            hostOptions = CreateHostOptions();
             ValidateHostOptions(hostOptions);
             var context = CreateApplicationContext(hostOptions);
             var lifecyclePipeline = LifecycleConfigurationStore.Build(lifecycleConfigurations);
@@ -90,8 +95,15 @@ public sealed class ApplicationHostBuilder : IApplicationHostBuilder
             buildStage = "ModuleGraph";
             var moduleCatalog = ModuleCatalog.LoadGenerated(Assembly.GetEntryAssembly());
             var resolvedModuleRegistrations = moduleCatalog.Resolve(moduleRegistrations);
+            var validatedModuleGraph = ModuleGraphValidator.Validate(resolvedModuleRegistrations);
+            var generatedServices = GeneratedServiceRegistrationCatalog
+                .LoadGenerated(Assembly.GetEntryAssembly())
+                .Select(validatedModuleGraph.OrderedRegistrations);
 
-            moduleRegistry = ModuleRegistry.Create(resolvedModuleRegistrations);
+            moduleRegistry = ModuleRegistry.Create(
+                validatedModuleGraph,
+                buildDiagnostics,
+                hostOptions.ShutdownTimeout);
             runtimeDiagnostics = GetRegisteredDiagnosticsInstance()
                 ?? new InMemoryHostDiagnostics(hostOptions.DiagnosticsCapacity);
 
@@ -101,14 +113,16 @@ public sealed class ApplicationHostBuilder : IApplicationHostBuilder
                 options.ShutdownTimeout = hostOptions.ShutdownTimeout);
             _builder.Services.TryAddSingleton<IHostDiagnostics>(runtimeDiagnostics);
             _builder.Services.TryAddSingleton<IUiDispatcher, UnavailableUiDispatcher>();
-            _builder.Services.TryAddSingleton<IModuleRegistry>(moduleRegistry);
+            _builder.Services.TryAddSingleton<IModuleRegistry>(
+                new ModuleRegistryView(moduleRegistry.Modules));
             _builder.Services.TryAddSingleton(lifecyclePipeline);
 
             buildStage = "ModuleServices";
-            moduleRegistry.ConfigureServicesAsync(context, _builder.Services, buildDiagnostics)
-                .AsTask()
-                .GetAwaiter()
-                .GetResult();
+            moduleRegistry.ConfigureServices(
+                context,
+                _builder.Services,
+                buildDiagnostics,
+                generatedServices);
 
             buildStage = "UserServices";
             ApplyUserServiceConfigurations();
@@ -142,6 +156,11 @@ public sealed class ApplicationHostBuilder : IApplicationHostBuilder
         }
         catch (Exception exception)
         {
+            var cleanupFailures = new List<Exception>();
+            var cleanupDeadline = hostOptions is not null &&
+                (genericHost is not null || moduleRegistry is not null)
+                    ? new BuildCleanupDeadline(hostOptions.ShutdownTimeout)
+                    : null;
             var failure = new HostDiagnosticRecord(
                 HostDiagnosticIds.HostBuildFailed,
                 "Application host failed to build.",
@@ -175,23 +194,55 @@ public sealed class ApplicationHostBuilder : IApplicationHostBuilder
 
             try
             {
-                genericHost?.Dispose();
+                if (genericHost is IAsyncDisposable asyncGenericHost)
+                {
+                    cleanupDeadline!.Run(
+                        asyncGenericHost.DisposeAsync,
+                        "GenericHost.DisposeAsync");
+                }
+                else if (genericHost is not null)
+                {
+                    genericHost.Dispose();
+                }
             }
-            catch
+            catch (Exception cleanupException)
             {
-                // Preserve the original build failure.
+                AddCleanupFailures(
+                    cleanupFailures,
+                    cleanupException,
+                    buildStage,
+                    "GenericHost",
+                    buildDiagnostics,
+                    runtimeDiagnostics,
+                    cleanupDeadline?.Timeout);
             }
 
             if (moduleRegistry is not null)
             {
                 try
                 {
-                    moduleRegistry.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                    moduleRegistry.DisposeAfterBuildFailure(
+                        buildDiagnostics,
+                        cleanupDeadline!);
                 }
-                catch
+                catch (Exception cleanupException)
                 {
-                    // Preserve the original build failure.
+                    AddCleanupFailures(
+                        cleanupFailures,
+                        cleanupException,
+                        buildStage,
+                        "ModuleRegistry",
+                        buildDiagnostics,
+                        runtimeDiagnostics,
+                        cleanupDeadline?.Timeout);
                 }
+            }
+
+            if (cleanupFailures.Count > 0)
+            {
+                throw new AggregateException(
+                    "Application host build failed and one or more resources failed to clean up.",
+                    new[] { exception }.Concat(cleanupFailures));
             }
 
             throw;
@@ -398,6 +449,54 @@ public sealed class ApplicationHostBuilder : IApplicationHostBuilder
         }
     }
 
+    private static void AddCleanupFailures(
+        List<Exception> failures,
+        Exception exception,
+        string buildStage,
+        string resourceKind,
+        IHostDiagnostics buildDiagnostics,
+        IHostDiagnostics? runtimeDiagnostics,
+        TimeSpan? cleanupTimeout)
+    {
+        IEnumerable<Exception> exceptions = exception is AggregateException aggregateException
+            ? aggregateException.Flatten().InnerExceptions
+            : [exception];
+
+        foreach (var cleanupException in exceptions)
+        {
+            failures.Add(cleanupException);
+            var context = new Dictionary<string, string?>
+            {
+                ["buildStage"] = buildStage,
+                ["resourceKind"] = resourceKind,
+                ["exceptionType"] = cleanupException.GetType().FullName,
+                ["details"] = cleanupException.Message,
+            };
+            if (cleanupException is AsyncCleanupTimeoutException timeoutException)
+            {
+                context["cleanupTimeout"] = cleanupTimeout?.ToString();
+                context["remainingWaitTimeout"] = timeoutException.WaitTimeout.ToString();
+                context["cleanupStarted"] = timeoutException.CleanupStarted.ToString();
+                context["cleanupMayStillBeRunning"] = timeoutException.CleanupStarted.ToString();
+            }
+
+            var record = new HostDiagnosticRecord(
+                HostDiagnosticIds.HostBuildCleanupFailed,
+                "A resource failed to clean up after application host build failed.",
+                HostDiagnosticSeverity.Error)
+            {
+                Context = context,
+            };
+
+            WriteDiagnostic(buildDiagnostics, record);
+
+            if (runtimeDiagnostics is not null && !ReferenceEquals(runtimeDiagnostics, buildDiagnostics))
+            {
+                WriteDiagnostic(runtimeDiagnostics, record);
+            }
+        }
+    }
+
     private void ThrowIfBuilt()
     {
         if (_built)
@@ -499,12 +598,19 @@ public sealed class ApplicationHostBuilder : IApplicationHostBuilder
 
         public GuardedConfigurationManager(
             IConfigurationManager inner,
-            Action throwIfFrozen)
+            Action throwIfFrozen,
+            Func<bool> canMutate)
         {
             _inner = inner;
             _throwIfFrozen = throwIfFrozen;
-            _properties = new GuardedDictionary<string, object>(inner.Properties, throwIfFrozen);
-            _sources = new GuardedList<IConfigurationSource>(inner.Sources, throwIfFrozen);
+            _properties = new GuardedDictionary<string, object>(
+                inner.Properties,
+                throwIfFrozen,
+                canMutate);
+            _sources = new GuardedList<IConfigurationSource>(
+                inner.Sources,
+                throwIfFrozen,
+                canMutate);
         }
 
         public string? this[string key]
@@ -523,7 +629,7 @@ public sealed class ApplicationHostBuilder : IApplicationHostBuilder
 
         public IConfigurationRoot Build()
         {
-            return _inner.Build();
+            return new GuardedConfigurationRoot(_inner.Build(), _throwIfFrozen);
         }
 
         public IConfigurationBuilder Add(IConfigurationSource source)
@@ -536,7 +642,8 @@ public sealed class ApplicationHostBuilder : IApplicationHostBuilder
 
         public IEnumerable<IConfigurationSection> GetChildren()
         {
-            return _inner.GetChildren();
+            return _inner.GetChildren()
+                .Select(section => new GuardedConfigurationSection(section, _throwIfFrozen));
         }
 
         public IChangeToken GetReloadToken()
@@ -546,13 +653,151 @@ public sealed class ApplicationHostBuilder : IApplicationHostBuilder
 
         public IConfigurationSection GetSection(string key)
         {
-            return _inner.GetSection(key);
+            return new GuardedConfigurationSection(_inner.GetSection(key), _throwIfFrozen);
+        }
+    }
+
+    private sealed class GuardedConfigurationSection(
+        IConfigurationSection inner,
+        Action throwIfFrozen) : IConfigurationSection
+    {
+        public string? this[string key]
+        {
+            get => inner[key];
+            set
+            {
+                throwIfFrozen();
+                inner[key] = value;
+            }
+        }
+
+        public string Key => inner.Key;
+
+        public string Path => inner.Path;
+
+        public string? Value
+        {
+            get => inner.Value;
+            set
+            {
+                throwIfFrozen();
+                inner.Value = value;
+            }
+        }
+
+        public IEnumerable<IConfigurationSection> GetChildren()
+        {
+            return inner.GetChildren()
+                .Select(section => new GuardedConfigurationSection(section, throwIfFrozen));
+        }
+
+        public IChangeToken GetReloadToken()
+        {
+            return inner.GetReloadToken();
+        }
+
+        public IConfigurationSection GetSection(string key)
+        {
+            return new GuardedConfigurationSection(inner.GetSection(key), throwIfFrozen);
+        }
+    }
+
+    private sealed class GuardedConfigurationRoot : IConfigurationRoot
+    {
+        private readonly IConfigurationRoot _inner;
+        private readonly IReadOnlyList<IConfigurationProvider> _providers;
+        private readonly Action _throwIfFrozen;
+
+        public GuardedConfigurationRoot(
+            IConfigurationRoot inner,
+            Action throwIfFrozen)
+        {
+            _inner = inner;
+            _throwIfFrozen = throwIfFrozen;
+            _providers = inner.Providers
+                .Select(provider =>
+                    (IConfigurationProvider)new GuardedConfigurationProvider(
+                        provider,
+                        throwIfFrozen))
+                .ToArray();
+        }
+
+        public string? this[string key]
+        {
+            get => _inner[key];
+            set
+            {
+                _throwIfFrozen();
+                _inner[key] = value;
+            }
+        }
+
+        public IEnumerable<IConfigurationProvider> Providers => _providers;
+
+        public IEnumerable<IConfigurationSection> GetChildren()
+        {
+            return _inner.GetChildren()
+                .Select(section => new GuardedConfigurationSection(section, _throwIfFrozen));
+        }
+
+        public IChangeToken GetReloadToken()
+        {
+            return _inner.GetReloadToken();
+        }
+
+        public IConfigurationSection GetSection(string key)
+        {
+            return new GuardedConfigurationSection(
+                _inner.GetSection(key),
+                _throwIfFrozen);
+        }
+
+        public void Reload()
+        {
+            _throwIfFrozen();
+            _inner.Reload();
+        }
+
+    }
+
+    private sealed class GuardedConfigurationProvider(
+        IConfigurationProvider inner,
+        Action throwIfFrozen) : IConfigurationProvider
+    {
+        public bool TryGet(string key, out string? value)
+        {
+            return inner.TryGet(key, out value);
+        }
+
+        public void Set(string key, string? value)
+        {
+            throwIfFrozen();
+            inner.Set(key, value);
+        }
+
+        public IChangeToken GetReloadToken()
+        {
+            return inner.GetReloadToken();
+        }
+
+        public void Load()
+        {
+            throwIfFrozen();
+            inner.Load();
+        }
+
+        public IEnumerable<string> GetChildKeys(
+            IEnumerable<string> earlierKeys,
+            string? parentPath)
+        {
+            return inner.GetChildKeys(earlierKeys, parentPath);
         }
     }
 
     private sealed class GuardedList<T>(
         IList<T> inner,
-        Action throwIfFrozen) : IList<T>
+        Action throwIfFrozen,
+        Func<bool> canMutate) : IList<T>
     {
         public T this[int index]
         {
@@ -566,7 +811,7 @@ public sealed class ApplicationHostBuilder : IApplicationHostBuilder
 
         public int Count => inner.Count;
 
-        public bool IsReadOnly => inner.IsReadOnly;
+        public bool IsReadOnly => !canMutate() || inner.IsReadOnly;
 
         public void Add(T item)
         {
@@ -627,7 +872,8 @@ public sealed class ApplicationHostBuilder : IApplicationHostBuilder
 
     private sealed class GuardedDictionary<TKey, TValue>(
         IDictionary<TKey, TValue> inner,
-        Action throwIfFrozen) : IDictionary<TKey, TValue>
+        Action throwIfFrozen,
+        Func<bool> canMutate) : IDictionary<TKey, TValue>
         where TKey : notnull
     {
         public TValue this[TKey key]
@@ -646,7 +892,7 @@ public sealed class ApplicationHostBuilder : IApplicationHostBuilder
 
         public int Count => inner.Count;
 
-        public bool IsReadOnly => inner.IsReadOnly;
+        public bool IsReadOnly => !canMutate() || inner.IsReadOnly;
 
         public void Add(TKey key, TValue value)
         {

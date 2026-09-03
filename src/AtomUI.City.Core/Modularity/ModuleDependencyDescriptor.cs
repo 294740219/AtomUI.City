@@ -1,7 +1,13 @@
 namespace AtomUI.City.Core.Modularity;
 
+/// <summary>
+/// Represents module dependency descriptor.
+/// </summary>
 public sealed class ModuleDependencyDescriptor
 {
+    /// <summary>
+    /// Initializes a new instance of the module dependency descriptor class.
+    /// </summary>
     public ModuleDependencyDescriptor(Type moduleType, bool optional)
     {
         ArgumentNullException.ThrowIfNull(moduleType);
@@ -17,7 +23,13 @@ public sealed class ModuleDependencyDescriptor
         Optional = optional;
     }
 
+    /// <summary>
+    /// Gets the module type value.
+    /// </summary>
     public Type ModuleType { get; }
 
+    /// <summary>
+    /// Gets the optional value.
+    /// </summary>
     public bool Optional { get; }
 }

@@ -1,16 +1,26 @@
 namespace AtomUI.City.Core.Diagnostics;
 
-public sealed class InMemoryHostDiagnostics : IHostDiagnostics
+/// <summary>
+/// Represents in memory host diagnostics.
+/// </summary>
+public sealed class InMemoryHostDiagnostics : IHostDiagnostics, IDisposable
 {
     private readonly object _syncRoot = new();
     private readonly Queue<HostDiagnosticRecord> _records = new();
     private readonly int? _capacity;
     private long _droppedCount;
+    private bool _isCompleted;
 
+    /// <summary>
+    /// Initializes a new instance of the in memory host diagnostics class.
+    /// </summary>
     public InMemoryHostDiagnostics()
     {
     }
 
+    /// <summary>
+    /// Initializes a new instance of the in memory host diagnostics class.
+    /// </summary>
     public InMemoryHostDiagnostics(int capacity)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(capacity);
@@ -18,8 +28,14 @@ public sealed class InMemoryHostDiagnostics : IHostDiagnostics
         _capacity = capacity;
     }
 
+    /// <summary>
+    /// Gets the capacity value.
+    /// </summary>
     public int? Capacity => _capacity;
 
+    /// <summary>
+    /// Gets the dropped count value.
+    /// </summary>
     public long DroppedCount
     {
         get
@@ -31,6 +47,9 @@ public sealed class InMemoryHostDiagnostics : IHostDiagnostics
         }
     }
 
+    /// <summary>
+    /// Gets the records value.
+    /// </summary>
     public IReadOnlyList<HostDiagnosticRecord> Records
     {
         get
@@ -42,14 +61,27 @@ public sealed class InMemoryHostDiagnostics : IHostDiagnostics
         }
     }
 
+    /// <summary>
+    /// Executes the write operation.
+    /// </summary>
     public void Write(HostDiagnosticRecord record)
     {
         ArgumentNullException.ThrowIfNull(record);
         ArgumentException.ThrowIfNullOrWhiteSpace(record.Code);
         ArgumentException.ThrowIfNullOrWhiteSpace(record.Message);
 
+        if (!Enum.IsDefined(record.Severity))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(record),
+                record.Severity,
+                "Diagnostic severity must be a defined value.");
+        }
+
         lock (_syncRoot)
         {
+            ObjectDisposedException.ThrowIf(_isCompleted, this);
+
             if (_capacity is { } capacity && _records.Count == capacity)
             {
                 _records.Dequeue();
@@ -58,5 +90,24 @@ public sealed class InMemoryHostDiagnostics : IHostDiagnostics
 
             _records.Enqueue(record);
         }
+    }
+
+    /// <summary>
+    /// Executes the complete operation.
+    /// </summary>
+    public void Complete()
+    {
+        lock (_syncRoot)
+        {
+            _isCompleted = true;
+        }
+    }
+
+    /// <summary>
+    /// Executes the dispose operation.
+    /// </summary>
+    public void Dispose()
+    {
+        Complete();
     }
 }

@@ -2,8 +2,14 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace AtomUI.City.Core.Modularity;
 
+/// <summary>
+/// Represents module service collection build guard extensions.
+/// </summary>
 public static class ModuleServiceCollectionBuildGuardExtensions
 {
+    /// <summary>
+    /// Executes the build service provider operation.
+    /// </summary>
     public static ServiceProvider BuildServiceProvider(this ModuleServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
@@ -11,6 +17,9 @@ public static class ModuleServiceCollectionBuildGuardExtensions
         return ThrowTemporaryProviderNotAllowed();
     }
 
+    /// <summary>
+    /// Executes the build service provider operation.
+    /// </summary>
     public static ServiceProvider BuildServiceProvider(
         this ModuleServiceCollection services,
         bool validateScopes)
@@ -20,6 +29,9 @@ public static class ModuleServiceCollectionBuildGuardExtensions
         return ThrowTemporaryProviderNotAllowed();
     }
 
+    /// <summary>
+    /// Executes the build service provider operation.
+    /// </summary>
     public static ServiceProvider BuildServiceProvider(
         this ModuleServiceCollection services,
         ServiceProviderOptions options)

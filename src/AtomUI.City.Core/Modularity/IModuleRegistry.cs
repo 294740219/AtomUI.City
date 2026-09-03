@@ -1,29 +1,12 @@
-using AtomUI.City.Core.Hosting;
-using Microsoft.Extensions.DependencyInjection;
-
 namespace AtomUI.City.Core.Modularity;
 
+/// <summary>
+/// Provides a read-only view of the modules selected for the current application host.
+/// </summary>
 public interface IModuleRegistry
 {
+    /// <summary>
+    /// Gets the immutable module descriptors in dependency order.
+    /// </summary>
     IReadOnlyList<ModuleDescriptor> Modules { get; }
-
-    ValueTask ConfigureServicesAsync(
-        IApplicationContext applicationContext,
-        IServiceCollection services,
-        CancellationToken cancellationToken = default);
-
-    ValueTask ConfigureContributionsAsync(
-        IApplicationContext applicationContext,
-        IServiceProvider services,
-        CancellationToken cancellationToken = default);
-
-    ValueTask InitializeAsync(
-        IApplicationContext applicationContext,
-        IServiceProvider services,
-        CancellationToken cancellationToken = default);
-
-    ValueTask ShutdownAsync(
-        IApplicationContext applicationContext,
-        IServiceProvider services,
-        CancellationToken cancellationToken = default);
 }

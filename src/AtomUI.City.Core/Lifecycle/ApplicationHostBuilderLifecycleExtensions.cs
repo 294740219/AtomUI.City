@@ -3,8 +3,14 @@ using AtomUI.City.Core.Hosting;
 
 namespace AtomUI.City.Core.Lifecycle;
 
+/// <summary>
+/// Represents application host builder lifecycle extensions.
+/// </summary>
 public static class ApplicationHostBuilderLifecycleExtensions
 {
+    /// <summary>
+    /// Executes the configure lifecycle operation.
+    /// </summary>
     public static IApplicationHostBuilder ConfigureLifecycle(
         this IApplicationHostBuilder builder,
         Action<LifecyclePipelineBuilder> configure)

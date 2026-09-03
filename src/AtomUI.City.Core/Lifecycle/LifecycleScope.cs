@@ -2,6 +2,9 @@ using AtomUI.City.Core.Diagnostics;
 
 namespace AtomUI.City.Core.Lifecycle;
 
+/// <summary>
+/// Represents lifecycle scope.
+/// </summary>
 public sealed class LifecycleScope : IDisposable, IAsyncDisposable
 {
     private readonly CancellationTokenSource _cancellationTokenSource;
@@ -20,6 +23,7 @@ public sealed class LifecycleScope : IDisposable, IAsyncDisposable
         CancellationTokenSource cancellationTokenSource,
         IHostDiagnostics? diagnostics)
     {
+        ValidateKind(kind);
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
 
         Kind = kind;
@@ -30,12 +34,24 @@ public sealed class LifecycleScope : IDisposable, IAsyncDisposable
         _state = LifecycleScopeState.Running;
     }
 
+    /// <summary>
+    /// Gets the id value.
+    /// </summary>
     public string Id { get; }
 
+    /// <summary>
+    /// Gets the kind value.
+    /// </summary>
     public LifecycleScopeKind Kind { get; }
 
+    /// <summary>
+    /// Gets the parent value.
+    /// </summary>
     public LifecycleScope? Parent { get; }
 
+    /// <summary>
+    /// Gets the children value.
+    /// </summary>
     public IReadOnlyList<LifecycleScope> Children
     {
         get
@@ -47,6 +63,9 @@ public sealed class LifecycleScope : IDisposable, IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Gets the state value.
+    /// </summary>
     public LifecycleScopeState State
     {
         get
@@ -58,12 +77,20 @@ public sealed class LifecycleScope : IDisposable, IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Gets the cancellation token value.
+    /// </summary>
     public CancellationToken CancellationToken => _cancellationTokenSource.Token;
 
     internal event EventHandler? Disposed;
 
+    /// <summary>
+    /// Executes the create root operation.
+    /// </summary>
     public static LifecycleScope CreateRoot(LifecycleScopeKind kind, string id)
     {
+        ValidateKind(kind);
+
         return new LifecycleScope(
             kind,
             id,
@@ -72,11 +99,15 @@ public sealed class LifecycleScope : IDisposable, IAsyncDisposable
             diagnostics: null);
     }
 
+    /// <summary>
+    /// Executes the create root operation.
+    /// </summary>
     public static LifecycleScope CreateRoot(
         LifecycleScopeKind kind,
         string id,
         IHostDiagnostics diagnostics)
     {
+        ValidateKind(kind);
         ArgumentNullException.ThrowIfNull(diagnostics);
 
         return new LifecycleScope(
@@ -87,8 +118,13 @@ public sealed class LifecycleScope : IDisposable, IAsyncDisposable
             diagnostics);
     }
 
+    /// <summary>
+    /// Executes the create child operation.
+    /// </summary>
     public LifecycleScope CreateChild(LifecycleScopeKind kind, string id)
     {
+        ValidateKind(kind);
+
         lock (_syncRoot)
         {
             ThrowIfDisposed();
@@ -112,25 +148,52 @@ public sealed class LifecycleScope : IDisposable, IAsyncDisposable
         }
     }
 
+    private static void ValidateKind(LifecycleScopeKind kind)
+    {
+        if (!Enum.IsDefined(kind))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(kind),
+                kind,
+                "Lifecycle scope kind must be a defined value.");
+        }
+    }
+
+    /// <summary>
+    /// Executes the stop async operation.
+    /// </summary>
     public ValueTask StopAsync()
     {
         LifecycleInvocationGuard.ThrowIfReentrant(this, LifecycleOperationKind.Stop);
 
-        return new ValueTask(GetOrStartStopTask());
+        return new ValueTask(GetOrStartStopTask(allowDisposed: false));
     }
 
-    private Task GetOrStartStopTask()
+    private ValueTask StopFromParentAsync()
+    {
+        return new ValueTask(GetOrStartStopTask(allowDisposed: true));
+    }
+
+    private Task GetOrStartStopTask(bool allowDisposed)
     {
         DeferredLifecycleOperation? operation = null;
         Task stopTask;
 
         lock (_syncRoot)
         {
-            ThrowIfDisposed();
+            if (!allowDisposed)
+            {
+                ThrowIfDisposed();
+            }
 
             if (_stopTask is not null)
             {
                 return _stopTask;
+            }
+
+            if (_disposed)
+            {
+                return Task.CompletedTask;
             }
 
             if (_state == LifecycleScopeState.Stopped)
@@ -150,6 +213,9 @@ public sealed class LifecycleScope : IDisposable, IAsyncDisposable
         return stopTask;
     }
 
+    /// <summary>
+    /// Executes the dispose operation.
+    /// </summary>
     public void Dispose()
     {
         Task.Run(async () => await DisposeAsync().ConfigureAwait(false))
@@ -157,6 +223,9 @@ public sealed class LifecycleScope : IDisposable, IAsyncDisposable
             .GetResult();
     }
 
+    /// <summary>
+    /// Executes the dispose async operation.
+    /// </summary>
     public ValueTask DisposeAsync()
     {
         LifecycleInvocationGuard.ThrowIfReentrant(this, LifecycleOperationKind.Dispose);
@@ -213,7 +282,7 @@ public sealed class LifecycleScope : IDisposable, IAsyncDisposable
         {
             try
             {
-                await children[index].StopAsync().ConfigureAwait(false);
+                await children[index].StopFromParentAsync().ConfigureAwait(false);
             }
             catch (Exception exception)
             {
@@ -241,7 +310,7 @@ public sealed class LifecycleScope : IDisposable, IAsyncDisposable
 
         try
         {
-            await GetOrStartStopTask().ConfigureAwait(false);
+            await GetOrStartStopTask(allowDisposed: false).ConfigureAwait(false);
         }
         catch (Exception exception)
         {

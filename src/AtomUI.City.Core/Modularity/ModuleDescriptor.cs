@@ -1,7 +1,13 @@
 namespace AtomUI.City.Core.Modularity;
 
+/// <summary>
+/// Represents module descriptor.
+/// </summary>
 public sealed class ModuleDescriptor
 {
+    /// <summary>
+    /// Initializes a new instance of the module descriptor class.
+    /// </summary>
     public ModuleDescriptor(
         string name,
         Type moduleType,
@@ -19,6 +25,9 @@ public sealed class ModuleDescriptor
     {
     }
 
+    /// <summary>
+    /// Initializes a new instance of the module descriptor class.
+    /// </summary>
     public ModuleDescriptor(
         string name,
         Type moduleType,
@@ -31,6 +40,14 @@ public sealed class ModuleDescriptor
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(moduleType);
         ArgumentNullException.ThrowIfNull(dependencies);
+
+        var dependencySnapshot = dependencies.ToArray();
+        if (dependencySnapshot.Any(static dependency => dependency is null))
+        {
+            throw new ArgumentException(
+                "Module dependencies cannot contain null.",
+                nameof(dependencies));
+        }
 
         if (!Enum.IsDefined(origin))
         {
@@ -59,22 +76,43 @@ public sealed class ModuleDescriptor
         ModuleType = moduleType;
         Version = version;
         Description = description;
-        Dependencies = Array.AsReadOnly(dependencies.ToArray());
+        Dependencies = Array.AsReadOnly(dependencySnapshot);
         Origin = origin;
         PluginId = pluginId;
     }
 
+    /// <summary>
+    /// Gets the name value.
+    /// </summary>
     public string Name { get; }
 
+    /// <summary>
+    /// Gets the module type value.
+    /// </summary>
     public Type ModuleType { get; }
 
+    /// <summary>
+    /// Gets the version value.
+    /// </summary>
     public string? Version { get; }
 
+    /// <summary>
+    /// Gets the description value.
+    /// </summary>
     public string? Description { get; }
 
+    /// <summary>
+    /// Gets the dependencies value.
+    /// </summary>
     public IReadOnlyList<ModuleDependencyDescriptor> Dependencies { get; }
 
+    /// <summary>
+    /// Gets the origin value.
+    /// </summary>
     public ModuleOrigin Origin { get; }
 
+    /// <summary>
+    /// Gets the plugin id value.
+    /// </summary>
     public string? PluginId { get; }
 }

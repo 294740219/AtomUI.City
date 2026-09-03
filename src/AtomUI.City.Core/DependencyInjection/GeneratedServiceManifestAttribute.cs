@@ -1,22 +1,21 @@
 using System.Diagnostics.CodeAnalysis;
 
-namespace AtomUI.City.Core.Modularity;
+namespace AtomUI.City.Core.DependencyInjection;
 
 /// <summary>
-/// Represents generated module manifest attribute.
+/// Represents generated service manifest attribute.
 /// </summary>
 [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = false)]
-public sealed class GeneratedModuleManifestAttribute : Attribute
+public sealed class GeneratedServiceManifestAttribute : Attribute
 {
     /// <summary>
-    /// Initializes a new instance of the generated module manifest attribute class.
+    /// Initializes a new instance of the generated service manifest attribute class.
     /// </summary>
-    public GeneratedModuleManifestAttribute(
+    public GeneratedServiceManifestAttribute(
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)]
         Type registrarType)
     {
         ArgumentNullException.ThrowIfNull(registrarType);
-
         RegistrarType = registrarType;
     }
 

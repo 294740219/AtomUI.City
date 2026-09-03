@@ -2,6 +2,7 @@ namespace AtomUI.City.Generators.Common;
 
 public static class GeneratorFeatureNames
 {
+    public const string DependencyInjection = nameof(DependencyInjection);
     public const string Modularity = nameof(Modularity);
     public const string Routing = nameof(Routing);
     public const string Presentation = nameof(Presentation);
@@ -14,6 +15,8 @@ public static class GeneratorFeatureNames
     {
         switch (feature)
         {
+            case GeneratorFeature.DependencyInjection:
+                return DependencyInjection;
             case GeneratorFeature.Modularity:
                 return Modularity;
             case GeneratorFeature.Routing:
