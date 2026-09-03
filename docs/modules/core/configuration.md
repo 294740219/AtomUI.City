@@ -40,7 +40,7 @@
 | AUC-CORE-002 | Lifecycle Pipeline | LifecycleMiddlewarePipelineTests; ApplicationHostLifecycleIntegrationTests |
 | AUC-CORE-003 | Lifecycle Scope Tree | LifecycleScopeTreeTests |
 | AUC-CORE-004 | Module Contract | ModuleAttributeTests; ModuleBaseTests; ModuleDescriptorTests |
-| AUC-CORE-005 | DI Registration Markers | ServiceRegistrationAttributeTests |
+| AUC-CORE-005 | DI Registration Markers | ServiceRegistrationAttributeTests; AtomUICityIncrementalGeneratorDependencyInjectionTests; GeneratedServiceRegistrationCatalogTests |
 | AUC-CORE-006 | Host Diagnostics | HostDiagnosticsTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
@@ -51,6 +51,17 @@
 - API contract、失败行为、诊断和测试矩阵一致。
 - 不出现业务领域假设。
 - 不引入 `AtomUI.City.Presentation` 等禁止依赖。
+
+## Builder Configuration 冻结边界
+
+- `ApplicationHostBuilder.Build()` 一旦开始，无论成功或失败，Builder 暴露的 Configuration 写入口都永久冻结。
+- 冻结检查必须跟随所有已逃逸 handle，而不只保护 `Configuration` 根对象；Build 前取得的 section、child、configuration root 和 provider 在 Build 后写入时同样抛 `InvalidOperationException`。
+- `GetSection()` 和 `GetChildren()` 返回递归 guarded section；section indexer setter 与 `Value` setter 在每次写入时检查当前 Builder 状态。
+- `Configuration.Build()` 返回 guarded root；root indexer setter、递归 section/children、`Reload()`，以及 `Providers` 返回对象的 `Set()`/`Load()` 都执行相同冻结检查。
+- 读取、reload token 和合法外部 provider reload 保持 Microsoft Configuration 语义；本合同冻结的是通过 Builder 逃逸对象发起的主动 mutation，不把运行时配置复制成失去 reload 能力的静态快照。
+- `Sources` 与 `Properties` 集合继续采用 guarded collection；Build 前且底层可写时 `IsReadOnly == false`，Build 开始后无论成功或失败均报告 `IsReadOnly == true`，与所有 mutation API 的拒绝行为一致。冻结为 shallow builder contract，不承诺递归冻结调用方自行放入集合的任意用户对象。
+
+Tests: `ApplicationHostBuilderTests; CoreHeadlessProcessTests`。
 
 ## 既有细化设计内容
 

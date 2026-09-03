@@ -28,6 +28,9 @@
 
 - 输入无效：使用标准参数异常或模块 Result。
 - 生命周期状态非法：返回失败 Result、模块异常或稳定诊断。
+- `ServiceAttribute` 只接受已定义的 `ServiceLifetime`；未知整数值不得静默降级为 Transient。
+- `ScopedServiceAttribute` 与 `ExposeServicesAttribute` 的数组不得为 null 或包含 null；空数组继续表示没有显式 exposed contract。
+- Generator 对未知 lifetime 或 null/invalid exposed type 产生 `AUCGEN005` 并停止 registrar 生成；metadata reader 不得过滤或修复非法输入。
 - 依赖缺失：阻止当前功能启用，不影响无关功能。
 - 插件卸载中：拒绝创建新贡献，并撤销已有贡献。
 - 释放失败：记录诊断并继续释放其他资源。
@@ -40,7 +43,7 @@
 | AUC-CORE-002 | Lifecycle Pipeline | LifecycleMiddlewarePipelineTests; ApplicationHostLifecycleIntegrationTests |
 | AUC-CORE-003 | Lifecycle Scope Tree | LifecycleScopeTreeTests |
 | AUC-CORE-004 | Module Contract | ModuleAttributeTests; ModuleBaseTests; ModuleDescriptorTests |
-| AUC-CORE-005 | DI Registration Markers | ServiceRegistrationAttributeTests |
+| AUC-CORE-005 | DI Registration Markers | ServiceRegistrationAttributeTests; AtomUICityIncrementalGeneratorDependencyInjectionTests; GeneratedServiceRegistrationCatalogTests |
 | AUC-CORE-006 | Host Diagnostics | HostDiagnosticsTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
@@ -117,10 +120,10 @@ Lifecycle-owned ServiceScope 由 RouteScope、ActivationScope、OperationScope �
 启动期模块流程建议：
 
 ```text
-PreConfigureServices(all modules)
--> Generated service registration(all modules)
--> ConfigureServices(all modules)
--> PostConfigureServices(all modules)
+PreConfigureServices(selected modules)
+-> Generated service registration(selected module owners)
+-> ConfigureServices(selected modules)
+-> PostConfigureServices(selected modules)
 -> User ConfigureServices(in registration order)
 -> Build GenericHost
 ```
@@ -141,9 +144,24 @@ Create plugin IServiceCollection
 
 PluginSystem 释放插件服务容器前，必须按各能力模块合同撤销领域 Lease 并关闭相关运行时 Scope；Core 当前不持有通用 ContributionLease。
 
-### 6. 自动服务注册
+### 6. 自动服务注册与所有权
 
 可以提供自动服务注册，但默认必须是 source generator 自动注册，不是运行时扫描。
+
+自动发现和运行时激活是两个不同阶段：Generator 可以发现当前编译及其引用中的服务清单，但 Host 只把最终 ModuleCatalog 已选依赖闭包所拥有的注册写入 Root `IServiceCollection`。所有已选静态模块共享同一个 Root Provider，不等于 Root Provider 接收所有引用程序集的服务。
+
+每个包含自动服务声明的程序集必须在且仅在一个 `IModule` 实现上声明 `[ServiceRegistrationOwner]`：
+
+```csharp
+[ServiceRegistrationOwner]
+public sealed class SalesModule : ModuleBase;
+```
+
+该 owner 必须由当前程序集声明，且当前程序集生成的 registrar 只能登记到这个本地 owner。一个 Module owner 只能由定义它的程序集及其唯一 generated registrar 持有；不相干的程序集不得把自己的业务服务登记到另一个程序集的 Module 名下。该 owner 是注册声明的唯一所有者，不是服务实例的所有者；实例仍由 DI 容器按 lifetime 创建和释放。
+
+项目 A 使用项目 B 时，A 必须声明自己的 `AModule`，通过 `[DependsOn(typeof(BModule))]` 表达依赖，并让 A 的服务继续归属 `AModule`。只选择 `BModule` 不得激活 A 的任何服务；选择 `AModule` 才会同时激活依赖闭包中的 B 与 A。跨模块共享服务应归属一个明确的公共模块，由消费模块通过 `DependsOn` 显式依赖；不得通过冒充其他 owner 实现隐式扩展。未被应用根或 `UseModule<TModule>()` 的依赖闭包选中的 owner，其服务不会产生 Root `ServiceDescriptor`，不会参与冲突、`IEnumerable<T>`、验证或 `IHostedService` 启动。插件服务清单只能由 PluginSystem 应用到插件 Provider，Core Host 不把 plugin origin 注册注入 Root。
+
+Registrar 图去重与 owner 所有权验证是两个不同步骤：同一个 registrar 经菱形引用多次到达时，必须按 registrar identity 幂等跳过；不同 registrar 声明同一个 owner 时属于所有权冲突，Host Build 必须确定性失败并报告 owner、原 registrar 与冲突 registrar，禁止按 owner 静默丢弃后到的注册。
 
 推荐三种注册方式：
 
@@ -183,17 +201,39 @@ Find service candidate types
 -> Emit diagnostics
 ```
 
-生成代码示例：
+生成代码示例（为便于阅读省略具体 descriptor 冲突策略）：
 
 ```csharp
-internal static class GeneratedServiceRegistrar
+public sealed class GeneratedServiceRegistrar
+    : IServiceRegistrar
 {
-    public static void Register(IServiceCollection services)
+    public void Register(IServiceRegistrarContext context)
     {
-        services.AddScoped<IUserSession, UserSession>();
-        services.AddSingleton<IClock, SystemClock>();
+        // 引用图边：Catalog 按 registrar type 去重，重复路径不会再次构造或执行 registrar。
+        context.RegisterRegistrar(
+            typeof(ReferencedGeneratedServiceRegistrar),
+            static () => new ReferencedGeneratedServiceRegistrar());
+
+        // 本地贡献：Catalog 将此 owner claim 绑定到当前实际 registrar，调用者不能伪造身份。
+        context.Register(typeof(SalesModule), static services =>
+        {
+            services.AddScoped<IUserSession, UserSession>();
+            services.AddSingleton<IClock, SystemClock>();
+        });
     }
 }
+```
+
+程序集级 `GeneratedServiceManifestAttribute` 把应用入口连接到根 registrar。每一条引用边通过 `RegisterRegistrar(Type, Func<IServiceRegistrar>)` 交还给 Catalog：Catalog 在调用 factory 前按 registrar type 去重，并校验 factory 返回实例的精确类型。每个 registrar 获得一个只在本次同步 `Register` 调用期间有效、且绑定到其真实类型的 context；保存 context 并在返回后调用会失败。`Register(owner, action)` 因而不能由调用者额外传入或伪造 registrar identity。
+
+Host 在解析 ModuleCatalog 后按 owner 过滤，再按如下稳定阶段执行：
+
+```text
+PreConfigureServices(selected modules)
+-> Generated service registration(selected module owners only)
+-> ConfigureServices(selected modules)
+-> PostConfigureServices(selected modules)
+-> User ConfigureServices
 ```
 
 Strict AOT 模式下可以进一步生成强类型 factory：
@@ -215,14 +255,20 @@ services.AddScoped<IUserSession>(sp =>
 - 动态代理作为默认服务注册方式。
 - Property injection 作为默认能力。
 
+服务 Attribute 的解释规则只有一份生产实现：`AtomUI.City.Generators` 中基于 Roslyn symbol 的 `ServiceRegistrationMetadataReader`。Core runtime 只保留 Attribute、marker interface、generated registrar bridge 和按已选 Module 应用 descriptor 的逻辑，不保留反射式 metadata reader 或测试替身，避免编译期与运行期规则分叉。
+
 Analyzer 必须诊断：
 
+- 自动服务程序集缺少 owner、存在多个 owner，或 owner 不是 `IModule`。
+- generated registrar 的 owner 不是由该 registrar 所在程序集声明，或不同 registrar 争用同一个 owner。
 - 多个公开构造函数但无明确构造函数选择。
 - service id 或 exposed service 冲突。
 - scoped 服务注入 singleton。
 - 插件服务暴露为 Host 长期持有实例。
 - 使用运行时扫描但未 opt-in。
 - AOT Strict 下使用不可静态生成的工厂。
+- `Replace` 与 `TryAdd` 同时启用。
+- disposable 实现暴露多个 contract；在当前 net8/net10 DI disposal 语义下不生成可能造成重复释放的 forwarding alias。
 
 ### 9. 服务覆盖策略
 
@@ -292,3 +338,5 @@ Testing 包应支持：
 - 断言重复注册和覆盖诊断。
 - 插件 Host contract 隔离和卸载后实例残留测试由 PluginSystem Feature 承担。
 - 断言 scoped 服务不会从 Root Provider 解析。
+
+产品级 DI 验收不得只使用单程序集示例。`fixtures/AtomUI.City.Core.Mvp` 以 8 个 owner 程序集、32 个服务声明和真实 CLI 进程覆盖跨程序集 registrar 图；其中相同 registrar 可经菱形项目引用被多次到达，Runtime Catalog 必须按 registrar identity 幂等跳过。不同 registrar 争用同一 owner 必须在 Build 阶段确定性失败，不能静默忽略；不同 owner 暴露同一 contract 且未声明 Replace/TryAdd 时仍必须确定性失败。

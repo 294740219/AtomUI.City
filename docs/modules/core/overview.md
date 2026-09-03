@@ -78,6 +78,8 @@ Core 不加载插件，也不创建插件独立 ServiceProvider 或通用 Contri
 | [threading.md](threading.md) | 线程边界、UI dispatcher、后台任务、并发冲突和死锁规避。 |
 | [diagnostics.md](diagnostics.md) | 现有诊断码、产品级目标诊断、上下文字段和测试断言。 |
 | [testing.md](testing.md) | 具体测试矩阵、必须断言的行为、测试类型和缺口处理。 |
+| [release-candidate-validation.md](release-candidate-validation.md) | Core MVP 1.0 发布候选的冻结规则、验收门禁、命令和判定标准。 |
+| [release-candidate-report.md](release-candidate-report.md) | 按冻结协议执行的候选身份、验收证据、限制与最终结论。 |
 | [compatibility.md](compatibility.md) | public API、配置、manifest、snapshot、generated output、CLI envelope 和包布局兼容。 |
 | [integration.md](integration.md) | 跨模块依赖方向、生命周期、线程和失败行为。 |
 | [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) | Feature 到现有基线、缺口、必补测试和实现工作的追踪。 |
@@ -86,6 +88,6 @@ Core 不加载插件，也不创建插件独立 ServiceProvider 或通用 Contri
 
 Partially Implemented
 
-`AUC-CORE-001` 到 `AUC-CORE-008` 已分别达到 `Verified`，包括 Host、Lifecycle、Scope、Module、DI markers、Host diagnostics、UI dispatcher contract 和 Generated Module Catalog。Generator 生成强类型 registrar，Core 通过 `GeneratedModuleManifestAttribute` 和 `ModuleCatalog` 在 Build 阶段消费，不再把未定义的 `ModuleManifest` 数据类型作为当前合同。
+当前 Core 1.0 Feature 基线为 8 个，`AUC-CORE-001` 到 `AUC-CORE-008` 均已达到 `Verified`，即 `8/8 Verified`；Feature 数量、编号和状态以 [features.md](features.md) 为权威来源。`AUC-CORE-005` 的生产生成链按 registrar identity 聚合并去重引用图，同时独立校验本地 Module owner 所有权；不同 registrar 争用同一 owner 或跨程序集冒充 owner 会确定性失败。Core MVP JIT dogfood 以及 net10/net8 win-x64 NativeAOT 原生门禁均已通过。Generator 生成强类型 registrar，Core 通过 generated manifest 在 Build 阶段消费，不运行时扫描程序集服务类型。
 
 模块整体仍为 `Partially Implemented`：自定义桌面 `IApplicationLifetime`、跨模块通用 Contribution/ContributionLease、ErrorPolicy/业务诊断管线以及插件独立 ServiceProvider 编排均未分配 Core Feature ID，也不属于当前 Core 1.0 合同。详细设计中保留的相关内容是后续路线图，不能用 Core Feature 的 `Verified` 状态推导其已经实现。

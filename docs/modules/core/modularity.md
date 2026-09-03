@@ -40,7 +40,7 @@
 | AUC-CORE-002 | Lifecycle Pipeline | LifecycleMiddlewarePipelineTests; ApplicationHostLifecycleIntegrationTests |
 | AUC-CORE-003 | Lifecycle Scope Tree | LifecycleScopeTreeTests |
 | AUC-CORE-004 | Module Contract | ModuleAttributeTests; ModuleBaseTests; ModuleDescriptorTests |
-| AUC-CORE-005 | DI Registration Markers | ServiceRegistrationAttributeTests |
+| AUC-CORE-005 | DI Registration Markers | ServiceRegistrationAttributeTests; AtomUICityIncrementalGeneratorDependencyInjectionTests; GeneratedServiceRegistrationCatalogTests |
 | AUC-CORE-006 | Host Diagnostics | HostDiagnosticsTests |
 | AUC-CORE-008 | Generated Module Catalog | GeneratedModuleCatalogTests; AtomUICityIncrementalGeneratorModularityTests; CoreHeadlessProcessTests |
 
@@ -110,11 +110,12 @@ Modularity 不负责：
 | `Module` | 模块基类，提供模块生命周期方法。 |
 | `ModuleAttribute` | 可选模块元数据。未指定 id 时使用模块类型全名。 |
 | `DependsOnAttribute` | 声明模块依赖，由 source generator 读取。 |
-| `ModuleDescriptor` | 模块不可变描述信息。 |
+| `ModuleDescriptor` | 模块不可变描述信息；构造时复制依赖集合并拒绝集合内部的 null。 |
 | `GeneratedModuleManifestAttribute` / `IModuleRegistrar` | Generator 发出的程序集入口和强类型模块登记合同。 |
 | `ModuleGraph` | 解析后的模块依赖图。 |
 | `ModuleCatalog` | 当前 Host 可见模块集合。 |
-| `ModuleRegistry` | 当前 Host 已加载模块状态和诊断信息。 |
+| `IModuleRegistry` | 对业务代码公开的已加载模块元数据只读视图，仅包含 `Modules`。 |
+| `IModuleLifecycleController` / `ModuleRegistry` | Core internal 的 Host 生命周期控制面与状态机，不进入 Root DI。 |
 | `ModuleLifecycleContext` | 模块生命周期执行上下文。 |
 
 ### 5. Module 基类
@@ -124,33 +125,9 @@ Modularity 不负责：
 ```csharp
 public abstract class Module
 {
-    public virtual ValueTask PreConfigureServicesAsync(
-        ServiceConfigurationContext context,
-        CancellationToken cancellationToken = default)
-    {
-        PreConfigureServices(context);
-        return ValueTask.CompletedTask;
-    }
-
     public virtual void PreConfigureServices(ServiceConfigurationContext context) { }
 
-    public virtual ValueTask ConfigureServicesAsync(
-        ServiceConfigurationContext context,
-        CancellationToken cancellationToken = default)
-    {
-        ConfigureServices(context);
-        return ValueTask.CompletedTask;
-    }
-
     public virtual void ConfigureServices(ServiceConfigurationContext context) { }
-
-    public virtual ValueTask PostConfigureServicesAsync(
-        ServiceConfigurationContext context,
-        CancellationToken cancellationToken = default)
-    {
-        PostConfigureServices(context);
-        return ValueTask.CompletedTask;
-    }
 
     public virtual void PostConfigureServices(ServiceConfigurationContext context) { }
 
@@ -303,10 +280,16 @@ ApplicationHost
 -> Build ModuleCatalog
 -> Merge generated default root and explicit UseModule roots
 -> Resolve startup dependency closure
--> Validate ModuleGraph
--> Topological sort
+-> ModuleGraphValidator validates duplicate ids, missing dependencies and cycles
+-> Produce immutable topologically ordered ValidatedModuleGraph
+-> ModuleRegistry accepts only ValidatedModuleGraph
+-> Run strong-typed module factories in topological order
 -> Run module lifecycle
 ```
+
+模块图验证和模块实例化是两个不可交换的 Build 阶段。`ModuleGraphValidator` 只读取 descriptor/registration 元数据，不调用用户 factory；检测到直接或间接循环时，`Build()` 必须立即失败且图中所有 module constructor/factory 调用次数为零。`ValidatedModuleGraph` 是 Core 内部验证凭证，应用开发者不可见；`ModuleRegistry` 不提供接收原始 registration 列表的创建入口。
+
+Generator 对当前编译可见的循环使用 `AUCGEN003` 提前拒绝；Host Build 验证仍是跨程序集 registrar、显式 `UseModule<TModule>()` 和最终 root 合并结果的权威兜底。两层使用相同的有向图语义，合法菱形依赖不得误判为循环。
 
 默认不允许运行时扫描程序集寻找模块。当前冻结合同不提供 dynamic discovery；未来只能作为 opt-in fallback，并必须在独立 Feature 中同时提供扫描边界、Analyzer 和 AOT/trimming 诊断。
 
@@ -355,6 +338,24 @@ OnApplicationShutdown
 
 启动顺序按拓扑排序执行：依赖先启动，被依赖方后启动。关闭顺序反向执行。
 
+`ModuleRegistry` 使用单向生命周期状态机管理同一批模块实例：
+
+```text
+Created
+-> ConfiguringServices -> ServicesConfigured
+-> ConfiguringContributions -> ContributionsConfigured
+-> Initializing -> Initialized
+-> Terminating -> Disposed
+
+任一正向阶段失败 -> Faulted -> Terminating -> Disposed
+```
+
+每个正向阶段只发布一个内部 transaction Task；同步 `ConfigureServices` 执行期间的外部并发调用快速失败，完成后的重复调用观察第一次结果，异步阶段的并发调用者共享 Task。阶段必须按上图顺序进入，部分执行后失败的阶段不可重试，避免重复服务、贡献、订阅或初始化副作用。
+
+`ShutdownAsync` 与 `DisposeAsync` 共享唯一 terminal transaction。第一个成功发布的终止操作决定路径：Shutdown-first 逆序运行所有已进入运行期模块的 shutdown hook，再逆序释放模块；Dispose-first 只逆序释放，后续 Shutdown 不得在已开始释放的模块上补跑 hook。终止操作若与正向阶段竞争，必须等待已发布阶段退出后才开始清理。
+
+生命周期控制权不属于 module 或业务服务。Builder 以 internal `IModuleLifecycleController` 将真实 Registry 直接交给 Host；Root DI 只注册一个与 controller 分离的 `IModuleRegistry` 只读 view。应用仍可查询当前模块 descriptor，但不能调用 Configure、Initialize、Shutdown，也不能把该 view 强转为 disposal 接口提前释放模块。该能力隔离与状态机互补：前者阻止无权调用者抢占事务，后者保证 Core 内部合法调用的顺序、并发共享与幂等性。
+
 ### 11. 阶段语义
 
 | 阶段 | 职责 |
@@ -369,6 +370,8 @@ OnApplicationShutdown
 | `OnApplicationShutdown` | 应用关闭或插件停用时的模块关闭。 |
 
 `PreConfigureServices`、`ConfigureServices`、`PostConfigureServices` 发生在 ServiceProvider 构建前。
+
+三个服务配置 hook 是严格同步的，只允许声明 DI、Options 和其他确定性元数据，不得执行网络、磁盘、数据库、进程、UI dispatch 或其他异步初始化。需要等待的资源加载和业务初始化必须放入 `OnPreApplicationInitializationAsync`、`OnApplicationInitializationAsync` 或 `OnPostApplicationInitializationAsync`，由 `IApplicationHost.StartAsync` 执行。
 `ConfigureContributions` 发生在 ServiceProvider 可用后。当前 context 只暴露 `IApplicationContext` 和 Application ServiceScope provider；Core 不统一校验领域贡献，也不返回通用 ContributionLease。
 
 ### 12. DI 规则

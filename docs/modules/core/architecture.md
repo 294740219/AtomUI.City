@@ -63,6 +63,10 @@ AtomUI.City.Core 的架构目标是把模块职责变成可实现、可测试、
 - Module descriptor 和 dependency graph 必须可由 generator 生成或缓存。
 - Diagnostics collector 不能在产品热路径无界增长。
 
+Core 当前只定义性能方向，不预设缺乏测量依据的绝对耗时。功能、生命周期和并发合同基本稳定后，必须通过可重复的 Benchmark 建立首份观察基线，覆盖 Host 冷启动、Build/Start/Stop 时间与分配量、模块图规模增长、Diagnostics 并发写入、大量 Scope 创建/释放，以及 DI 首次和重复解析。观察基线用于发现版本间退化，不代表所有机器上的性能承诺。
+
+基线报告必须记录 SDK/runtime、TFM、JIT 或 NativeAOT、Release 配置、RID、操作系统、CPU 和样本参数。分配量与规模增长曲线可以较早设置稳定门禁；对环境敏感的时间指标应先记录趋势和宽松告警，待 Core 实现与测试稳定、完成针对性优化后，再冻结阈值并逐步升级为 CI 或发布阻断项。
+
 默认 Host diagnostics 容量为 1024，溢出时保留最新记录并累计 dropped count。直接创建的无参 InMemoryHostDiagnostics 保留原有无界测试/自定义行为。
 
 ## 运行时对象模型
@@ -81,6 +85,7 @@ flowchart LR
 - 扩展点只能通过 public API、DI、attribute、manifest、source generator 输出、MSBuild property、CLI command 或 template variable 暴露。
 - 新增扩展点必须同步更新 [features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 和 [compatibility.md](compatibility.md)。
 - 插件来源扩展点必须有 owner 和撤销路径。
+- 自动服务 owner 必须由 registrar 所在程序集声明；不同程序集即使存在引用关系，也不得把自己的业务服务登记到对方 Module 名下。跨项目组合使用本地 Module + `DependsOn`，程序集引用本身不授予 Root DI 注册权。
 
 ## AOT 和 Trimming 约束
 

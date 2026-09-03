@@ -37,10 +37,10 @@
 | Feature ID | 相关能力 | 测试文件 |
 | --- | --- | --- |
 | AUC-CORE-001 | Application Host Builder | ApplicationHostBuilderTests; ApplicationHostRuntimeTests |
-| AUC-CORE-002 | Lifecycle Pipeline | LifecycleMiddlewarePipelineTests; ApplicationHostLifecycleIntegrationTests |
+| AUC-CORE-002 | Lifecycle Pipeline | ApplicationHostRuntimeTests; LifecycleMiddlewarePipelineTests; ApplicationHostLifecycleIntegrationTests; ApplicationHostIndustrialLifecycleTests; CoreHeadlessProcessTests |
 | AUC-CORE-003 | Lifecycle Scope Tree | LifecycleScopeTreeTests |
 | AUC-CORE-004 | Module Contract | ModuleAttributeTests; ModuleBaseTests; ModuleDescriptorTests |
-| AUC-CORE-005 | DI Registration Markers | ServiceRegistrationAttributeTests |
+| AUC-CORE-005 | DI Registration Markers | ServiceRegistrationAttributeTests; AtomUICityIncrementalGeneratorDependencyInjectionTests; GeneratedServiceRegistrationCatalogTests |
 | AUC-CORE-006 | Host Diagnostics | HostDiagnosticsTests |
 | AUC-CORE-008 | Generated Module Catalog | GeneratedModuleCatalogTests; AtomUICityIncrementalGeneratorModularityTests; CoreHeadlessProcessTests |
 
@@ -85,9 +85,11 @@ StopAsync
 -> Stopped
 ```
 
-并发 Start/Stop 合并到各自的单一事务。启动失败保持原异常、逆序补偿模块并进入 Faulted。停止调用方的 cancellation 只取消等待；内部使用 `ShutdownTimeout` 作为协作式 deadline，所有清理错误最终聚合。Stop-before-Start 保持 no-op，Stopped/Faulted Host 不允许重新启动。
+并发 Start/Stop 合并到各自的单一事务。启动失败时必须逆序补偿模块并进入 Faulted：回滚完全成功则原样抛出启动主异常；回滚存在失败则在所有最低清理完成后抛出 `AggregateException`，第一项固定为启动主异常，其后按发生顺序包含全部回滚异常。启动取消且回滚成功时保持 Canceled；启动取消但回滚失败时返回以 `OperationCanceledException` 为第一项的 Faulted 聚合。停止调用方的 cancellation 只取消等待；内部使用 `ShutdownTimeout` 作为协作式 deadline，所有清理错误最终聚合。Stop-before-Start 不执行从未进入运行期的 module shutdown hook 或 `IHostedService.StopAsync`，但仍执行完整 Stop transaction：运行 ApplicationStop middleware、取消 HostScope 及其 descendants、释放 Build 阶段创建的 module instances，并写入 AUCHOST003；Stopped/Faulted Host 不允许重新启动。
 
 Core 在 Windows 默认禁用 GenericHost 的 EventLog provider 输出，避免普通桌面或 CLI 进程因系统事件日志权限覆盖原始启动异常；Console、Debug、EventSource 和应用显式配置的 provider 不受影响。
+
+Build 失败回滚使用 `ShutdownTimeout` 作为全部异步 cleanup 的共享总 deadline。Generic Host、完整 ModuleRegistry 和模块构造中途的局部回滚不能分别获得一份完整预算；超时作为 cleanup failure 进入 `AUCHOST109` 与最终 `AggregateException`。`DisposeAsync` 不接受取消 token，因此 deadline 只能终止等待，不能强制终止用户清理代码；Core 会观察晚到失败并继续发起剩余独立 cleanup，但明确报告资源可能仍在释放。
 
 ## 路线图设计内容
 

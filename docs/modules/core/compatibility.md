@@ -7,17 +7,27 @@
 ## 模块兼容性硬边界
 
 - Core 不允许引用 Avalonia、AtomUI、Roslyn、CLI、Templates 或 Testing 生产程序集。
-- ApplicationHostBuilder Build 后必须冻结服务注册入口。
+- ApplicationHostBuilder Build 成功或失败后必须冻结服务注册入口及所有通过 Builder 逃逸的 Configuration mutation handle；`Sources`/`Properties.IsReadOnly` 必须同步反映冻结状态。补齐递归 section/child/root/provider Guard 与只读状态报告属于执行既有冻结合同的缺陷修复。
 - LifecyclePipeline stage 顺序必须稳定，同一 stage 内 middleware 顺序必须稳定。
+- LifecycleScope Parent Stop 必须把快照后正常完成的 child Dispose 视为已清理，并通过 child Stop transaction 保留真实 failure；该内部 handoff 不放宽公开 Stop-after-Dispose 合同。
 - StartAsync、StopAsync、DisposeAsync 和 Dispose 必须有明确幂等规则。
 - 模块配置阶段禁止 BuildServiceProvider；常用入口由 runtime guard 拒绝，非测试 City 项目中的显式 Provider 创建和 Microsoft Generic Host 构建/启动入口由 `AUCANL0001` 阻止编译。运行期服务解析只能发生在 Provider 构建后的声明生命周期阶段。
 - IUiDispatcher 只定义抽象，Core 不提交真实 UI work。
+- 公共不可变模型必须在构造或接纳边界拒绝集合内部 null、未知枚举及 `default` struct；公开的进程级表必须使用真正的只读包装，不能只依赖 `IReadOnlyList<T>` 的静态类型。
 
 ## API 兼容规则
 
 - public 类型、成员、枚举值、attribute 参数和扩展方法默认视为兼容性承诺。
 - 删除、重命名、改变默认行为、异常类型、Result status 或诊断码语义属于 breaking change。
 - 新增 API 可以 minor 版本发布，但必须有文档、测试和迁移说明。
+
+Core 的当前公开签名冻结在 `src/AtomUI.City.Core/PublicAPI.Shipped.txt`。`Microsoft.CodeAnalysis.PublicApiAnalyzers` 在每次编译中拒绝未登记的新 API 和已登记但被删除或改签名的 API；`CS1591` 在 Core 中重新启用并升级为错误。Release 门禁还会构建 `net10.0`/`net8.0` 并通过 SDK package validation 比较兼容目标框架的程序集表面。当前尚无对外发布包，因此首份源码基线就是发布前基线；首次发布后再增加 NuGet baseline package 比较。
+
+Core 包的产品主页固定为上游 `https://github.com/AtomUI/AtomUI.City`，但 NuGet `RepositoryUrl` 与 SourceLink 必须从实际执行构建的标准 GitHub remote 推导，禁止硬编码为尚不包含当前 commit 的仓库。PR 合并前的 Engineering RC 指向 `https://github.com/kusarparlly/AtomUI.City` 中实际存在的干净 commit；正式包只能在合并后从上游仓库的干净 commit 构建，并指向上游。自定义 SSH host alias 可以保留为 push URL，但 SourceLink 所读取的 fetch URL 必须是可识别的标准 GitHub URL。包中的 repository commit、PDB SourceLink 和实际二进制源码必须一致。
+
+`ApplicationHostBuilder`、`ModuleRegistry` 与 `IModuleLifecycleController` 是 Core 内部实现，不属于冻结的 public surface。应用通过 `IApplicationHostBuilder` 建造 Host；public `IModuleRegistry` 只提供已加载模块元数据查询，不提供 Configure、Initialize、Shutdown 或 Dispose 控制能力。Core 尚未对外发布，移除这些误暴露的 Preview 控制成员属于 1.0 前 API 边界纠正。
+
+`IUiDispatcher.InvokeAsync` 使用无 token 的便捷重载和显式 `CancellationToken` 重载，不在多个重载上叠加可选参数。这既保持调用便利，也避免以后增加重载时产生源码绑定歧义。
 
 ## 1.0 Preview 命名空间标准化
 
@@ -48,6 +58,8 @@ builder.ConfigureServices(services => services.AddSingleton<AppService>());
 
 `ConfigureServices` delegate 从调用时立即执行改为 Build 时在全部模块服务阶段之后执行。依赖 delegate 立即副作用或立即异常的代码必须迁移到显式的普通方法；服务注册失败现在由 `Build()` 抛出并写入 `UserServices` stage 诊断。
 
+模块的 `PreConfigureServicesAsync`、`ConfigureServicesAsync` 和 `PostConfigureServicesAsync` 已收紧为同步的 `PreConfigureServices`、`ConfigureServices` 和 `PostConfigureServices`。原异步 hook 中纯 DI 注册代码直接迁移到对应同步 hook；网络、磁盘、数据库或其他需要等待的初始化迁移到 `OnPreApplicationInitializationAsync`、`OnApplicationInitializationAsync` 或 `OnPostApplicationInitializationAsync`，由 `StartAsync` 驱动。
+
 ## 本轮新增 API
 
 - `ApplicationHostOptions.ApplicationId`：必填的稳定应用产品标识。
@@ -61,11 +73,26 @@ builder.ConfigureServices(services => services.AddSingleton<AppService>());
 - `ModuleServiceCollectionBuildGuardExtensions.BuildServiceProvider(..., bool/ServiceProviderOptions)`：补齐常用临时 Provider 入口的稳定失败行为。
 - `ApplicationModuleAttribute`：允许可执行应用项目声明唯一 generated default root，从而省略 `UseModule<AppModule>()`。
 - `GeneratedModuleManifestAttribute`、`IModuleRegistrar`、`IModuleRegistrarContext`：连接编译期生成的模块 Catalog 与 Host Build；应用业务代码不直接调用。
+- `ServiceRegistrationOwnerAttribute`：把当前程序集的自动服务注册唯一归属到由当前程序集声明的静态 Module；registrar 不得登记到其他程序集的 owner，仅当本地 owner 位于启动依赖闭包中时进入 Root DI。
+- `GeneratedServiceManifestAttribute`、`IServiceRegistrar`、`IServiceRegistrarContext`：连接生成服务清单与 Host Build；属于 generated-code bridge，应用业务代码不直接调用。
 - `LifecycleContext.OperationId`：增加只读 lifecycle transaction id；构造函数末尾的可选参数保持现有调用源码兼容。
 - `LifecyclePipelineBuilder.Use<TMiddleware>(...)`：允许显式声明稳定 middleware 诊断类型；现有 delegate overload 保留并使用兼容推断。
 - `HostDiagnosticIds.LifecycleMiddlewareFailed` (`AUCHOST108`)：定位 lifecycle middleware 的 stage、类型、operationId 和异常类型。
+- `HostDiagnosticIds.HostBuildCleanupFailed` (`AUCHOST109`)：定位 Build 失败回滚中的 Generic Host 或 Module 清理异常。
 
 `UseModule<TModule>()` 保留为显式附加根和无生成清单时的兼容入口；它与 generated default root 合并并去重。Library 和 Plugin 中的 `[ApplicationModule]` 现在由 `AUCGEN008` 拒绝。
+
+自动服务的兼容语义是“编译期全局发现、运行时按已选 Module 激活”。引用一个程序集本身不会把其中所有服务注入 Root。Singleton/Scoped 多 contract 的非 disposable 服务共享一个容器拥有的 backing instance；disposable 多 contract 当前由 Generator 拒绝，避免 net8/net10 forwarding registration 的重复 disposal 风险。Strict AOT 强类型构造 factory 仍为后续能力，当前生成代码使用强类型 service descriptor，构造函数激活遵循 Microsoft DI。
+
+DI Attribute 解释以 Generator 的 Roslyn metadata reader 为唯一生产规则源。Core runtime 不提供反射式 `ServiceRegistrationMetadata` reader；重新引入第二套 Attribute/lifetime/expose 解释实现属于兼容性与 NativeAOT 风险，必须作为独立设计变更审查。
+
+Windows `net8.0` NativeAOT 应用若保留 Generic Host 的 EventLog 可达路径，需要显式提供 `System.Threading.AccessControl`；Core MVP AOT 产品夹具已采用仅 AOT 模式的直接引用，并把 ILC `will always throw` 纳入失败门禁。该要求来自 Generic Host 的 Windows 日志依赖闭包，不改变自动服务注册协议。
+
+引用程序集 registrar 形成的是图而不是树。同一 registrar 可能经多条引用路径到达应用聚合入口，必须按 registrar identity 幂等跳过，不能重复产生 descriptor。Owner type 不是 registrar identity：不同 registrar 声明同一 owner 属于跨程序集所有权冲突，必须在 Host Build 确定性失败并报告双方身份，禁止静默忽略后到注册。不同 owner 的同 contract 注册不属于 registrar 去重规则，继续遵守普通冲突、TryAdd 或 Replace 合同。
+
+Preview 阶段的 generated-code bridge 使用 `IServiceRegistrarContext.RegisterRegistrar(Type, Func<IServiceRegistrar>)` 表达引用边。Catalog 在 factory 执行前按 registrar type 去重，并为每次真实执行建立不可逃逸、绑定实际 registrar identity 的 context。未来改变该签名、把去重键改回 owner，或允许调用方自行声明 registrar identity，均属于生成器与 Core 必须同步升级的协议变更。
+
+跨项目扩展采用“本地 Module + `DependsOn`”模型：A 引用 B 时，A 的业务服务归属 A 自己声明的 Module；选择 B 不得隐式激活 A。允许第三方 registrar 无条件向外部 owner 注入服务、或把程序集引用等同于 owner 授权，均属于破坏 Root DI 隔离的兼容性变更。
 
 ## Host 诊断码兼容合同
 
@@ -82,6 +109,7 @@ builder.ConfigureServices(services => services.AddSingleton<AppService>());
 | `AUCHOST106` | ModuleLifecycleFailed | 模块 lifecycle hook 失败时写入 Error 记录，context 定位 module id、module type、stage 和 exception type。 |
 | `AUCHOST107` | DispatcherUnavailable | 默认 `UnavailableUiDispatcher` 被调用时以该 code 标识失败消息；当前不向 `IHostDiagnostics` 额外写 record。 |
 | `AUCHOST108` | LifecycleMiddlewareFailed | 非正常取消的 lifecycle middleware 异常写入 Error 记录，强类型 Stage 及 middlewareType、operationId、exceptionType 为必需定位字段。 |
+| `AUCHOST109` | HostBuildCleanupFailed | Build 失败回滚中的每个 cleanup failure 写入 Error 记录，context 包含 buildStage、resourceKind、exceptionType；Module 构造回滚还包含 moduleId 和 moduleType；异步 cleanup timeout 另外包含总预算、剩余等待、是否已启动及是否可能仍在运行。 |
 
 诊断码一经公开不得删除、复用或改变名称映射。修改触发条件、severity、错误/成功含义或删除必需 context 字段属于兼容性变更；message 文案可以优化，新增可选 context 字段属于向后兼容扩展。
 
