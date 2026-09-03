@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <PublishAot Condition="'$(AtomUICityCoreMvpPublishAot)' == 'true'">true</PublishAot>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <SuppressTrimAnalysisWarnings>false</SuppressTrimAnalysisWarnings>
+    <WarningsAsErrors>$(WarningsAsErrors);IL2026;IL2104;IL3050</WarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../AtomUI.City.Core.Mvp.Foundation/AtomUI.City.Core.Mvp.Foundation.csproj" />
+    <ProjectReference Include="../AtomUI.City.Core.Mvp.Data/AtomUI.City.Core.Mvp.Data.csproj" />
+    <ProjectReference Include="../AtomUI.City.Core.Mvp.Operations/AtomUI.City.Core.Mvp.Operations.csproj" />
+    <ProjectReference Include="../AtomUI.City.Core.Mvp.Reporting/AtomUI.City.Core.Mvp.Reporting.csproj" />
+    <ProjectReference Include="../AtomUI.City.Core.Mvp.Diagnostics/AtomUI.City.Core.Mvp.Diagnostics.csproj" />
+    <ProjectReference Include="../AtomUI.City.Core.Mvp.Unselected/AtomUI.City.Core.Mvp.Unselected.csproj" />
+    <ProjectReference Include="../AtomUI.City.Core.Mvp.Conflict/AtomUI.City.Core.Mvp.Conflict.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(AtomUICityCoreMvpPublishAot)' == 'true'">
+    <PackageReference Include="System.Threading.AccessControl" />
+  </ItemGroup>
+
+</Project>

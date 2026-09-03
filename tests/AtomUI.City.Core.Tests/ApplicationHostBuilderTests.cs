@@ -157,6 +157,168 @@ public sealed class ApplicationHostBuilderTests
     }
 
     [Fact]
+    public void BuildPreservesPrimaryFailureWhenGenericHostCleanupAlsoFails()
+    {
+        ThrowingBuildCleanupService.DisposeCount = 0;
+        var builder = ApplicationHostTestBuilder.Create();
+        var diagnostics = builder.GetBuildDiagnostics();
+        builder.ConfigureServices(services =>
+        {
+            services.AddSingleton<ThrowingBuildCleanupService>();
+            services.AddSingleton<IHostDiagnostics>(services =>
+            {
+                _ = services.GetRequiredService<ThrowingBuildCleanupService>();
+                throw new InvalidOperationException("runtime diagnostics activation failed");
+            });
+        });
+
+        var failure = Assert.Throws<AggregateException>(() => builder.Build());
+
+        Assert.Collection(
+            failure.InnerExceptions,
+            primary => Assert.Equal("runtime diagnostics activation failed", primary.Message),
+            cleanup => Assert.Equal("generic host cleanup failed", cleanup.Message));
+        Assert.Equal(1, ThrowingBuildCleanupService.DisposeCount);
+        Assert.Contains(diagnostics.Records, record =>
+            record.Code == HostDiagnosticIds.HostBuildCleanupFailed &&
+            record.Context["resourceKind"] == "GenericHost" &&
+            record.Context["buildStage"] == "GenericHost");
+    }
+
+    [Fact]
+    public void BuildFailureAwaitsAsyncOnlyGenericHostServices()
+    {
+        AsyncOnlyBuildCleanupService.Reset();
+        var builder = ApplicationHostTestBuilder.Create();
+        builder.ConfigureServices(services =>
+        {
+            services.AddSingleton<AsyncOnlyBuildCleanupService>();
+            services.AddSingleton<IHostDiagnostics>(provider =>
+            {
+                _ = provider.GetRequiredService<AsyncOnlyBuildCleanupService>();
+                throw new InvalidOperationException("runtime diagnostics activation failed");
+            });
+        });
+
+        var failure = Assert.Throws<InvalidOperationException>(() => builder.Build());
+
+        Assert.Equal("runtime diagnostics activation failed", failure.Message);
+        Assert.Equal(1, AsyncOnlyBuildCleanupService.DisposeCount);
+        Assert.True(AsyncOnlyBuildCleanupService.DisposeCompleted);
+    }
+
+    [Fact]
+    public void BuildPreservesPrimaryFailureWhenAsyncGenericHostCleanupAlsoFails()
+    {
+        ThrowingAsyncOnlyBuildCleanupService.Reset();
+        var builder = ApplicationHostTestBuilder.Create();
+        var diagnostics = builder.GetBuildDiagnostics();
+        builder.ConfigureServices(services =>
+        {
+            services.AddSingleton<ThrowingAsyncOnlyBuildCleanupService>();
+            services.AddSingleton<IHostDiagnostics>(provider =>
+            {
+                _ = provider.GetRequiredService<ThrowingAsyncOnlyBuildCleanupService>();
+                throw new InvalidOperationException("runtime diagnostics activation failed");
+            });
+        });
+
+        var failure = Assert.Throws<AggregateException>(() => builder.Build());
+
+        Assert.Collection(
+            failure.InnerExceptions,
+            primary => Assert.Equal("runtime diagnostics activation failed", primary.Message),
+            cleanup => Assert.Equal("async generic host cleanup failed", cleanup.Message));
+        Assert.Equal(1, ThrowingAsyncOnlyBuildCleanupService.DisposeCount);
+        Assert.Contains(diagnostics.Records, record =>
+            record.Code == HostDiagnosticIds.HostBuildCleanupFailed &&
+            record.Context["resourceKind"] == "GenericHost" &&
+            record.Context["buildStage"] == "GenericHost");
+    }
+
+    [Fact]
+    public void BuildAsyncCleanupUsesBoundedDeadlineAndReportsStillRunningCleanup()
+    {
+        HangingAsyncOnlyBuildCleanupService.Reset();
+        ExpiredBudgetCleanupModule.Reset();
+        var builder = ApplicationHostTestBuilder.Create();
+        var diagnostics = builder.GetBuildDiagnostics();
+        builder.ConfigureHost(options => options.ShutdownTimeout = TimeSpan.FromMilliseconds(100));
+        builder.UseModule<ExpiredBudgetCleanupModule>();
+        builder.ConfigureServices(services =>
+        {
+            services.AddSingleton<HangingAsyncOnlyBuildCleanupService>();
+            services.AddSingleton<IHostDiagnostics>(provider =>
+            {
+                _ = provider.GetRequiredService<HangingAsyncOnlyBuildCleanupService>();
+                throw new InvalidOperationException("runtime diagnostics activation failed");
+            });
+        });
+
+        try
+        {
+            var failure = Assert.Throws<AggregateException>(() => builder.Build());
+
+            Assert.Equal("runtime diagnostics activation failed", failure.InnerExceptions[0].Message);
+            Assert.Equal(2, failure.InnerExceptions.Count(exception => exception is TimeoutException));
+            Assert.Equal(1, HangingAsyncOnlyBuildCleanupService.DisposeCount);
+            Assert.False(HangingAsyncOnlyBuildCleanupService.DisposeCompleted);
+            Assert.True(SpinWait.SpinUntil(
+                () => ExpiredBudgetCleanupModule.DisposeCount == 1,
+                TimeSpan.FromSeconds(5)));
+            Assert.Contains(diagnostics.Records, record =>
+                record.Code == HostDiagnosticIds.HostBuildCleanupFailed &&
+                record.Context["resourceKind"] == "GenericHost" &&
+                record.Context["exceptionType"] == typeof(AsyncCleanupTimeoutException).FullName &&
+                record.Context["cleanupTimeout"] == TimeSpan.FromMilliseconds(100).ToString() &&
+                record.Context["cleanupStarted"] == bool.TrueString &&
+                record.Context["cleanupMayStillBeRunning"] == bool.TrueString);
+            Assert.Contains(diagnostics.Records, record =>
+                record.Code == HostDiagnosticIds.HostBuildCleanupFailed &&
+                record.Context["resourceKind"] == "ModuleRegistry" &&
+                record.Context["exceptionType"] == typeof(AsyncCleanupTimeoutException).FullName &&
+                record.Context["remainingWaitTimeout"] == TimeSpan.Zero.ToString() &&
+                record.Context["cleanupStarted"] == bool.TrueString);
+        }
+        finally
+        {
+            HangingAsyncOnlyBuildCleanupService.Release();
+            ExpiredBudgetCleanupModule.Release();
+            Assert.True(SpinWait.SpinUntil(
+                () => HangingAsyncOnlyBuildCleanupService.DisposeCompleted,
+                TimeSpan.FromSeconds(5)));
+            Assert.True(SpinWait.SpinUntil(
+                () => ExpiredBudgetCleanupModule.DisposeCompleted,
+                TimeSpan.FromSeconds(5)));
+        }
+    }
+
+    [Fact]
+    public void BuildAggregatesModuleServiceAndCleanupFailures()
+    {
+        FailingServiceAndDisposeModule.Reset();
+        var builder = ApplicationHostTestBuilder.Create();
+        var diagnostics = builder.GetBuildDiagnostics();
+        builder.UseModule<FailingServiceAndDisposeModule>();
+
+        var failure = Assert.Throws<AggregateException>(() => builder.Build());
+
+        Assert.Collection(
+            failure.InnerExceptions,
+            primary => Assert.Equal("module service configuration failed", primary.Message),
+            cleanup => Assert.Equal("module cleanup failed", cleanup.Message));
+        Assert.Equal(1, FailingServiceAndDisposeModule.DisposeCount);
+        Assert.Contains(diagnostics.Records, record =>
+            record.Code == HostDiagnosticIds.ModuleLifecycleFailed &&
+            record.Context["stage"] == "Dispose" &&
+            record.Context["moduleType"] == typeof(FailingServiceAndDisposeModule).FullName);
+        Assert.Contains(diagnostics.Records, record =>
+            record.Code == HostDiagnosticIds.HostBuildCleanupFailed &&
+            record.Context["resourceKind"] == "ModuleRegistry" &&
+            record.Context["buildStage"] == "ModuleServices");
+    }
+
+    [Fact]
     public async Task StartupArgumentsRejectExternalListMutation()
     {
         await using var host = ApplicationHostTestBuilder.Create(["--mode=test"]).Build();
@@ -217,6 +379,160 @@ public sealed class ApplicationHostBuilderTests
         Assert.Throws<InvalidOperationException>(() =>
             builder.Configuration.AddInMemoryCollection(
                 new Dictionary<string, string?> { ["changed"] = "true" }));
+    }
+
+    [Fact]
+    public async Task BuildFreezesEveryCapturedConfigurationSectionTraversal()
+    {
+        var builder = ApplicationHostTestBuilder.Create();
+        builder.Configuration["Boxer:Mode"] = "Original";
+        builder.Configuration["Boxer:Nested:Level"] = "One";
+        var section = builder.Configuration.GetSection("Boxer");
+        var mode = section.GetSection("Mode");
+        var nested = Assert.Single(section.GetChildren(), child => child.Key == "Nested");
+        var managerChild = Assert.Single(
+            builder.Configuration.GetChildren(),
+            child => child.Key == "Boxer");
+        var lazyChildren = section.GetChildren();
+
+        await using var host = builder.Build();
+        var lazyMode = Assert.Single(lazyChildren, child => child.Key == "Mode");
+
+        Assert.Throws<InvalidOperationException>(() => section["Mode"] = "Changed");
+        Assert.Throws<InvalidOperationException>(() => section.Value = "Changed");
+        Assert.Throws<InvalidOperationException>(() => mode.Value = "Changed");
+        Assert.Throws<InvalidOperationException>(() => nested["Level"] = "Changed");
+        Assert.Throws<InvalidOperationException>(() => managerChild["Mode"] = "Changed");
+        Assert.Throws<InvalidOperationException>(() => lazyMode.Value = "Changed");
+        Assert.Throws<InvalidOperationException>(() =>
+            builder.Configuration.GetSection("Boxer")["Mode"] = "Changed");
+
+        var configuration = host.Services.GetRequiredService<IConfiguration>();
+        Assert.Equal("Original", configuration["Boxer:Mode"]);
+        Assert.Equal("One", configuration["Boxer:Nested:Level"]);
+        Assert.Null(configuration["Boxer"]);
+    }
+
+    [Fact]
+    public async Task ConfigurationGuardsAllowEveryMutationPathBeforeBuild()
+    {
+        var builder = ApplicationHostTestBuilder.Create();
+        var sources = builder.Configuration.Sources;
+        var properties = builder.Configuration.Properties;
+
+        Assert.False(sources.IsReadOnly);
+        Assert.False(properties.IsReadOnly);
+
+        builder.Configuration.AddInMemoryCollection();
+        var section = builder.Configuration.GetSection("BeforeBuild");
+        var child = section.GetSection("Child");
+        var root = builder.Configuration.Build();
+        var provider = root.Providers.Last();
+
+        root.Reload();
+        section.Value = "Section";
+        child.Value = "Child";
+        root["BeforeBuild:Root"] = "Root";
+        provider.Set("BeforeBuild:Provider", "Provider");
+
+        await using var host = builder.Build();
+        var configuration = host.Services.GetRequiredService<IConfiguration>();
+
+        Assert.True(sources.IsReadOnly);
+        Assert.True(properties.IsReadOnly);
+        Assert.Equal("Section", configuration["BeforeBuild"]);
+        Assert.Equal("Child", configuration["BeforeBuild:Child"]);
+        Assert.Equal("Root", configuration["BeforeBuild:Root"]);
+        Assert.Equal("Provider", configuration["BeforeBuild:Provider"]);
+    }
+
+    [Fact]
+    public async Task BuildFreezesCapturedConfigurationRootAndProviders()
+    {
+        const string sectionName = "AtomUICityConfigurationFreezeProbe";
+        var builder = ApplicationHostTestBuilder.Create();
+        builder.Configuration.AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                [$"{sectionName}:Mode"] = "Original",
+                [$"{sectionName}:Nested:Level"] = "One",
+            });
+        var root = builder.Configuration.Build();
+        var rootSection = root.GetSection(sectionName);
+        var rootChild = Assert.Single(
+            root.GetChildren(),
+            child => string.Equals(child.Key, sectionName, StringComparison.OrdinalIgnoreCase));
+        var providers = root.Providers.ToArray();
+        Assert.NotEmpty(providers);
+
+        Assert.Equal("Original", root[$"{sectionName}:Mode"]);
+        Assert.Equal("One", root[$"{sectionName}:Nested:Level"]);
+
+        await using var host = builder.Build();
+
+        Assert.Throws<InvalidOperationException>(() => root[$"{sectionName}:Mode"] = "Changed");
+        Assert.Throws<InvalidOperationException>(() => rootSection["Mode"] = "Changed");
+        Assert.Throws<InvalidOperationException>(() => rootChild["Mode"] = "Changed");
+        Assert.Throws<InvalidOperationException>(root.Reload);
+        Assert.All(providers, provider =>
+        {
+            Assert.Throws<InvalidOperationException>(() =>
+                provider.Set($"{sectionName}:Mode", "Changed"));
+            Assert.Throws<InvalidOperationException>(provider.Load);
+        });
+
+        var configuration = host.Services.GetRequiredService<IConfiguration>();
+        Assert.Equal("Original", configuration[$"{sectionName}:Mode"]);
+        Assert.Equal("One", configuration[$"{sectionName}:Nested:Level"]);
+    }
+
+    [Fact]
+    public void FailedBuildFreezesCapturedConfigurationHandles()
+    {
+        var builder = ApplicationHostTestBuilder.Create();
+        var sources = builder.Configuration.Sources;
+        var properties = builder.Configuration.Properties;
+        builder.Configuration["Failure:Mode"] = "Original";
+        var section = builder.Configuration.GetSection("Failure");
+        var root = builder.Configuration.Build();
+        var providers = root.Providers.ToArray();
+        builder.ConfigureServices(_ =>
+            throw new InvalidOperationException("configuration freeze build failure"));
+
+        Assert.Throws<InvalidOperationException>(() => builder.Build());
+
+        Assert.True(sources.IsReadOnly);
+        Assert.True(properties.IsReadOnly);
+        Assert.Throws<InvalidOperationException>(() => section["Mode"] = "Changed");
+        Assert.Throws<InvalidOperationException>(() => root["Failure:Mode"] = "Changed");
+        Assert.Throws<InvalidOperationException>(root.Reload);
+        Assert.All(providers, provider =>
+            Assert.Throws<InvalidOperationException>(() =>
+                provider.Set("Failure:Mode", "Changed")));
+        Assert.Equal("Original", section["Mode"]);
+    }
+
+    [Fact]
+    public async Task BuildFreezesLargeConfigurationSectionGraph()
+    {
+        var builder = ApplicationHostTestBuilder.Create();
+        for (var index = 0; index < 64; index++)
+        {
+            builder.Configuration[$"Matrix:Owner{index}:Mode"] = "Original";
+        }
+
+        var sections = builder.Configuration
+            .GetSection("Matrix")
+            .GetChildren()
+            .Select(owner => owner.GetSection("Mode"))
+            .ToArray();
+        Assert.Equal(64, sections.Length);
+
+        await using var host = builder.Build();
+
+        Assert.All(sections, section =>
+            Assert.Throws<InvalidOperationException>(() => section.Value = "Changed"));
+        Assert.All(sections, section => Assert.Equal("Original", section.Value));
     }
 
     [Fact]
@@ -327,5 +643,126 @@ public sealed class ApplicationHostBuilderTests
         {
             throw new InvalidOperationException("module service configuration failed");
         }
+    }
+
+    private sealed class FailingServiceAndDisposeModule : ModuleBase, IDisposable
+    {
+        public static int DisposeCount { get; private set; }
+
+        public static void Reset() => DisposeCount = 0;
+
+        public override void ConfigureServices(ServiceConfigurationContext context) =>
+            throw new InvalidOperationException("module service configuration failed");
+
+        public void Dispose()
+        {
+            DisposeCount++;
+            throw new InvalidOperationException("module cleanup failed");
+        }
+    }
+
+    private sealed class ThrowingBuildCleanupService : IDisposable
+    {
+        public static int DisposeCount { get; set; }
+
+        public void Dispose()
+        {
+            DisposeCount++;
+            throw new InvalidOperationException("generic host cleanup failed");
+        }
+    }
+
+    private sealed class AsyncOnlyBuildCleanupService : IAsyncDisposable
+    {
+        public static int DisposeCount { get; private set; }
+
+        public static bool DisposeCompleted { get; private set; }
+
+        public static void Reset()
+        {
+            DisposeCount = 0;
+            DisposeCompleted = false;
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            DisposeCount++;
+            await Task.Yield();
+            DisposeCompleted = true;
+        }
+    }
+
+    private sealed class ThrowingAsyncOnlyBuildCleanupService : IAsyncDisposable
+    {
+        public static int DisposeCount { get; private set; }
+
+        public static void Reset() => DisposeCount = 0;
+
+        public async ValueTask DisposeAsync()
+        {
+            DisposeCount++;
+            await Task.Yield();
+            throw new InvalidOperationException("async generic host cleanup failed");
+        }
+    }
+
+    private sealed class HangingAsyncOnlyBuildCleanupService : IAsyncDisposable
+    {
+        private static TaskCompletionSource _release = CreateCompletionSource();
+        private static int _disposeCount;
+        private static int _disposeCompleted;
+
+        public static int DisposeCount => Volatile.Read(ref _disposeCount);
+
+        public static bool DisposeCompleted => Volatile.Read(ref _disposeCompleted) != 0;
+
+        public static void Reset()
+        {
+            _release = CreateCompletionSource();
+            Volatile.Write(ref _disposeCount, 0);
+            Volatile.Write(ref _disposeCompleted, 0);
+        }
+
+        public static void Release() => _release.TrySetResult();
+
+        public async ValueTask DisposeAsync()
+        {
+            Interlocked.Increment(ref _disposeCount);
+            await _release.Task.ConfigureAwait(false);
+            Volatile.Write(ref _disposeCompleted, 1);
+        }
+
+        private static TaskCompletionSource CreateCompletionSource() =>
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
+    private sealed class ExpiredBudgetCleanupModule : ModuleBase, IAsyncDisposable
+    {
+        private static TaskCompletionSource _release = CreateCompletionSource();
+        private static int _disposeCount;
+        private static int _disposeCompleted;
+
+        public static int DisposeCount => Volatile.Read(ref _disposeCount);
+
+        public static bool DisposeCompleted => Volatile.Read(ref _disposeCompleted) != 0;
+
+        public static void Reset()
+        {
+            _release = CreateCompletionSource();
+            Volatile.Write(ref _disposeCount, 0);
+            Volatile.Write(ref _disposeCompleted, 0);
+        }
+
+        public static void Release() => _release.TrySetResult();
+
+        public async ValueTask DisposeAsync()
+        {
+            Interlocked.Increment(ref _disposeCount);
+            await _release.Task.ConfigureAwait(false);
+            Volatile.Write(ref _disposeCompleted, 1);
+        }
+
+        private static TaskCompletionSource CreateCompletionSource() =>
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 }

@@ -9,9 +9,14 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/AtomUI.City.Core/AtomUI.City.Core.csproj" />
+    <ProjectReference Include="../AtomUI.City.Core.CyclicModules/AtomUI.City.Core.CyclicModules.csproj" />
     <ProjectReference Include="../../src/AtomUI.City.Generators/AtomUI.City.Generators.csproj"
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(AtomUICityHeadlessPublishAot)' == 'true' And '$(TargetFramework)' == 'net8.0'">
+    <PackageReference Include="System.Threading.AccessControl" />
   </ItemGroup>
 
 </Project>

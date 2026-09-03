@@ -29,3 +29,26 @@ jobs:
 
       - name: Release Gates
         run: bash engineering/check-release.sh --no-restore
+
+  core-mvp-nativeaot:
+    name: Core MVP NativeAOT (${{ matrix.framework }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        framework:
+          - net10.0
+          - net8.0
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.300
+
+      - name: Publish and run Core MVP NativeAOT
+        shell: pwsh
+        run: ./engineering/check-core-mvp-aot.ps1 -Frameworks ${{ matrix.framework }}

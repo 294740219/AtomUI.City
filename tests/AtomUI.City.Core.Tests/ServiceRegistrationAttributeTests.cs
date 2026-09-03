@@ -22,6 +22,13 @@ public sealed class ServiceRegistrationAttributeTests
     }
 
     [Fact]
+    public void ServiceAttributeRejectsUnknownLifetime()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new ServiceAttribute((ServiceLifetime)int.MaxValue));
+    }
+
+    [Fact]
     public void ScopedServiceAttributeStoresExposedServiceTypes()
     {
         var attribute = new ScopedServiceAttribute(typeof(IClock), typeof(ISystemClock));
@@ -58,6 +65,20 @@ public sealed class ServiceRegistrationAttributeTests
     }
 
     [Fact]
+    public void ServiceTypeAttributesRejectNullArraysAndElements()
+    {
+        Assert.Throws<ArgumentNullException>(() => new ScopedServiceAttribute(null!));
+        Assert.Throws<ArgumentNullException>(() => new ExposeServicesAttribute(null!));
+        Assert.Throws<ArgumentException>(() =>
+            new ScopedServiceAttribute(typeof(IClock), null!));
+        Assert.Throws<ArgumentException>(() =>
+            new ExposeServicesAttribute(typeof(IClock), null!));
+
+        Assert.Empty(new ScopedServiceAttribute().ServiceTypes);
+        Assert.Empty(new ExposeServicesAttribute().ServiceTypes);
+    }
+
+    [Fact]
     public void DependencyMarkerInterfacesAreEmptyContracts()
     {
         Assert.True(typeof(ISingletonDependency).IsInterface);
@@ -68,44 +89,7 @@ public sealed class ServiceRegistrationAttributeTests
         Assert.Empty(typeof(ITransientDependency).GetInterfaces());
     }
 
-    [Fact]
-    public void ServiceRegistrationMetadataReadsLifetimeAndExposedServices()
-    {
-        var metadata = ServiceRegistrationMetadata.Read(typeof(SampleSingletonService));
-
-        Assert.Equal(ServiceLifetime.Singleton, metadata.Lifetime);
-        Assert.Equal([typeof(IClock)], metadata.ExposedServiceTypes);
-    }
-
-    [Fact]
-    public void ConflictingLifetimeMarkersAreRejectedByMetadataReader()
-    {
-        var exception = Assert.Throws<InvalidOperationException>(() =>
-            ServiceRegistrationMetadata.Read(typeof(ConflictingLifetimeService)));
-
-        Assert.Contains(nameof(ConflictingLifetimeService), exception.Message, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void InvalidExposedServiceTypeIsRejectedByMetadataReader()
-    {
-        var exception = Assert.Throws<InvalidOperationException>(() =>
-            ServiceRegistrationMetadata.Read(typeof(InvalidExposedService)));
-
-        Assert.Contains(nameof(InvalidExposedService), exception.Message, StringComparison.Ordinal);
-        Assert.Contains(nameof(ISystemClock), exception.Message, StringComparison.Ordinal);
-    }
-
     private interface IClock;
 
     private interface ISystemClock;
-
-    [Service(ServiceLifetime.Singleton)]
-    [ExposeServices(typeof(IClock))]
-    private sealed class SampleSingletonService : IClock;
-
-    private sealed class ConflictingLifetimeService : ISingletonDependency, IScopedDependency;
-
-    [ExposeServices(typeof(ISystemClock))]
-    private sealed class InvalidExposedService : IClock;
 }

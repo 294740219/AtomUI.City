@@ -1,3 +1,4 @@
+using AtomUI.City.Core.DependencyInjection;
 using AtomUI.City.Core.Modularity;
 
 namespace AtomUI.City.Core.HeadlessApp;
@@ -56,6 +57,7 @@ public sealed class GeneratedFoundationModule : ModuleBase
 }
 
 [ApplicationModule]
+[ServiceRegistrationOwner]
 [DependsOn(typeof(GeneratedFoundationModule))]
 public sealed class GeneratedApplicationModule : ModuleBase
 {
@@ -74,6 +76,24 @@ public sealed class GeneratedApplicationModule : ModuleBase
         GeneratedHeadlessRecorder.Record("generated:application:shutdown");
     }
 }
+
+public interface IGeneratedServiceReader;
+
+public interface IGeneratedServiceWriter;
+
+[Service(Microsoft.Extensions.DependencyInjection.ServiceLifetime.Singleton)]
+[ExposeServices(typeof(IGeneratedServiceReader), typeof(IGeneratedServiceWriter))]
+public sealed class GeneratedService : IGeneratedServiceReader, IGeneratedServiceWriter;
+
+[ScopedService]
+public sealed class GeneratedScopedService;
+
+public sealed class GeneratedSingletonMarkerService : ISingletonDependency;
+
+public sealed class GeneratedTransientMarkerService : ITransientDependency;
+
+[Service(Microsoft.Extensions.DependencyInjection.ServiceLifetime.Transient, Key = "generated")]
+public sealed class GeneratedKeyedService;
 
 public sealed class GeneratedUnusedModule : ModuleBase
 {

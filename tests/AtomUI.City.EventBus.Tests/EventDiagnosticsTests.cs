@@ -380,6 +380,10 @@ public sealed class EventDiagnosticsTests
             }
         }
 
+        public void Complete()
+        {
+        }
+
         public async Task WaitForExpectedRecordsAsync()
         {
             await _expectedRecords.Task

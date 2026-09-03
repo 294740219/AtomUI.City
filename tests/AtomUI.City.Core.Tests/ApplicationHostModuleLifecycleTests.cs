@@ -96,6 +96,92 @@ public sealed class ApplicationHostModuleLifecycleTests
     }
 
     [Fact]
+    public void ModuleConstructionFailureAggregatesDependencyCleanupFailure()
+    {
+        ThrowingConstructionCleanupModule.DisposeCount = 0;
+
+        var failure = Assert.Throws<AggregateException>(() => ModuleRegistry.CreateForTesting(
+            [typeof(FailingConstructorModule), typeof(ThrowingConstructionCleanupModule)]));
+
+        Assert.Equal(2, failure.InnerExceptions.Count);
+        Assert.Equal("construction rollback cleanup failed", failure.InnerExceptions[1].Message);
+        Assert.Equal(1, ThrowingConstructionCleanupModule.DisposeCount);
+    }
+
+    [Fact]
+    public void BuildFailureAwaitsAsyncModuleCleanupWithoutPumpingSynchronizationContext()
+    {
+        AsyncBuildFailureCleanupModule.Reset();
+
+        var result = RunBuildOnNonPumpingSynchronizationContext(() =>
+        {
+            var builder = ApplicationHostTestBuilder.Create();
+            builder.UseModule<AsyncBuildFailureCleanupModule>();
+            using var host = builder.Build();
+        });
+
+        Assert.True(result.Completed, "Build deadlocked while awaiting asynchronous failure cleanup.");
+        var failure = Assert.IsType<InvalidOperationException>(result.Failure);
+        Assert.Equal("async build failed", failure.Message);
+        Assert.Equal(1, AsyncBuildFailureCleanupModule.DisposeCount);
+    }
+
+    [Fact]
+    public void ModuleConstructionFailureAwaitsAsyncDependencyCleanupWithoutPumpingSynchronizationContext()
+    {
+        AsyncConstructionCleanupModule.Reset();
+
+        var result = RunBuildOnNonPumpingSynchronizationContext(() =>
+        {
+            var builder = ApplicationHostTestBuilder.Create();
+            builder.UseModule<AsyncConstructionCleanupModule>();
+            builder.UseModule<AsyncCleanupFailingConstructorModule>();
+            using var host = builder.Build();
+        });
+
+        Assert.True(result.Completed, "Build deadlocked while rolling back partially constructed modules.");
+        var failure = Assert.IsType<System.Reflection.TargetInvocationException>(result.Failure);
+        var cause = Assert.IsType<InvalidOperationException>(failure.InnerException);
+        Assert.Equal("async cleanup construction failed", cause.Message);
+        Assert.Equal(1, AsyncConstructionCleanupModule.DisposeCount);
+    }
+
+    [Fact]
+    public void ModuleConstructionRollbackUsesBoundedAsyncCleanupDeadline()
+    {
+        HangingConstructionCleanupModule.Reset();
+        var diagnostics = new InMemoryHostDiagnostics();
+
+        try
+        {
+            var result = RunBuildOnNonPumpingSynchronizationContext(() =>
+                ModuleRegistry.CreateForTesting(
+                    [typeof(HangingConstructionCleanupModule), typeof(HangingCleanupFailingConstructorModule)],
+                    diagnostics,
+                    TimeSpan.FromMilliseconds(100)));
+
+            Assert.True(result.Completed, "Module construction rollback exceeded its cleanup deadline.");
+            var failure = Assert.IsType<AggregateException>(result.Failure);
+            Assert.Contains(failure.InnerExceptions, exception => exception is TimeoutException);
+            Assert.Equal(1, HangingConstructionCleanupModule.DisposeCount);
+            Assert.False(HangingConstructionCleanupModule.DisposeCompleted);
+            Assert.Contains(diagnostics.Records, record =>
+                record.Code == HostDiagnosticIds.HostBuildCleanupFailed &&
+                record.Context["resourceKind"] == "Module" &&
+                record.Context["moduleType"] == typeof(HangingConstructionCleanupModule).FullName &&
+                record.Context["cleanupTimeout"] == TimeSpan.FromMilliseconds(100).ToString() &&
+                record.Context["cleanupMayStillBeRunning"] == bool.TrueString);
+        }
+        finally
+        {
+            HangingConstructionCleanupModule.Release();
+            Assert.True(SpinWait.SpinUntil(
+                () => HangingConstructionCleanupModule.DisposeCompleted,
+                TimeSpan.FromSeconds(5)));
+        }
+    }
+
+    [Fact]
     public async Task OptionalDependencyCanBeMissing()
     {
         ModuleRecorder.Reset();
@@ -127,6 +213,28 @@ public sealed class ApplicationHostModuleLifecycleTests
             description: null,
             []));
         Assert.Equal(typeof(CoreModule), registry.Modules[0].ModuleType);
+    }
+
+    [Fact]
+    public async Task PublicModuleRegistryIsAReadOnlyViewWithoutHostControlCapabilities()
+    {
+        var builder = ApplicationHostTestBuilder.Create();
+        builder.UseModule<CoreModule>();
+
+        await using var host = builder.Build();
+        var registry = host.Services.GetRequiredService<IModuleRegistry>();
+
+        Assert.Equal(
+            ["get_Modules"],
+            typeof(IModuleRegistry).GetMethods().Select(method => method.Name));
+        Assert.IsNotAssignableFrom<IAsyncDisposable>(registry);
+        Assert.IsNotAssignableFrom<IDisposable>(registry);
+        Assert.False(typeof(IModuleLifecycleController).IsVisible);
+        Assert.Null(host.Services.GetService<IModuleLifecycleController>());
+        Assert.False(registry.GetType().IsVisible);
+
+        await host.StartAsync();
+        await host.StopAsync();
     }
 
     [Fact]
@@ -208,13 +316,13 @@ public sealed class ApplicationHostModuleLifecycleTests
     }
 
     [Fact]
-    public async Task CapturedModuleServiceCollectionRejectsMutationAfterServiceConfigurationPhase()
+    public void CapturedModuleServiceCollectionRejectsMutationAfterServiceConfigurationPhase()
     {
         CapturedServicesModule.CapturedServices = null;
         var registry = ModuleRegistry.CreateForTesting([typeof(CapturedServicesModule)]);
         var services = new ServiceCollection();
 
-        await registry.ConfigureServicesAsync(ApplicationHostTestBuilder.CreateContext(), services);
+        registry.ConfigureServices(ApplicationHostTestBuilder.CreateContext(), services);
         var capturedServices = Assert.IsType<ModuleServiceCollection>(CapturedServicesModule.CapturedServices);
 
         Assert.Throws<InvalidOperationException>(() =>
@@ -352,6 +460,101 @@ public sealed class ApplicationHostModuleLifecycleTests
         public void Dispose() => WasDisposed = true;
     }
 
+    private sealed class ThrowingConstructionCleanupModule : ModuleBase, IDisposable
+    {
+        public static int DisposeCount { get; set; }
+
+        public void Dispose()
+        {
+            DisposeCount++;
+            throw new InvalidOperationException("construction rollback cleanup failed");
+        }
+    }
+
+    [DependsOn(typeof(ThrowingConstructionCleanupModule))]
+    private sealed class FailingConstructorModule : ModuleBase
+    {
+        public FailingConstructorModule() =>
+            throw new InvalidOperationException("module construction failed");
+    }
+
+    private sealed class AsyncBuildFailureCleanupModule : ModuleBase, IAsyncDisposable
+    {
+        private static int _disposeCount;
+
+        public static int DisposeCount => Volatile.Read(ref _disposeCount);
+
+        public static void Reset() => Volatile.Write(ref _disposeCount, 0);
+
+        public override void ConfigureServices(ServiceConfigurationContext context) =>
+            throw new InvalidOperationException("async build failed");
+
+        public async ValueTask DisposeAsync()
+        {
+            await Task.Yield();
+            Interlocked.Increment(ref _disposeCount);
+        }
+    }
+
+    private sealed class AsyncConstructionCleanupModule : ModuleBase, IAsyncDisposable
+    {
+        private static int _disposeCount;
+
+        public static int DisposeCount => Volatile.Read(ref _disposeCount);
+
+        public static void Reset() => Volatile.Write(ref _disposeCount, 0);
+
+        public async ValueTask DisposeAsync()
+        {
+            await Task.Yield();
+            Interlocked.Increment(ref _disposeCount);
+        }
+    }
+
+    [DependsOn(typeof(AsyncConstructionCleanupModule))]
+    private sealed class AsyncCleanupFailingConstructorModule : ModuleBase
+    {
+        public AsyncCleanupFailingConstructorModule() =>
+            throw new InvalidOperationException("async cleanup construction failed");
+    }
+
+    private sealed class HangingConstructionCleanupModule : ModuleBase, IAsyncDisposable
+    {
+        private static TaskCompletionSource _release = CreateCompletionSource();
+        private static int _disposeCount;
+        private static int _disposeCompleted;
+
+        public static int DisposeCount => Volatile.Read(ref _disposeCount);
+
+        public static bool DisposeCompleted => Volatile.Read(ref _disposeCompleted) != 0;
+
+        public static void Reset()
+        {
+            _release = CreateCompletionSource();
+            Volatile.Write(ref _disposeCount, 0);
+            Volatile.Write(ref _disposeCompleted, 0);
+        }
+
+        public static void Release() => _release.TrySetResult();
+
+        public async ValueTask DisposeAsync()
+        {
+            Interlocked.Increment(ref _disposeCount);
+            await _release.Task.ConfigureAwait(false);
+            Volatile.Write(ref _disposeCompleted, 1);
+        }
+
+        private static TaskCompletionSource CreateCompletionSource() =>
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
+    [DependsOn(typeof(HangingConstructionCleanupModule))]
+    private sealed class HangingCleanupFailingConstructorModule : ModuleBase
+    {
+        public HangingCleanupFailingConstructorModule() =>
+            throw new InvalidOperationException("hanging cleanup construction failed");
+    }
+
     private sealed class CapturedServicesModule : ModuleBase
     {
         public static ModuleServiceCollection? CapturedServices { get; set; }
@@ -362,6 +565,40 @@ public sealed class ApplicationHostModuleLifecycleTests
             context.Services.AddSingleton<CapturedService>();
         }
     }
+
+    private static BuildThreadResult RunBuildOnNonPumpingSynchronizationContext(Action build)
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            SynchronizationContext.SetSynchronizationContext(new NonPumpingSynchronizationContext());
+
+            try
+            {
+                build();
+            }
+            catch (Exception exception)
+            {
+                failure = exception;
+            }
+        })
+        {
+            IsBackground = true,
+        };
+
+        thread.Start();
+        var completed = thread.Join(TimeSpan.FromSeconds(5));
+        return new BuildThreadResult(completed, failure);
+    }
+
+    private sealed class NonPumpingSynchronizationContext : SynchronizationContext
+    {
+        public override void Post(SendOrPostCallback d, object? state)
+        {
+        }
+    }
+
+    private sealed record BuildThreadResult(bool Completed, Exception? Failure);
 
     private sealed class FoundationOptionsModule : ModuleBase
     {

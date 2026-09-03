@@ -17,11 +17,64 @@ public sealed class ModuleDescriptorTests
     [Fact]
     public void ModuleGraphFailureRecordsCyclePath()
     {
+        CycleStartModule.CreatedCount = 0;
+        CycleEndModule.CreatedCount = 0;
+
         var exception = Assert.Throws<InvalidOperationException>(() =>
             ModuleRegistry.CreateForTesting([typeof(CycleStartModule), typeof(CycleEndModule)]));
 
         Assert.Contains(typeof(CycleStartModule).FullName!, exception.Message, StringComparison.Ordinal);
         Assert.Contains(typeof(CycleEndModule).FullName!, exception.Message, StringComparison.Ordinal);
+        Assert.Equal(0, CycleStartModule.CreatedCount);
+        Assert.Equal(0, CycleEndModule.CreatedCount);
+    }
+
+    [Fact]
+    public void HostBuildRejectsIndirectCycleBeforeAnyModuleFactoryRuns()
+    {
+        IndirectCycleOne.CreatedCount = 0;
+        IndirectCycleTwo.CreatedCount = 0;
+        IndirectCycleThree.CreatedCount = 0;
+        var builder = ApplicationHostTestBuilder.Create();
+        builder.UseModule<IndirectCycleThree>();
+        builder.UseModule<IndirectCycleOne>();
+        builder.UseModule<IndirectCycleTwo>();
+
+        var exception = Assert.Throws<InvalidOperationException>(() => builder.Build());
+
+        Assert.Contains(typeof(IndirectCycleOne).FullName!, exception.Message, StringComparison.Ordinal);
+        Assert.Contains(typeof(IndirectCycleTwo).FullName!, exception.Message, StringComparison.Ordinal);
+        Assert.Contains(typeof(IndirectCycleThree).FullName!, exception.Message, StringComparison.Ordinal);
+        Assert.Equal(0, IndirectCycleOne.CreatedCount);
+        Assert.Equal(0, IndirectCycleTwo.CreatedCount);
+        Assert.Equal(0, IndirectCycleThree.CreatedCount);
+    }
+
+    [Fact]
+    public async Task ValidatedGraphOrdersDiamondBeforeCreatingAnyModule()
+    {
+        DiamondRecorder.Reset();
+        var registrations = new ModuleRegistration[]
+        {
+            Registration<DiamondRoot>(),
+            Registration<DiamondRight>(),
+            Registration<DiamondFoundation>(),
+            Registration<DiamondLeft>(),
+        };
+
+        var graph = ModuleGraphValidator.Validate(registrations);
+
+        Assert.Empty(DiamondRecorder.Created);
+        Assert.Equal(
+            [typeof(DiamondFoundation), typeof(DiamondLeft), typeof(DiamondRight), typeof(DiamondRoot)],
+            graph.OrderedRegistrations.Select(registration => registration.ModuleType));
+        var exposed = Assert.IsAssignableFrom<IList<ModuleRegistration>>(graph.OrderedRegistrations);
+        Assert.Throws<NotSupportedException>(() => exposed[0] = registrations[0]);
+
+        await using var registry = ModuleRegistry.Create(graph);
+        Assert.Equal(
+            ["foundation", "left", "right", "root"],
+            DiamondRecorder.Created);
     }
 
     [Fact]
@@ -53,6 +106,25 @@ public sealed class ModuleDescriptorTests
             optional: true));
         Assert.Equal(typeof(DependencyModule), descriptor.Dependencies[0].ModuleType);
         Assert.False(descriptor.Dependencies[0].Optional);
+    }
+
+    [Fact]
+    public void DependenciesRejectNullEntriesAtConstructionBoundary()
+    {
+        var dependencies = new ModuleDependencyDescriptor[]
+        {
+            new(typeof(DependencyModule), optional: false),
+            null!,
+        };
+
+        var exception = Assert.Throws<ArgumentException>(() => new ModuleDescriptor(
+            "TestModule",
+            typeof(TestModule),
+            version: null,
+            description: null,
+            dependencies));
+
+        Assert.Equal("dependencies", exception.ParamName);
     }
 
     [Fact]
@@ -143,16 +215,89 @@ public sealed class ModuleDescriptorTests
 
     private sealed class ReplacementModule : ModuleBase;
 
+    private static ModuleRegistration Registration<TModule>()
+        where TModule : IModule, new()
+    {
+        return new ModuleRegistration(
+            ModuleDescriptorFactory.CreateFromAttributes(typeof(TModule)),
+            static () => new TModule());
+    }
+
     [DependsOn(typeof(MissingModule))]
     private sealed class DependsOnMissingModule : ModuleBase;
 
     private sealed class MissingModule : ModuleBase;
 
     [DependsOn(typeof(CycleEndModule))]
-    private sealed class CycleStartModule : ModuleBase;
+    private sealed class CycleStartModule : ModuleBase
+    {
+        public static int CreatedCount;
+
+        public CycleStartModule() => CreatedCount++;
+    }
 
     [DependsOn(typeof(CycleStartModule))]
-    private sealed class CycleEndModule : ModuleBase;
+    private sealed class CycleEndModule : ModuleBase
+    {
+        public static int CreatedCount;
+
+        public CycleEndModule() => CreatedCount++;
+    }
+
+    [DependsOn(typeof(IndirectCycleTwo))]
+    private sealed class IndirectCycleOne : ModuleBase
+    {
+        public static int CreatedCount;
+
+        public IndirectCycleOne() => CreatedCount++;
+    }
+
+    [DependsOn(typeof(IndirectCycleThree))]
+    private sealed class IndirectCycleTwo : ModuleBase
+    {
+        public static int CreatedCount;
+
+        public IndirectCycleTwo() => CreatedCount++;
+    }
+
+    [DependsOn(typeof(IndirectCycleOne))]
+    private sealed class IndirectCycleThree : ModuleBase
+    {
+        public static int CreatedCount;
+
+        public IndirectCycleThree() => CreatedCount++;
+    }
+
+    private static class DiamondRecorder
+    {
+        public static List<string> Created { get; } = [];
+
+        public static void Reset() => Created.Clear();
+    }
+
+    private sealed class DiamondFoundation : ModuleBase
+    {
+        public DiamondFoundation() => DiamondRecorder.Created.Add("foundation");
+    }
+
+    [DependsOn(typeof(DiamondFoundation))]
+    private sealed class DiamondLeft : ModuleBase
+    {
+        public DiamondLeft() => DiamondRecorder.Created.Add("left");
+    }
+
+    [DependsOn(typeof(DiamondFoundation))]
+    private sealed class DiamondRight : ModuleBase
+    {
+        public DiamondRight() => DiamondRecorder.Created.Add("right");
+    }
+
+    [DependsOn(typeof(DiamondLeft))]
+    [DependsOn(typeof(DiamondRight))]
+    private sealed class DiamondRoot : ModuleBase
+    {
+        public DiamondRoot() => DiamondRecorder.Created.Add("root");
+    }
 
     [Module("DuplicateModule")]
     private sealed class DuplicateModuleA : ModuleBase;

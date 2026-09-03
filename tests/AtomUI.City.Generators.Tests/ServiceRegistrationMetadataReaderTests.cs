@@ -118,6 +118,43 @@ public sealed class ServiceRegistrationMetadataReaderTests
         Assert.Null(ServiceRegistrationMetadataReader.TryRead(type));
     }
 
+    [Fact]
+    public void TryReadRejectsUnknownLifetimeInsteadOfDowngradingToTransient()
+    {
+        var compilation = CreateCompilation(
+            """
+            using AtomUI.City.Core.DependencyInjection;
+            using Microsoft.Extensions.DependencyInjection;
+
+            namespace Sample.App;
+
+            [Service((ServiceLifetime)999)]
+            public sealed class InvalidService;
+            """);
+        var type = GetTypeSymbol(compilation, "Sample.App.InvalidService");
+
+        Assert.Null(ServiceRegistrationMetadataReader.TryRead(type));
+    }
+
+    [Fact]
+    public void TryReadRejectsNullExposedServiceTypeInsteadOfFilteringIt()
+    {
+        var compilation = CreateCompilation(
+            """
+            using AtomUI.City.Core.DependencyInjection;
+            using Microsoft.Extensions.DependencyInjection;
+
+            namespace Sample.App;
+
+            [Service(ServiceLifetime.Singleton)]
+            [ExposeServices(null)]
+            public sealed class InvalidService;
+            """);
+        var type = GetTypeSymbol(compilation, "Sample.App.InvalidService");
+
+        Assert.Null(ServiceRegistrationMetadataReader.TryRead(type));
+    }
+
     private static ServiceRegistrationMetadata ReadSingleRegistration(string source, string typeName)
     {
         var compilation = CreateCompilation(source);

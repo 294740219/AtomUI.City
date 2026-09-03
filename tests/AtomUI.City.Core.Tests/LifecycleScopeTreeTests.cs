@@ -6,6 +6,19 @@ namespace AtomUI.City.Core.Tests;
 public sealed class LifecycleScopeTreeTests
 {
     [Fact]
+    public void ScopeCreationRejectsUnknownKindsWithoutAttachingAChild()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            LifecycleScope.CreateRoot((LifecycleScopeKind)int.MaxValue, "invalid"));
+
+        using var root = LifecycleScope.CreateRoot(LifecycleScopeKind.Host, "host");
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            root.CreateChild((LifecycleScopeKind)int.MaxValue, "invalid-child"));
+        Assert.Empty(root.Children);
+    }
+
+    [Fact]
     public async Task DisposedChildDetachesFromParentAndDoesNotBreakParentStop()
     {
         await using var root = LifecycleScope.CreateRoot(LifecycleScopeKind.Host, "host");
@@ -16,6 +29,155 @@ public sealed class LifecycleScopeTreeTests
 
         Assert.Empty(root.Children);
         Assert.Equal(LifecycleScopeState.Stopped, root.State);
+    }
+
+    [Fact]
+    public async Task ParentStopJoinsChildDisposedSynchronouslyByCancellationCallback()
+    {
+        var diagnostics = new InMemoryHostDiagnostics();
+        await using var root = LifecycleScope.CreateRoot(
+            LifecycleScopeKind.Host,
+            "host",
+            diagnostics);
+        var child = root.CreateChild(LifecycleScopeKind.Operation, "completed-operation");
+        using var registration = root.CancellationToken.Register(child.Dispose);
+
+        await root.StopAsync();
+
+        Assert.Equal(LifecycleScopeState.Stopped, root.State);
+        Assert.Equal(LifecycleScopeState.Disposed, child.State);
+        Assert.Empty(root.Children);
+        Assert.DoesNotContain(
+            diagnostics.Records,
+            record => record.Code == HostDiagnosticIds.LifecycleScopeCleanupFailed);
+    }
+
+    [Fact]
+    public async Task ParentStopJoinsChildDisposedAsynchronouslyByCancellationCallback()
+    {
+        await using var root = LifecycleScope.CreateRoot(LifecycleScopeKind.Host, "host");
+        var child = root.CreateChild(LifecycleScopeKind.Operation, "completed-operation");
+        using var registration = root.CancellationToken.Register(() =>
+            child.DisposeAsync().AsTask().GetAwaiter().GetResult());
+
+        await root.StopAsync();
+
+        Assert.Equal(LifecycleScopeState.Stopped, root.State);
+        Assert.Equal(LifecycleScopeState.Disposed, child.State);
+        Assert.Empty(root.Children);
+    }
+
+    [Fact]
+    public async Task ParentStopJoinsInProgressChildStopWithoutWaitingCycle()
+    {
+        await using var root = LifecycleScope.CreateRoot(LifecycleScopeKind.Host, "host");
+        var child = root.CreateChild(LifecycleScopeKind.Operation, "active-operation");
+        var callbackEntered = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseCallback = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        using var registration = child.CancellationToken.Register(() =>
+        {
+            callbackEntered.TrySetResult();
+            releaseCallback.Task.GetAwaiter().GetResult();
+        });
+
+        var childDispose = Task.Run(async () => await child.DisposeAsync());
+        await callbackEntered.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        var parentStop = Task.Run(async () => await root.StopAsync());
+
+        Assert.False(parentStop.IsCompleted);
+        releaseCallback.TrySetResult();
+        await Task.WhenAll(childDispose, parentStop).WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.Equal(LifecycleScopeState.Stopped, root.State);
+        Assert.Equal(LifecycleScopeState.Disposed, child.State);
+        Assert.Empty(root.Children);
+    }
+
+    [Fact]
+    public async Task ParentStopToleratesSixtyFourChildrenDisposedDuringCancellation()
+    {
+        var diagnostics = new InMemoryHostDiagnostics();
+        await using var root = LifecycleScope.CreateRoot(
+            LifecycleScopeKind.Host,
+            "host",
+            diagnostics);
+        var children = Enumerable.Range(0, 64)
+            .Select(index => root.CreateChild(
+                LifecycleScopeKind.Operation,
+                $"operation-{index}"))
+            .ToArray();
+        var registrations = children
+            .Select((child, index) => root.CancellationToken.Register(() =>
+            {
+                if (index % 2 == 0)
+                {
+                    child.Dispose();
+                }
+                else
+                {
+                    child.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                }
+            }))
+            .ToArray();
+
+        try
+        {
+            await root.StopAsync();
+        }
+        finally
+        {
+            foreach (var registration in registrations)
+            {
+                registration.Dispose();
+            }
+        }
+
+        Assert.Equal(LifecycleScopeState.Stopped, root.State);
+        Assert.All(children, child =>
+            Assert.Equal(LifecycleScopeState.Disposed, child.State));
+        Assert.Empty(root.Children);
+        Assert.DoesNotContain(
+            diagnostics.Records,
+            record => record.Code == HostDiagnosticIds.LifecycleScopeCleanupFailed);
+    }
+
+    [Fact]
+    public async Task ConcurrentDisposeDoesNotHideRealChildStopFailure()
+    {
+        var diagnostics = new InMemoryHostDiagnostics();
+        var root = LifecycleScope.CreateRoot(LifecycleScopeKind.Host, "host", diagnostics);
+        var child = root.CreateChild(LifecycleScopeKind.Operation, "failing-operation");
+        using var failureRegistration = child.CancellationToken.Register(
+            static () => throw new InvalidOperationException("child cancellation failed"));
+        using var disposeRegistration = root.CancellationToken.Register(child.Dispose);
+
+        var failure = await Assert.ThrowsAsync<AggregateException>(async () =>
+            await root.StopAsync());
+
+        Assert.Contains(
+            failure.Flatten().InnerExceptions,
+            exception => exception.Message.Contains(
+                "child cancellation failed",
+                StringComparison.Ordinal));
+        Assert.Equal(LifecycleScopeState.Faulted, root.State);
+        Assert.Equal(LifecycleScopeState.Disposed, child.State);
+        Assert.Contains(
+            diagnostics.Records,
+            record => record.Code == HostDiagnosticIds.LifecycleScopeCleanupFailed);
+        await Assert.ThrowsAsync<AggregateException>(async () => await root.DisposeAsync());
+    }
+
+    [Fact]
+    public async Task PublicStopStillRejectsDisposedScope()
+    {
+        await using var root = LifecycleScope.CreateRoot(LifecycleScopeKind.Host, "host");
+        var child = root.CreateChild(LifecycleScopeKind.Operation, "completed-operation");
+        await child.DisposeAsync();
+
+        await Assert.ThrowsAsync<ObjectDisposedException>(async () =>
+            await child.StopAsync());
     }
 
     [Fact]

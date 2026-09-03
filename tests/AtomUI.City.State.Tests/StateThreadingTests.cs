@@ -328,5 +328,10 @@ public sealed class StateThreadingTests
             _inner.Write(record);
             _nextRecord.TrySetResult(record);
         }
+
+        public void Complete()
+        {
+            _inner.Complete();
+        }
     }
 }

@@ -7,7 +7,18 @@ namespace AtomUI.City.Core.Tests;
 public sealed class ModuleBaseTests
 {
     [Fact]
-    public async Task AsyncLifecycleMethodsCallSynchronousConvenienceMethodsInOrder()
+    public void ServiceConfigurationContractIsSynchronous()
+    {
+        Assert.Equal(typeof(void), typeof(IModule).GetMethod(nameof(IModule.PreConfigureServices))!.ReturnType);
+        Assert.Equal(typeof(void), typeof(IModule).GetMethod(nameof(IModule.ConfigureServices))!.ReturnType);
+        Assert.Equal(typeof(void), typeof(IModule).GetMethod(nameof(IModule.PostConfigureServices))!.ReturnType);
+        Assert.Null(typeof(IModule).GetMethod("PreConfigureServicesAsync"));
+        Assert.Null(typeof(IModule).GetMethod("ConfigureServicesAsync"));
+        Assert.Null(typeof(IModule).GetMethod("PostConfigureServicesAsync"));
+    }
+
+    [Fact]
+    public async Task LifecycleMethodsRunInOrder()
     {
         var applicationContext = ApplicationHostTestBuilder.CreateContext();
         var services = new ServiceCollection();
@@ -15,9 +26,9 @@ public sealed class ModuleBaseTests
         var calls = new List<string>();
         var module = new RecordingModule(calls);
 
-        await module.PreConfigureServicesAsync(new ServiceConfigurationContext(applicationContext, services));
-        await module.ConfigureServicesAsync(new ServiceConfigurationContext(applicationContext, services));
-        await module.PostConfigureServicesAsync(new ServiceConfigurationContext(applicationContext, services));
+        module.PreConfigureServices(new ServiceConfigurationContext(applicationContext, services));
+        module.ConfigureServices(new ServiceConfigurationContext(applicationContext, services));
+        module.PostConfigureServices(new ServiceConfigurationContext(applicationContext, services));
         await module.ConfigureContributionsAsync(new ContributionConfigurationContext(applicationContext, serviceProvider));
         await module.OnPreApplicationInitializationAsync(new ApplicationInitializationContext(applicationContext, serviceProvider));
         await module.OnApplicationInitializationAsync(new ApplicationInitializationContext(applicationContext, serviceProvider));
@@ -46,9 +57,9 @@ public sealed class ModuleBaseTests
         using var serviceProvider = services.BuildServiceProvider();
         var module = new EmptyModule();
 
-        await module.PreConfigureServicesAsync(new ServiceConfigurationContext(applicationContext, services));
-        await module.ConfigureServicesAsync(new ServiceConfigurationContext(applicationContext, services));
-        await module.PostConfigureServicesAsync(new ServiceConfigurationContext(applicationContext, services));
+        module.PreConfigureServices(new ServiceConfigurationContext(applicationContext, services));
+        module.ConfigureServices(new ServiceConfigurationContext(applicationContext, services));
+        module.PostConfigureServices(new ServiceConfigurationContext(applicationContext, services));
         await module.ConfigureContributionsAsync(new ContributionConfigurationContext(applicationContext, serviceProvider));
         await module.OnPreApplicationInitializationAsync(new ApplicationInitializationContext(applicationContext, serviceProvider));
         await module.OnApplicationInitializationAsync(new ApplicationInitializationContext(applicationContext, serviceProvider));
@@ -57,13 +68,13 @@ public sealed class ModuleBaseTests
     }
 
     [Fact]
-    public async Task AsyncLifecycleMethodsRejectNullContext()
+    public async Task LifecycleMethodsRejectNullContext()
     {
         var module = new EmptyModule();
 
-        await Assert.ThrowsAsync<ArgumentNullException>(async () => await module.PreConfigureServicesAsync(null!));
-        await Assert.ThrowsAsync<ArgumentNullException>(async () => await module.ConfigureServicesAsync(null!));
-        await Assert.ThrowsAsync<ArgumentNullException>(async () => await module.PostConfigureServicesAsync(null!));
+        Assert.Throws<ArgumentNullException>(() => module.PreConfigureServices(null!));
+        Assert.Throws<ArgumentNullException>(() => module.ConfigureServices(null!));
+        Assert.Throws<ArgumentNullException>(() => module.PostConfigureServices(null!));
         await Assert.ThrowsAsync<ArgumentNullException>(async () => await module.ConfigureContributionsAsync(null!));
         await Assert.ThrowsAsync<ArgumentNullException>(async () => await module.OnPreApplicationInitializationAsync(null!));
         await Assert.ThrowsAsync<ArgumentNullException>(async () => await module.OnApplicationInitializationAsync(null!));
@@ -83,18 +94,6 @@ public sealed class ModuleBaseTests
 
         cancellation.Cancel();
 
-        await AssertCanceledBeforeSyncCall(
-            token => module.PreConfigureServicesAsync(new ServiceConfigurationContext(applicationContext, services), token),
-            calls,
-            cancellation.Token);
-        await AssertCanceledBeforeSyncCall(
-            token => module.ConfigureServicesAsync(new ServiceConfigurationContext(applicationContext, services), token),
-            calls,
-            cancellation.Token);
-        await AssertCanceledBeforeSyncCall(
-            token => module.PostConfigureServicesAsync(new ServiceConfigurationContext(applicationContext, services), token),
-            calls,
-            cancellation.Token);
         await AssertCanceledBeforeSyncCall(
             token => module.ConfigureContributionsAsync(new ContributionConfigurationContext(applicationContext, serviceProvider), token),
             calls,

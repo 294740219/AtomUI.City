@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../AtomUI.City.Core.Mvp.Foundation/AtomUI.City.Core.Mvp.Foundation.csproj" />
+  </ItemGroup>
+</Project>

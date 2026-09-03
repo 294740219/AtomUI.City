@@ -98,6 +98,32 @@ public sealed class ServiceRegistrationManifestBuilderTests
         Assert.Equal("Sample.App.IClock", registration.ExposedServiceTypeNames[0]);
     }
 
+    [Fact]
+    public void ServiceRegistrationMetadataRejectsUnknownLifetimeAndInvalidExposedNames()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ServiceRegistrationMetadata(
+            "Sample.App.SystemClock",
+            (ServiceRegistrationLifetime)int.MaxValue,
+            ["Sample.App.IClock"],
+            replace: false,
+            tryAdd: false,
+            key: null));
+        Assert.Throws<ArgumentException>(() => new ServiceRegistrationMetadata(
+            "Sample.App.SystemClock",
+            ServiceRegistrationLifetime.Singleton,
+            ["Sample.App.IClock", null!],
+            replace: false,
+            tryAdd: false,
+            key: null));
+        Assert.Throws<ArgumentException>(() => new ServiceRegistrationMetadata(
+            "Sample.App.SystemClock",
+            ServiceRegistrationLifetime.Singleton,
+            ["Sample.App.IClock", " "],
+            replace: false,
+            tryAdd: false,
+            key: null));
+    }
+
     private static ServiceRegistrationMetadata Registration(
         string implementationTypeName,
         ServiceRegistrationLifetime lifetime,

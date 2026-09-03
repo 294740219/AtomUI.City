@@ -47,6 +47,35 @@ public sealed class LifecycleStageModelTests
     }
 
     [Fact]
+    public void LifecycleStageRejectsUnknownArea()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new LifecycleStage((LifecycleStageArea)int.MaxValue, "Start"));
+    }
+
+    [Fact]
+    public void DefaultLifecycleStageDoesNotExposeANullNameOrMalformedKey()
+    {
+        var stage = default(LifecycleStage);
+
+        Assert.Throws<InvalidOperationException>(() => stage.Name);
+        Assert.Throws<InvalidOperationException>(() => stage.Key);
+    }
+
+    [Fact]
+    public void BuiltInStageCollectionDoesNotExposeOrPermitMutationOfItsBackingStorage()
+    {
+        var stages = LifecycleStages.All;
+        var firstStage = stages[0];
+        var list = Assert.IsAssignableFrom<IList<LifecycleStage>>(stages);
+
+        Assert.IsNotType<LifecycleStage[]>(stages);
+        Assert.Throws<NotSupportedException>(() => list[0] = LifecycleStages.ErrorHandle);
+        Assert.Equal(firstStage, LifecycleStages.All[0]);
+        Assert.Same(stages, LifecycleStages.All);
+    }
+
+    [Fact]
     public void ScopeKindsAndStatesExposeCoreLifecycleVocabulary()
     {
         Assert.Contains(LifecycleScopeKind.Host, Enum.GetValues<LifecycleScopeKind>());

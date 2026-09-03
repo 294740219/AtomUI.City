@@ -262,13 +262,12 @@ public sealed class ModuleTestHostTests
     {
         public CancellationToken ObservedToken { get; private set; }
 
-        public override ValueTask PreConfigureServicesAsync(
-            ServiceConfigurationContext context,
+        public override ValueTask OnApplicationInitializationAsync(
+            ApplicationInitializationContext context,
             CancellationToken cancellationToken = default)
         {
             ObservedToken = cancellationToken;
             cancellationToken.ThrowIfCancellationRequested();
-
             return ValueTask.CompletedTask;
         }
     }

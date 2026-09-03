@@ -21,6 +21,19 @@ public sealed class LifecycleMiddlewarePipelineTests
     }
 
     [Fact]
+    public void LifecycleBoundariesRejectDefaultStageValues()
+    {
+        Assert.Throws<ArgumentException>(() => new LifecycleContext(default));
+
+        var builder = new LifecyclePipelineBuilder();
+        Assert.Throws<ArgumentException>(() => builder.Use(default, static (_, _) => default));
+        Assert.Throws<ArgumentException>(() =>
+            builder.Use<LifecycleBoundariesRejectDefaultStageValuesMiddleware>(
+                default,
+                static (_, _) => default));
+    }
+
+    [Fact]
     public async Task PipelineExecutesMiddlewareInRegistrationOrderAroundTerminalHandler()
     {
         var trace = new List<string>();
@@ -49,6 +62,145 @@ public sealed class LifecycleMiddlewarePipelineTests
         Assert.Equal(
             ["one.before", "two.before", "terminal", "two.after", "one.after"],
             trace);
+    }
+
+    [Fact]
+    public async Task MiddlewareCanReturnNextDirectly()
+    {
+        var terminalCalls = 0;
+        var pipeline = new LifecyclePipelineBuilder()
+            .Use(static (_, next) => next())
+            .Build(_ =>
+            {
+                Interlocked.Increment(ref terminalCalls);
+                return ValueTask.CompletedTask;
+            });
+
+        await pipeline.ExecuteAsync(new LifecycleContext(LifecycleStages.ApplicationStart));
+
+        Assert.Equal(1, terminalCalls);
+    }
+
+    [Fact]
+    public async Task PipelineDrainsAndRejectsFireAndForgetNext()
+    {
+        var terminalEntered = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseTerminal = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var pipeline = new LifecyclePipelineBuilder()
+            .Use(static (context, next) =>
+            {
+                _ = next();
+                return ValueTask.CompletedTask;
+            })
+            .Build(async _ =>
+            {
+                terminalEntered.TrySetResult();
+                await releaseTerminal.Task.ConfigureAwait(false);
+            });
+
+        var execution = pipeline.ExecuteAsync(
+            new LifecycleContext(LifecycleStages.ApplicationStart)).AsTask();
+        await terminalEntered.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.False(execution.IsCompleted);
+
+        releaseTerminal.TrySetResult();
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => execution);
+        Assert.Contains("must await or return next", failure.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task SavedNextExpiresWhenMiddlewareReturns()
+    {
+        LifecycleNext? savedNext = null;
+        var terminalCalls = 0;
+        var pipeline = new LifecyclePipelineBuilder()
+            .Use((_, next) =>
+            {
+                savedNext = next;
+                return ValueTask.CompletedTask;
+            })
+            .Build(_ =>
+            {
+                Interlocked.Increment(ref terminalCalls);
+                return ValueTask.CompletedTask;
+            });
+
+        await pipeline.ExecuteAsync(new LifecycleContext(LifecycleStages.ApplicationStart));
+
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await savedNext!());
+        Assert.Contains("after its invocation has completed", failure.Message, StringComparison.Ordinal);
+        Assert.Equal(0, terminalCalls);
+    }
+
+    [Fact]
+    public async Task ConcurrentNextCallsHaveOneOwnerAndOneTerminalExecution()
+    {
+        const int callerCount = 32;
+        var terminalCalls = 0;
+        var rejectedCalls = 0;
+        using var start = new ManualResetEventSlim();
+        var pipeline = new LifecyclePipelineBuilder()
+            .Use(async (_, next) =>
+            {
+                var callers = Enumerable.Range(0, callerCount)
+                    .Select(_ => Task.Run(async () =>
+                    {
+                        start.Wait();
+
+                        try
+                        {
+                            await next();
+                        }
+                        catch (InvalidOperationException exception) when (
+                            exception.Message.Contains("only once", StringComparison.Ordinal))
+                        {
+                            Interlocked.Increment(ref rejectedCalls);
+                        }
+                    }))
+                    .ToArray();
+
+                start.Set();
+                await Task.WhenAll(callers);
+            })
+            .Build(_ =>
+            {
+                Interlocked.Increment(ref terminalCalls);
+                return ValueTask.CompletedTask;
+            });
+
+        await pipeline.ExecuteAsync(new LifecycleContext(LifecycleStages.ApplicationStart));
+
+        Assert.Equal(1, terminalCalls);
+        Assert.Equal(callerCount - 1, rejectedCalls);
+    }
+
+    [Fact]
+    public async Task NextExpiresAfterACompletedPipelineTransaction()
+    {
+        LifecycleNext? savedNext = null;
+        var terminalCalls = 0;
+        var pipeline = new LifecyclePipelineBuilder()
+            .Use(async (_, next) =>
+            {
+                savedNext = next;
+                await next();
+            })
+            .Build(_ =>
+            {
+                Interlocked.Increment(ref terminalCalls);
+                return ValueTask.CompletedTask;
+            });
+
+        await pipeline.ExecuteAsync(new LifecycleContext(LifecycleStages.ApplicationStart));
+
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await savedNext!());
+        Assert.Contains("after its invocation has completed", failure.Message, StringComparison.Ordinal);
+        Assert.Equal(1, terminalCalls);
     }
 
     [Fact]
@@ -272,5 +424,11 @@ public sealed class LifecycleMiddlewarePipelineTests
         {
             throw new InvalidOperationException("diagnostics failed");
         }
+
+        public void Complete()
+        {
+        }
     }
 }
+
+file sealed class LifecycleBoundariesRejectDefaultStageValuesMiddleware;
