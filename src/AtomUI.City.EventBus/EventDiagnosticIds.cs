@@ -8,5 +8,7 @@ public static class EventDiagnosticIds
     public const string EventDeliveryFailed = "EventBus.EventDeliveryFailed";
     public const string EventDeliveryCancelled = "EventBus.EventDeliveryCancelled";
     public const string EventSubscriptionAdded = "EventBus.EventSubscriptionAdded";
+    public const string EventSubscriptionQuiescing = "EventBus.EventSubscriptionQuiescing";
     public const string EventSubscriptionDisposed = "EventBus.EventSubscriptionDisposed";
+    public const string EventSubscriptionTerminationFailed = "EventBus.EventSubscriptionTerminationFailed";
 }

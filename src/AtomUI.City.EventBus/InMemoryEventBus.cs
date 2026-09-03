@@ -30,77 +30,16 @@ public sealed class InMemoryEventBus : IEventBus, IDisposable
     }
 
     public IEventSubscription Subscribe<TEvent>(
-        Func<EventContext<TEvent>, ValueTask> handler,
-        EventSubscriptionOptions? options = null)
-    {
-        ArgumentNullException.ThrowIfNull(handler);
-        ThrowIfDisposed();
-
-        return SubscribeCore(
-            owner: null,
-            handler,
-            options ?? EventSubscriptionOptions.Serialized);
-    }
-
-    public IEventSubscription Subscribe<TEvent>(
-        Action<EventContext<TEvent>> handler,
-        EventSubscriptionOptions? options = null)
-    {
-        ArgumentNullException.ThrowIfNull(handler);
-
-        return Subscribe<TEvent>(
-            context =>
-            {
-                handler(context);
-
-                return ValueTask.CompletedTask;
-            },
-            options);
-    }
-
-    public IEventSubscription Subscribe<TEvent>(
-        IEventHandler<TEvent> handler,
-        EventSubscriptionOptions? options = null)
-    {
-        ArgumentNullException.ThrowIfNull(handler);
-
-        return Subscribe<TEvent>(
-            context => handler.HandleAsync(context),
-            options);
-    }
-
-    public IEventSubscription Subscribe<TEvent>(
         LifecycleScope owner,
         Func<EventContext<TEvent>, ValueTask> handler,
         EventSubscriptionOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(owner);
         ArgumentNullException.ThrowIfNull(handler);
-        ThrowIfDisposed();
-        ThrowIfOwnerNotRunning(owner);
-
         return SubscribeCore(
             owner,
             handler,
             options ?? EventSubscriptionOptions.Serialized);
-    }
-
-    public IEventSubscription Subscribe<TEvent>(
-        LifecycleScope owner,
-        Action<EventContext<TEvent>> handler,
-        EventSubscriptionOptions? options = null)
-    {
-        ArgumentNullException.ThrowIfNull(handler);
-
-        return Subscribe<TEvent>(
-            owner,
-            context =>
-            {
-                handler(context);
-
-                return ValueTask.CompletedTask;
-            },
-            options);
     }
 
     public IEventSubscription Subscribe<TEvent>(
@@ -114,15 +53,6 @@ public sealed class InMemoryEventBus : IEventBus, IDisposable
             owner,
             context => handler.HandleAsync(context),
             options);
-    }
-
-    public IEventSubscription Subscribe<TEvent>(Func<TEvent, CancellationToken, ValueTask> handler)
-    {
-        ArgumentNullException.ThrowIfNull(handler);
-
-        return Subscribe<TEvent>(
-            context => handler(context.Event, context.CancellationToken),
-            EventSubscriptionOptions.Serialized);
     }
 
     public async ValueTask<EventPublishResult> PublishAsync<TEvent>(
@@ -306,10 +236,11 @@ public sealed class InMemoryEventBus : IEventBus, IDisposable
     }
 
     private IEventSubscription SubscribeCore<TEvent>(
-        LifecycleScope? owner,
+        LifecycleScope owner,
         Func<EventContext<TEvent>, ValueTask> handler,
         EventSubscriptionOptions options)
     {
+        ArgumentNullException.ThrowIfNull(owner);
         ArgumentNullException.ThrowIfNull(handler);
         ArgumentNullException.ThrowIfNull(options);
 
@@ -333,19 +264,42 @@ public sealed class InMemoryEventBus : IEventBus, IDisposable
 
                 return handler(context);
             },
-            _diagnostics,
-            owner);
+            _diagnostics);
 
-        lock (_syncRoot)
+        subscription.BindOwner(owner.CancellationToken);
+
+        try
         {
-            if (!_subscriptions.TryGetValue(subscription.EventType, out var subscriptions))
+            lock (_syncRoot)
             {
-                subscriptions = [];
-                _subscriptions[subscription.EventType] = subscriptions;
-            }
+                if (_disposed)
+                {
+                    throw new ObjectDisposedException(GetType().FullName);
+                }
 
-            subscriptions.Add(subscription);
-            subscription.MarkActive();
+                if (owner.State != LifecycleScopeState.Running || owner.CancellationToken.IsCancellationRequested)
+                {
+                    throw new InvalidOperationException("Event subscription owner scope must be running.");
+                }
+
+                if (!subscription.TryMarkActive())
+                {
+                    throw new InvalidOperationException("Event subscription owner scope stopped during registration.");
+                }
+
+                if (!_subscriptions.TryGetValue(subscription.EventType, out var subscriptions))
+                {
+                    subscriptions = [];
+                    _subscriptions[subscription.EventType] = subscriptions;
+                }
+
+                subscriptions.Add(subscription);
+            }
+        }
+        catch
+        {
+            subscription.Dispose();
+            throw;
         }
 
         WriteDiagnostic(
@@ -398,12 +352,6 @@ public sealed class InMemoryEventBus : IEventBus, IDisposable
                 _subscriptions.Remove(subscription.EventType);
             }
         }
-
-        WriteDiagnostic(
-            EventDiagnosticIds.EventSubscriptionDisposed,
-            $"Event subscription '{subscription.Id}' was disposed.",
-            HostDiagnosticSeverity.Trace,
-            CreateSubscriptionDiagnosticContext(subscription));
     }
 
     private void WriteDiagnostic(
@@ -508,14 +456,6 @@ public sealed class InMemoryEventBus : IEventBus, IDisposable
         }
     }
 
-    private static void ThrowIfOwnerNotRunning(LifecycleScope owner)
-    {
-        if (owner.State != LifecycleScopeState.Running)
-        {
-            throw new InvalidOperationException("Event subscription owner scope must be running.");
-        }
-    }
-
     private readonly record struct DeliveryContext(
         EventContractId ContractId,
         Guid EventId,
@@ -529,23 +469,25 @@ public sealed class InMemoryEventBus : IEventBus, IDisposable
 
     private sealed class EventSubscription : IEventSubscription
     {
-        private readonly InMemoryEventBus _eventBus;
-        private readonly Func<object, DeliveryContext, ValueTask> _handler;
-        private readonly IHostDiagnostics? _diagnostics;
+        private InMemoryEventBus? _eventBus;
+        private Func<object, DeliveryContext, ValueTask>? _handler;
+        private IHostDiagnostics? _diagnostics;
         private readonly SemaphoreSlim _serialGate = new(1, 1);
         private readonly object _stateGate = new();
-        private readonly CancellationTokenRegistration _ownerCancellation;
+        private readonly CancellationTokenSource _subscriptionCancellation = new();
+        private CancellationTokenRegistration _ownerCancellation;
         private TaskCompletionSource? _drainCompletion;
         private int _inFlightCount;
+        private bool _ownerBound;
         private EventSubscriptionState _state = EventSubscriptionState.Created;
+        private Task? _terminationTask;
 
         public EventSubscription(
             InMemoryEventBus eventBus,
             Type eventType,
             EventSubscriptionOptions options,
             Func<object, DeliveryContext, ValueTask> handler,
-            IHostDiagnostics? diagnostics,
-            LifecycleScope? owner)
+            IHostDiagnostics? diagnostics)
         {
             _eventBus = eventBus;
             EventType = eventType;
@@ -553,13 +495,6 @@ public sealed class InMemoryEventBus : IEventBus, IDisposable
             _handler = handler;
             _diagnostics = diagnostics;
             Id = EventSubscriptionId.New();
-
-            if (owner is not null)
-            {
-                _ownerCancellation = owner.CancellationToken.Register(
-                    static state => ((EventSubscription)state!).Dispose(),
-                    this);
-            }
         }
 
         public EventSubscriptionId Id { get; }
@@ -579,14 +514,43 @@ public sealed class InMemoryEventBus : IEventBus, IDisposable
             }
         }
 
-        public void MarkActive()
+        public void BindOwner(CancellationToken ownerCancellationToken)
+        {
+            var registration = ownerCancellationToken.Register(
+                static state => ((EventSubscription)state!).RequestTermination(),
+                this);
+            var disposeRegistration = false;
+
+            lock (_stateGate)
+            {
+                if (_ownerBound)
+                {
+                    registration.Dispose();
+                    throw new InvalidOperationException("Event subscription already has an owner.");
+                }
+
+                _ownerBound = true;
+                _ownerCancellation = registration;
+                disposeRegistration = _terminationTask is not null;
+            }
+
+            if (disposeRegistration)
+            {
+                registration.Dispose();
+            }
+        }
+
+        public bool TryMarkActive()
         {
             lock (_stateGate)
             {
-                if (_state == EventSubscriptionState.Created)
+                if (_state != EventSubscriptionState.Created || _terminationTask is not null)
                 {
-                    _state = EventSubscriptionState.Active;
+                    return false;
                 }
+
+                _state = EventSubscriptionState.Active;
+                return true;
             }
         }
 
@@ -600,53 +564,34 @@ public sealed class InMemoryEventBus : IEventBus, IDisposable
             int publishDepth,
             CancellationToken cancellationToken)
         {
-            if (State != EventSubscriptionState.Active)
-            {
-                return null;
-            }
-
-            if (Options.DispatchPolicy == EventDispatchPolicy.Serialized)
-            {
-                await _serialGate.WaitAsync(cancellationToken).ConfigureAwait(false);
-                var acquiredDelivery = false;
-
-                try
-                {
-                    acquiredDelivery = TryBeginDelivery();
-                    if (!acquiredDelivery)
-                    {
-                        return null;
-                    }
-
-                    return await DispatchAsync(
-                            eventData,
-                            descriptor,
-                            eventId,
-                            correlationId,
-                            causationId,
-                            publishedAt,
-                            publishDepth,
-                            cancellationToken)
-                        .ConfigureAwait(false);
-                }
-                finally
-                {
-                    if (acquiredDelivery)
-                    {
-                        EndDelivery();
-                    }
-
-                    _serialGate.Release();
-                }
-            }
-
             if (!TryBeginDelivery())
             {
                 return null;
             }
 
+            var serialGateAcquired = false;
             try
             {
+                using var deliveryCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                    cancellationToken,
+                    _subscriptionCancellation.Token);
+                var deliveryCancellationToken = deliveryCancellation.Token;
+
+                if (Options.DispatchPolicy == EventDispatchPolicy.Serialized)
+                {
+                    try
+                    {
+                        await _serialGate.WaitAsync(deliveryCancellationToken).ConfigureAwait(false);
+                        serialGateAcquired = true;
+                    }
+                    catch (OperationCanceledException) when (
+                        _subscriptionCancellation.IsCancellationRequested &&
+                        !cancellationToken.IsCancellationRequested)
+                    {
+                        return null;
+                    }
+                }
+
                 return await DispatchAsync(
                         eventData,
                         descriptor,
@@ -655,11 +600,16 @@ public sealed class InMemoryEventBus : IEventBus, IDisposable
                         causationId,
                         publishedAt,
                         publishDepth,
-                        cancellationToken)
+                        deliveryCancellationToken)
                     .ConfigureAwait(false);
             }
             finally
             {
+                if (serialGateAcquired)
+                {
+                    _serialGate.Release();
+                }
+
                 EndDelivery();
             }
         }
@@ -674,25 +624,102 @@ public sealed class InMemoryEventBus : IEventBus, IDisposable
                 }
             }
 
-            cancellationToken.ThrowIfCancellationRequested();
-            Task? drainTask;
-            var removeFromBus = false;
+            var terminationTask = RequestTermination();
+            await terminationTask.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        public void Dispose()
+        {
+            _ = RequestTermination();
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            return new ValueTask(RequestTermination());
+        }
+
+        private Task RequestTermination()
+        {
+            TaskCompletionSource? completion = null;
+            Task terminationTask;
 
             lock (_stateGate)
             {
+                if (_terminationTask is not null)
+                {
+                    return _terminationTask;
+                }
+
                 if (_state == EventSubscriptionState.Disposed)
                 {
-                    return;
+                    _terminationTask = Task.CompletedTask;
+                    return _terminationTask;
                 }
 
-                if (_state != EventSubscriptionState.Quiescing)
+                completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                _terminationTask = completion.Task;
+                _state = EventSubscriptionState.Quiescing;
+                terminationTask = _terminationTask;
+            }
+
+            try
+            {
+                _ = Task.Run(() => TerminateCoreAsync(completion));
+            }
+            catch (Exception exception)
+            {
+                lock (_stateGate)
                 {
-                    _state = EventSubscriptionState.Quiescing;
-                    removeFromBus = true;
+                    _state = EventSubscriptionState.Faulted;
                 }
 
+                completion.TrySetException(exception);
+            }
+
+            return terminationTask;
+        }
+
+        private async Task TerminateCoreAsync(TaskCompletionSource completion)
+        {
+            var failures = new List<Exception>();
+            Task? drainTask;
+            var eventBus = _eventBus;
+            var diagnostics = _diagnostics;
+
+            try
+            {
+                eventBus?.Remove(this);
+                diagnostics?.Write(
+                    new HostDiagnosticRecord(
+                        EventDiagnosticIds.EventSubscriptionQuiescing,
+                        $"Event subscription '{Id}' stopped accepting new deliveries.",
+                        HostDiagnosticSeverity.Trace)
+                    {
+                        Context = CreateSubscriptionDiagnosticContext(this)
+                    });
+            }
+            catch (Exception exception)
+            {
+                AddTerminationFailure(failures, exception);
+            }
+
+            try
+            {
+                if (!_subscriptionCancellation.IsCancellationRequested)
+                {
+                    _subscriptionCancellation.Cancel(throwOnFirstException: false);
+                }
+            }
+            catch (Exception exception)
+            {
+                AddTerminationFailure(failures, exception);
+            }
+
+            lock (_stateGate)
+            {
                 if (_inFlightCount > 0)
                 {
+                    _state = EventSubscriptionState.Draining;
                     _drainCompletion ??= new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                     drainTask = _drainCompletion.Task;
                 }
@@ -702,31 +729,109 @@ public sealed class InMemoryEventBus : IEventBus, IDisposable
                 }
             }
 
-            if (removeFromBus)
-            {
-                _eventBus.Remove(this);
-                _ownerCancellation.Dispose();
-            }
-
             if (drainTask is not null)
             {
-                await drainTask.WaitAsync(cancellationToken).ConfigureAwait(false);
+                await drainTask.ConfigureAwait(false);
+            }
+
+            try
+            {
+                _ownerCancellation.Dispose();
+            }
+            catch (Exception exception)
+            {
+                AddTerminationFailure(failures, exception);
+            }
+
+            try
+            {
+                _subscriptionCancellation.Dispose();
+            }
+            catch (Exception exception)
+            {
+                AddTerminationFailure(failures, exception);
+            }
+
+            try
+            {
+                _serialGate.Dispose();
+            }
+            catch (Exception exception)
+            {
+                AddTerminationFailure(failures, exception);
+            }
+
+            _handler = null;
+            _eventBus = null;
+            _diagnostics = null;
+
+            if (failures.Count == 0)
+            {
+                try
+                {
+                    diagnostics?.Write(
+                        new HostDiagnosticRecord(
+                            EventDiagnosticIds.EventSubscriptionDisposed,
+                            $"Event subscription '{Id}' was disposed.",
+                            HostDiagnosticSeverity.Trace)
+                        {
+                            Context = CreateSubscriptionDiagnosticContext(this)
+                        });
+                }
+                catch (Exception exception)
+                {
+                    AddTerminationFailure(failures, exception);
+                }
+            }
+            else
+            {
+                try
+                {
+                    diagnostics?.Write(
+                        new HostDiagnosticRecord(
+                            EventDiagnosticIds.EventSubscriptionTerminationFailed,
+                            $"Event subscription '{Id}' termination failed: {failures[0].Message}",
+                            HostDiagnosticSeverity.Error)
+                        {
+                            Context = CreateSubscriptionDiagnosticContext(this)
+                        });
+                }
+                catch (Exception exception)
+                {
+                    AddTerminationFailure(failures, exception);
+                }
             }
 
             lock (_stateGate)
             {
-                _state = EventSubscriptionState.Disposed;
+                _state = failures.Count == 0
+                    ? EventSubscriptionState.Disposed
+                    : EventSubscriptionState.Faulted;
+            }
+
+            if (failures.Count == 0)
+            {
+                completion.TrySetResult();
+            }
+            else if (failures.Count == 1)
+            {
+                completion.TrySetException(failures[0]);
+            }
+            else
+            {
+                completion.TrySetException(new AggregateException(failures));
             }
         }
 
-        public void Dispose()
+        private static void AddTerminationFailure(List<Exception> failures, Exception exception)
         {
-            StopAsync().AsTask().GetAwaiter().GetResult();
-        }
+            if (exception is AggregateException aggregateException)
+            {
+                failures.AddRange(aggregateException.Flatten().InnerExceptions);
+                return;
+            }
 
-        public ValueTask DisposeAsync()
-        {
-            return StopAsync();
+            failures.Add(exception);
         }
 
         private async ValueTask<EventDeliveryResult> DispatchAsync(
@@ -808,6 +913,8 @@ public sealed class InMemoryEventBus : IEventBus, IDisposable
             DeliveryContext delivery,
             CancellationToken cancellationToken)
         {
+            var handler = _handler ?? throw new ObjectDisposedException(nameof(EventSubscription));
+
             switch (Options.DispatchPolicy)
             {
                 case EventDispatchPolicy.UiThread:
@@ -817,18 +924,18 @@ public sealed class InMemoryEventBus : IEventBus, IDisposable
                     }
 
                     await Options.UiDispatcher.PostAsync(
-                            async token => await _handler(eventData, delivery with { CancellationToken = token }).ConfigureAwait(false),
+                            async token => await handler(eventData, delivery with { CancellationToken = token }).ConfigureAwait(false),
                             cancellationToken)
                         .ConfigureAwait(false);
                     break;
                 case EventDispatchPolicy.Background:
                     await Task.Run(
-                            async () => await _handler(eventData, delivery).ConfigureAwait(false),
+                            async () => await handler(eventData, delivery).ConfigureAwait(false),
                             cancellationToken)
                         .ConfigureAwait(false);
                     break;
                 default:
-                    await _handler(eventData, delivery).ConfigureAwait(false);
+                    await handler(eventData, delivery).ConfigureAwait(false);
                     break;
             }
         }
@@ -856,7 +963,9 @@ public sealed class InMemoryEventBus : IEventBus, IDisposable
             {
                 _inFlightCount--;
 
-                if (_inFlightCount == 0 && _state == EventSubscriptionState.Quiescing)
+                if (_inFlightCount == 0 &&
+                    (_state == EventSubscriptionState.Quiescing ||
+                     _state == EventSubscriptionState.Draining))
                 {
                     drainCompletion = _drainCompletion;
                 }

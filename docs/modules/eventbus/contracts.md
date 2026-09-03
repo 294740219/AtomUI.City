@@ -36,12 +36,9 @@
 
 | Feature ID | 相关能力 | 测试文件 |
 | --- | --- | --- |
-| AUC-EVENTBUS-001 | Typed Publish | EventPublicationTests |
-| AUC-EVENTBUS-002 | Subscription Lifecycle | EventSubscriptionTests |
-| AUC-EVENTBUS-003 | Contract Registry | EventContractRegistryTests |
-| AUC-EVENTBUS-004 | Dispatch Policy | EventDispatchingTests |
-| AUC-EVENTBUS-005 | Diagnostics | EventDiagnosticsTests |
-| AUC-EVENTBUS-006 | DI Registration | EventBusRegistrationTests |
+| AUC-EVENTBUS-003 | Contract Identity & Registry | EventContractRegistryTests |
+| AUC-EVENTBUS-008 | Generated Event Catalog & NativeAOT | EventBusGeneratorTests; EventBusNativeAotProcessTests |
+| AUC-EVENTBUS-009 | Plugin Event Planes | EventBusPluginContractTests; EventBusPluginLifecycleTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 

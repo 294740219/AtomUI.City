@@ -22,22 +22,23 @@ AtomUI.City.EventBus 的架构目标是把模块职责变成可实现、可测�
 | --- | --- | --- | --- |
 | IEventBus | 发布和订阅入口。 | DI singleton | Host stop 释放订阅 registry。 |
 | EventContractDescriptor | 事件类型、id、plane 和 assembly。 | 配置或插件贡献 | 不可变，可跨线程读取。 |
-| EventSubscription | 可释放订阅句柄。 | Subscribe | owner dispose 或插件 unload 释放。 |
+| EventSubscription | 可释放订阅句柄；每条订阅只有一个 owner。 | Subscribe / generated registration / plugin contribution | LifecycleScope cancellation、显式 Stop/Dispose 或插件 Lease revoke 触发唯一终止事务。 |
 | EventPublishOptions | 派发和错误策略。 | 调用方 | 不可变或调用内复制。 |
 | EventContext<TEvent> | 事件实例和 operation context。 | Publish | 单次 publish 有效。 |
 
 ## 产品级状态机
 
-- Subscription: Created -> Active -> Disposing -> Disposed
+- Subscription: Created -> Active -> Quiescing -> Draining -> Disposed；终止或清理失败进入 Faulted
 - Publish: Created -> Dispatching -> Completed 或 Failed 或 Cancelled
 - Contract registry: MutableDuringConfiguration -> FrozenAtRuntime；插件动态贡献走 snapshot 替换
 
 ## 关键运行流程
 
-- Subscribe 验证 contract、记录 owner、创建 subscription id。
+- Subscribe 验证 contract、记录唯一 owner、创建 subscription id，并在同一提交协议中复核 EventBus/owner 状态后进入 active snapshot。
 - Publish 创建 EventContext，选定 dispatch policy，按稳定顺序调用 handler。
 - handler 失败按 EventErrorPolicy 继续、停止或聚合错误。
-- owner dispose 或插件 unload 释放 subscription。
+- owner cancellation 只撤销该 owner 的 subscriptions；同一 event contract 下属于其他 owner 的订阅不受影响。
+- Dispose 快速建立 Quiescing barrier；StopAsync/DisposeAsync 共享唯一事务并等待 drain。
 
 ## 失败矩阵
 

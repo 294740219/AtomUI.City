@@ -23,7 +23,9 @@
 - 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
 - Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
 - 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
-- Owned subscription 只能绑定 `Running` owner；stopped owner 必须拒绝创建订阅，且不得写 subscription-added 诊断。
+- 每条动态 subscription 必须绑定且只能绑定一个 owner；停止一个 owner 不能撤销其他 owner 对同一事件的订阅。
+- Application Plane 动态订阅的 owner 使用 Core `LifecycleScope`，且只能绑定 `Running` scope；stopped owner 必须拒绝创建订阅，且不得写 subscription-added 诊断。
+- 静态/DI handler 由 generated registration 和 EventBus Host controller 绑定 `ApplicationScope`；插件 handler 由 EventBus 领域 ContributionLease 持有。
 
 ## 失败行为
 
@@ -37,12 +39,11 @@
 
 | Feature ID | 相关能力 | 测试文件 |
 | --- | --- | --- |
-| AUC-EVENTBUS-001 | Typed Publish | EventPublicationTests |
-| AUC-EVENTBUS-002 | Subscription Lifecycle | EventSubscriptionTests |
-| AUC-EVENTBUS-003 | Contract Registry | EventContractRegistryTests |
-| AUC-EVENTBUS-004 | Dispatch Policy | EventDispatchingTests |
-| AUC-EVENTBUS-005 | Diagnostics | EventDiagnosticsTests |
-| AUC-EVENTBUS-006 | DI Registration | EventBusRegistrationTests |
+| AUC-EVENTBUS-002 | Subscription Ownership & Lifecycle | EventSubscriptionLifecycleTests |
+| AUC-EVENTBUS-004 | Dispatch & Failure Policy | EventDispatchAndFailurePolicyTests |
+| AUC-EVENTBUS-006 | DI & Host Lifecycle | EventBusHostIntegrationTests |
+| AUC-EVENTBUS-008 | Generated Event Catalog & NativeAOT | EventBusGeneratorTests; EventBusNativeAotProcessTests |
+| AUC-EVENTBUS-009 | Plugin Event Planes | EventBusPluginContractTests; EventBusPluginLifecycleTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -79,27 +80,38 @@ EventBus 必须能明确回答：
 
 ### 2. 核心抽象
 
-建议抽象：
+1.0 公共抽象固定为：
 
 ```csharp
-public interface IEventHandler<in TEvent>
+public interface IEventHandler<TEvent>
 {
-    ValueTask HandleAsync(
-        EventContext<TEvent> context);
+    ValueTask HandleAsync(EventContext<TEvent> context);
 }
-```
 
-动态订阅入口：
-
-```csharp
 public interface IEventSubscriber
 {
     IEventSubscription Subscribe<TEvent>(
-        ILifecycleScope owner,
+        LifecycleScope owner,
         Func<EventContext<TEvent>, ValueTask> handler,
+        EventSubscriptionOptions? options = null);
+
+    IEventSubscription Subscribe<TEvent>(
+        LifecycleScope owner,
+        IEventHandler<TEvent> handler,
+        EventSubscriptionOptions? options = null);
+}
+
+public static class EventSubscriberExtensions
+{
+    public static IEventSubscription Subscribe<TEvent>(
+        this IEventSubscriber subscriber,
+        LifecycleScope owner,
+        Action<EventContext<TEvent>> handler,
         EventSubscriptionOptions? options = null);
 }
 ```
+
+`IEventHandler<TEvent>` 保持 invariant。核心接口不提供 ownerless overload，也不提供丢失 `EventContext<TEvent>` 的简化 delegate；同步 `Action` 只通过上面的有 owner 便利扩展转接到异步核心入口。
 
 订阅句柄：
 
@@ -115,7 +127,7 @@ public interface IEventSubscription :
 }
 ```
 
-`Dispose` 用于无异步等待的快速撤销入口；需要 drain handler 时必须使用 `StopAsync` 或 `DisposeAsync`。
+`Dispose` 用于无异步等待的快速撤销入口：原子进入 `Quiescing`、移出新发布快照、触发 subscription cancellation 并发布唯一终止事务。需要等待 in-flight handler drain 和资源清理时必须使用 `StopAsync` 或 `DisposeAsync`；三者以及 owner cancellation 共享同一个终止事务。
 
 ### 3. 订阅类型
 
@@ -151,6 +163,8 @@ Module declaration
 - 插件 Contribution。
 
 动态订阅必须提供明确 owner，并返回 `IEventSubscription`。
+
+一条订阅只能有一个 owner。同一个 event contract 可以存在多条由不同 scope 持有的订阅；例如 `WindowScope` 停止只撤销该窗口的 SubscriptionId，不影响 `RouteScope` 或 `ApplicationScope` 对同一事件的订阅。
 
 ### 4. Subscription Descriptor
 
@@ -224,7 +238,6 @@ Created
 
 ```text
 Faulted
-StopTimedOut
 ```
 
 语义：
@@ -234,7 +247,9 @@ StopTimedOut
 - `Quiescing`：已从新发布快照移除，不接收新事件。
 - `Draining`：等待已排队或执行中的 handler 完成或取消。
 - `Disposed`：队列、handler、service scope 和引用已释放。
-- `StopTimedOut`：停止超过 timeout，进入错误策略。
+- `Faulted`：不再接收新 delivery，但终止或资源清理失败。
+
+`EventSubscriptionState` 的稳定值为 `Created=0`、`Active=1`、`Quiescing=2`、`Draining=3`、`Disposed=4`、`Faulted=5`。调用方取消或 shutdown deadline 超时只结束本次等待并产生声明的异常/诊断，不形成永久 `StopTimedOut` 状态；后台唯一终止事务继续执行。
 
 ### 8. 注册流程
 
@@ -244,9 +259,9 @@ Validate owner
 -> Validate channel and capability
 -> Build subscription descriptor
 -> Allocate subscription runtime
--> Atomically add to immutable snapshot
 -> Attach subscription to owner
--> Mark Active
+-> Revalidate EventBus accepting state, owner Running state and owner token
+-> Atomically mark Active and add to immutable snapshot
 ```
 
 如果注册中途失败：
@@ -256,13 +271,16 @@ Validate owner
 - 插件 Contribution 不得创建 Active lease。
 - 错误进入 Diagnostics。
 
+EventBus accepting 状态、owner 状态、owner cancellation registration、subscription 状态和 snapshot 提交属于一个原子提交协议。owner 或 EventBus 在准备和提交之间开始停止时，注册必须失败或完成后立即进入同一个 Quiescing 事务，不能留下 Active 或半注册订阅。
+
 ### 9. 撤销流程
 
 ```text
 Mark Quiescing
 -> Atomically remove from publication snapshots
 -> Reject new deliveries
--> Cancel or drain queued deliveries
+-> Cancel queued and in-flight deliveries
+-> Mark Draining when in-flight count is non-zero
 -> Wait for in-flight handlers
 -> Dispose handler resources
 -> Detach from owner
@@ -276,6 +294,8 @@ Mark Quiescing
 - 插件停用可以要求取消旧快照中的未开始投递。
 - 正在执行的 handler 通过 cancellation token 协作停止。
 - EventBus 不能强制终止线程。
+- Owner cancellation callback 只能建立 Quiescing barrier、触发取消并发布终止事务，不能同步等待 handler；这避免在 UI 线程或 LifecycleScope cancellation 调用栈中死锁。
+- Core `LifecycleScope.StopAsync()` 当前不承诺等待 EventBus 外部资源 drain。要求确定性 teardown 的 Window/Route owner 必须等待返回的 `IEventSubscription.StopAsync()`；Application Host controller 和 Plugin ContributionLease 必须在销毁所属资源前等待其拥有的全部订阅。
 
 ### 10. 发布与撤销竞争
 

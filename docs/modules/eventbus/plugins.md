@@ -36,12 +36,12 @@
 
 | Feature ID | 相关能力 | 测试文件 |
 | --- | --- | --- |
-| AUC-EVENTBUS-001 | Typed Publish | EventPublicationTests |
-| AUC-EVENTBUS-002 | Subscription Lifecycle | EventSubscriptionTests |
-| AUC-EVENTBUS-003 | Contract Registry | EventContractRegistryTests |
-| AUC-EVENTBUS-004 | Dispatch Policy | EventDispatchingTests |
-| AUC-EVENTBUS-005 | Diagnostics | EventDiagnosticsTests |
-| AUC-EVENTBUS-006 | DI Registration | EventBusRegistrationTests |
+| AUC-EVENTBUS-002 | Subscription Ownership & Lifecycle | EventSubscriptionLifecycleTests |
+| AUC-EVENTBUS-003 | Contract Identity & Registry | EventContractRegistryTests |
+| AUC-EVENTBUS-005 | Diagnostics & Observability | EventDiagnosticsTests |
+| AUC-EVENTBUS-007 | Bounded Channel Runtime | EventChannelRuntimeTests |
+| AUC-EVENTBUS-008 | Generated Event Catalog & NativeAOT | EventBusGeneratorTests; EventBusNativeAotProcessTests |
+| AUC-EVENTBUS-009 | Plugin Event Planes | EventBusPluginContractTests; EventBusPluginLifecycleTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -174,8 +174,10 @@ Capability 应进一步绑定：
 Host 根据 capability 给插件暴露受限 contract：
 
 - `IEventPublisher`。
-- `IEventSubscriber`。
+- capability 受控的 EventBus handler contribution contract。
 - Plugin Private EventBus。
+
+插件不直接获得 Application Plane `IEventSubscriber`，也不把插件私有生命周期包装成 Host `LifecycleScope`。Shared Plane handler 和 Private Plane subscription 都由 EventBus 领域 ContributionLease 持有，并由 PluginSystem 在停用/卸载阶段显式等待撤销和 drain。
 
 插件不应获得：
 

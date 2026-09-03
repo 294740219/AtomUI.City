@@ -36,12 +36,15 @@
 
 | Feature ID | 相关能力 | 测试文件 |
 | --- | --- | --- |
-| AUC-EVENTBUS-001 | Typed Publish | EventPublicationTests |
-| AUC-EVENTBUS-002 | Subscription Lifecycle | EventSubscriptionTests |
-| AUC-EVENTBUS-003 | Contract Registry | EventContractRegistryTests |
-| AUC-EVENTBUS-004 | Dispatch Policy | EventDispatchingTests |
-| AUC-EVENTBUS-005 | Diagnostics | EventDiagnosticsTests |
-| AUC-EVENTBUS-006 | DI Registration | EventBusRegistrationTests |
+| AUC-EVENTBUS-001 | Typed Publication | EventPublicationTests |
+| AUC-EVENTBUS-002 | Subscription Ownership & Lifecycle | EventSubscriptionLifecycleTests |
+| AUC-EVENTBUS-003 | Contract Identity & Registry | EventContractRegistryTests |
+| AUC-EVENTBUS-004 | Dispatch & Failure Policy | EventDispatchAndFailurePolicyTests |
+| AUC-EVENTBUS-005 | Diagnostics & Observability | EventDiagnosticsTests |
+| AUC-EVENTBUS-006 | DI & Host Lifecycle | EventBusHostIntegrationTests |
+| AUC-EVENTBUS-007 | Bounded Channel Runtime | EventChannelRuntimeTests |
+| AUC-EVENTBUS-008 | Generated Event Catalog & NativeAOT | EventBusGeneratorTests; EventBusNativeAotProcessTests |
+| AUC-EVENTBUS-009 | Plugin Event Planes | EventBusPluginContractTests; EventBusPluginLifecycleTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -139,7 +142,7 @@ EventBus 遵守以下原则：
 
 ### 5. 核心抽象
 
-建议公共抽象：
+公共抽象以 [api-contracts.md](api-contracts.md) 为唯一行为合同。本专题固定以下订阅边界：
 
 | 类型 | 职责 |
 |---|---|
@@ -159,7 +162,12 @@ EventBus 遵守以下原则：
 | `IEventContractRegistry` | Host 可见事件契约注册表。 |
 | `IEventSubscriptionRegistry` | 当前 EventBus 的订阅注册表。 |
 
-插件可以只获得受限的 `IEventPublisher` 或 `IEventSubscriber`，不应默认获得可管理整个 registry 的接口。
+Application Plane 调用方可以获得只读的 `IEventPublisher` 或强制 `LifecycleScope` owner 的 `IEventSubscriber`。插件不直接获得要求 Host `LifecycleScope` 的 Application Plane subscriber；插件 handler 通过 capability 受控的 EventBus contribution contract 注册并由领域 ContributionLease 持有。任何调用方都不应获得可管理整个 registry 的接口。
+
+- Application Plane 动态订阅必须显式传入现有 Core `LifecycleScope`，每条订阅只能有一个 owner。
+- `IEventSubscriber` 只保留有 owner 的异步 delegate 和 `IEventHandler<TEvent>` 两个核心 overload；同步 `Action` 由有 owner 的扩展方法适配。
+- 不提供 ownerless overload，不引入 `ILifecycleScope`，也不以丢失 `EventContext<TEvent>` 的 delegate 作为核心入口。
+- 静态/DI handler 由 generated registration 绑定 `ApplicationScope`；插件 handler 由 EventBus 领域 ContributionLease 持有。
 
 ### 6. 发布接口
 
@@ -365,6 +373,17 @@ Owner 停止后：
 - 订阅从 registry 和所有快照缓存中移除。
 
 第一版使用强引用订阅，不提供弱引用订阅。弱引用会掩盖生命周期管理错误，并降低插件卸载问题的可诊断性。
+
+停止一个 owner 只撤销该 owner 持有的 SubscriptionId，不影响其他 owner 对同一 event contract 的订阅。owner cancellation 先同步建立 Quiescing barrier、移出新 snapshot 并触发组合 token，不能在 cancellation callback 中同步等待 handler。`Dispose()` 只执行该快速撤销；`StopAsync()` 和 `DisposeAsync()` 共享唯一终止事务并等待 drain。
+
+Subscription 状态固定为：
+
+```text
+Created -> Active -> Quiescing -> Draining -> Disposed
+                         termination failure -> Faulted
+```
+
+Timeout 或调用方取消只结束本次等待，不形成永久状态；终止事务继续执行。
 
 完整规则见：[Subscriptions 设计](subscriptions.md)。
 

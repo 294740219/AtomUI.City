@@ -22,4 +22,4 @@
 
 ## 集成变更规则
 
-新增跨模块集成时，必须同时更新 features、api-contracts、testing、compatibility，并在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中同步完成度。
+新增跨模块集成时，必须同时更新 features、api-contracts、testing 和 compatibility。EventBus Feature 状态以 [features.md](features.md) 为唯一来源；[全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 只作为仓库级镜像同步，不能反向覆盖模块设计状态。

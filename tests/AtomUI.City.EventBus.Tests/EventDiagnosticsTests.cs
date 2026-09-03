@@ -29,7 +29,9 @@ public sealed class EventDiagnosticsTests
                 "EventBus.EventPublished",
                 "EventBus.EventRejected",
                 "EventBus.EventSubscriptionAdded",
-                "EventBus.EventSubscriptionDisposed"
+                "EventBus.EventSubscriptionDisposed",
+                "EventBus.EventSubscriptionQuiescing",
+                "EventBus.EventSubscriptionTerminationFailed"
             ],
             codes);
         Assert.Equal(codes.Length, codes.Distinct(StringComparer.Ordinal).Count());

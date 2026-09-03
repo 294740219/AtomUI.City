@@ -36,12 +36,15 @@
 
 | Feature ID | 相关能力 | 测试文件 |
 | --- | --- | --- |
-| AUC-EVENTBUS-001 | Typed Publish | EventPublicationTests |
-| AUC-EVENTBUS-002 | Subscription Lifecycle | EventSubscriptionTests |
-| AUC-EVENTBUS-003 | Contract Registry | EventContractRegistryTests |
-| AUC-EVENTBUS-004 | Dispatch Policy | EventDispatchingTests |
-| AUC-EVENTBUS-005 | Diagnostics | EventDiagnosticsTests |
-| AUC-EVENTBUS-006 | DI Registration | EventBusRegistrationTests |
+| AUC-EVENTBUS-001 | Typed Publication | EventPublicationTests |
+| AUC-EVENTBUS-002 | Subscription Ownership & Lifecycle | EventSubscriptionLifecycleTests |
+| AUC-EVENTBUS-003 | Contract Identity & Registry | EventContractRegistryTests |
+| AUC-EVENTBUS-004 | Dispatch & Failure Policy | EventDispatchAndFailurePolicyTests |
+| AUC-EVENTBUS-005 | Diagnostics & Observability | EventDiagnosticsTests |
+| AUC-EVENTBUS-006 | DI & Host Lifecycle | EventBusHostIntegrationTests |
+| AUC-EVENTBUS-007 | Bounded Channel Runtime | EventChannelRuntimeTests |
+| AUC-EVENTBUS-008 | Generated Event Catalog & NativeAOT | EventBusGeneratorTests; EventBusNativeAotProcessTests |
+| AUC-EVENTBUS-009 | Plugin Event Planes | EventBusPluginContractTests; EventBusPluginLifecycleTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -140,6 +143,7 @@ Command operation
 | `EventSubscriptionAdded` | 新订阅进入 snapshot。 |
 | `EventSubscriptionQuiescing` | 订阅停止接收新投递。 |
 | `EventSubscriptionDisposed` | 订阅完全释放。 |
+| `EventSubscriptionTerminationFailed` | 订阅终止或资源清理失败。 |
 | `EventChannelBackpressure` | Queue 达到阈值。 |
 | `EventPluginDrainTimedOut` | 插件 handler 无法在时限内结束。 |
 

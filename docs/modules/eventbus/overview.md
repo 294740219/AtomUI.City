@@ -1,7 +1,7 @@
 # AtomUI.City.EventBus
 
 文档等级：Level 3
-成熟度：Partially Implemented
+成熟度：In Design
 执行边界：Host runtime service
 程序集：`AtomUI.City.EventBus`
 源码：`src/AtomUI.City.EventBus`
@@ -46,7 +46,7 @@ AtomUI.City.EventBus 作为 Host 服务或模块贡献接入 Core 生命周期�
 
 ## 与 PluginSystem 的关系
 
-插件可以通过 manifest 或 Host 共享 contract 贡献本模块能力；所有插件来源对象必须绑定 plugin owner 并可撤销。
+`AUC-EVENTBUS-009` 先在 EventBus 中冻结 Shared/Private Plane、capability、领域 lease 和撤销协议；真实动态插件集成、AssemblyLoadContext drain/unload 和最终验收等待 PluginSystem 施工。Plugin Plane 不阻断 `AUC-EVENTBUS-001` 至 `008` 组成的 Application Plane MVP。
 
 ## 与 Testing 的关系
 
@@ -61,14 +61,14 @@ AtomUI.City.EventBus 作为 Host 服务或模块贡献接入 Core 生命周期�
 | [api-contracts.md](api-contracts.md) | API family、关键方法、参数/返回/异常/取消/并发/Dispose 后行为。 |
 | [lifecycle.md](lifecycle.md) | 模块特有生命周期、Host shutdown、插件动态变更和失败处理。 |
 | [threading.md](threading.md) | 线程边界、UI dispatcher、后台任务、并发冲突和死锁规避。 |
-| [diagnostics.md](diagnostics.md) | 现有诊断码、产品级目标诊断、上下文字段和测试断言。 |
+| [diagnostics.md](diagnostics.md) | EventBus 1.0 诊断目录、上下文字段和测试断言。 |
 | [testing.md](testing.md) | 具体测试矩阵、必须断言的行为、测试类型和缺口处理。 |
 | [compatibility.md](compatibility.md) | public API、配置、manifest、snapshot、generated output、CLI envelope 和包布局兼容。 |
 | [integration.md](integration.md) | 跨模块依赖方向、生命周期、线程和失败行为。 |
-| [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) | Feature 到现有基线、缺口、必补测试和实现工作的追踪。 |
+| [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) | 仓库级进度镜像；必须以下述模块 Feature 状态为准，不能反向覆盖模块设计状态。 |
 
 ## 当前成熟度状态
 
-Partially Implemented
+`In Design`
 
-该状态表示模块已有实现基线，但还需要按产品级合同补齐实现和测试。单个功能点状态以 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 为准。
+EventBus 以 [features.md](features.md) 中的九个 Feature 为唯一状态来源。当前所有 Feature 均处于设计收口阶段，既有源码和测试不作为设计完成证明。`001–008 Verified` 表示 Application Plane MVP 完成；`009 Verified` 表示 Plugin Plane 完成。
