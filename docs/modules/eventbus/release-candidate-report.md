@@ -5,11 +5,11 @@
 - 复核日期：2026-09-04
 - 验收协议：[release-candidate-validation.md](release-candidate-validation.md)
 - 当前分支：`develop`
-- 基准 HEAD：`a1ebd8624bc770adadf201fae93dfdc7a060a267`
-- Engineering RC 范围指纹：`8d272d10f1bd03ce5ffdaa48d237bf702773a7dbee61d9362e789095620a3db0`（243 个文件；报告自身不计入）
+- 正式候选 commit：`25ce5d5d82f73e1adf276f683bc710c16c4df06f`
+- 候选范围指纹：`8d272d10f1bd03ce5ffdaa48d237bf702773a7dbee61d9362e789095620a3db0`（243 个文件；报告自身不计入）
 - Application Plane MVP：**模块内工业级验收已通过**
 - Plugin Plane：**EventBus 侧 contract 已验证；真实 PluginSystem 集成 Pending**
-- 正式发布身份：**尚未建立**。当前工作区包含未提交的收口改动，正式 RC 必须在单一 commit 上重新记录 HEAD、范围指纹和完整门禁结果。
+- 正式 RC 身份：**已建立**。上述 commit 在 clean worktree 上完成统一 EventBus RC 门禁复验。
 
 这里的“Application Plane MVP 通过”只表示 EventBus 模块自身的设计、实现和模块级验收闭环，不表示整个 City 已完成，也不把尚未施工的 PluginSystem 集成虚报为完成。
 
@@ -17,7 +17,7 @@
 
 | Gate ID | 状态 | 当前证据 |
 | --- | --- | --- |
-| EVENTBUS-RC-001 | Engineering passed / Formal RC pending | 已记录 HEAD、dirty 状态、243 文件范围和稳定内容指纹；工作区提交后仍须以新 commit 身份完整复验。 |
+| EVENTBUS-RC-001 | Passed | commit `25ce5d5d82f73e1adf276f683bc710c16c4df06f` 在 clean worktree 上复验；243 文件范围指纹为 `8d272d10f1bd03ce5ffdaa48d237bf702773a7dbee61d9362e789095620a3db0`。 |
 | EVENTBUS-RC-002 | Passed | `features.md`、详细 Feature 卡、`testing.md` 和 `overview.md` 已统一 Application Plane 与 Plugin Plane 状态。 |
 | EVENTBUS-RC-003 | Passed | net8.0/net10.0 Release 零 warning/error；498 项 Public API baseline；PublicApiAnalyzers、PackageValidation、XML、SourceLink 和包 repository metadata 已进入统一门禁。 |
 | EVENTBUS-RC-004 | Passed | EventBus Release 全量 245/245、0 skipped；Generator 专项以及高风险合同测试亦已通过。 |
@@ -28,7 +28,7 @@
 | EVENTBUS-RC-009 | Observation passed | ShortRun 12/12 case 产生有效统计；零 case 和无统计结果均返回非零退出码。首份数据只作趋势基线，不承诺跨机器绝对耗时。 |
 | EVENTBUS-RC-010 | Passed | Feature 状态漂移已消除，工程门禁与模块文档已经对齐。 |
 
-统一入口 `bash engineering/check-eventbus-release.sh` 已于 2026-09-04 完整执行通过。它固定使用 Release，覆盖候选范围格式、双 TFM 构建、工程/模块/生成器测试、20 轮压力、Public API、本地 NuGet 外部消费、Benchmark 和候选身份输出。
+统一入口 `bash engineering/check-eventbus-release.sh` 已于 2026-09-04 在上述 clean commit 上完整执行通过。它固定使用 Release，覆盖候选范围格式、双 TFM 构建、工程/模块/生成器测试、20 轮压力、Public API、本地 NuGet 外部消费、Benchmark 和候选身份输出。
 
 City 全局 `check-release.sh --configuration Release` 的首次执行在 solution 格式门禁停止，其中包含 Presentation、Data、State 和 Core fixture 等 EventBus 候选范围外文件。没有修改这些其他模块；EventBus 候选范围内格式问题已修正并由专属入口验证。该范围外失败不计作 EventBus 产品失败，也未从 City 全局门禁中删除。
 
@@ -92,7 +92,7 @@ EventBus XML 当前优先覆盖 `IEventBus`、`IEventPublisher`、`IEventSubscri
 
 - Presentation 的真实 UI dispatcher 集成不属于 EventBus 模块内验收；当前由可控 dispatcher 合同测试覆盖。
 - PluginSystem 尚未施工真实插件 manifest、DI Scope、capability 和动态 ALC 集成，因此 Plugin Plane 不能标记为完整 Verified。
-- 当前工作区未提交；只有提交并重新运行完整验收协议后，才能形成可从单一 commit 重建的正式 RC。
+- 验收报告自身不进入候选指纹；报告更新不改变已经复验的候选 commit 和内容身份。
 
 ## 历史 RC1 说明
 
@@ -100,4 +100,4 @@ EventBus XML 当前优先覆盖 `IEventBus`、`IEventPublisher`、`IEventSubscri
 
 ## 最终判定
 
-EventBus **Application Plane MVP 已达到进入实际应用塑造与后续模块集成阶段的标准**。当前没有已知的 EventBus 模块内 P0/P1 发布阻断项；Plugin Plane 的 Pending 是明确的跨模块施工边界。正式对外发布仍需在干净、已提交的候选上按验收协议完整重跑并冻结结果。
+EventBus **Application Plane MVP 已达到进入实际应用塑造与后续模块集成阶段的标准，并已形成可复现的正式模块候选**。当前没有已知的 EventBus 模块内 P0/P1 发布阻断项；Plugin Plane 的 Pending 是明确的跨模块施工边界，不影响 Application Plane 候选结论。
