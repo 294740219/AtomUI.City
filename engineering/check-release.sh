@@ -21,6 +21,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+export CONFIGURATION="$configuration"
+
 run_gate() {
   local gate_name="$1"
   shift
@@ -33,17 +35,19 @@ run_gate() {
 }
 
 if [[ "$restore" == true ]]; then
-  run_gate "restore" dotnet restore AtomUICity.slnx
+  run_gate "restore" dotnet restore AtomUICity.slnx -p:Configuration="$configuration"
 fi
 
 run_gate "format" dotnet format AtomUICity.slnx --verify-no-changes --no-restore
-run_gate "build" dotnet build AtomUICity.slnx --no-restore
+run_gate "build" dotnet build AtomUICity.slnx --configuration "$configuration" --no-restore
 run_gate "docs" bash engineering/check-docs.sh
 run_gate "license" bash engineering/check-license.sh
 run_gate "project-inventory" bash engineering/check-project-inventory.sh
 run_gate "dependency-boundaries" bash engineering/check-dependency-boundaries.sh
 run_gate "test-naming" bash engineering/check-test-naming.sh
 run_gate "public-api" bash engineering/check-public-api.sh
+run_gate "eventbus-package-consumer" bash engineering/check-eventbus-package-consumer.sh
+run_gate "eventbus-benchmarks" bash engineering/check-eventbus-benchmarks.sh
 run_gate "release-notes" bash engineering/generate-release-notes.sh
 run_gate "pack" bash engineering/pack.sh --configuration "$configuration" --no-build
 run_gate "package-validation" bash engineering/validate-packages.sh --configuration "$configuration"

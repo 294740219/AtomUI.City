@@ -50,15 +50,20 @@ public sealed class EngineeringGateTests
         Assert.Contains("release gate failed", script, StringComparison.Ordinal);
         Assert.Contains("dotnet restore AtomUICity.slnx", script, StringComparison.Ordinal);
         Assert.Contains("dotnet format AtomUICity.slnx --verify-no-changes --no-restore", script, StringComparison.Ordinal);
-        Assert.Contains("dotnet build AtomUICity.slnx --no-restore", script, StringComparison.Ordinal);
+        Assert.Contains("dotnet build AtomUICity.slnx --configuration \"$configuration\" --no-restore", script, StringComparison.Ordinal);
         Assert.Contains("bash engineering/check-docs.sh", script, StringComparison.Ordinal);
         Assert.Contains("bash engineering/check-license.sh", script, StringComparison.Ordinal);
         Assert.Contains("bash engineering/check-project-inventory.sh", script, StringComparison.Ordinal);
         Assert.Contains("bash engineering/check-dependency-boundaries.sh", script, StringComparison.Ordinal);
         Assert.Contains("bash engineering/check-public-api.sh", script, StringComparison.Ordinal);
+        Assert.Contains("bash engineering/check-eventbus-package-consumer.sh", script, StringComparison.Ordinal);
+        Assert.Contains("bash engineering/check-eventbus-benchmarks.sh", script, StringComparison.Ordinal);
         Assert.Contains("bash engineering/test-ci.sh", script, StringComparison.Ordinal);
         Assert.Contains("bash engineering/pack.sh --configuration \"$configuration\" --no-build", script, StringComparison.Ordinal);
         Assert.Contains("bash engineering/validate-packages.sh --configuration \"$configuration\"", script, StringComparison.Ordinal);
+        Assert.Contains("export CONFIGURATION=\"$configuration\"", script, StringComparison.Ordinal);
+        Assert.Contains("dotnet restore AtomUICity.slnx -p:Configuration=\"$configuration\"", script, StringComparison.Ordinal);
+        Assert.Contains("dotnet build AtomUICity.slnx --configuration \"$configuration\" --no-restore", script, StringComparison.Ordinal);
         Assert.Contains("bash engineering/check-template-smoke.sh", script, StringComparison.Ordinal);
     }
 
@@ -83,7 +88,7 @@ public sealed class EngineeringGateTests
 
         var script = File.ReadAllText(scriptPath);
 
-        Assert.Contains("dotnet test AtomUICity.slnx --no-build", script, StringComparison.Ordinal);
+        Assert.Contains("dotnet test AtomUICity.slnx --configuration \"$configuration\" --no-build", script, StringComparison.Ordinal);
         Assert.Contains("Category!=PlatformIntegration", script, StringComparison.Ordinal);
     }
 
@@ -112,9 +117,10 @@ public sealed class EngineeringGateTests
 
         var script = File.ReadAllText(scriptPath);
 
-        Assert.Contains("README", script, StringComparison.Ordinal);
         Assert.Contains("odd code fences", script, StringComparison.Ordinal);
         Assert.Contains("missing markdown links", script, StringComparison.Ordinal);
+        Assert.Contains("--pcre2", script, StringComparison.Ordinal);
+        Assert.Contains("[[:alnum:]_]", script, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -172,7 +178,7 @@ public sealed class EngineeringGateTests
     }
 
     [Fact]
-    public void PublicApiScriptBuildsAndPacksCoreAgainstItsApiBaseline()
+    public void PublicApiScriptBuildsAndPacksCoreAndEventBusAgainstTheirApiBaselines()
     {
         var repositoryRoot = RepositoryPaths.FindRepositoryRoot();
         var scriptPath = Path.Combine(repositoryRoot, EngineeringScriptsDirectoryName, "check-public-api.sh");
@@ -187,9 +193,109 @@ public sealed class EngineeringGateTests
         Assert.Contains("dotnet build", script, StringComparison.Ordinal);
         Assert.Contains("dotnet pack", script, StringComparison.Ordinal);
         Assert.Contains("TreatWarningsAsErrors", script, StringComparison.Ordinal);
-        Assert.Contains("AtomUI.City.Core.sourcelink.json", script, StringComparison.Ordinal);
+        Assert.Contains("AtomUI.City.Core", script, StringComparison.Ordinal);
+        Assert.Contains("AtomUI.City.EventBus", script, StringComparison.Ordinal);
+        Assert.Contains("$assembly_name.sourcelink.json", script, StringComparison.Ordinal);
+        Assert.Contains("$assembly_name.*.nupkg", script, StringComparison.Ordinal);
+        Assert.Contains("validate_build_artifacts", script, StringComparison.Ordinal);
+        Assert.Contains("src/AtomUI.City.EventBus/PublicAPI.Shipped.txt", script, StringComparison.Ordinal);
+        Assert.Contains("src/AtomUI.City.EventBus/PublicAPI.Unshipped.txt", script, StringComparison.Ordinal);
+        Assert.Contains("%s public API gate passed", script, StringComparison.Ordinal);
         Assert.Contains("https://raw.githubusercontent.com/", script, StringComparison.Ordinal);
         Assert.Contains("git rev-parse HEAD", script, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EventBusBenchmarkGateRejectsEmptyRunsAndRequiresReports()
+    {
+        var repositoryRoot = RepositoryPaths.FindRepositoryRoot();
+        var scriptPath = Path.Combine(repositoryRoot, EngineeringScriptsDirectoryName, "check-eventbus-benchmarks.sh");
+        var programPath = Path.Combine(
+            repositoryRoot,
+            "benchmarks",
+            "AtomUI.City.EventBus.Benchmarks",
+            "Program.cs");
+
+        Assert.True(File.Exists(scriptPath), "Expected EventBus benchmark gate script.");
+        Assert.True(File.Exists(programPath), "Expected EventBus benchmark executable.");
+
+        var script = File.ReadAllText(scriptPath);
+        var program = File.ReadAllText(programPath);
+        Assert.Contains("*-report.csv", script, StringComparison.Ordinal);
+        Assert.Contains("report_count", script, StringComparison.Ordinal);
+        Assert.Contains("reports.Length == 0", program, StringComparison.Ordinal);
+        Assert.Contains("report.ResultStatistics is null", program, StringComparison.Ordinal);
+        Assert.Contains("EVENTBUS_BENCHMARK_GATE_OK", program, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EventBusPackageConsumerGateUsesLocalCityFeedAndAnIsolatedPackageCache()
+    {
+        var repositoryRoot = RepositoryPaths.FindRepositoryRoot();
+        var scriptPath = Path.Combine(repositoryRoot, EngineeringScriptsDirectoryName, "check-eventbus-package-consumer.sh");
+        var templateRoot = Path.Combine(repositoryRoot, EngineeringScriptsDirectoryName, "package-consumers", "eventbus");
+
+        Assert.True(File.Exists(scriptPath), "Expected EventBus package consumer gate script.");
+        Assert.True(File.Exists(Path.Combine(templateRoot, "EventBus.PackageConsumer.csproj.template")));
+        Assert.True(File.Exists(Path.Combine(templateRoot, "NuGet.Config.template")));
+        Assert.True(File.Exists(Path.Combine(templateRoot, "Program.cs.template")));
+        Assert.True(File.Exists(Path.Combine(templateRoot, "Directory.Build.props.template")));
+        Assert.True(File.Exists(Path.Combine(templateRoot, "Directory.Build.targets.template")));
+        Assert.True(File.Exists(Path.Combine(templateRoot, "Directory.Packages.props.template")));
+
+        var script = File.ReadAllText(scriptPath);
+        var nugetConfig = File.ReadAllText(Path.Combine(templateRoot, "NuGet.Config.template"));
+        var project = File.ReadAllText(Path.Combine(templateRoot, "EventBus.PackageConsumer.csproj.template"));
+        var program = File.ReadAllText(Path.Combine(templateRoot, "Program.cs.template"));
+
+        Assert.Contains("repository_root=\"$(pwd -P)\"", script, StringComparison.Ordinal);
+        Assert.Contains("$repository_root/output/eventbus-package-consumer", script, StringComparison.Ordinal);
+        Assert.Contains("local_feed=\"$validation_root/local-feed\"", script, StringComparison.Ordinal);
+        Assert.Contains("NUGET_PACKAGES", script, StringComparison.Ordinal);
+        Assert.Contains("DOTNET_CLI_HOME", script, StringComparison.Ordinal);
+        Assert.Contains("Refusing to clean unexpected consumer paths", script, StringComparison.Ordinal);
+        Assert.Contains("find \"$packages\" -mindepth 1 -maxdepth 1 -exec rm -rf {} +", script, StringComparison.Ordinal);
+        Assert.Contains("--no-http-cache", script, StringComparison.Ordinal);
+        Assert.Contains("project.assets.json", script, StringComparison.Ordinal);
+        Assert.Contains("--runtime win-x64", script, StringComparison.Ordinal);
+        Assert.Contains("--self-contained true", script, StringComparison.Ordinal);
+        Assert.Contains("EventBus.PackageConsumer.exe", script, StringComparison.Ordinal);
+        Assert.Contains("EVENTBUS_PACKAGE_CONSUMER_OK", script, StringComparison.Ordinal);
+        Assert.Contains("<clear />", nugetConfig, StringComparison.Ordinal);
+        Assert.Contains("<package pattern=\"AtomUI.City.*\" />", nugetConfig, StringComparison.Ordinal);
+        Assert.Contains("../local-feed", nugetConfig, StringComparison.Ordinal);
+        Assert.Contains("Directory.Packages.props", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("ProjectReference", project, StringComparison.Ordinal);
+        Assert.Contains("PackageReference Include=\"AtomUI.City.Build\"", project, StringComparison.Ordinal);
+        Assert.Contains("PackageReference Include=\"AtomUI.City.Core\"", project, StringComparison.Ordinal);
+        Assert.Contains("PackageReference Include=\"AtomUI.City.EventBus\"", project, StringComparison.Ordinal);
+        Assert.Contains("UseModule<ConsumerModule>", program, StringComparison.Ordinal);
+        Assert.Contains("PublishAsync", program, StringComparison.Ordinal);
+        Assert.Contains("PostAsync", program, StringComparison.Ordinal);
+        Assert.Contains("StopAsync", program, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EventBusReleaseCandidateGateIsReleaseOnlyAndScopeBounded()
+    {
+        var repositoryRoot = RepositoryPaths.FindRepositoryRoot();
+        var scriptPath = Path.Combine(repositoryRoot, EngineeringScriptsDirectoryName, "check-eventbus-release.sh");
+
+        Assert.True(File.Exists(scriptPath), "Expected EventBus release candidate gate script.");
+
+        var script = File.ReadAllText(scriptPath);
+
+        Assert.Contains("configuration=\"Release\"", script, StringComparison.Ordinal);
+        Assert.Contains("--verify-no-changes", script, StringComparison.Ordinal);
+        Assert.Contains("--include \"${candidate_code_paths[@]}\"", script, StringComparison.Ordinal);
+        Assert.Contains("EventBus stress iteration %s/20", script, StringComparison.Ordinal);
+        Assert.Contains("timeout 300s dotnet test", script, StringComparison.Ordinal);
+        Assert.Contains("bash engineering/check-public-api.sh", script, StringComparison.Ordinal);
+        Assert.Contains("bash engineering/check-eventbus-package-consumer.sh", script, StringComparison.Ordinal);
+        Assert.Contains("bash engineering/check-eventbus-benchmarks.sh", script, StringComparison.Ordinal);
+        Assert.Contains("EVENTBUS_RC_IDENTITY", script, StringComparison.Ordinal);
+        Assert.Contains("git rev-parse HEAD", script, StringComparison.Ordinal);
+        Assert.Contains("sha256sum", script, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -226,6 +332,37 @@ public sealed class EngineeringGateTests
         var testingStatuses = ReadStatuses(
             testing,
             "^\\| (?<id>AUC-CORE-\\d{3}) \\|.*\\| (?<status>[^ |]+) \\|$");
+
+        Assert.Equal(expectedIds, indexStatuses.Keys.Order(StringComparer.Ordinal));
+        Assert.Equal(expectedIds, detailStatuses.Keys.Order(StringComparer.Ordinal));
+        Assert.Equal(expectedIds, testingStatuses.Keys.Order(StringComparer.Ordinal));
+
+        foreach (var featureId in expectedIds)
+        {
+            Assert.Equal(indexStatuses[featureId], detailStatuses[featureId]);
+            Assert.Equal(indexStatuses[featureId], testingStatuses[featureId]);
+        }
+    }
+
+    [Fact]
+    public void EventBusFeatureStatusesStaySynchronized()
+    {
+        var repositoryRoot = RepositoryPaths.FindRepositoryRoot();
+        var features = File.ReadAllText(Path.Combine(repositoryRoot, "docs", "modules", "eventbus", "features.md"));
+        var testing = File.ReadAllText(Path.Combine(repositoryRoot, "docs", "modules", "eventbus", "testing.md"));
+        var expectedIds = Enumerable.Range(1, 9)
+            .Select(number => $"AUC-EVENTBUS-{number:D3}")
+            .ToArray();
+
+        var indexStatuses = ReadStatuses(
+            features,
+            "^\\| (?<id>AUC-EVENTBUS-\\d{3}) \\| [^|]+ \\| [^|]+ \\| (?<status>[^|]+?) \\|");
+        var detailStatuses = ReadStatuses(
+            features,
+            "^Feature ID: `(?<id>AUC-EVENTBUS-\\d{3})`\\r?\\nStatus: (?<status>.+)$");
+        var testingStatuses = ReadStatuses(
+            testing,
+            "^\\| (?<id>AUC-EVENTBUS-\\d{3}) \\|.*\\| (?<status>[^|]+?) \\|$");
 
         Assert.Equal(expectedIds, indexStatuses.Keys.Order(StringComparer.Ordinal));
         Assert.Equal(expectedIds, detailStatuses.Keys.Order(StringComparer.Ordinal));

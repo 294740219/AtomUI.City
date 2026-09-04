@@ -54,6 +54,8 @@ public sealed class WorkspaceChangedHandler : IEventHandler<WorkspaceChanged>;
 - Host Build 必须在创建 Root Provider 前，对实际选中 Module contribution 中的全部 `GeneratedEventHandlerDescriptor.EventType` 与 `EventContractDescriptor.EventType` 执行闭包验证。缺失 contract 必须直接使 Build 失败，不能延迟到 `StartAsync` 激活部分 handler 后才失败。
 - frozen Registry 在 subscribe/publish/post 时对未知 event type 的拒绝仍是运行期防御边界；编译期或 Build 验证成功不能移除该防线。
 
+`EventBusMetricsSnapshot` 和 `EventChannelMetricsSnapshot` 是只读公共模型；所有计数和 duration 必须非负，channel snapshot 还必须拒绝 default ContractId、空白 channel、未知 execution mode 和非正 capacity。非法值在构造或 init 边界立即抛标准参数异常，不能制造运行时永远不会产生的状态。
+
 ### Subscription public surface
 
 `AUC-EVENTBUS-002` 的目标 public surface 固定为：

@@ -17,8 +17,9 @@ public sealed class PackageMetadataTests
         Assert.Equal("$(Author)", properties["Authors"]);
         Assert.Equal("AtomUI.City is a full-stack application framework for Avalonia and AtomUI applications.", properties["Description"]);
         Assert.Equal("avalonia;AtomUI;full-stack;framework;desktop", properties["PackageTags"]);
-        Assert.Equal("https://github.com/AtomUI/AtomUICity", properties["ProjectUrl"]);
-        Assert.Equal("https://github.com/AtomUI/AtomUICity", properties["RepositoryUrl"]);
+        Assert.Equal("https://github.com/AtomUI/AtomUI.City", properties["ProjectUrl"]);
+        Assert.False(properties.ContainsKey("RepositoryUrl"));
+        Assert.Equal("true", properties["PublishRepositoryUrl"]);
         Assert.Equal("LGPL-3.0-only", properties["PackageLicenseExpression"]);
         Assert.Equal("$(AtomUICityVersion)", properties["Version"]);
     }
@@ -74,7 +75,7 @@ public sealed class PackageMetadataTests
         Assert.Contains("<id>$project_name</id>", validatePackagesScript, StringComparison.Ordinal);
         Assert.Contains("<version>$version</version>", validatePackagesScript, StringComparison.Ordinal);
         Assert.Contains("LGPL-3.0-only", validatePackagesScript, StringComparison.Ordinal);
-        Assert.Contains("https://github.com/AtomUI/AtomUICity", validatePackagesScript, StringComparison.Ordinal);
+        Assert.Contains("https://github.com/AtomUI/AtomUI.City", validatePackagesScript, StringComparison.Ordinal);
         Assert.Contains("require_nuspec_dependency_group", validatePackagesScript, StringComparison.Ordinal);
         Assert.Contains("<group targetFramework=", validatePackagesScript, StringComparison.Ordinal);
     }

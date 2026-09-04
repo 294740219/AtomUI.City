@@ -37,11 +37,19 @@ find_source_projects() {
 while IFS= read -r project_path; do
   project_name="$(project_name_from_path "$project_path")"
 
-  while IFS= read -r include_path; do
-    [[ -n "$include_path" ]] || continue
+  while IFS= read -r reference_element; do
+    [[ -n "$reference_element" ]] || continue
+
+    include_path="$(sed -E 's/^<ProjectReference Include="([^"]+)".*/\1/' <<< "$reference_element")"
 
     normalized_include="${include_path//\\//}"
     referenced_project="$(basename "$normalized_include" .csproj)"
+    is_private_analyzer=false
+    if [[ "$reference_element" == *'OutputItemType="Analyzer"'* ]] &&
+       [[ "$reference_element" == *'ReferenceOutputAssembly="false"'* ]] &&
+       [[ "$reference_element" == *'PrivateAssets="all"'* ]]; then
+      is_private_analyzer=true
+    fi
 
     if [[ "$normalized_include" == *"/tests/"* ]] ||
        [[ "$referenced_project" == *.Tests ]] ||
@@ -50,10 +58,11 @@ while IFS= read -r project_path; do
     fi
 
     if is_runtime_project "$project_name" &&
-       [[ "$forbidden_runtime_projects" == *"|$referenced_project|"* ]]; then
+       [[ "$forbidden_runtime_projects" == *"|$referenced_project|"* ]] &&
+       [[ "$is_private_analyzer" != true ]]; then
       report_failure "runtime project references forbidden project" "$project_path" "$referenced_project"
     fi
-  done < <(grep -Eo '<ProjectReference Include="[^"]+"' "$project_path" | sed -E 's/^<ProjectReference Include="//')
+  done < <(grep -Eo '<ProjectReference Include="[^"]+"[^>]*/?>' "$project_path")
 
   if is_runtime_project "$project_name"; then
     while IFS= read -r package_id; do

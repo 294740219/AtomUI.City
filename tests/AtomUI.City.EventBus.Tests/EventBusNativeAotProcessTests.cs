@@ -29,6 +29,11 @@ public sealed class EventBusNativeAotProcessTests
 
         Assert.True(run.ExitCode == 0, run.Output);
         Assert.Contains("EVENTBUS_AOT_OK", run.Output, StringComparison.Ordinal);
+        Assert.Contains("EVENTBUS_DOGFOOD modules=6 handlers=20 deliveries=20", run.Output, StringComparison.Ordinal);
+        Assert.Contains(
+            "EVENTBUS_DYNAMIC_MATRIX admission=ok ownership=ok failures=ok metrics=ok concurrent-stop=ok",
+            run.Output,
+            StringComparison.Ordinal);
 
         var failure = await RunAsync(executable, processDirectory, "--test-entry-failure");
         Assert.NotEqual(0, failure.ExitCode);

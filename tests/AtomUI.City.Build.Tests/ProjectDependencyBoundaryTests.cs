@@ -131,10 +131,18 @@ public sealed class ProjectDependencyBoundaryTests
 
         return project
             .Descendants("ProjectReference")
+            .Where(reference => !IsPrivateAnalyzerReference(reference))
             .Select(reference => reference.Attribute("Include")?.Value)
             .Where(include => !string.IsNullOrWhiteSpace(include))
             .Select(include => Path.GetFullPath(include!, projectDirectory).Replace('\\', '/'))
             .ToArray();
+    }
+
+    private static bool IsPrivateAnalyzerReference(XElement reference)
+    {
+        return string.Equals(reference.Attribute("OutputItemType")?.Value, "Analyzer", StringComparison.Ordinal) &&
+               string.Equals(reference.Attribute("ReferenceOutputAssembly")?.Value, "false", StringComparison.Ordinal) &&
+               string.Equals(reference.Attribute("PrivateAssets")?.Value, "all", StringComparison.Ordinal);
     }
 
     private static string[] ReadPackageReferences(string projectPath)

@@ -34,6 +34,7 @@
 - Plugin Lease 的 pending registration barrier、Subscribe 三阶段提交/回滚、Quiescing 前发布唯一终止 Task，以及不在 Lease 锁内调用 EventBus/Registry/Diagnostics 的重入安全规则进入 1.0 并发兼容承诺。
 - `EventDispatchPolicy` 的 `Current=0`、`UiThread=1`、`Background=2`、`Serialized=3`，`EventDispatchMode` 的 `Post=0`、`InlineIfAllowed=1`，以及 `EventErrorPolicy` 的 `ContinueAndReport=0`、`StopPublication=1`、`FailPublisher=2`、`DisableSubscription=3` 进入 1.0 兼容承诺。
 - `EventDeliveryStatus` 的 `Succeeded=0`、`Failed=1`、`Canceled=2`、`TimedOut=3`、`Skipped=4`，默认 handler timeout `30s`、默认 DisableSubscription 连续失败阈值 `3`，以及默认单次 publication 最大 delivery 并发 `16` 进入 1.0 兼容承诺。
+- 两类 public metrics snapshot 拒绝 default ContractId、未知 execution mode、空白 channel、非正 capacity、负计数和负 duration；放宽为可表达不可能状态属于合同变更。
 - `EventChannel<TEvent>.Default.Name="default"`，channel identity 由精确事件类型和 ordinal name 组成；默认 contract channel 的 `Capacity=256`、`Wait`、`Serialized`、`MaximumConcurrency=1` 和无限 queue wait 进入 1.0 兼容承诺。
 - `EventChannelBackpressurePolicy` 的 `Wait=0`、`Reject=1`、`DropOldest=2`、`DropNewest=3`、`CoalesceLatest=4`，以及 `EventChannelExecutionMode` 的 `Serialized=0`、`Partitioned=1`、`Concurrent=2` 进入 1.0 兼容承诺。
 - `ConfigureEventChannel<TEvent>` 的精确 type/channel override、重复配置拒绝，命名 channel 发布/订阅隔离，以及 `PartitionKey` 模式匹配规则进入 1.0 兼容承诺。

@@ -1,0 +1,111 @@
+using AtomUI.City.Core.Hosting;
+using AtomUI.City.Core.Lifecycle;
+using AtomUI.City.Core.Modularity;
+using AtomUI.City.EventBus;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace EventBus.PackageConsumer;
+
+[ApplicationModule]
+[DependsOn(typeof(EventBusModule))]
+public sealed class ConsumerModule : ModuleBase;
+
+[EventContract("atomui.city.eventbus.package-consumer.v1", typeof(ConsumerModule), SchemaVersion = 1)]
+[EventChannel("external", Capacity = 8, BackpressurePolicy = EventChannelBackpressurePolicy.Wait)]
+public sealed record ConsumerEvent(int Value);
+
+[EventHandler(typeof(ConsumerModule), ChannelName = "external")]
+public sealed class ConsumerEventHandler : IEventHandler<ConsumerEvent>
+{
+    private static readonly TaskCompletionSource<bool> TwoDeliveries =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private static int _deliveryCount;
+
+    public static int DeliveryCount => Volatile.Read(ref _deliveryCount);
+
+    public static Task WaitForTwoDeliveriesAsync() => TwoDeliveries.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+    public ValueTask HandleAsync(EventContext<ConsumerEvent> context)
+    {
+        if (Interlocked.Increment(ref _deliveryCount) == 2)
+        {
+            TwoDeliveries.TrySetResult(true);
+        }
+
+        return ValueTask.CompletedTask;
+    }
+}
+
+internal static class Program
+{
+    public static async Task<int> Main(string[] args)
+    {
+        try
+        {
+            return await RunAsync(args);
+        }
+        catch (Exception exception)
+        {
+            Console.Error.WriteLine(exception);
+            return 1;
+        }
+    }
+
+    private static async Task<int> RunAsync(string[] args)
+    {
+        var builder = ApplicationHost.CreateBuilder(args);
+        builder.UseModule<ConsumerModule>();
+        builder.ConfigureHost(options =>
+        {
+            options.ApplicationId = "AtomUI.City.EventBus.PackageConsumer";
+            options.ApplicationName = "AtomUI.City.EventBus.PackageConsumer";
+        });
+        await using var host = builder.Build();
+        await host.StartAsync();
+
+        var publisher = host.Services.GetRequiredService<IEventPublisher>();
+        var subscriber = host.Services.GetRequiredService<IEventSubscriber>();
+        var channel = new EventChannel<ConsumerEvent>("external");
+        var published = await publisher.PublishAsync(channel, new ConsumerEvent(1));
+        var posted = await publisher.PostAsync(channel, new ConsumerEvent(2));
+        await ConsumerEventHandler.WaitForTwoDeliveriesAsync();
+
+        var applicationScope = host.ApplicationScope ??
+            throw new InvalidOperationException("The package consumer Host has no ApplicationScope.");
+        await using var owner = applicationScope.CreateChild(LifecycleScopeKind.Operation, "package-consumer-owner");
+        var dynamicDeliveries = 0;
+        subscriber.Subscribe(owner, channel, _ =>
+        {
+            Interlocked.Increment(ref dynamicDeliveries);
+            return ValueTask.CompletedTask;
+        });
+        await publisher.PublishAsync(channel, new ConsumerEvent(3));
+        await owner.StopAsync();
+        await publisher.PublishAsync(channel, new ConsumerEvent(4));
+
+        if (!published.Succeeded || !posted.Accepted || ConsumerEventHandler.DeliveryCount < 4 || dynamicDeliveries != 1)
+        {
+            throw new InvalidOperationException("The package consumer EventBus contract did not complete.");
+        }
+
+        await host.StopAsync();
+        var stoppedPublicationRejected = false;
+        try
+        {
+            await publisher.PublishAsync(channel, new ConsumerEvent(5));
+        }
+        catch (InvalidOperationException)
+        {
+            stoppedPublicationRejected = true;
+        }
+
+        if (!stoppedPublicationRejected)
+        {
+            throw new InvalidOperationException("The package consumer EventBus accepted a publication after Stop.");
+        }
+
+        Console.WriteLine(
+            $"EVENTBUS_PACKAGE_CONSUMER_OK publish={published.DeliveredCount} post=accepted generated={ConsumerEventHandler.DeliveryCount} owner={dynamicDeliveries} stop=rejected");
+        return 0;
+    }
+}

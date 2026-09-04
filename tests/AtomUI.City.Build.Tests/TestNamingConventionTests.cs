@@ -11,6 +11,7 @@ public sealed partial class TestNamingConventionTests
         var violations = Directory
             .EnumerateFiles(Path.Combine(repositoryRoot, "tests"), "*.cs", SearchOption.AllDirectories)
             .Where(path => !Path.GetFileName(path).EndsWith("AssemblyInfo.cs", StringComparison.Ordinal))
+            .Where(path => !IsCollectionDefinitionOnly(File.ReadAllText(path)))
             .SelectMany(path => PublicTestClassRegex()
                 .Matches(File.ReadAllText(path))
                 .Select(match => new
@@ -23,6 +24,13 @@ public sealed partial class TestNamingConventionTests
             .ToArray();
 
         Assert.Empty(violations);
+    }
+
+    private static bool IsCollectionDefinitionOnly(string source)
+    {
+        return source.Contains("[CollectionDefinition", StringComparison.Ordinal) &&
+               !source.Contains("[Fact]", StringComparison.Ordinal) &&
+               !source.Contains("[Theory]", StringComparison.Ordinal);
     }
 
     [Fact]

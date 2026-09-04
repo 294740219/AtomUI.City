@@ -11,7 +11,9 @@ public sealed class OutputLayoutTests
         var assemblyPath = typeof(OutputLayoutTests).Assembly.Location;
         var relativeAssemblyPath = RepositoryPaths.ToRepositoryRelativePath(repositoryRoot, assemblyPath);
 
-        Assert.StartsWith("output/bin/Debug/AtomUI.City.Build.Tests/", relativeAssemblyPath, StringComparison.Ordinal);
+        Assert.Matches(
+            "^output/bin/(Debug|Release)/AtomUI\\.City\\.Build\\.Tests/",
+            relativeAssemblyPath);
         Assert.EndsWith("/AtomUI.City.Build.Tests.dll", relativeAssemblyPath, StringComparison.Ordinal);
     }
 
@@ -23,12 +25,28 @@ public sealed class OutputLayoutTests
         var properties = outputProps
             .Descendants()
             .Where(element => element.Parent?.Name.LocalName == "PropertyGroup")
+            .Where(element => element.Name.LocalName != "BaseIntermediateOutputPath")
             .ToDictionary(element => element.Name.LocalName, element => element.Value, StringComparer.Ordinal);
+        var baseIntermediateOutputPaths = outputProps
+            .Descendants("BaseIntermediateOutputPath")
+            .Select(element => new
+            {
+                Condition = element.Attribute("Condition")?.Value,
+                Value = element.Value,
+            })
+            .ToArray();
 
         Assert.Equal("$(AtomUICityPackagesOutputPath)", properties["PackageOutputPath"]);
         Assert.Equal("$(MSBuildThisFileDirectory)../output/bin/$(Configuration)/$(MSBuildProjectName)", properties["OutputPathWithoutFramework"]);
         Assert.Equal("$(OutputPathWithoutFramework)", properties["OutputPath"]);
-        Assert.Equal("$(MSBuildThisFileDirectory)../output/$(MSBuildProjectName)/obj", properties["BaseIntermediateOutputPath"]);
+        Assert.Contains(
+            baseIntermediateOutputPaths,
+            property => property.Condition == "'$(AtomUICityIsolatedIntermediateRoot)' == ''" &&
+                        property.Value == "$(MSBuildThisFileDirectory)../output/$(MSBuildProjectName)/obj");
+        Assert.Contains(
+            baseIntermediateOutputPaths,
+            property => property.Condition == "'$(AtomUICityIsolatedIntermediateRoot)' != ''" &&
+                        property.Value == "$(AtomUICityIsolatedIntermediateRoot)/$(MSBuildProjectName)/obj");
         Assert.Equal("$(BaseIntermediateOutputPath)/$(Configuration)", properties["IntermediateOutputPath"]);
         Assert.Equal("$(MSBuildThisFileDirectory)../output", properties["AtomUICityOutputRoot"]);
         Assert.Equal("$(AtomUICityOutputRoot)/artifacts/$(Configuration)", properties["AtomUICityArtifactsOutputPath"]);

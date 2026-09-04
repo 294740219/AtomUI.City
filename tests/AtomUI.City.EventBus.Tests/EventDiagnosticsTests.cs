@@ -497,6 +497,53 @@ public sealed class EventDiagnosticsTests
         Assert.True(snapshot.DiagnosticWriteFailureCount > 0);
     }
 
+    [Fact]
+    public void MetricsSnapshotsRejectImpossiblePublicStates()
+    {
+        Action[] invalidBusSnapshots =
+        [
+            () => CreateBusSnapshot(activeSubscriptionCount: -1),
+            () => CreateBusSnapshot(publicationCount: -1),
+            () => CreateBusSnapshot(deliverySucceededCount: -1),
+            () => CreateBusSnapshot(deliveryFailedCount: -1),
+            () => CreateBusSnapshot(deliveryCanceledCount: -1),
+            () => CreateBusSnapshot(deliveryTimedOutCount: -1),
+            () => CreateBusSnapshot(deliverySkippedCount: -1),
+            () => CreateBusSnapshot(totalHandlerDuration: TimeSpan.FromTicks(-1)),
+            () => CreateBusSnapshot(diagnosticWriteFailureCount: -1)
+        ];
+        Action[] invalidChannelSnapshots =
+        [
+            () => _ = new EventChannelMetricsSnapshot(
+                default,
+                "metrics",
+                EventChannelExecutionMode.Serialized,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0),
+            () => CreateChannelSnapshot(channelName: " "),
+            () => CreateChannelSnapshot(executionMode: (EventChannelExecutionMode)int.MaxValue),
+            () => CreateChannelSnapshot(capacity: 0),
+            () => CreateChannelSnapshot(pendingCount: -1),
+            () => CreateChannelSnapshot(inFlightCount: -1),
+            () => CreateChannelSnapshot(acceptedCount: -1),
+            () => CreateChannelSnapshot(rejectedCount: -1),
+            () => CreateChannelSnapshot(droppedCount: -1),
+            () => CreateChannelSnapshot(completedCount: -1),
+            () => CreateChannelSnapshot(failedCount: -1),
+            () => _ = CreateChannelSnapshot() with { TotalQueueWaitDuration = TimeSpan.FromTicks(-1) },
+            () => _ = CreateChannelSnapshot() with { MaximumQueueWaitDuration = TimeSpan.FromTicks(-1) }
+        ];
+
+        Assert.All(invalidBusSnapshots, action => Assert.IsAssignableFrom<ArgumentException>(Record.Exception(action)));
+        Assert.All(invalidChannelSnapshots, action => Assert.IsAssignableFrom<ArgumentException>(Record.Exception(action)));
+    }
+
     [Theory]
     [InlineData(-0.01)]
     [InlineData(1.01)]
@@ -582,6 +629,52 @@ public sealed class EventDiagnosticsTests
     private sealed record TestEvent(string Value);
 
     private sealed record ChildEvent(string Value);
+
+    private static EventBusMetricsSnapshot CreateBusSnapshot(
+        int activeSubscriptionCount = 0,
+        long publicationCount = 0,
+        long deliverySucceededCount = 0,
+        long deliveryFailedCount = 0,
+        long deliveryCanceledCount = 0,
+        long deliveryTimedOutCount = 0,
+        long deliverySkippedCount = 0,
+        TimeSpan? totalHandlerDuration = null,
+        long diagnosticWriteFailureCount = 0) =>
+        new(
+            activeSubscriptionCount,
+            publicationCount,
+            deliverySucceededCount,
+            deliveryFailedCount,
+            deliveryCanceledCount,
+            deliveryTimedOutCount,
+            deliverySkippedCount,
+            totalHandlerDuration ?? TimeSpan.Zero,
+            diagnosticWriteFailureCount);
+
+    private static EventChannelMetricsSnapshot CreateChannelSnapshot(
+        EventContractId? contractId = null,
+        string channelName = "metrics",
+        EventChannelExecutionMode executionMode = EventChannelExecutionMode.Serialized,
+        int capacity = 1,
+        int pendingCount = 0,
+        int inFlightCount = 0,
+        long acceptedCount = 0,
+        long rejectedCount = 0,
+        long droppedCount = 0,
+        long completedCount = 0,
+        long failedCount = 0) =>
+        new(
+            contractId ?? new EventContractId("tests.metrics"),
+            channelName,
+            executionMode,
+            capacity,
+            pendingCount,
+            inFlightCount,
+            acceptedCount,
+            rejectedCount,
+            droppedCount,
+            completedCount,
+            failedCount);
 
     private sealed class PayloadEvent(string secret, string summary)
     {

@@ -34,7 +34,7 @@ public sealed class SourceGeneratorProjectStructureTests
     }
 
     [Fact]
-    public void RuntimeProjectsDoNotReferenceGeneratorsProject()
+    public void RuntimeProjectsOnlyReferenceGeneratorsAsPrivateCompileTimeAnalyzers()
     {
         var repositoryRoot = RepositoryPaths.FindRepositoryRoot();
         var runtimeProjects = RepositoryPaths
@@ -47,9 +47,19 @@ public sealed class SourceGeneratorProjectStructureTests
 
         foreach (var projectPath in runtimeProjects)
         {
-            var text = File.ReadAllText(projectPath);
+            var project = XDocument.Load(projectPath);
+            var generatorReferences = project
+                .Descendants("ProjectReference")
+                .Where(reference => reference.Attribute("Include")?.Value.EndsWith(
+                    "AtomUI.City.Generators.csproj",
+                    StringComparison.Ordinal) == true);
 
-            Assert.DoesNotContain("AtomUI.City.Generators.csproj", text, StringComparison.Ordinal);
+            foreach (var reference in generatorReferences)
+            {
+                Assert.Equal("Analyzer", reference.Attribute("OutputItemType")?.Value);
+                Assert.Equal("false", reference.Attribute("ReferenceOutputAssembly")?.Value);
+                Assert.Equal("all", reference.Attribute("PrivateAssets")?.Value);
+            }
         }
     }
 

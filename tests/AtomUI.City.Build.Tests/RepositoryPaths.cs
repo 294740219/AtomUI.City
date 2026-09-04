@@ -53,7 +53,8 @@ internal static class RepositoryPaths
     {
         var relativePath = ToRepositoryRelativePath(repositoryRoot, projectPath);
 
-        return (relativePath.StartsWith("src/", StringComparison.Ordinal) ||
+        return (relativePath.StartsWith("benchmarks/", StringComparison.Ordinal) ||
+                relativePath.StartsWith("src/", StringComparison.Ordinal) ||
                 relativePath.StartsWith("tests/", StringComparison.Ordinal)) &&
                !relativePath.StartsWith(TemplatePayloadRoot, StringComparison.Ordinal);
     }

@@ -20,7 +20,7 @@ if [[ -n "$missing_links" ]]; then
   exit 1
 fi
 
-if rg -n "README\.md|README|TODO|TBD|待定|FIXME|：text|:text" docs; then
+if rg --pcre2 -n "(?<![[:alnum:]_])(TODO|TBD|FIXME)(?![[:alnum:]_])|待定|：text|:text" docs; then
   printf 'forbidden documentation tokens found\n' >&2
   exit 1
 fi

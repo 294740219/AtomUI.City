@@ -77,9 +77,23 @@ Directory.Build.targets
 Directory.Packages.props
 global.json
 build/**
+engineering/check-dependency-boundaries.sh
+engineering/check-docs.sh
+engineering/check-eventbus-benchmarks.sh
+engineering/check-eventbus-package-consumer.sh
+engineering/check-eventbus-release.sh
+engineering/check-project-inventory.sh
+engineering/check-public-api.sh
+engineering/check-release.sh
+engineering/check-test-naming.sh
+engineering/test-ci.sh
+engineering/validate-packages.sh
+engineering/package-consumers/eventbus/**
 ```
 
 排除 `bin`、`obj`、临时 NativeAOT 输出和验收报告。每个文件计算 SHA-256，再对 UTF-8 编码的 `relative-path<TAB>file-hash<LF>` 清单计算总 SHA-256。
+
+EventBus RC 的统一执行入口为 `bash engineering/check-eventbus-release.sh`。该入口固定使用 Release，只格式化并验收上述候选范围及 EventBus 所依赖的工程合同，不得因其他尚在开发模块的状态而改写其源码，也不得用 City 全局发布入口的范围外失败冒充 EventBus 失败。
 
 ## EVENTBUS-RC-002 Feature、合同与实现追踪
 
@@ -150,7 +164,9 @@ $env:HTTPS_PROXY="http://127.0.0.1:7897"
 
 包至少包含 net8/net10 的 EventBus DLL、PDB、XML、LICENSE、README 和 release notes，且不得携带测试、fixture、Benchmark、Roslyn runtime 或无关 UI 依赖。
 
-在 `output/eventbus-rc/consumer` 创建隔离 net8 Console，只配置本地 package source，安装当前版本 Core 与 EventBus 包，编译并真实运行最小 Host：注册 contract、启动 EventBus、绑定 owner 订阅、Publish/Post、停止并释放。消费项目属于验收产物，不进入源码指纹。
+执行 `bash engineering/check-eventbus-package-consumer.sh`。门禁在 `output/eventbus-package-consumer` 创建本地包源和隔离 net8 Console，将当前版本 Build（仅作为编译期生成器）、Core 与 EventBus 打包后仅通过 `PackageReference` 消费；City 包必须来自本地源，Microsoft/System/runtime 依赖才允许来自 nuget.org。每轮必须清空门禁专用的展开包缓存并禁用 HTTP 缓存，禁止相同版本的旧包污染候选结果。
+
+消费者不得包含指向仓库源码的 `ProjectReference`，必须编译并真实运行最小 Host：通过消费者 Module 的 `DependsOn(EventBusModule)` 验证包内生成的 Module manifest，启动 EventBus、绑定 owner 订阅、Publish/Post、停止并释放。消费项目属于验收产物，不进入源码指纹。
 
 ## EVENTBUS-RC-009 性能与资源观察基线
 
@@ -164,6 +180,8 @@ Release Benchmark 至少覆盖：
 - 大量订阅建立/释放及并发写入。
 
 首份基线不承诺跨机器绝对毫秒数。报告记录 SDK、CPU、样本、吞吐、延迟、分配量和异常；运行失败、挂起或可复现的数量级离群是阻断问题。
+
+统一门禁入口为 `bash engineering/check-eventbus-benchmarks.sh`。Benchmark 可执行程序必须在零 case、任一 case 无有效统计结果或执行失败时返回非零退出码；门禁还必须确认生成了 CSV 报告，禁止仅凭 BenchmarkDotNet 进程退出码判绿。
 
 ## EVENTBUS-RC-010 文档与证据闭环
 

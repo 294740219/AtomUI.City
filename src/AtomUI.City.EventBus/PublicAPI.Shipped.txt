@@ -1,0 +1,499 @@
+#nullable enable
+~override AtomUI.City.EventBus.EventChannel<TEvent>.Equals(object obj) -> bool
+~override AtomUI.City.EventBus.EventChannel<TEvent>.ToString() -> string
+~override AtomUI.City.EventBus.EventContractId.Equals(object obj) -> bool
+~override AtomUI.City.EventBus.EventSubscriptionId.Equals(object obj) -> bool
+AtomUI.City.EventBus.EventBusContributionRequest
+AtomUI.City.EventBus.EventBusContributionRequest.EventBusContributionRequest(string! pluginId, System.Collections.Generic.IReadOnlyList<AtomUI.City.EventBus.EventPluginAccessRule!>? sharedAccess = null, System.Collections.Generic.IReadOnlyList<AtomUI.City.EventBus.EventContractDescriptor!>? privateContracts = null, AtomUI.City.EventBus.EventPluginQuotas? quotas = null) -> void
+AtomUI.City.EventBus.EventBusContributionRequest.PluginId.get -> string!
+AtomUI.City.EventBus.EventBusContributionRequest.PrivateContracts.get -> System.Collections.Generic.IReadOnlyList<AtomUI.City.EventBus.EventContractDescriptor!>!
+AtomUI.City.EventBus.EventBusContributionRequest.Quotas.get -> AtomUI.City.EventBus.EventPluginQuotas!
+AtomUI.City.EventBus.EventBusContributionRequest.SharedAccess.get -> System.Collections.Generic.IReadOnlyList<AtomUI.City.EventBus.EventPluginAccessRule!>!
+AtomUI.City.EventBus.EventBusContributionState
+AtomUI.City.EventBus.EventBusContributionState.Activating = 0 -> AtomUI.City.EventBus.EventBusContributionState
+AtomUI.City.EventBus.EventBusContributionState.Active = 1 -> AtomUI.City.EventBus.EventBusContributionState
+AtomUI.City.EventBus.EventBusContributionState.Disposed = 4 -> AtomUI.City.EventBus.EventBusContributionState
+AtomUI.City.EventBus.EventBusContributionState.Draining = 3 -> AtomUI.City.EventBus.EventBusContributionState
+AtomUI.City.EventBus.EventBusContributionState.Faulted = 5 -> AtomUI.City.EventBus.EventBusContributionState
+AtomUI.City.EventBus.EventBusContributionState.Quiescing = 2 -> AtomUI.City.EventBus.EventBusContributionState
+AtomUI.City.EventBus.EventBusDiagnosticsOptions
+AtomUI.City.EventBus.EventBusDiagnosticsOptions.EnablePayloadProjection.get -> bool
+AtomUI.City.EventBus.EventBusDiagnosticsOptions.EnablePayloadProjection.init -> void
+AtomUI.City.EventBus.EventBusDiagnosticsOptions.EventBusDiagnosticsOptions() -> void
+AtomUI.City.EventBus.EventBusDiagnosticsOptions.MaximumPayloadFieldCount.get -> int
+AtomUI.City.EventBus.EventBusDiagnosticsOptions.MaximumPayloadFieldCount.init -> void
+AtomUI.City.EventBus.EventBusDiagnosticsOptions.MaximumPayloadValueLength.get -> int
+AtomUI.City.EventBus.EventBusDiagnosticsOptions.MaximumPayloadValueLength.init -> void
+AtomUI.City.EventBus.EventBusDiagnosticsOptions.TraceSamplingRate.get -> double
+AtomUI.City.EventBus.EventBusDiagnosticsOptions.TraceSamplingRate.init -> void
+AtomUI.City.EventBus.EventBusDispatchOptions
+AtomUI.City.EventBus.EventBusDispatchOptions.EventBusDispatchOptions() -> void
+AtomUI.City.EventBus.EventBusDispatchOptions.MaximumConcurrentDeliveriesPerPublication.get -> int
+AtomUI.City.EventBus.EventBusDispatchOptions.MaximumConcurrentDeliveriesPerPublication.init -> void
+AtomUI.City.EventBus.EventBusMetricsSnapshot
+AtomUI.City.EventBus.EventBusMetricsSnapshot.<Clone>$() -> AtomUI.City.EventBus.EventBusMetricsSnapshot!
+AtomUI.City.EventBus.EventBusMetricsSnapshot.ActiveSubscriptionCount.get -> int
+AtomUI.City.EventBus.EventBusMetricsSnapshot.DeliveryCanceledCount.get -> long
+AtomUI.City.EventBus.EventBusMetricsSnapshot.DeliveryFailedCount.get -> long
+AtomUI.City.EventBus.EventBusMetricsSnapshot.DeliverySkippedCount.get -> long
+AtomUI.City.EventBus.EventBusMetricsSnapshot.DeliverySucceededCount.get -> long
+AtomUI.City.EventBus.EventBusMetricsSnapshot.DeliveryTimedOutCount.get -> long
+AtomUI.City.EventBus.EventBusMetricsSnapshot.DiagnosticWriteFailureCount.get -> long
+AtomUI.City.EventBus.EventBusMetricsSnapshot.Equals(AtomUI.City.EventBus.EventBusMetricsSnapshot? other) -> bool
+AtomUI.City.EventBus.EventBusMetricsSnapshot.EventBusMetricsSnapshot(int activeSubscriptionCount, long publicationCount, long deliverySucceededCount, long deliveryFailedCount, long deliveryCanceledCount, long deliveryTimedOutCount, long deliverySkippedCount, System.TimeSpan totalHandlerDuration, long diagnosticWriteFailureCount) -> void
+AtomUI.City.EventBus.EventBusMetricsSnapshot.PublicationCount.get -> long
+AtomUI.City.EventBus.EventBusMetricsSnapshot.TotalHandlerDuration.get -> System.TimeSpan
+AtomUI.City.EventBus.EventBusModule
+AtomUI.City.EventBus.EventBusModule.EventBusModule() -> void
+AtomUI.City.EventBus.EventBusRuntimeOptions
+AtomUI.City.EventBus.EventBusRuntimeOptions.EventBusRuntimeOptions() -> void
+AtomUI.City.EventBus.EventBusRuntimeOptions.MaximumChannelRuntimes.get -> int
+AtomUI.City.EventBus.EventBusRuntimeOptions.MaximumChannelRuntimes.init -> void
+AtomUI.City.EventBus.EventBusServiceCollectionExtensions
+AtomUI.City.EventBus.EventChannel<TEvent>
+AtomUI.City.EventBus.EventChannel<TEvent>.Equals(AtomUI.City.EventBus.EventChannel<TEvent> other) -> bool
+AtomUI.City.EventBus.EventChannel<TEvent>.EventChannel() -> void
+AtomUI.City.EventBus.EventChannel<TEvent>.EventChannel(string! name) -> void
+AtomUI.City.EventBus.EventChannel<TEvent>.Name.get -> string!
+AtomUI.City.EventBus.EventChannelAttribute
+AtomUI.City.EventBus.EventChannelAttribute.BackpressurePolicy.get -> AtomUI.City.EventBus.EventChannelBackpressurePolicy
+AtomUI.City.EventBus.EventChannelAttribute.BackpressurePolicy.init -> void
+AtomUI.City.EventBus.EventChannelAttribute.Capacity.get -> int
+AtomUI.City.EventBus.EventChannelAttribute.Capacity.init -> void
+AtomUI.City.EventBus.EventChannelAttribute.EventChannelAttribute(string! name) -> void
+AtomUI.City.EventBus.EventChannelAttribute.ExecutionMode.get -> AtomUI.City.EventBus.EventChannelExecutionMode
+AtomUI.City.EventBus.EventChannelAttribute.ExecutionMode.init -> void
+AtomUI.City.EventBus.EventChannelAttribute.MaximumConcurrency.get -> int
+AtomUI.City.EventBus.EventChannelAttribute.MaximumConcurrency.init -> void
+AtomUI.City.EventBus.EventChannelAttribute.Name.get -> string!
+AtomUI.City.EventBus.EventChannelAttribute.QueueWaitTimeoutMilliseconds.get -> int
+AtomUI.City.EventBus.EventChannelAttribute.QueueWaitTimeoutMilliseconds.init -> void
+AtomUI.City.EventBus.EventChannelBackpressurePolicy
+AtomUI.City.EventBus.EventChannelBackpressurePolicy.CoalesceLatest = 4 -> AtomUI.City.EventBus.EventChannelBackpressurePolicy
+AtomUI.City.EventBus.EventChannelBackpressurePolicy.DropNewest = 3 -> AtomUI.City.EventBus.EventChannelBackpressurePolicy
+AtomUI.City.EventBus.EventChannelBackpressurePolicy.DropOldest = 2 -> AtomUI.City.EventBus.EventChannelBackpressurePolicy
+AtomUI.City.EventBus.EventChannelBackpressurePolicy.Reject = 1 -> AtomUI.City.EventBus.EventChannelBackpressurePolicy
+AtomUI.City.EventBus.EventChannelBackpressurePolicy.Wait = 0 -> AtomUI.City.EventBus.EventChannelBackpressurePolicy
+AtomUI.City.EventBus.EventChannelDescriptor
+AtomUI.City.EventBus.EventChannelDescriptor.ChannelName.get -> string!
+AtomUI.City.EventBus.EventChannelDescriptor.EventChannelDescriptor(System.Type! eventType, string! channelName, AtomUI.City.EventBus.EventChannelOptions! options) -> void
+AtomUI.City.EventBus.EventChannelDescriptor.EventType.get -> System.Type!
+AtomUI.City.EventBus.EventChannelDescriptor.Options.get -> AtomUI.City.EventBus.EventChannelOptions!
+AtomUI.City.EventBus.EventChannelExecutionMode
+AtomUI.City.EventBus.EventChannelExecutionMode.Concurrent = 2 -> AtomUI.City.EventBus.EventChannelExecutionMode
+AtomUI.City.EventBus.EventChannelExecutionMode.Partitioned = 1 -> AtomUI.City.EventBus.EventChannelExecutionMode
+AtomUI.City.EventBus.EventChannelExecutionMode.Serialized = 0 -> AtomUI.City.EventBus.EventChannelExecutionMode
+AtomUI.City.EventBus.EventChannelMetricsSnapshot
+AtomUI.City.EventBus.EventChannelMetricsSnapshot.<Clone>$() -> AtomUI.City.EventBus.EventChannelMetricsSnapshot!
+AtomUI.City.EventBus.EventChannelMetricsSnapshot.AcceptedCount.get -> long
+AtomUI.City.EventBus.EventChannelMetricsSnapshot.Capacity.get -> int
+AtomUI.City.EventBus.EventChannelMetricsSnapshot.ChannelName.get -> string!
+AtomUI.City.EventBus.EventChannelMetricsSnapshot.CompletedCount.get -> long
+AtomUI.City.EventBus.EventChannelMetricsSnapshot.ContractId.get -> AtomUI.City.EventBus.EventContractId
+AtomUI.City.EventBus.EventChannelMetricsSnapshot.DroppedCount.get -> long
+AtomUI.City.EventBus.EventChannelMetricsSnapshot.Equals(AtomUI.City.EventBus.EventChannelMetricsSnapshot? other) -> bool
+AtomUI.City.EventBus.EventChannelMetricsSnapshot.EventChannelMetricsSnapshot(AtomUI.City.EventBus.EventContractId contractId, string! channelName, AtomUI.City.EventBus.EventChannelExecutionMode executionMode, int capacity, int pendingCount, int inFlightCount, long acceptedCount, long rejectedCount, long droppedCount, long completedCount, long failedCount) -> void
+AtomUI.City.EventBus.EventChannelMetricsSnapshot.ExecutionMode.get -> AtomUI.City.EventBus.EventChannelExecutionMode
+AtomUI.City.EventBus.EventChannelMetricsSnapshot.FailedCount.get -> long
+AtomUI.City.EventBus.EventChannelMetricsSnapshot.InFlightCount.get -> int
+AtomUI.City.EventBus.EventChannelMetricsSnapshot.MaximumQueueWaitDuration.get -> System.TimeSpan
+AtomUI.City.EventBus.EventChannelMetricsSnapshot.MaximumQueueWaitDuration.init -> void
+AtomUI.City.EventBus.EventChannelMetricsSnapshot.PendingCount.get -> int
+AtomUI.City.EventBus.EventChannelMetricsSnapshot.RejectedCount.get -> long
+AtomUI.City.EventBus.EventChannelMetricsSnapshot.TotalQueueWaitDuration.get -> System.TimeSpan
+AtomUI.City.EventBus.EventChannelMetricsSnapshot.TotalQueueWaitDuration.init -> void
+AtomUI.City.EventBus.EventChannelOptions
+AtomUI.City.EventBus.EventChannelOptions.BackpressurePolicy.get -> AtomUI.City.EventBus.EventChannelBackpressurePolicy
+AtomUI.City.EventBus.EventChannelOptions.BackpressurePolicy.init -> void
+AtomUI.City.EventBus.EventChannelOptions.Capacity.get -> int
+AtomUI.City.EventBus.EventChannelOptions.Capacity.init -> void
+AtomUI.City.EventBus.EventChannelOptions.EventChannelOptions() -> void
+AtomUI.City.EventBus.EventChannelOptions.ExecutionMode.get -> AtomUI.City.EventBus.EventChannelExecutionMode
+AtomUI.City.EventBus.EventChannelOptions.ExecutionMode.init -> void
+AtomUI.City.EventBus.EventChannelOptions.MaximumConcurrency.get -> int
+AtomUI.City.EventBus.EventChannelOptions.MaximumConcurrency.init -> void
+AtomUI.City.EventBus.EventChannelOptions.QueueWaitTimeout.get -> System.TimeSpan?
+AtomUI.City.EventBus.EventChannelOptions.QueueWaitTimeout.init -> void
+AtomUI.City.EventBus.EventContext<TEvent>
+AtomUI.City.EventBus.EventContext<TEvent>.CancellationToken.get -> System.Threading.CancellationToken
+AtomUI.City.EventBus.EventContext<TEvent>.CausationId.get -> string?
+AtomUI.City.EventBus.EventContext<TEvent>.ContractId.get -> AtomUI.City.EventBus.EventContractId
+AtomUI.City.EventBus.EventContext<TEvent>.CorrelationId.get -> string!
+AtomUI.City.EventBus.EventContext<TEvent>.DispatchPolicy.get -> AtomUI.City.EventBus.EventDispatchPolicy
+AtomUI.City.EventBus.EventContext<TEvent>.Event.get -> TEvent
+AtomUI.City.EventBus.EventContext<TEvent>.EventContext(TEvent eventData, AtomUI.City.EventBus.EventContractId contractId, System.Guid eventId, string! correlationId, string? causationId, System.DateTimeOffset publishedAt, int publishDepth, AtomUI.City.EventBus.EventSubscriptionId subscriptionId, AtomUI.City.EventBus.EventDispatchPolicy dispatchPolicy, System.Threading.CancellationToken cancellationToken) -> void
+AtomUI.City.EventBus.EventContext<TEvent>.EventId.get -> System.Guid
+AtomUI.City.EventBus.EventContext<TEvent>.PublishDepth.get -> int
+AtomUI.City.EventBus.EventContext<TEvent>.PublishedAt.get -> System.DateTimeOffset
+AtomUI.City.EventBus.EventContext<TEvent>.SubscriptionId.get -> AtomUI.City.EventBus.EventSubscriptionId
+AtomUI.City.EventBus.EventContractAttribute
+AtomUI.City.EventBus.EventContractAttribute.ContractId.get -> string!
+AtomUI.City.EventBus.EventContractAttribute.EventContractAttribute(string! contractId, System.Type! ownerModuleType) -> void
+AtomUI.City.EventBus.EventContractAttribute.OwnerModuleType.get -> System.Type!
+AtomUI.City.EventBus.EventContractAttribute.SchemaVersion.get -> int
+AtomUI.City.EventBus.EventContractAttribute.SchemaVersion.init -> void
+AtomUI.City.EventBus.EventContractDescriptor
+AtomUI.City.EventBus.EventContractDescriptor.Assembly.get -> System.Reflection.Assembly!
+AtomUI.City.EventBus.EventContractDescriptor.ContractId.get -> AtomUI.City.EventBus.EventContractId
+AtomUI.City.EventBus.EventContractDescriptor.EventType.get -> System.Type!
+AtomUI.City.EventBus.EventContractDescriptor.Plane.get -> AtomUI.City.EventBus.EventContractPlane
+AtomUI.City.EventBus.EventContractDescriptor.SchemaFingerprint.get -> string!
+AtomUI.City.EventBus.EventContractDescriptor.SchemaVersion.get -> int
+AtomUI.City.EventBus.EventContractId
+AtomUI.City.EventBus.EventContractId.Equals(AtomUI.City.EventBus.EventContractId other) -> bool
+AtomUI.City.EventBus.EventContractId.EventContractId() -> void
+AtomUI.City.EventBus.EventContractId.EventContractId(string! value) -> void
+AtomUI.City.EventBus.EventContractId.Value.get -> string!
+AtomUI.City.EventBus.EventContractPlane
+AtomUI.City.EventBus.EventContractPlane.PluginPrivate = 1 -> AtomUI.City.EventBus.EventContractPlane
+AtomUI.City.EventBus.EventContractPlane.Shared = 0 -> AtomUI.City.EventBus.EventContractPlane
+AtomUI.City.EventBus.EventDeliveryResult
+AtomUI.City.EventBus.EventDeliveryResult.<Clone>$() -> AtomUI.City.EventBus.EventDeliveryResult!
+AtomUI.City.EventBus.EventDeliveryResult.Canceled.get -> bool
+AtomUI.City.EventBus.EventDeliveryResult.Canceled.init -> void
+AtomUI.City.EventBus.EventDeliveryResult.Deconstruct(out AtomUI.City.EventBus.EventSubscriptionId SubscriptionId, out AtomUI.City.EventBus.EventDispatchPolicy DispatchPolicy, out bool Succeeded, out string? ErrorMessage, out bool Canceled) -> void
+AtomUI.City.EventBus.EventDeliveryResult.DispatchPolicy.get -> AtomUI.City.EventBus.EventDispatchPolicy
+AtomUI.City.EventBus.EventDeliveryResult.DispatchPolicy.init -> void
+AtomUI.City.EventBus.EventDeliveryResult.Duration.get -> System.TimeSpan
+AtomUI.City.EventBus.EventDeliveryResult.Duration.init -> void
+AtomUI.City.EventBus.EventDeliveryResult.Equals(AtomUI.City.EventBus.EventDeliveryResult? other) -> bool
+AtomUI.City.EventBus.EventDeliveryResult.ErrorMessage.get -> string?
+AtomUI.City.EventBus.EventDeliveryResult.ErrorMessage.init -> void
+AtomUI.City.EventBus.EventDeliveryResult.EventDeliveryResult(AtomUI.City.EventBus.EventSubscriptionId SubscriptionId, AtomUI.City.EventBus.EventDispatchPolicy DispatchPolicy, bool Succeeded, string? ErrorMessage = null, bool Canceled = false) -> void
+AtomUI.City.EventBus.EventDeliveryResult.Skipped.get -> bool
+AtomUI.City.EventBus.EventDeliveryResult.Skipped.init -> void
+AtomUI.City.EventBus.EventDeliveryResult.Status.get -> AtomUI.City.EventBus.EventDeliveryStatus
+AtomUI.City.EventBus.EventDeliveryResult.SubscriptionId.get -> AtomUI.City.EventBus.EventSubscriptionId
+AtomUI.City.EventBus.EventDeliveryResult.SubscriptionId.init -> void
+AtomUI.City.EventBus.EventDeliveryResult.Succeeded.get -> bool
+AtomUI.City.EventBus.EventDeliveryResult.Succeeded.init -> void
+AtomUI.City.EventBus.EventDeliveryResult.TimedOut.get -> bool
+AtomUI.City.EventBus.EventDeliveryResult.TimedOut.init -> void
+AtomUI.City.EventBus.EventDeliveryStatus
+AtomUI.City.EventBus.EventDeliveryStatus.Canceled = 2 -> AtomUI.City.EventBus.EventDeliveryStatus
+AtomUI.City.EventBus.EventDeliveryStatus.Failed = 1 -> AtomUI.City.EventBus.EventDeliveryStatus
+AtomUI.City.EventBus.EventDeliveryStatus.Skipped = 4 -> AtomUI.City.EventBus.EventDeliveryStatus
+AtomUI.City.EventBus.EventDeliveryStatus.Succeeded = 0 -> AtomUI.City.EventBus.EventDeliveryStatus
+AtomUI.City.EventBus.EventDeliveryStatus.TimedOut = 3 -> AtomUI.City.EventBus.EventDeliveryStatus
+AtomUI.City.EventBus.EventDiagnosticIds
+AtomUI.City.EventBus.EventDispatchMode
+AtomUI.City.EventBus.EventDispatchMode.InlineIfAllowed = 1 -> AtomUI.City.EventBus.EventDispatchMode
+AtomUI.City.EventBus.EventDispatchMode.Post = 0 -> AtomUI.City.EventBus.EventDispatchMode
+AtomUI.City.EventBus.EventDispatchPolicy
+AtomUI.City.EventBus.EventDispatchPolicy.Background = 2 -> AtomUI.City.EventBus.EventDispatchPolicy
+AtomUI.City.EventBus.EventDispatchPolicy.Current = 0 -> AtomUI.City.EventBus.EventDispatchPolicy
+AtomUI.City.EventBus.EventDispatchPolicy.Serialized = 3 -> AtomUI.City.EventBus.EventDispatchPolicy
+AtomUI.City.EventBus.EventDispatchPolicy.UiThread = 1 -> AtomUI.City.EventBus.EventDispatchPolicy
+AtomUI.City.EventBus.EventErrorPolicy
+AtomUI.City.EventBus.EventErrorPolicy.ContinueAndReport = 0 -> AtomUI.City.EventBus.EventErrorPolicy
+AtomUI.City.EventBus.EventErrorPolicy.DisableSubscription = 3 -> AtomUI.City.EventBus.EventErrorPolicy
+AtomUI.City.EventBus.EventErrorPolicy.FailPublisher = 2 -> AtomUI.City.EventBus.EventErrorPolicy
+AtomUI.City.EventBus.EventErrorPolicy.StopPublication = 1 -> AtomUI.City.EventBus.EventErrorPolicy
+AtomUI.City.EventBus.EventHandlerAttribute
+AtomUI.City.EventBus.EventHandlerAttribute.ChannelName.get -> string!
+AtomUI.City.EventBus.EventHandlerAttribute.ChannelName.init -> void
+AtomUI.City.EventBus.EventHandlerAttribute.DisableSubscriptionAfterFailures.get -> int
+AtomUI.City.EventBus.EventHandlerAttribute.DisableSubscriptionAfterFailures.init -> void
+AtomUI.City.EventBus.EventHandlerAttribute.DispatchMode.get -> AtomUI.City.EventBus.EventDispatchMode
+AtomUI.City.EventBus.EventHandlerAttribute.DispatchMode.init -> void
+AtomUI.City.EventBus.EventHandlerAttribute.DispatchPolicy.get -> AtomUI.City.EventBus.EventDispatchPolicy
+AtomUI.City.EventBus.EventHandlerAttribute.DispatchPolicy.init -> void
+AtomUI.City.EventBus.EventHandlerAttribute.ErrorPolicy.get -> AtomUI.City.EventBus.EventErrorPolicy
+AtomUI.City.EventBus.EventHandlerAttribute.ErrorPolicy.init -> void
+AtomUI.City.EventBus.EventHandlerAttribute.EventHandlerAttribute(System.Type! ownerModuleType) -> void
+AtomUI.City.EventBus.EventHandlerAttribute.HandlerTimeoutMilliseconds.get -> int
+AtomUI.City.EventBus.EventHandlerAttribute.HandlerTimeoutMilliseconds.init -> void
+AtomUI.City.EventBus.EventHandlerAttribute.OwnerModuleType.get -> System.Type!
+AtomUI.City.EventBus.EventPayloadDiagnosticProjectorDescriptor
+AtomUI.City.EventBus.EventPayloadDiagnosticProjectorDescriptor.EventType.get -> System.Type!
+AtomUI.City.EventBus.EventPayloadDiagnosticSnapshot
+AtomUI.City.EventBus.EventPayloadDiagnosticSnapshot.EventPayloadDiagnosticSnapshot(System.Collections.Generic.IReadOnlyDictionary<string!, string?>! fields, string? schemaVersion = null, long? sizeEstimate = null) -> void
+AtomUI.City.EventBus.EventPayloadDiagnosticSnapshot.Fields.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string?>!
+AtomUI.City.EventBus.EventPayloadDiagnosticSnapshot.SchemaVersion.get -> string?
+AtomUI.City.EventBus.EventPayloadDiagnosticSnapshot.SizeEstimate.get -> long?
+AtomUI.City.EventBus.EventPluginAccess
+AtomUI.City.EventBus.EventPluginAccess.None = 0 -> AtomUI.City.EventBus.EventPluginAccess
+AtomUI.City.EventBus.EventPluginAccess.Publish = 1 -> AtomUI.City.EventBus.EventPluginAccess
+AtomUI.City.EventBus.EventPluginAccess.Subscribe = 2 -> AtomUI.City.EventBus.EventPluginAccess
+AtomUI.City.EventBus.EventPluginAccessRule
+AtomUI.City.EventBus.EventPluginAccessRule.<Clone>$() -> AtomUI.City.EventBus.EventPluginAccessRule!
+AtomUI.City.EventBus.EventPluginAccessRule.Access.get -> AtomUI.City.EventBus.EventPluginAccess
+AtomUI.City.EventBus.EventPluginAccessRule.ChannelName.get -> string!
+AtomUI.City.EventBus.EventPluginAccessRule.ContractId.get -> AtomUI.City.EventBus.EventContractId
+AtomUI.City.EventBus.EventPluginAccessRule.Equals(AtomUI.City.EventBus.EventPluginAccessRule? other) -> bool
+AtomUI.City.EventBus.EventPluginAccessRule.EventPluginAccessRule(AtomUI.City.EventBus.EventContractId contractId, string! channelName, AtomUI.City.EventBus.EventPluginAccess access, int minimumSchemaVersion = 1, int maximumSchemaVersion = 2147483647) -> void
+AtomUI.City.EventBus.EventPluginAccessRule.MaximumSchemaVersion.get -> int
+AtomUI.City.EventBus.EventPluginAccessRule.MinimumSchemaVersion.get -> int
+AtomUI.City.EventBus.EventPluginDrainTimeoutException
+AtomUI.City.EventBus.EventPluginDrainTimeoutException.ActiveOperations.get -> int
+AtomUI.City.EventBus.EventPluginDrainTimeoutException.ActiveSubscriptions.get -> int
+AtomUI.City.EventBus.EventPluginDrainTimeoutException.DrainTimeout.get -> System.TimeSpan
+AtomUI.City.EventBus.EventPluginDrainTimeoutException.EventPluginDrainTimeoutException(string! pluginId, System.TimeSpan drainTimeout, int activeOperations, int activeSubscriptions, int pendingRegistrations) -> void
+AtomUI.City.EventBus.EventPluginDrainTimeoutException.PendingRegistrations.get -> int
+AtomUI.City.EventBus.EventPluginDrainTimeoutException.PluginId.get -> string!
+AtomUI.City.EventBus.EventPluginPlane
+AtomUI.City.EventBus.EventPluginPlane.Private = 1 -> AtomUI.City.EventBus.EventPluginPlane
+AtomUI.City.EventBus.EventPluginPlane.Shared = 0 -> AtomUI.City.EventBus.EventPluginPlane
+AtomUI.City.EventBus.EventPluginQuotas
+AtomUI.City.EventBus.EventPluginQuotas.DrainTimeout.get -> System.TimeSpan
+AtomUI.City.EventBus.EventPluginQuotas.DrainTimeout.init -> void
+AtomUI.City.EventBus.EventPluginQuotas.EventPluginQuotas() -> void
+AtomUI.City.EventBus.EventPluginQuotas.MaximumPrivateChannelRuntimes.get -> int
+AtomUI.City.EventBus.EventPluginQuotas.MaximumPrivateChannelRuntimes.init -> void
+AtomUI.City.EventBus.EventPluginQuotas.MaximumPrivateContracts.get -> int
+AtomUI.City.EventBus.EventPluginQuotas.MaximumPrivateContracts.init -> void
+AtomUI.City.EventBus.EventPluginQuotas.MaximumSharedAccessRules.get -> int
+AtomUI.City.EventBus.EventPluginQuotas.MaximumSharedAccessRules.init -> void
+AtomUI.City.EventBus.EventPluginQuotas.MaximumSubscriptions.get -> int
+AtomUI.City.EventBus.EventPluginQuotas.MaximumSubscriptions.init -> void
+AtomUI.City.EventBus.EventPostResult
+AtomUI.City.EventBus.EventPostResult.<Clone>$() -> AtomUI.City.EventBus.EventPostResult!
+AtomUI.City.EventBus.EventPostResult.Accepted.get -> bool
+AtomUI.City.EventBus.EventPostResult.Accepted.init -> void
+AtomUI.City.EventBus.EventPostResult.ContractId.get -> AtomUI.City.EventBus.EventContractId
+AtomUI.City.EventBus.EventPostResult.ContractId.init -> void
+AtomUI.City.EventBus.EventPostResult.Deconstruct(out System.Guid EventId, out AtomUI.City.EventBus.EventContractId ContractId, out bool Accepted, out string? RejectionReason) -> void
+AtomUI.City.EventBus.EventPostResult.Equals(AtomUI.City.EventBus.EventPostResult? other) -> bool
+AtomUI.City.EventBus.EventPostResult.EventId.get -> System.Guid
+AtomUI.City.EventBus.EventPostResult.EventId.init -> void
+AtomUI.City.EventBus.EventPostResult.EventPostResult(System.Guid EventId, AtomUI.City.EventBus.EventContractId ContractId, bool Accepted, string? RejectionReason = null) -> void
+AtomUI.City.EventBus.EventPostResult.RejectionReason.get -> string?
+AtomUI.City.EventBus.EventPostResult.RejectionReason.init -> void
+AtomUI.City.EventBus.EventPublicationRejectedException
+AtomUI.City.EventBus.EventPublicationRejectedException.ContractId.get -> AtomUI.City.EventBus.EventContractId
+AtomUI.City.EventBus.EventPublicationRejectedException.EventId.get -> System.Guid
+AtomUI.City.EventBus.EventPublicationRejectedException.EventPublicationRejectedException(System.Guid eventId, AtomUI.City.EventBus.EventContractId contractId, string! reason) -> void
+AtomUI.City.EventBus.EventPublishOptions
+AtomUI.City.EventBus.EventPublishOptions.CausationId.get -> string?
+AtomUI.City.EventBus.EventPublishOptions.CausationId.init -> void
+AtomUI.City.EventBus.EventPublishOptions.CorrelationId.get -> string?
+AtomUI.City.EventBus.EventPublishOptions.CorrelationId.init -> void
+AtomUI.City.EventBus.EventPublishOptions.EventPublishOptions() -> void
+AtomUI.City.EventBus.EventPublishOptions.PartitionKey.get -> string?
+AtomUI.City.EventBus.EventPublishOptions.PartitionKey.init -> void
+AtomUI.City.EventBus.EventPublishOptions.PublishDepth.get -> int
+AtomUI.City.EventBus.EventPublishOptions.PublishDepth.init -> void
+AtomUI.City.EventBus.EventPublishResult
+AtomUI.City.EventBus.EventPublishResult.CanceledCount.get -> int
+AtomUI.City.EventBus.EventPublishResult.ContractId.get -> AtomUI.City.EventBus.EventContractId
+AtomUI.City.EventBus.EventPublishResult.DeliveredCount.get -> int
+AtomUI.City.EventBus.EventPublishResult.Deliveries.get -> System.Collections.Generic.IReadOnlyList<AtomUI.City.EventBus.EventDeliveryResult!>!
+AtomUI.City.EventBus.EventPublishResult.Duration.get -> System.TimeSpan
+AtomUI.City.EventBus.EventPublishResult.EventId.get -> System.Guid
+AtomUI.City.EventBus.EventPublishResult.EventPublishResult(System.Guid eventId, AtomUI.City.EventBus.EventContractId contractId, System.Collections.Generic.IReadOnlyList<AtomUI.City.EventBus.EventDeliveryResult!>! deliveries, System.TimeSpan duration) -> void
+AtomUI.City.EventBus.EventPublishResult.EventPublishResult(System.Guid eventId, AtomUI.City.EventBus.EventContractId contractId, System.Collections.Generic.IReadOnlyList<AtomUI.City.EventBus.EventDeliveryResult!>! deliveries) -> void
+AtomUI.City.EventBus.EventPublishResult.FailedCount.get -> int
+AtomUI.City.EventBus.EventPublishResult.SkippedCount.get -> int
+AtomUI.City.EventBus.EventPublishResult.SubscriptionCount.get -> int
+AtomUI.City.EventBus.EventPublishResult.Succeeded.get -> bool
+AtomUI.City.EventBus.EventPublishResult.TimedOutCount.get -> int
+AtomUI.City.EventBus.EventSubscriberExtensions
+AtomUI.City.EventBus.EventSubscriptionId
+AtomUI.City.EventBus.EventSubscriptionId.Equals(AtomUI.City.EventBus.EventSubscriptionId other) -> bool
+AtomUI.City.EventBus.EventSubscriptionId.EventSubscriptionId() -> void
+AtomUI.City.EventBus.EventSubscriptionId.EventSubscriptionId(System.Guid value) -> void
+AtomUI.City.EventBus.EventSubscriptionId.Value.get -> System.Guid
+AtomUI.City.EventBus.EventSubscriptionOptions
+AtomUI.City.EventBus.EventSubscriptionOptions.DisableSubscriptionAfterFailures.get -> int
+AtomUI.City.EventBus.EventSubscriptionOptions.DispatchMode.get -> AtomUI.City.EventBus.EventDispatchMode
+AtomUI.City.EventBus.EventSubscriptionOptions.DispatchPolicy.get -> AtomUI.City.EventBus.EventDispatchPolicy
+AtomUI.City.EventBus.EventSubscriptionOptions.ErrorPolicy.get -> AtomUI.City.EventBus.EventErrorPolicy
+AtomUI.City.EventBus.EventSubscriptionOptions.HandlerTimeout.get -> System.TimeSpan?
+AtomUI.City.EventBus.EventSubscriptionOptions.UiDispatcher.get -> AtomUI.City.Core.Threading.IUiDispatcher?
+AtomUI.City.EventBus.EventSubscriptionOptions.WithDisableSubscriptionAfterFailures(int failureCount) -> AtomUI.City.EventBus.EventSubscriptionOptions!
+AtomUI.City.EventBus.EventSubscriptionOptions.WithErrorPolicy(AtomUI.City.EventBus.EventErrorPolicy errorPolicy) -> AtomUI.City.EventBus.EventSubscriptionOptions!
+AtomUI.City.EventBus.EventSubscriptionOptions.WithHandlerTimeout(System.TimeSpan? handlerTimeout) -> AtomUI.City.EventBus.EventSubscriptionOptions!
+AtomUI.City.EventBus.EventSubscriptionState
+AtomUI.City.EventBus.EventSubscriptionState.Active = 1 -> AtomUI.City.EventBus.EventSubscriptionState
+AtomUI.City.EventBus.EventSubscriptionState.Created = 0 -> AtomUI.City.EventBus.EventSubscriptionState
+AtomUI.City.EventBus.EventSubscriptionState.Disposed = 4 -> AtomUI.City.EventBus.EventSubscriptionState
+AtomUI.City.EventBus.EventSubscriptionState.Draining = 3 -> AtomUI.City.EventBus.EventSubscriptionState
+AtomUI.City.EventBus.EventSubscriptionState.Faulted = 5 -> AtomUI.City.EventBus.EventSubscriptionState
+AtomUI.City.EventBus.EventSubscriptionState.Quiescing = 2 -> AtomUI.City.EventBus.EventSubscriptionState
+AtomUI.City.EventBus.GeneratedEventHandlerDescriptor
+AtomUI.City.EventBus.GeneratedEventHandlerDescriptor.ChannelName.get -> string!
+AtomUI.City.EventBus.GeneratedEventHandlerDescriptor.EventType.get -> System.Type!
+AtomUI.City.EventBus.GeneratedEventHandlerDescriptor.HandlerType.get -> System.Type!
+AtomUI.City.EventBus.GeneratedEventHandlerDescriptor.OwnerModuleType.get -> System.Type!
+AtomUI.City.EventBus.GeneratedEventManifestAttribute
+AtomUI.City.EventBus.GeneratedEventManifestAttribute.GeneratedEventManifestAttribute(System.Type! registrarType, int version) -> void
+AtomUI.City.EventBus.GeneratedEventManifestAttribute.RegistrarType.get -> System.Type!
+AtomUI.City.EventBus.GeneratedEventManifestAttribute.Version.get -> int
+AtomUI.City.EventBus.IEventBackgroundScheduler
+AtomUI.City.EventBus.IEventBackgroundScheduler.RunAsync(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask>! callback, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+AtomUI.City.EventBus.IEventBus
+AtomUI.City.EventBus.IEventBusContributionController
+AtomUI.City.EventBus.IEventBusContributionController.CreateAsync(AtomUI.City.EventBus.EventBusContributionRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AtomUI.City.EventBus.IEventBusContributionLease!>
+AtomUI.City.EventBus.IEventBusContributionLease
+AtomUI.City.EventBus.IEventBusContributionLease.PluginId.get -> string!
+AtomUI.City.EventBus.IEventBusContributionLease.Publisher.get -> AtomUI.City.EventBus.IPluginEventPublisher!
+AtomUI.City.EventBus.IEventBusContributionLease.State.get -> AtomUI.City.EventBus.EventBusContributionState
+AtomUI.City.EventBus.IEventBusContributionLease.StopAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+AtomUI.City.EventBus.IEventBusContributionLease.Subscriber.get -> AtomUI.City.EventBus.IPluginEventSubscriber!
+AtomUI.City.EventBus.IEventBusMonitor
+AtomUI.City.EventBus.IEventBusMonitor.GetSnapshot() -> AtomUI.City.EventBus.EventBusMetricsSnapshot!
+AtomUI.City.EventBus.IEventChannelMonitor
+AtomUI.City.EventBus.IEventChannelMonitor.GetChannelSnapshots() -> System.Collections.Generic.IReadOnlyList<AtomUI.City.EventBus.EventChannelMetricsSnapshot!>!
+AtomUI.City.EventBus.IEventContractRegistry
+AtomUI.City.EventBus.IEventContractRegistry.Descriptors.get -> System.Collections.Generic.IReadOnlyList<AtomUI.City.EventBus.EventContractDescriptor!>!
+AtomUI.City.EventBus.IEventContractRegistry.Freeze() -> void
+AtomUI.City.EventBus.IEventContractRegistry.GetOrCreate<TEvent>() -> AtomUI.City.EventBus.EventContractDescriptor!
+AtomUI.City.EventBus.IEventContractRegistry.IsFrozen.get -> bool
+AtomUI.City.EventBus.IEventContractRegistry.Register(AtomUI.City.EventBus.EventContractDescriptor! descriptor) -> void
+AtomUI.City.EventBus.IEventContractRegistry.TryGet(AtomUI.City.EventBus.EventContractId contractId, out AtomUI.City.EventBus.EventContractDescriptor? descriptor) -> bool
+AtomUI.City.EventBus.IEventContractRegistry.TryGet(System.Type! eventType, out AtomUI.City.EventBus.EventContractDescriptor? descriptor) -> bool
+AtomUI.City.EventBus.IEventHandler<TEvent>
+AtomUI.City.EventBus.IEventHandler<TEvent>.HandleAsync(AtomUI.City.EventBus.EventContext<TEvent>! context) -> System.Threading.Tasks.ValueTask
+AtomUI.City.EventBus.IEventPayloadDiagnosticProjector<TEvent>
+AtomUI.City.EventBus.IEventPayloadDiagnosticProjector<TEvent>.Project(TEvent eventData) -> AtomUI.City.EventBus.EventPayloadDiagnosticSnapshot!
+AtomUI.City.EventBus.IEventPublisher
+AtomUI.City.EventBus.IEventPublisher.PostAsync<TEvent>(AtomUI.City.EventBus.EventChannel<TEvent> channel, TEvent eventData, AtomUI.City.EventBus.EventPublishOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AtomUI.City.EventBus.EventPostResult!>
+AtomUI.City.EventBus.IEventPublisher.PostAsync<TEvent>(TEvent eventData, AtomUI.City.EventBus.EventPublishOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AtomUI.City.EventBus.EventPostResult!>
+AtomUI.City.EventBus.IEventPublisher.PublishAsync<TEvent>(AtomUI.City.EventBus.EventChannel<TEvent> channel, TEvent eventData, AtomUI.City.EventBus.EventPublishOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AtomUI.City.EventBus.EventPublishResult!>
+AtomUI.City.EventBus.IEventPublisher.PublishAsync<TEvent>(TEvent eventData, AtomUI.City.EventBus.EventPublishOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AtomUI.City.EventBus.EventPublishResult!>
+AtomUI.City.EventBus.IEventSubscriber
+AtomUI.City.EventBus.IEventSubscriber.Subscribe<TEvent>(AtomUI.City.Core.Lifecycle.LifecycleScope! owner, AtomUI.City.EventBus.EventChannel<TEvent> channel, AtomUI.City.EventBus.IEventHandler<TEvent>! handler, AtomUI.City.EventBus.EventSubscriptionOptions? options = null) -> AtomUI.City.EventBus.IEventSubscription!
+AtomUI.City.EventBus.IEventSubscriber.Subscribe<TEvent>(AtomUI.City.Core.Lifecycle.LifecycleScope! owner, AtomUI.City.EventBus.EventChannel<TEvent> channel, System.Func<AtomUI.City.EventBus.EventContext<TEvent>!, System.Threading.Tasks.ValueTask>! handler, AtomUI.City.EventBus.EventSubscriptionOptions? options = null) -> AtomUI.City.EventBus.IEventSubscription!
+AtomUI.City.EventBus.IEventSubscriber.Subscribe<TEvent>(AtomUI.City.Core.Lifecycle.LifecycleScope! owner, AtomUI.City.EventBus.IEventHandler<TEvent>! handler, AtomUI.City.EventBus.EventSubscriptionOptions? options = null) -> AtomUI.City.EventBus.IEventSubscription!
+AtomUI.City.EventBus.IEventSubscriber.Subscribe<TEvent>(AtomUI.City.Core.Lifecycle.LifecycleScope! owner, System.Func<AtomUI.City.EventBus.EventContext<TEvent>!, System.Threading.Tasks.ValueTask>! handler, AtomUI.City.EventBus.EventSubscriptionOptions? options = null) -> AtomUI.City.EventBus.IEventSubscription!
+AtomUI.City.EventBus.IEventSubscription
+AtomUI.City.EventBus.IEventSubscription.Id.get -> AtomUI.City.EventBus.EventSubscriptionId
+AtomUI.City.EventBus.IEventSubscription.State.get -> AtomUI.City.EventBus.EventSubscriptionState
+AtomUI.City.EventBus.IEventSubscription.StopAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+AtomUI.City.EventBus.InMemoryEventBus
+AtomUI.City.EventBus.InMemoryEventBus.Dispose() -> void
+AtomUI.City.EventBus.InMemoryEventBus.DisposeAsync() -> System.Threading.Tasks.ValueTask
+AtomUI.City.EventBus.InMemoryEventBus.GetChannelSnapshots() -> System.Collections.Generic.IReadOnlyList<AtomUI.City.EventBus.EventChannelMetricsSnapshot!>!
+AtomUI.City.EventBus.InMemoryEventBus.GetSnapshot() -> AtomUI.City.EventBus.EventBusMetricsSnapshot!
+AtomUI.City.EventBus.InMemoryEventBus.InMemoryEventBus(AtomUI.City.EventBus.IEventContractRegistry? contractRegistry = null, AtomUI.City.Core.Diagnostics.IHostDiagnostics? diagnostics = null, AtomUI.City.EventBus.EventChannelOptions? channelOptions = null, System.Collections.Generic.IEnumerable<AtomUI.City.EventBus.EventChannelDescriptor!>? channelDescriptors = null, AtomUI.City.EventBus.IEventBackgroundScheduler? backgroundScheduler = null, AtomUI.City.EventBus.EventBusDispatchOptions? dispatchOptions = null, AtomUI.City.EventBus.EventBusDiagnosticsOptions? diagnosticsOptions = null, System.Collections.Generic.IEnumerable<AtomUI.City.EventBus.EventPayloadDiagnosticProjectorDescriptor!>? payloadProjectors = null, AtomUI.City.EventBus.EventBusRuntimeOptions? runtimeOptions = null, System.Collections.Generic.IEnumerable<AtomUI.City.EventBus.GeneratedEventHandlerDescriptor!>? generatedHandlers = null, System.IServiceProvider? generatedHandlerServices = null) -> void
+AtomUI.City.EventBus.InMemoryEventBus.PostAsync<TEvent>(AtomUI.City.EventBus.EventChannel<TEvent> channel, TEvent eventData, AtomUI.City.EventBus.EventPublishOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AtomUI.City.EventBus.EventPostResult!>
+AtomUI.City.EventBus.InMemoryEventBus.PostAsync<TEvent>(TEvent eventData, AtomUI.City.EventBus.EventPublishOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AtomUI.City.EventBus.EventPostResult!>
+AtomUI.City.EventBus.InMemoryEventBus.PublishAsync<TEvent>(AtomUI.City.EventBus.EventChannel<TEvent> channel, TEvent eventData, AtomUI.City.EventBus.EventPublishOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AtomUI.City.EventBus.EventPublishResult!>
+AtomUI.City.EventBus.InMemoryEventBus.PublishAsync<TEvent>(TEvent eventData, AtomUI.City.EventBus.EventPublishOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AtomUI.City.EventBus.EventPublishResult!>
+AtomUI.City.EventBus.InMemoryEventBus.Subscribe<TEvent>(AtomUI.City.Core.Lifecycle.LifecycleScope! owner, AtomUI.City.EventBus.EventChannel<TEvent> channel, AtomUI.City.EventBus.IEventHandler<TEvent>! handler, AtomUI.City.EventBus.EventSubscriptionOptions? options = null) -> AtomUI.City.EventBus.IEventSubscription!
+AtomUI.City.EventBus.InMemoryEventBus.Subscribe<TEvent>(AtomUI.City.Core.Lifecycle.LifecycleScope! owner, AtomUI.City.EventBus.EventChannel<TEvent> channel, System.Func<AtomUI.City.EventBus.EventContext<TEvent>!, System.Threading.Tasks.ValueTask>! handler, AtomUI.City.EventBus.EventSubscriptionOptions? options = null) -> AtomUI.City.EventBus.IEventSubscription!
+AtomUI.City.EventBus.InMemoryEventBus.Subscribe<TEvent>(AtomUI.City.Core.Lifecycle.LifecycleScope! owner, AtomUI.City.EventBus.IEventHandler<TEvent>! handler, AtomUI.City.EventBus.EventSubscriptionOptions? options = null) -> AtomUI.City.EventBus.IEventSubscription!
+AtomUI.City.EventBus.InMemoryEventBus.Subscribe<TEvent>(AtomUI.City.Core.Lifecycle.LifecycleScope! owner, System.Func<AtomUI.City.EventBus.EventContext<TEvent>!, System.Threading.Tasks.ValueTask>! handler, AtomUI.City.EventBus.EventSubscriptionOptions? options = null) -> AtomUI.City.EventBus.IEventSubscription!
+AtomUI.City.EventBus.InMemoryEventContractRegistry
+AtomUI.City.EventBus.InMemoryEventContractRegistry.Descriptors.get -> System.Collections.Generic.IReadOnlyList<AtomUI.City.EventBus.EventContractDescriptor!>!
+AtomUI.City.EventBus.InMemoryEventContractRegistry.Freeze() -> void
+AtomUI.City.EventBus.InMemoryEventContractRegistry.GetOrCreate<TEvent>() -> AtomUI.City.EventBus.EventContractDescriptor!
+AtomUI.City.EventBus.InMemoryEventContractRegistry.InMemoryEventContractRegistry() -> void
+AtomUI.City.EventBus.InMemoryEventContractRegistry.IsFrozen.get -> bool
+AtomUI.City.EventBus.InMemoryEventContractRegistry.Register(AtomUI.City.EventBus.EventContractDescriptor! descriptor) -> void
+AtomUI.City.EventBus.InMemoryEventContractRegistry.TryGet(AtomUI.City.EventBus.EventContractId contractId, out AtomUI.City.EventBus.EventContractDescriptor? descriptor) -> bool
+AtomUI.City.EventBus.InMemoryEventContractRegistry.TryGet(System.Type! eventType, out AtomUI.City.EventBus.EventContractDescriptor? descriptor) -> bool
+AtomUI.City.EventBus.IPluginEventPublisher
+AtomUI.City.EventBus.IPluginEventPublisher.PostAsync<TEvent>(AtomUI.City.EventBus.EventPluginPlane plane, AtomUI.City.EventBus.EventChannel<TEvent> channel, TEvent eventData, AtomUI.City.EventBus.EventPublishOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AtomUI.City.EventBus.EventPostResult!>
+AtomUI.City.EventBus.IPluginEventPublisher.PostAsync<TEvent>(AtomUI.City.EventBus.EventPluginPlane plane, TEvent eventData, AtomUI.City.EventBus.EventPublishOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AtomUI.City.EventBus.EventPostResult!>
+AtomUI.City.EventBus.IPluginEventPublisher.PublishAsync<TEvent>(AtomUI.City.EventBus.EventPluginPlane plane, AtomUI.City.EventBus.EventChannel<TEvent> channel, TEvent eventData, AtomUI.City.EventBus.EventPublishOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AtomUI.City.EventBus.EventPublishResult!>
+AtomUI.City.EventBus.IPluginEventPublisher.PublishAsync<TEvent>(AtomUI.City.EventBus.EventPluginPlane plane, TEvent eventData, AtomUI.City.EventBus.EventPublishOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AtomUI.City.EventBus.EventPublishResult!>
+AtomUI.City.EventBus.IPluginEventSubscriber
+AtomUI.City.EventBus.IPluginEventSubscriber.Subscribe<TEvent>(AtomUI.City.EventBus.EventPluginPlane plane, AtomUI.City.EventBus.EventChannel<TEvent> channel, System.Func<AtomUI.City.EventBus.EventContext<TEvent>!, System.Threading.Tasks.ValueTask>! handler, AtomUI.City.EventBus.EventSubscriptionOptions? options = null) -> AtomUI.City.EventBus.IEventSubscription!
+AtomUI.City.EventBus.IPluginEventSubscriber.Subscribe<TEvent>(AtomUI.City.EventBus.EventPluginPlane plane, System.Func<AtomUI.City.EventBus.EventContext<TEvent>!, System.Threading.Tasks.ValueTask>! handler, AtomUI.City.EventBus.EventSubscriptionOptions? options = null) -> AtomUI.City.EventBus.IEventSubscription!
+AtomUI.City.EventBus.ThreadPoolEventBackgroundScheduler
+AtomUI.City.EventBus.ThreadPoolEventBackgroundScheduler.RunAsync(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask>! callback, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+AtomUI.City.EventBus.ThreadPoolEventBackgroundScheduler.ThreadPoolEventBackgroundScheduler() -> void
+AtomUI.City.Generated.GeneratedModularityModuleRegistrar_AtomUI_City_EventBus_9DC40369
+AtomUI.City.Generated.GeneratedModularityModuleRegistrar_AtomUI_City_EventBus_9DC40369.GeneratedModularityModuleRegistrar_AtomUI_City_EventBus_9DC40369() -> void
+AtomUI.City.Generated.GeneratedModularityModuleRegistrar_AtomUI_City_EventBus_9DC40369.Register(AtomUI.City.Core.Modularity.IModuleRegistrarContext! context) -> void
+const AtomUI.City.EventBus.EventBusDiagnosticsOptions.DefaultMaximumPayloadFieldCount = 16 -> int
+const AtomUI.City.EventBus.EventBusDiagnosticsOptions.DefaultMaximumPayloadValueLength = 512 -> int
+const AtomUI.City.EventBus.EventBusDiagnosticsOptions.DefaultMemoryBufferCapacity = 2048 -> int
+const AtomUI.City.EventBus.EventBusDispatchOptions.DefaultMaximumConcurrentDeliveriesPerPublication = 16 -> int
+const AtomUI.City.EventBus.EventBusRuntimeOptions.DefaultMaximumChannelRuntimes = 256 -> int
+const AtomUI.City.EventBus.EventBusRuntimeOptions.MaximumAllowedChannelRuntimes = 65536 -> int
+const AtomUI.City.EventBus.EventChannel<TEvent>.DefaultName = "default" -> string!
+const AtomUI.City.EventBus.EventChannelOptions.DefaultCapacity = 256 -> int
+const AtomUI.City.EventBus.EventDiagnosticIds.EventAccepted = "EventBus.EventAccepted" -> string!
+const AtomUI.City.EventBus.EventDiagnosticIds.EventChannelBackpressure = "EventBus.EventChannelBackpressure" -> string!
+const AtomUI.City.EventBus.EventDiagnosticIds.EventContractRejected = "EventBus.EventContractRejected" -> string!
+const AtomUI.City.EventBus.EventDiagnosticIds.EventDeliveryCancelled = "EventBus.EventDeliveryCancelled" -> string!
+const AtomUI.City.EventBus.EventDiagnosticIds.EventDeliveryCompleted = "EventBus.EventDeliveryCompleted" -> string!
+const AtomUI.City.EventBus.EventDiagnosticIds.EventDeliveryFailed = "EventBus.EventDeliveryFailed" -> string!
+const AtomUI.City.EventBus.EventDiagnosticIds.EventDeliveryStarted = "EventBus.EventDeliveryStarted" -> string!
+const AtomUI.City.EventBus.EventDiagnosticIds.EventDeliveryTimedOut = "EventBus.EventDeliveryTimedOut" -> string!
+const AtomUI.City.EventBus.EventDiagnosticIds.EventDropped = "EventBus.EventDropped" -> string!
+const AtomUI.City.EventBus.EventDiagnosticIds.EventPayloadProjectionFailed = "EventBus.EventPayloadProjectionFailed" -> string!
+const AtomUI.City.EventBus.EventDiagnosticIds.EventPluginDrainTimedOut = "EventBus.EventPluginDrainTimedOut" -> string!
+const AtomUI.City.EventBus.EventDiagnosticIds.EventPublished = "EventBus.EventPublished" -> string!
+const AtomUI.City.EventBus.EventDiagnosticIds.EventRejected = "EventBus.EventRejected" -> string!
+const AtomUI.City.EventBus.EventDiagnosticIds.EventSubscriptionAdded = "EventBus.EventSubscriptionAdded" -> string!
+const AtomUI.City.EventBus.EventDiagnosticIds.EventSubscriptionDisabled = "EventBus.EventSubscriptionDisabled" -> string!
+const AtomUI.City.EventBus.EventDiagnosticIds.EventSubscriptionDisposed = "EventBus.EventSubscriptionDisposed" -> string!
+const AtomUI.City.EventBus.EventDiagnosticIds.EventSubscriptionQuiescing = "EventBus.EventSubscriptionQuiescing" -> string!
+const AtomUI.City.EventBus.EventDiagnosticIds.EventSubscriptionTerminationFailed = "EventBus.EventSubscriptionTerminationFailed" -> string!
+const AtomUI.City.EventBus.EventDiagnosticIds.PluginContributionActivated = "EventBus.PluginContributionActivated" -> string!
+const AtomUI.City.EventBus.EventDiagnosticIds.PluginContributionDisposed = "EventBus.PluginContributionDisposed" -> string!
+const AtomUI.City.EventBus.EventDiagnosticIds.PluginContributionQuiescing = "EventBus.PluginContributionQuiescing" -> string!
+const AtomUI.City.EventBus.EventDiagnosticIds.PluginContributionRejected = "EventBus.PluginContributionRejected" -> string!
+const AtomUI.City.EventBus.GeneratedEventManifestAttribute.CurrentVersion = 1 -> int
+override AtomUI.City.EventBus.EventBusMetricsSnapshot.Equals(object? obj) -> bool
+override AtomUI.City.EventBus.EventBusMetricsSnapshot.GetHashCode() -> int
+override AtomUI.City.EventBus.EventBusMetricsSnapshot.ToString() -> string!
+override AtomUI.City.EventBus.EventBusModule.ConfigureServices(AtomUI.City.Core.Modularity.ServiceConfigurationContext! context) -> void
+override AtomUI.City.EventBus.EventBusModule.OnApplicationShutdownAsync(AtomUI.City.Core.Modularity.ApplicationShutdownContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+override AtomUI.City.EventBus.EventBusModule.OnPreApplicationInitializationAsync(AtomUI.City.Core.Modularity.ApplicationInitializationContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+override AtomUI.City.EventBus.EventBusModule.PostConfigureServices(AtomUI.City.Core.Modularity.ServiceConfigurationContext! context) -> void
+override AtomUI.City.EventBus.EventChannel<TEvent>.GetHashCode() -> int
+override AtomUI.City.EventBus.EventChannelMetricsSnapshot.Equals(object? obj) -> bool
+override AtomUI.City.EventBus.EventChannelMetricsSnapshot.GetHashCode() -> int
+override AtomUI.City.EventBus.EventChannelMetricsSnapshot.ToString() -> string!
+override AtomUI.City.EventBus.EventContractId.GetHashCode() -> int
+override AtomUI.City.EventBus.EventContractId.ToString() -> string!
+override AtomUI.City.EventBus.EventDeliveryResult.Equals(object? obj) -> bool
+override AtomUI.City.EventBus.EventDeliveryResult.GetHashCode() -> int
+override AtomUI.City.EventBus.EventDeliveryResult.ToString() -> string!
+override AtomUI.City.EventBus.EventPluginAccessRule.Equals(object? obj) -> bool
+override AtomUI.City.EventBus.EventPluginAccessRule.GetHashCode() -> int
+override AtomUI.City.EventBus.EventPluginAccessRule.ToString() -> string!
+override AtomUI.City.EventBus.EventPostResult.Equals(object? obj) -> bool
+override AtomUI.City.EventBus.EventPostResult.GetHashCode() -> int
+override AtomUI.City.EventBus.EventPostResult.ToString() -> string!
+override AtomUI.City.EventBus.EventSubscriptionId.GetHashCode() -> int
+override AtomUI.City.EventBus.EventSubscriptionId.ToString() -> string!
+static AtomUI.City.EventBus.EventBusDiagnosticsOptions.Default.get -> AtomUI.City.EventBus.EventBusDiagnosticsOptions!
+static AtomUI.City.EventBus.EventBusDispatchOptions.Default.get -> AtomUI.City.EventBus.EventBusDispatchOptions!
+static AtomUI.City.EventBus.EventBusMetricsSnapshot.operator !=(AtomUI.City.EventBus.EventBusMetricsSnapshot? left, AtomUI.City.EventBus.EventBusMetricsSnapshot? right) -> bool
+static AtomUI.City.EventBus.EventBusMetricsSnapshot.operator ==(AtomUI.City.EventBus.EventBusMetricsSnapshot? left, AtomUI.City.EventBus.EventBusMetricsSnapshot? right) -> bool
+static AtomUI.City.EventBus.EventBusRuntimeOptions.Default.get -> AtomUI.City.EventBus.EventBusRuntimeOptions!
+static AtomUI.City.EventBus.EventBusServiceCollectionExtensions.AddEventBus(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, AtomUI.City.EventBus.EventChannelOptions! defaultChannelOptions) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static AtomUI.City.EventBus.EventBusServiceCollectionExtensions.AddEventBus(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static AtomUI.City.EventBus.EventBusServiceCollectionExtensions.AddEventContract<TEvent>(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, AtomUI.City.EventBus.EventContractId contractId) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static AtomUI.City.EventBus.EventBusServiceCollectionExtensions.AddEventPayloadDiagnosticProjector<TEvent, TProjector>(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static AtomUI.City.EventBus.EventBusServiceCollectionExtensions.ConfigureEventBusDiagnostics(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, AtomUI.City.EventBus.EventBusDiagnosticsOptions! options) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static AtomUI.City.EventBus.EventBusServiceCollectionExtensions.ConfigureEventBusRuntime(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, AtomUI.City.EventBus.EventBusRuntimeOptions! options) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static AtomUI.City.EventBus.EventBusServiceCollectionExtensions.ConfigureEventChannel<TEvent>(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, AtomUI.City.EventBus.EventChannel<TEvent> channel, AtomUI.City.EventBus.EventChannelOptions! options) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static AtomUI.City.EventBus.EventBusServiceCollectionExtensions.ConfigureEventChannel<TEvent>(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, AtomUI.City.EventBus.EventChannelOptions! options) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static AtomUI.City.EventBus.EventChannel<TEvent>.Default.get -> AtomUI.City.EventBus.EventChannel<TEvent>
+static AtomUI.City.EventBus.EventChannel<TEvent>.operator !=(AtomUI.City.EventBus.EventChannel<TEvent> left, AtomUI.City.EventBus.EventChannel<TEvent> right) -> bool
+static AtomUI.City.EventBus.EventChannel<TEvent>.operator ==(AtomUI.City.EventBus.EventChannel<TEvent> left, AtomUI.City.EventBus.EventChannel<TEvent> right) -> bool
+static AtomUI.City.EventBus.EventChannelDescriptor.Create<TEvent>(AtomUI.City.EventBus.EventChannel<TEvent> channel, AtomUI.City.EventBus.EventChannelOptions! options) -> AtomUI.City.EventBus.EventChannelDescriptor!
+static AtomUI.City.EventBus.EventChannelMetricsSnapshot.operator !=(AtomUI.City.EventBus.EventChannelMetricsSnapshot? left, AtomUI.City.EventBus.EventChannelMetricsSnapshot? right) -> bool
+static AtomUI.City.EventBus.EventChannelMetricsSnapshot.operator ==(AtomUI.City.EventBus.EventChannelMetricsSnapshot? left, AtomUI.City.EventBus.EventChannelMetricsSnapshot? right) -> bool
+static AtomUI.City.EventBus.EventChannelOptions.Default.get -> AtomUI.City.EventBus.EventChannelOptions!
+static AtomUI.City.EventBus.EventContractDescriptor.GeneratedShared<TEvent>(AtomUI.City.EventBus.EventContractId contractId, System.Reflection.Assembly! sharedAssembly, int schemaVersion, string! schemaFingerprint) -> AtomUI.City.EventBus.EventContractDescriptor!
+static AtomUI.City.EventBus.EventContractDescriptor.PluginPrivate<TEvent>(AtomUI.City.EventBus.EventContractId contractId) -> AtomUI.City.EventBus.EventContractDescriptor!
+static AtomUI.City.EventBus.EventContractDescriptor.Shared<TEvent>(AtomUI.City.EventBus.EventContractId contractId, System.Reflection.Assembly! sharedAssembly, int schemaVersion, string! schemaFingerprint) -> AtomUI.City.EventBus.EventContractDescriptor!
+static AtomUI.City.EventBus.EventContractDescriptor.Shared<TEvent>(AtomUI.City.EventBus.EventContractId contractId, System.Reflection.Assembly! sharedAssembly) -> AtomUI.City.EventBus.EventContractDescriptor!
+static AtomUI.City.EventBus.EventContractId.operator !=(AtomUI.City.EventBus.EventContractId left, AtomUI.City.EventBus.EventContractId right) -> bool
+static AtomUI.City.EventBus.EventContractId.operator ==(AtomUI.City.EventBus.EventContractId left, AtomUI.City.EventBus.EventContractId right) -> bool
+static AtomUI.City.EventBus.EventDeliveryResult.operator !=(AtomUI.City.EventBus.EventDeliveryResult? left, AtomUI.City.EventBus.EventDeliveryResult? right) -> bool
+static AtomUI.City.EventBus.EventDeliveryResult.operator ==(AtomUI.City.EventBus.EventDeliveryResult? left, AtomUI.City.EventBus.EventDeliveryResult? right) -> bool
+static AtomUI.City.EventBus.EventPayloadDiagnosticProjectorDescriptor.Create<TEvent>(AtomUI.City.EventBus.IEventPayloadDiagnosticProjector<TEvent>! projector) -> AtomUI.City.EventBus.EventPayloadDiagnosticProjectorDescriptor!
+static AtomUI.City.EventBus.EventPluginAccessRule.operator !=(AtomUI.City.EventBus.EventPluginAccessRule? left, AtomUI.City.EventBus.EventPluginAccessRule? right) -> bool
+static AtomUI.City.EventBus.EventPluginAccessRule.operator ==(AtomUI.City.EventBus.EventPluginAccessRule? left, AtomUI.City.EventBus.EventPluginAccessRule? right) -> bool
+static AtomUI.City.EventBus.EventPluginQuotas.Default.get -> AtomUI.City.EventBus.EventPluginQuotas!
+static AtomUI.City.EventBus.EventPostResult.operator !=(AtomUI.City.EventBus.EventPostResult? left, AtomUI.City.EventBus.EventPostResult? right) -> bool
+static AtomUI.City.EventBus.EventPostResult.operator ==(AtomUI.City.EventBus.EventPostResult? left, AtomUI.City.EventBus.EventPostResult? right) -> bool
+static AtomUI.City.EventBus.EventPublishOptions.Default.get -> AtomUI.City.EventBus.EventPublishOptions!
+static AtomUI.City.EventBus.EventSubscriberExtensions.Subscribe<TEvent>(this AtomUI.City.EventBus.IEventSubscriber! subscriber, AtomUI.City.Core.Lifecycle.LifecycleScope! owner, AtomUI.City.EventBus.EventChannel<TEvent> channel, System.Action<AtomUI.City.EventBus.EventContext<TEvent>!>! handler, AtomUI.City.EventBus.EventSubscriptionOptions? options = null) -> AtomUI.City.EventBus.IEventSubscription!
+static AtomUI.City.EventBus.EventSubscriberExtensions.Subscribe<TEvent>(this AtomUI.City.EventBus.IEventSubscriber! subscriber, AtomUI.City.Core.Lifecycle.LifecycleScope! owner, System.Action<AtomUI.City.EventBus.EventContext<TEvent>!>! handler, AtomUI.City.EventBus.EventSubscriptionOptions? options = null) -> AtomUI.City.EventBus.IEventSubscription!
+static AtomUI.City.EventBus.EventSubscriptionId.New() -> AtomUI.City.EventBus.EventSubscriptionId
+static AtomUI.City.EventBus.EventSubscriptionId.operator !=(AtomUI.City.EventBus.EventSubscriptionId left, AtomUI.City.EventBus.EventSubscriptionId right) -> bool
+static AtomUI.City.EventBus.EventSubscriptionId.operator ==(AtomUI.City.EventBus.EventSubscriptionId left, AtomUI.City.EventBus.EventSubscriptionId right) -> bool
+static AtomUI.City.EventBus.EventSubscriptionOptions.Background() -> AtomUI.City.EventBus.EventSubscriptionOptions!
+static AtomUI.City.EventBus.EventSubscriptionOptions.Current.get -> AtomUI.City.EventBus.EventSubscriptionOptions!
+static AtomUI.City.EventBus.EventSubscriptionOptions.Serialized.get -> AtomUI.City.EventBus.EventSubscriptionOptions!
+static AtomUI.City.EventBus.EventSubscriptionOptions.UiThread(AtomUI.City.Core.Threading.IUiDispatcher! dispatcher, AtomUI.City.EventBus.EventDispatchMode dispatchMode = AtomUI.City.EventBus.EventDispatchMode.Post) -> AtomUI.City.EventBus.EventSubscriptionOptions!
+static AtomUI.City.EventBus.GeneratedEventHandlerDescriptor.Create<TEvent, THandler>(System.Type! ownerModuleType, string! channelName, AtomUI.City.EventBus.EventDispatchPolicy dispatchPolicy, AtomUI.City.EventBus.EventDispatchMode dispatchMode, AtomUI.City.EventBus.EventErrorPolicy errorPolicy, int handlerTimeoutMilliseconds, int disableSubscriptionAfterFailures) -> AtomUI.City.EventBus.GeneratedEventHandlerDescriptor!

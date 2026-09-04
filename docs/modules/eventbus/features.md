@@ -2,19 +2,19 @@
 
 本文件是 EventBus 唯一 Feature 来源。没有 Feature ID 的能力不能进入实现；专题设计、API contract、诊断和测试矩阵必须引用本文件中的 Feature ID。
 
-EventBus 当前处于设计收口阶段。下列 Feature 均为 `In Design`，不能由既有源码或测试文件的存在推导为产品级完成。
+EventBus Application Plane 已完成实现与模块级验证；Plugin Plane 的 EventBus 侧 contract 已冻结，真实 PluginSystem 集成仍待后续模块施工。
 
 ## Feature 索引
 
 | Feature ID | 名称 | 阶段 | 状态 | Contract Family | 主测试族 |
 | --- | --- | --- | --- | --- | --- |
-| AUC-EVENTBUS-001 | Typed Publication | Application Plane MVP | In Design | IEventPublisher, EventPublishOptions, EventContext, EventPublishResult, EventPostResult | EventPublicationTests |
-| AUC-EVENTBUS-002 | Subscription Ownership & Lifecycle | Application Plane MVP | In Design | IEventSubscriber, IEventHandler, IEventSubscription, subscription state/options/descriptor | EventSubscriptionLifecycleTests |
-| AUC-EVENTBUS-003 | Contract Identity & Registry | Application Plane MVP | In Design | EventContractId, EventContractDescriptor, EventContractPlane, IEventContractRegistry | EventContractRegistryTests |
-| AUC-EVENTBUS-004 | Dispatch & Failure Policy | Application Plane MVP | In Design | dispatch target/mode, delivery result, error and timeout policy | EventDispatchAndFailurePolicyTests |
-| AUC-EVENTBUS-005 | Diagnostics & Observability | Application Plane MVP | In Design | EventDiagnosticIds, diagnostic context, metrics and safe payload projection | EventDiagnosticsTests |
-| AUC-EVENTBUS-006 | DI & Host Lifecycle | Application Plane MVP | In Design | AddEventBus, EventBus module/options, internal lifecycle control plane | EventBusHostIntegrationTests |
-| AUC-EVENTBUS-007 | Bounded Channel Runtime | Application Plane MVP | In Design | EventChannel, channel options, execution/concurrency/backpressure policy | EventChannelRuntimeTests |
+| AUC-EVENTBUS-001 | Typed Publication | Application Plane MVP | Verified | IEventPublisher, EventPublishOptions, EventContext, EventPublishResult, EventPostResult | EventPublicationTests |
+| AUC-EVENTBUS-002 | Subscription Ownership & Lifecycle | Application Plane MVP | EventBus Contract Verified / PluginSystem Integration Pending | IEventSubscriber, IEventHandler, IEventSubscription, subscription state/options/descriptor | EventSubscriptionLifecycleTests |
+| AUC-EVENTBUS-003 | Contract Identity & Registry | Application Plane MVP | Verified | EventContractId, EventContractDescriptor, EventContractPlane, IEventContractRegistry | EventContractRegistryTests |
+| AUC-EVENTBUS-004 | Dispatch & Failure Policy | Application Plane MVP | Verified | dispatch target/mode, delivery result, error and timeout policy | EventDispatchAndFailurePolicyTests |
+| AUC-EVENTBUS-005 | Diagnostics & Observability | Application Plane MVP | Verified | EventDiagnosticIds, diagnostic context, metrics and safe payload projection | EventDiagnosticsTests |
+| AUC-EVENTBUS-006 | DI & Host Lifecycle | Application Plane MVP | Verified | AddEventBus, EventBus module/options, internal lifecycle control plane | EventBusHostIntegrationTests |
+| AUC-EVENTBUS-007 | Bounded Channel Runtime | Application Plane MVP | Verified | EventChannel, channel options, execution/concurrency/backpressure policy | EventChannelRuntimeTests |
 | AUC-EVENTBUS-008 | Generated Event Catalog & NativeAOT | Application Plane MVP | Verified | event attributes, generated registrar/manifest/descriptors/invokers | EventBusGeneratorTests; EventBusNativeAotProcessTests |
 | AUC-EVENTBUS-009 | Plugin Event Planes | Plugin Integration Phase | EventBus Contract Verified / PluginSystem Integration Pending | shared/private plane, capability, EventBus contribution controller and domain lease | EventBusPluginContractTests; EventBusPluginLifecycleTests |
 
@@ -68,7 +68,7 @@ Primary Tests: `EventSubscriptionLifecycleTests`。
 ## AUC-EVENTBUS-003 Contract Identity & Registry
 
 Feature ID: `AUC-EVENTBUS-003`
-Status: In Design
+Status: Verified
 Goal: 为事件提供独立于临时 CLR 名称的稳定身份、唯一映射和加载边界。
 Contract Family: `EventContractId`、`EventContractDescriptor`、`EventContractPlane`、`IEventContractRegistry`。
 Design Coverage: ContractId/精确 Type 双向唯一映射、Shared/PluginPrivate plane 与 Assembly/ALC 身份、配置期只读快照、Register/Freeze 原子竞争、DI descriptor 汇入与生产冻结。版本、schema/object graph 生成验证属于 AUC-EVENTBUS-008；Plugin Private Registry 动态生命周期属于 AUC-EVENTBUS-009。
@@ -78,7 +78,7 @@ Primary Tests: `EventContractRegistryTests`。
 ## AUC-EVENTBUS-004 Dispatch & Failure Policy
 
 Feature ID: `AUC-EVENTBUS-004`
-Status: In Design
+Status: Verified
 Goal: 明确 handler 的执行目标、完成语义、错误隔离、取消和超时行为。
 Contract Family: dispatch target/mode、delivery result、error policy、handler timeout policy。
 Design Coverage: Current、UiThread、Background 和受管 Serialized dispatch；Post/InlineIfAllowed；ContinueAndReport、StopPublication、FailPublisher、DisableSubscription；订阅级 handler timeout 和有界 publication delivery 并发。1.0 只开放 subscription error policy，不声明尚未落地的 Global/Contract/Channel/Plugin 优先级。
@@ -88,7 +88,7 @@ Primary Tests: `EventDispatchAndFailurePolicyTests`。
 ## AUC-EVENTBUS-005 Diagnostics & Observability
 
 Feature ID: `AUC-EVENTBUS-005`
-Status: In Design
+Status: Verified
 Goal: 用稳定诊断和指标重建 publication、delivery、subscription、channel 与插件因果链。
 Contract Family: `EventDiagnosticIds`、EventBus diagnostic context、metrics snapshot、safe payload projector。
 Design Coverage: EventId、CorrelationId、CausationId、ContractId、SubscriptionId、owner、channel、partition、policy 和 duration。
@@ -98,7 +98,7 @@ Primary Tests: `EventDiagnosticsTests`。
 ## AUC-EVENTBUS-006 DI & Host Lifecycle
 
 Feature ID: `AUC-EVENTBUS-006`
-Status: In Design
+Status: Verified
 Goal: 将 EventBus 作为 ApplicationScope 运行时模块接入 Core Build、Start、Stop 和 Dispose。
 Contract Family: `AddEventBus`、EventBus module/options、只读业务接口、internal lifecycle controller。
 Design Coverage: descriptor 收集、配置冻结、worker 启停、拒绝新操作、总 deadline 下的 drain、Root DI 能力隔离。
@@ -108,7 +108,7 @@ Primary Tests: `EventBusHostIntegrationTests`。
 ## AUC-EVENTBUS-007 Bounded Channel Runtime
 
 Feature ID: `AUC-EVENTBUS-007`
-Status: In Design
+Status: Verified
 Goal: 用有界 channel 提供声明式顺序、并发、partition 和背压控制。
 Contract Family: `EventChannel<TEvent>`、`EventChannelOptions`、`EventBusRuntimeOptions`、execution/concurrency/backpressure policy。
 Design Coverage: Serialized、Partitioned、Concurrent；Wait、Reject、DropOldest、DropNewest、CoalesceLatest；有限 capacity、全局 runtime 总量、并发度、partition 数量和回收规则。
@@ -118,7 +118,7 @@ Primary Tests: `EventChannelRuntimeTests`。
 ## AUC-EVENTBUS-008 Generated Event Catalog & NativeAOT
 
 Feature ID: `AUC-EVENTBUS-008`
-Status: In Design
+Status: Verified
 Goal: 在编译期生成 contract、handler、channel 和 manifest 元数据，并接入唯一生产注册流程。
 Contract Family: event/handler/owner attributes、generated registrar/manifest、descriptor 和 strongly typed invoker。
 Design Coverage: 多程序集 catalog 合并、稳定 registrar identity、Module owner、生成代码 Host 接入、manifest version、无运行时扫描或 `MethodInfo.Invoke`。
@@ -143,7 +143,7 @@ Primary Tests: `EventBusGeneratorTests`、`EventBusNativeAotProcessTests`。
 ## AUC-EVENTBUS-009 Plugin Event Planes
 
 Feature ID: `AUC-EVENTBUS-009`
-Status: In Design
+Status: EventBus Contract Verified / PluginSystem Integration Pending
 Goal: 允许 PluginSystem 通过受控协议使用 Shared Plane，并为单个插件建立可整体释放的 Private Plane。
 Contract Family: plugin event capability、EventBus contribution request/controller/domain lease、private plane runtime contract。
 Design Coverage: EventBus 不依赖 PluginSystem 具体实现；EventBus 侧先冻结接口和测试替身；真实动态插件集成在 PluginSystem 阶段完成。

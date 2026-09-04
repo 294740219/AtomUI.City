@@ -79,7 +79,7 @@ require_nuspec_metadata() {
   require_nuspec_text "$package" "$nuspec" "<id>$project_name</id>"
   require_nuspec_text "$package" "$nuspec" "<version>$version</version>"
   require_nuspec_text "$package" "$nuspec" '<license type="expression">LGPL-3.0-only</license>'
-  require_nuspec_text "$package" "$nuspec" '<repository type="git" url="https://github.com/AtomUI/AtomUICity"'
+  require_nuspec_text "$package" "$nuspec" '<repository type="git" url="https://github.com/AtomUI/AtomUI.City"'
   require_nuspec_text "$package" "$nuspec" '<readme>README.nuget.md</readme>'
   require_nuspec_text "$package" "$nuspec" '<releaseNotes>See RELEASE_NOTES.md for release notes.</releaseNotes>'
 }

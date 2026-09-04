@@ -1,7 +1,7 @@
 # AtomUI.City.EventBus
 
 文档等级：Level 3
-成熟度：In Design
+成熟度：Application Plane Verified / PluginSystem Integration Pending
 执行边界：Host runtime service
 程序集：`AtomUI.City.EventBus`
 源码：`src/AtomUI.City.EventBus`
@@ -70,6 +70,6 @@ AtomUI.City.EventBus 作为 Host 服务或模块贡献接入 Core 生命周期�
 
 ## 当前成熟度状态
 
-`In Design`
+`Application Plane Verified / PluginSystem Integration Pending`
 
-EventBus 以 [features.md](features.md) 中的九个 Feature 为唯一状态来源。当前所有 Feature 均处于设计收口阶段，既有源码和测试不作为设计完成证明。`001–008 Verified` 表示 Application Plane MVP 完成；`009 Verified` 表示 Plugin Plane 完成。
+EventBus 以 [features.md](features.md) 中的九个 Feature 为唯一状态来源。`001`、`003–008` 已完成模块内验收；`002` 的 Application Plane 与 EventBus contribution contract 已验证，但完整插件集成与 `009` 一同等待 PluginSystem 施工。该 Pending 不阻断 Application Plane MVP，也不能被误写为完整 EventBus Plugin Plane 已完成。

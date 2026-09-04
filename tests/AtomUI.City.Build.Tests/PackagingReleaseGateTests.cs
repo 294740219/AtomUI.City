@@ -205,7 +205,7 @@ public sealed class PackagingReleaseGateTests
         Assert.Contains("dotnet build", publicApiScript, StringComparison.Ordinal);
         Assert.Contains("dotnet pack", publicApiScript, StringComparison.Ordinal);
         Assert.Contains("EnablePackageValidation", publicApiScript, StringComparison.Ordinal);
-        Assert.Contains("AtomUI.City.Core.xml", publicApiScript, StringComparison.Ordinal);
+        Assert.Contains("$assembly_name.xml", publicApiScript, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -262,6 +262,7 @@ public sealed class PackagingReleaseGateTests
         Assert.Contains("bash engineering/check-public-api.sh", releaseGate, StringComparison.Ordinal);
         Assert.Contains("bash engineering/pack.sh --configuration \"$configuration\" --no-build", releaseGate, StringComparison.Ordinal);
         Assert.Contains("bash engineering/validate-packages.sh --configuration \"$configuration\"", releaseGate, StringComparison.Ordinal);
+        Assert.Contains("export CONFIGURATION=\"$configuration\"", releaseGate, StringComparison.Ordinal);
         Assert.Contains("bash engineering/check-template-smoke.sh", releaseGate, StringComparison.Ordinal);
         Assert.Contains("bash engineering/generate-release-notes.sh", releaseGate, StringComparison.Ordinal);
 

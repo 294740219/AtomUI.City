@@ -10,7 +10,7 @@ tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/atomuicity-project-inventory.XXXXXX")"
 trap 'rm -rf "$tmp_dir"' EXIT
 
 find_repository_projects() {
-  find src tests -path 'src/AtomUI.City.Templates/templates' -prune -o -name '*.csproj' -print
+  find benchmarks src tests -path 'src/AtomUI.City.Templates/templates' -prune -o -name '*.csproj' -print
 }
 
 find_source_projects() {

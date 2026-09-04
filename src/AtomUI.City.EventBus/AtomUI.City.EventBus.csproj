@@ -2,10 +2,15 @@
 
   <ItemGroup>
     <ProjectReference Include="../AtomUI.City.Core/AtomUI.City.Core.csproj" />
+    <ProjectReference Include="../AtomUI.City.Generators/AtomUI.City.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" PrivateAssets="all" />
   </ItemGroup>
 
   <PropertyGroup>
     <TargetFrameworks>$(AtomUICityTargetFrameworks)</TargetFrameworks>
+    <EnablePackageValidation>true</EnablePackageValidation>
+    <EnableStrictModeForCompatibleFrameworksInPackage>true</EnableStrictModeForCompatibleFrameworksInPackage>
+    <WarningsAsErrors>$(WarningsAsErrors);RS0016;RS0017;RS0022;RS0024;RS0025;RS0027;RS0036;RS0041;RS0048</WarningsAsErrors>
   </PropertyGroup>
 
 </Project>

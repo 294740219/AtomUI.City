@@ -56,6 +56,10 @@ while IFS= read -r test_file; do
     continue
   fi
 
+  if grep -q '\[CollectionDefinition' "$test_file" && ! grep -Eq '\[(Fact|Theory)\]' "$test_file"; then
+    continue
+  fi
+
   if grep -Eq '\[(Fact|Theory)\]' "$test_file" && [[ "$test_file_name" != *Tests.cs ]]; then
     report_failure "test file without Tests suffix" "$test_file" "$test_file_name"
   fi
