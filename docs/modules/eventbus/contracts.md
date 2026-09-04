@@ -199,6 +199,14 @@ Host 维护共享契约注册表。它可以与全局 `IHostContractRegistry` �
 
 运行时发布热路径使用预构建 descriptor，不反复反射读取 Assembly 和 Attribute。
 
+Application Plane 1.0 的 Shared Registry public surface 还必须提供 `IsFrozen`、只读 `Descriptors` 快照、`Freeze()`，以及按 `EventContractId` 和精确 `Type` 的 `TryGet`。`Register` 只在 MutableDuringConfiguration 阶段成功；`Freeze` 与 `Register` 竞争时只允许“完整进入快照”或“明确拒绝”两种结果。
+
+DI 生产路径必须在构造 EventBus 前执行一次 Registry 准备事务：将 `AddEventContract<TEvent>` 收集的 descriptor 汇入尚未冻结的 Registry，然后冻结并逐项核验 ContractId 与精确 Type 映射。调用方替换 `IEventContractRegistry` 不能绕过该事务；已经冻结却缺失已收集 descriptor 的自定义 Registry 必须阻止 EventBus 创建，不能静默丢弃配置。
+
+`GetOrCreate<TEvent>` 只作为当前手工构造 `InMemoryEventContractRegistry` 时的应用内部事件过渡入口：仅在未冻结状态、且事件类型来自 Default AssemblyLoadContext 时允许创建默认 descriptor。DI 生产路径必须在 EventBus 可解析前冻结 Registry；冻结后该方法对未知类型执行 required lookup 并失败，不能在发布热路径修改身份表。插件或 collectible ALC 类型在任何状态下都不能通过该入口进入 Shared Plane。
+
+Contract version、schema fingerprint、兼容版本范围和完整对象图由 `AUC-EVENTBUS-008` 的 generated descriptor/analyzer 提供；`AUC-EVENTBUS-003` 当前只负责保存和验证 ContractId、精确 Type、Assembly、AssemblyLoadContext 和 plane 身份边界，不能为了提前填充这些字段而在运行时反射扫描对象图。Plugin Private Registry 的创建、动态快照和释放由 `AUC-EVENTBUS-009` 落实。
+
 ### 8. EventContractId
 
 EventContractId 是事件跨版本和跨加载边界的稳定身份。
@@ -237,13 +245,15 @@ Contract Id 不用于把任意无类型 payload 转换为动态消息。运行�
 - 明确 nullability。
 - 简单、稳定的数据结构。
 
-可以使用：
+Shared Contract 1.0 使用封闭白名单，只允许：
 
-- BCL 基础类型。
+- `bool`、整数、浮点数、`decimal`、`char`、`string`。
+- `Guid`、`DateTime`、`DateTimeOffset`、`DateOnly`、`TimeOnly`、`TimeSpan`。
 - Contract Assembly 自己定义的 enum。
-- Contract Assembly 自己定义的不可变 value object。
-- `DateTimeOffset`、`Guid` 等稳定值类型。
-- 只读集合接口，但实际值应避免后续原地修改。
+- Contract Assembly 自己定义的 sealed、无自定义基类、非 abstract 不可变 class，或 readonly struct；公开属性只能 get/init，实例字段必须 readonly 或是 get/init 自动属性的 backing field。
+- `Nullable<T>`、`ImmutableArray<T>`、`KeyValuePair<TKey,TValue>`，且全部泛型参数递归满足本白名单。
+
+数组、集合接口和任意其他外部程序集类型不在 1.0 白名单中。需要多值数据时使用 `ImmutableArray<T>`；需要字典语义时使用 `ImmutableArray<KeyValuePair<string,T>>`，避免接口实际实例或自定义 comparer 持有插件类型。
 
 不推荐使用继承层次表达事件多态。默认只进行精确 contract 匹配，避免运行时扫描继承树和产生隐式订阅范围。
 
@@ -264,6 +274,8 @@ Contract Id 不用于把任意无类型 payload 转换为动态消息。运行�
 - 插件私有 `Type` 或反射对象。
 - 可变全局集合。
 - 无约束 `object` 扩展数据。
+- `dynamic`、interface、abstract class、数组、开放或用户自定义泛型。
+- 任意未进入封闭白名单的外部 BCL/第三方类型。
 
 以下设计不允许作为共享 Contract：
 
@@ -273,13 +285,11 @@ public sealed record DataChangedEvent(object Data);
 
 即使 `DataChangedEvent` 位于共享 Assembly，`Data` 仍可能引用插件私有实例，从而把插件类型泄漏给 Host 和其他订阅者。
 
-如果确实需要扩展字段，应使用受约束的稳定值模型，例如：
+如果确实需要扩展字段，应使用 Contract Assembly 明确定义的 sealed value object，或 `ImmutableArray<KeyValuePair<string,string>>`。第一版不接受任意 `object` property bag、只读集合接口或仅靠运行时约定的可序列化 schema。
 
-- `IReadOnlyDictionary<string,string>`。
-- 明确定义的 Contract value object。
-- 已注册的可序列化 schema。
+生成器必须在编译期递归验证上述完整对象图并生成安全证明；运行时发布热路径不得使用反射重新扫描或通用深复制。手工 `AddEventContract<TEvent>` 仍可用于 Application Plane 内部事件，但其 descriptor 没有 generated object-graph proof，不得授予插件 Shared Publish/Subscribe capability。
 
-第一版不建议提供任意 object property bag。
+Generated handler 也必须在编译期证明其 `IEventHandler<TEvent>` 指向可达的 generated Shared contract。当前 compilation 以有效 contract candidate 为准；引用程序集以 `EventContractAttribute`、`GeneratedEventManifestAttribute`、Core `GeneratedServiceManifestAttribute` 三者共同证明，且两个 manifest 必须指向同一个 registrar。Host 随后基于实际选中的 Module contribution 再做一次 handler/contract 闭包验证；这允许 Module 合法订阅另一 Module 的 Shared contract，同时拒绝只选择 handler owner、却遗漏 contract owner 的应用组合。
 
 ### 11. Shared Plane 与 Private Plane
 
@@ -307,6 +317,8 @@ Plugin publishes private event
 ```
 
 插件私有事件不能因为 namespace 看起来公共就进入 Shared Plane。判断依据是加载期生成并注册的 EventContract descriptor。PluginPrivate descriptor 仍必须持有已创建的 `EventContractId`，不能使用 default id。
+
+`EventContractDescriptor.PluginPrivate<TEvent>` 只接受 collectible、non-default AssemblyLoadContext 中定义的类型。Default ALC 类型不能通过标记 `PluginPrivate` 冒充插件私有身份；非 collectible 私有上下文也不符合 City 的插件可卸载合同。该 descriptor 只能由后续 AUC-EVENTBUS-009 的插件领域运行时持有，Shared Registry 必须拒绝注册。
 
 ### 12. 插件之间通信
 

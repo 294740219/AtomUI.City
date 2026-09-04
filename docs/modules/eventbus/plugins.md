@@ -321,6 +321,26 @@ EventBus 维护：
 
 无法 drain 时，插件停用结果必须明确失败或降级。
 
+EventBus contribution 使用 `EventPluginQuotas.DrainTimeout` 作为整个终止事务的单一总 deadline，默认 30 秒。该 deadline 覆盖 subscription drain、已接受 operation、plugin `LifecycleScope` 与 private runtime 清理，不能为每个步骤重新计时。超过 deadline 时：
+
+- lease 进入 `Faulted`，并以 `EventPluginDrainTimeoutException` 向 PluginSystem 报告；
+- 写入 `EventBus.EventPluginDrainTimedOut`，最小 context 包含 `pluginId`、`drainTimeoutMilliseconds`、`activeOperations`、`activeSubscriptions` 和 `pendingRegistrations`；
+- EventBus 不强制终止线程，也不声称插件已经安全卸载；
+- 迟到清理继续被观察，PluginId 在真实清理完成前仍被占用，避免旧、新插件实例并存；
+- PluginSystem 决定拒绝卸载、隔离、重试或上报故障，EventBus 不越权决定整插件策略。
+
+ContributionLease 不允许在内部状态锁中调用 EventBus、Contract Registry、Diagnostics sink、用户代码或其他可重入组件。插件 Subscribe 采用三阶段提交：
+
+```text
+锁外验证 contract/capability
+-> 锁内复核 Active、预留配额并登记 pending registration
+-> 锁外创建底层 subscription
+-> 锁内提交；若已 Quiescing 则拒绝提交
+-> 锁外完成失败回滚
+```
+
+Stop 在锁内发布 Quiescing 和唯一终止 Task 后立即退出锁，再写诊断。终止 Task 必须先等待所有 pending registration 成为“完整提交”或“底层资源已完成回滚”，然后才能认定 subscription snapshot 完整。诊断 sink 同步重入 Stop/Subscribe 时只能观察完整状态，不能递归发布第二个终止事务。
+
 ### 14. 卸载流程
 
 插件卸载前 EventBus 必须满足：

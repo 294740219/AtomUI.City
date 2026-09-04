@@ -16,6 +16,7 @@
     <ProjectReference Include="../AtomUI.City.Core.Mvp.Diagnostics/AtomUI.City.Core.Mvp.Diagnostics.csproj" />
     <ProjectReference Include="../AtomUI.City.Core.Mvp.Unselected/AtomUI.City.Core.Mvp.Unselected.csproj" />
     <ProjectReference Include="../AtomUI.City.Core.Mvp.Conflict/AtomUI.City.Core.Mvp.Conflict.csproj" />
+    <Compile Include="../../Shared/ProcessEntryPoint.cs" Link="ProcessEntryPoint.cs" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(AtomUICityCoreMvpPublishAot)' == 'true'">

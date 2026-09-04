@@ -308,10 +308,12 @@ internal sealed class ModuleRegistry : IModuleLifecycleController
     public ValueTask InitializeAsync(
         IApplicationContext applicationContext,
         IServiceProvider services,
+        LifecycleScope applicationScope,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(applicationContext);
         ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(applicationScope);
         LifecycleInvocationGuard.ThrowIfReentrant(this, LifecycleOperationKind.Initialize);
 
         DeferredLifecycleOperation? operation = null;
@@ -342,7 +344,11 @@ internal sealed class ModuleRegistry : IModuleLifecycleController
                 initializeTask,
                 ModuleRegistryState.Initializing,
                 ModuleRegistryState.Initialized,
-                () => InitializeCoreAsync(applicationContext, services, cancellationToken)));
+                () => InitializeCoreAsync(
+                    applicationContext,
+                    services,
+                    applicationScope,
+                    cancellationToken)));
 
         return new ValueTask(initializeTask);
     }
@@ -350,9 +356,13 @@ internal sealed class ModuleRegistry : IModuleLifecycleController
     private async Task InitializeCoreAsync(
         IApplicationContext applicationContext,
         IServiceProvider services,
+        LifecycleScope applicationScope,
         CancellationToken cancellationToken)
     {
-        var context = new ApplicationInitializationContext(applicationContext, services);
+        var context = new ApplicationInitializationContext(
+            applicationContext,
+            services,
+            applicationScope);
         var diagnostics = services.GetService<IHostDiagnostics>();
 
         await ExecuteInitializationStageAsync(

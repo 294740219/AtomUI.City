@@ -8,7 +8,7 @@ AtomUI.City.EventBus 作为 Host 服务或模块贡献接入 Core 生命周期�
 
 ## 模块特有状态机
 
-- EventBus: Active -> Disposed
+- EventBus: Active -> Quiescing -> Draining -> Disposed；终止失败由共享 DisposeAsync 事务传播。单独 `AddEventBus` 构造完成即 Active；City Host-managed runtime 在 Core pre-application-initialization 之前保持 closed gate，成功绑定真实 ApplicationScope 后才进入 Active，该 gate 不是额外公开状态。
 - Subscription: Created -> Active -> Quiescing -> Draining -> Disposed；终止或清理失败进入 Faulted
 - Publish: Created -> Dispatching -> Completed 或 Failed 或 Cancelled
 - Contract registry: MutableDuringConfiguration -> FrozenAtRuntime；插件动态贡献走 snapshot 替换
@@ -19,7 +19,7 @@ AtomUI.City.EventBus 作为 Host 服务或模块贡献接入 Core 生命周期�
 - Subscribe 提交必须原子复核 EventBus accepting 状态、owner Running 状态和 owner token；与 stop 竞争时不得留下 Active 或半注册 subscription。
 - Publish 创建 EventContext，选定 dispatch policy，按稳定顺序调用 handler。
 - handler 失败按 EventErrorPolicy 继续、停止或聚合错误。
-- EventBus Dispose 幂等，释放 active subscriptions，并阻止新的 publish、post 和 subscribe。
+- EventBus Dispose 幂等并快速建立 Quiescing barrier，阻止新的 publish、post 和 subscribe；DisposeAsync 等待同一事务取消 queued/in-flight publication、结束 channel worker 并释放 active subscriptions。
 - owner cancellation 立即把该 owner 的 subscription 移出新 snapshot 并触发 handler cancellation，不影响其他 owner 对同一事件的订阅。
 - Subscription `Dispose()` 只执行快速 Quiescing，不等待异步 handler；`StopAsync()`、`DisposeAsync()` 和 owner cancellation 共享唯一终止事务。
 - 调用方 token 或 shutdown deadline 只取消等待；后台终止继续到 Disposed 或 Faulted，不产生永久 StopTimedOut 状态。
@@ -37,6 +37,7 @@ AtomUI.City.EventBus 作为 Host 服务或模块贡献接入 Core 生命周期�
 - 插件来源对象必须绑定 plugin owner。
 - 插件停用时先拒绝新贡献，再撤销现有贡献，最后释放对象。
 - PluginSystem 在卸载插件资源前等待 EventBus 领域 ContributionLease 持有的 subscriptions 完成 drain。
+- ContributionLease 使用配额中的单一总 DrainTimeout；超时后进入 Faulted 并结束公开等待，但迟到清理继续受观察，真实清理完成前 PluginId 不得复用。
 - 跨插件 contract 类型必须来自 Host 共享程序集。
 
 ## 异常中断行为

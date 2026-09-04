@@ -2,6 +2,7 @@ using System.Text;
 using AtomUI.City.Generators.Common;
 using AtomUI.City.Generators.DependencyInjection;
 using AtomUI.City.Generators.Diagnostics;
+using AtomUI.City.Generators.EventBus;
 using AtomUI.City.Generators.Modularity;
 using AtomUI.City.Generators.Presentation;
 using Microsoft.CodeAnalysis;
@@ -20,9 +21,15 @@ public sealed class AtomUICityIncrementalGenerator : IIncrementalGenerator
         "AtomUI.City.Core.Modularity.GeneratedModuleManifestAttribute";
     private const string GeneratedServiceManifestAttributeName =
         "AtomUI.City.Core.DependencyInjection.GeneratedServiceManifestAttribute";
+    private const string GeneratedEventManifestAttributeName =
+        "AtomUI.City.EventBus.GeneratedEventManifestAttribute";
+    private const string EventContractAttributeName =
+        "AtomUI.City.EventBus.EventContractAttribute";
     private const string ServiceRegistrationOwnerAttributeName =
         "AtomUI.City.Core.DependencyInjection.ServiceRegistrationOwnerAttribute";
     private const string ModuleInterfaceName = "AtomUI.City.Core.Modularity.IModule";
+    private const string ServiceRegistrarInterfaceName =
+        "AtomUI.City.Core.DependencyInjection.IServiceRegistrar";
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
@@ -39,13 +46,20 @@ public sealed class AtomUICityIncrementalGenerator : IIncrementalGenerator
                 static (syntaxContext, _) => ReadServiceCandidate(syntaxContext))
             .Where(static candidate => candidate is not null)
             .Collect();
+        var eventCandidates = context.SyntaxProvider
+            .CreateSyntaxProvider(
+                static (node, _) => node is TypeDeclarationSyntax declaration && declaration.AttributeLists.Count > 0,
+                static (syntaxContext, _) => ReadEventCandidate(syntaxContext))
+            .Where(static candidate => candidate is not null)
+            .Collect();
 
         context.RegisterSourceOutput(
-            context.CompilationProvider.Combine(candidates),
+            context.CompilationProvider.Combine(candidates).Combine(eventCandidates),
             static (sourceContext, value) =>
             {
-                var compilation = value.Left;
-                var allCandidates = value.Right.Where(candidate => candidate is not null).Select(candidate => candidate!).ToArray();
+                var compilation = value.Left.Left;
+                var allCandidates = value.Left.Right.Where(candidate => candidate is not null).Select(candidate => candidate!).ToArray();
+                var allEventCandidates = value.Right.Where(candidate => candidate is not null).Select(candidate => candidate!).ToArray();
                 var services = allCandidates
                     .Where(candidate => candidate.Registration is not null)
                     .GroupBy(candidate => candidate.TypeName, StringComparer.Ordinal)
@@ -61,7 +75,7 @@ public sealed class AtomUICityIncrementalGenerator : IIncrementalGenerator
                     .Where(candidate => candidate.Registration is null && candidate.Issues.Count > 0)
                     .ToArray();
 
-                if (invalidDeclarations.Length > 0)
+                if (invalidDeclarations.Length > 0 || allEventCandidates.Any(candidate => candidate.Issues.Count > 0))
                 {
                     foreach (var candidate in invalidDeclarations)
                     {
@@ -70,10 +84,57 @@ public sealed class AtomUICityIncrementalGenerator : IIncrementalGenerator
                             ReportInvalidService(sourceContext, candidate.Location, issue);
                         }
                     }
+                    foreach (var candidate in allEventCandidates)
+                    {
+                        foreach (var issue in candidate.Issues)
+                        {
+                            ReportInvalidEvent(sourceContext, candidate.Location, issue);
+                        }
+                    }
                     return;
                 }
 
-                if (services.Length == 0 && referencedRegistrars.Count == 0)
+                var eventContracts = allEventCandidates.Where(candidate => candidate.Contract is not null)
+                    .Select(candidate => candidate.Contract!).OrderBy(value => value.ContractId, StringComparer.Ordinal).ToArray();
+                var eventHandlers = allEventCandidates.Where(candidate => candidate.Handler is not null)
+                    .Select(candidate => candidate.Handler!).OrderBy(value => value.HandlerTypeName, StringComparer.Ordinal).ToArray();
+                var duplicateContractIds = eventContracts.GroupBy(value => value.ContractId, StringComparer.Ordinal)
+                    .Where(group => group.Count() > 1).ToArray();
+                if (duplicateContractIds.Length > 0)
+                {
+                    foreach (var duplicate in duplicateContractIds)
+                    {
+                        ReportInvalidEvent(sourceContext, null,
+                            $"Event ContractId '{duplicate.Key}' is declared by more than one event type in the same compilation.");
+                    }
+                    return;
+                }
+
+                var localContractTypes = new HashSet<ITypeSymbol>(
+                    eventContracts.Select(contract => contract.EventTypeSymbol),
+                    SymbolEqualityComparer.Default);
+                var invalidHandlerContracts = allEventCandidates
+                    .Where(candidate => candidate.Handler is not null)
+                    .Where(candidate => !IsReachableGeneratedEventContract(
+                        compilation,
+                        candidate.Handler!.EventTypeSymbol,
+                        localContractTypes))
+                    .ToArray();
+                if (invalidHandlerContracts.Length > 0)
+                {
+                    foreach (var candidate in invalidHandlerContracts)
+                    {
+                        ReportInvalidEvent(
+                            sourceContext,
+                            candidate.Location,
+                            $"Event handler '{candidate.Handler!.HandlerTypeName}' targets event type " +
+                            $"'{candidate.Handler.EventTypeName}', which is not present in the reachable generated Shared event contract catalog.");
+                    }
+                    return;
+                }
+                var eventManifest = new EventGenerationManifest(eventContracts, eventHandlers);
+
+                if (services.Length == 0 && referencedRegistrars.Count == 0 && eventManifest.IsEmpty)
                 {
                     return;
                 }
@@ -139,11 +200,27 @@ public sealed class AtomUICityIncrementalGenerator : IIncrementalGenerator
                     assemblyName,
                     owners.SingleOrDefault()?.TypeName,
                     manifest.Manifest.Registrations,
-                    referencedRegistrars);
+                    referencedRegistrars,
+                    eventManifest);
                 sourceContext.AddSource(
                     GeneratedCodeNames.CreateHintName(GeneratorFeature.DependencyInjection, assemblyName, "Services"),
                     SourceText.From(source, Encoding.UTF8));
             });
+    }
+
+    private static EventGenerationCandidate? ReadEventCandidate(GeneratorSyntaxContext context)
+    {
+        return context.SemanticModel.GetDeclaredSymbol(context.Node) is INamedTypeSymbol symbol
+            ? EventMetadataReader.Read(symbol)
+            : null;
+    }
+
+    private static void ReportInvalidEvent(SourceProductionContext context, Location? location, string message)
+    {
+        context.ReportDiagnostic(GeneratorDiagnostics.CreateRoslynDiagnostic(
+            GeneratorFeature.EventBus,
+            new GeneratorDiagnostic(GeneratorDiagnostics.InvalidManifestInput, message),
+            location));
     }
 
     private static ServiceGenerationCandidate? ReadServiceCandidate(GeneratorSyntaxContext context)
@@ -327,6 +404,55 @@ public sealed class AtomUICityIncrementalGenerator : IIncrementalGenerator
         }
 
         return registrarTypes.OrderBy(name => name, StringComparer.Ordinal).ToArray();
+    }
+
+    private static bool IsReachableGeneratedEventContract(
+        Compilation compilation,
+        ITypeSymbol eventType,
+        HashSet<ITypeSymbol> localContractTypes)
+    {
+        if (SymbolEqualityComparer.Default.Equals(eventType.ContainingAssembly, compilation.Assembly))
+        {
+            return localContractTypes.Contains(eventType);
+        }
+
+        if (eventType is not INamedTypeSymbol namedEventType ||
+            !namedEventType.GetAttributes().Any(attribute =>
+                HasAttributeName(attribute, EventContractAttributeName)))
+        {
+            return false;
+        }
+
+        var eventManifests = eventType.ContainingAssembly.GetAttributes().Where(attribute =>
+            HasAttributeName(attribute, GeneratedEventManifestAttributeName)).ToArray();
+        var serviceManifests = eventType.ContainingAssembly.GetAttributes().Where(attribute =>
+            HasAttributeName(attribute, GeneratedServiceManifestAttributeName)).ToArray();
+        if (eventManifests.Length != 1 || serviceManifests.Length != 1)
+        {
+            return false;
+        }
+
+        var eventManifest = eventManifests[0];
+        var serviceManifest = serviceManifests[0];
+        if (
+            eventManifest.ConstructorArguments.Length != 2 ||
+            serviceManifest.ConstructorArguments.Length != 1 ||
+            eventManifest.ConstructorArguments[0].Value is not INamedTypeSymbol eventRegistrar ||
+            serviceManifest.ConstructorArguments[0].Value is not INamedTypeSymbol serviceRegistrar ||
+            eventManifest.ConstructorArguments[1].Value is not int version || version != 1)
+        {
+            return false;
+        }
+
+        return SymbolEqualityComparer.Default.Equals(eventRegistrar, serviceRegistrar) &&
+            SymbolEqualityComparer.Default.Equals(eventRegistrar.ContainingAssembly, eventType.ContainingAssembly) &&
+            eventRegistrar.DeclaredAccessibility == Accessibility.Public &&
+            !eventRegistrar.IsAbstract &&
+            eventRegistrar.Arity == 0 &&
+            eventRegistrar.AllInterfaces.Any(@interface => string.Equals(
+                @interface.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat),
+                ServiceRegistrarInterfaceName,
+                StringComparison.Ordinal));
     }
 
     private static void ReportInvalidService(SourceProductionContext context, Location? location, string message)

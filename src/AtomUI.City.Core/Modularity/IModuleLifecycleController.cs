@@ -1,5 +1,6 @@
 using AtomUI.City.Core.Diagnostics;
 using AtomUI.City.Core.Hosting;
+using AtomUI.City.Core.Lifecycle;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace AtomUI.City.Core.Modularity;
@@ -26,6 +27,7 @@ internal interface IModuleLifecycleController : IAsyncDisposable
     ValueTask InitializeAsync(
         IApplicationContext applicationContext,
         IServiceProvider services,
+        LifecycleScope applicationScope,
         CancellationToken cancellationToken = default);
 
     ValueTask ShutdownAsync(

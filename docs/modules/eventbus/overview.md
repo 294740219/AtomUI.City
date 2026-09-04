@@ -65,6 +65,7 @@ AtomUI.City.EventBus 作为 Host 服务或模块贡献接入 Core 生命周期�
 | [testing.md](testing.md) | 具体测试矩阵、必须断言的行为、测试类型和缺口处理。 |
 | [compatibility.md](compatibility.md) | public API、配置、manifest、snapshot、generated output、CLI envelope 和包布局兼容。 |
 | [integration.md](integration.md) | 跨模块依赖方向、生命周期、线程和失败行为。 |
+| [release-candidate-validation.md](release-candidate-validation.md) | EventBus Application Plane MVP 发布候选的冻结规则、验收门禁、命令和判定标准。 |
 | [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) | 仓库级进度镜像；必须以下述模块 Feature 状态为准，不能反向覆盖模块设计状态。 |
 
 ## 当前成熟度状态

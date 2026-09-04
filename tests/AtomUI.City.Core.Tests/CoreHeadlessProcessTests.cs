@@ -1,8 +1,9 @@
-using System.Diagnostics;
 using System.Text.Json;
+using AtomUI.City.Testing.Processes;
 
 namespace AtomUI.City.Core.Tests;
 
+[Collection(ProcessTestCollection.Name)]
 public sealed class CoreHeadlessProcessTests
 {
 #if DEBUG
@@ -10,6 +11,29 @@ public sealed class CoreHeadlessProcessTests
 #else
     private const string BuildConfiguration = "Release";
 #endif
+
+    [Theory]
+    [InlineData("build", "Core fixture build failure.")]
+    [InlineData("di", "Unable to resolve service")]
+    [InlineData("start", "Core fixture start failure.")]
+    public async Task HeadlessEntryFailureIsReportedWithoutUnhandledExceptionEscape(
+        string phase,
+        string expectedMessage)
+    {
+        var result = await RunApplicationAsync("--test-entry-failure", phase);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains(expectedMessage, result.StandardError, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task HeadlessHungEntryIsTerminatedByTheProcessTimeout()
+    {
+        var exception = await Assert.ThrowsAsync<TimeoutException>(() =>
+            RunApplicationAsync(TimeSpan.FromMilliseconds(500), "--test-entry-hang"));
+
+        Assert.Contains("did not exit", exception.Message, StringComparison.Ordinal);
+    }
 
     [Fact]
     public async Task HeadlessLifecycleRunsToCompletionWithoutUiRuntime()
@@ -425,6 +449,30 @@ public sealed class CoreHeadlessProcessTests
 
     private static async Task<JsonElement> RunScenarioAsync(string scenario)
     {
+        var result = await RunApplicationAsync("--test-scenario", scenario);
+        Assert.True(
+            result.ExitCode == 0,
+            $"Headless Core scenario '{scenario}' exited with {result.ExitCode}. " +
+            $"stdout: {result.StandardOutput} stderr: {result.StandardError}");
+
+        var jsonLine = result.StandardOutput
+            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
+            .LastOrDefault();
+        Assert.False(string.IsNullOrWhiteSpace(jsonLine));
+
+        using var document = JsonDocument.Parse(jsonLine);
+        return document.RootElement.Clone();
+    }
+
+    private static Task<TestProcessResult> RunApplicationAsync(params string[] arguments)
+    {
+        return RunApplicationAsync(TimeSpan.FromSeconds(15), arguments);
+    }
+
+    private static Task<TestProcessResult> RunApplicationAsync(
+        TimeSpan timeout,
+        params string[] arguments)
+    {
         var repositoryRoot = FindRepositoryRoot();
         var applicationPath = Path.Combine(
             repositoryRoot,
@@ -436,48 +484,11 @@ public sealed class CoreHeadlessProcessTests
             "AtomUI.City.Core.HeadlessApp.dll");
 
         Assert.True(File.Exists(applicationPath), $"Headless fixture was not built: {applicationPath}");
-
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet",
-            RedirectStandardError = true,
-            RedirectStandardOutput = true,
-            UseShellExecute = false,
-            CreateNoWindow = true,
-        };
-        startInfo.ArgumentList.Add(applicationPath);
-        startInfo.ArgumentList.Add("--test-scenario");
-        startInfo.ArgumentList.Add(scenario);
-
-        using var process = Process.Start(startInfo)
-            ?? throw new InvalidOperationException("Could not start the headless Core fixture.");
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-        var standardOutput = process.StandardOutput.ReadToEndAsync(timeout.Token);
-        var standardError = process.StandardError.ReadToEndAsync(timeout.Token);
-
-        try
-        {
-            await process.WaitForExitAsync(timeout.Token);
-        }
-        catch (OperationCanceledException)
-        {
-            process.Kill(entireProcessTree: true);
-            throw new TimeoutException($"Headless Core scenario '{scenario}' did not exit.");
-        }
-
-        var output = await standardOutput;
-        var error = await standardError;
-        Assert.True(
-            process.ExitCode == 0,
-            $"Headless Core scenario '{scenario}' exited with {process.ExitCode}. stdout: {output} stderr: {error}");
-
-        var jsonLine = output
-            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
-            .LastOrDefault();
-        Assert.False(string.IsNullOrWhiteSpace(jsonLine));
-
-        using var document = JsonDocument.Parse(jsonLine);
-        return document.RootElement.Clone();
+        return ProcessTestRunner.RunAsync(
+            Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet",
+            repositoryRoot,
+            timeout,
+            [applicationPath, .. arguments]);
     }
 
     private static string FindRepositoryRoot()

@@ -24,18 +24,31 @@ public sealed class EventDiagnosticsTests
         Assert.Equal(
             [
                 "EventBus.EventAccepted",
+                "EventBus.EventChannelBackpressure",
+                "EventBus.EventContractRejected",
                 "EventBus.EventDeliveryCancelled",
+                "EventBus.EventDeliveryCompleted",
                 "EventBus.EventDeliveryFailed",
+                "EventBus.EventDeliveryStarted",
+                "EventBus.EventDeliveryTimedOut",
+                "EventBus.EventDropped",
+                "EventBus.EventPayloadProjectionFailed",
+                "EventBus.EventPluginDrainTimedOut",
                 "EventBus.EventPublished",
                 "EventBus.EventRejected",
                 "EventBus.EventSubscriptionAdded",
+                "EventBus.EventSubscriptionDisabled",
                 "EventBus.EventSubscriptionDisposed",
                 "EventBus.EventSubscriptionQuiescing",
-                "EventBus.EventSubscriptionTerminationFailed"
+                "EventBus.EventSubscriptionTerminationFailed",
+                "EventBus.PluginContributionActivated",
+                "EventBus.PluginContributionDisposed",
+                "EventBus.PluginContributionQuiescing",
+                "EventBus.PluginContributionRejected"
             ],
             codes);
         Assert.Equal(codes.Length, codes.Distinct(StringComparer.Ordinal).Count());
-        Assert.All(codes, code => Assert.StartsWith("EventBus.Event", code, StringComparison.Ordinal));
+        Assert.All(codes, code => Assert.StartsWith("EventBus.", code, StringComparison.Ordinal));
     }
 
     [Fact]
@@ -318,7 +331,309 @@ public sealed class EventDiagnosticsTests
         Assert.Contains(diagnostics.Records, record => record.Code == EventDiagnosticIds.EventRejected);
     }
 
+    [Fact]
+    public async Task DiagnosticSinkFailureCannotChangeEventBusBusinessResult()
+    {
+        var diagnostics = new ThrowingHostDiagnostics();
+        await using var eventBus = new InMemoryEventBus(diagnostics: diagnostics);
+        var handled = 0;
+
+        var subscription = eventBus.Subscribe<TestEvent>(_ =>
+        {
+            Interlocked.Increment(ref handled);
+            return ValueTask.CompletedTask;
+        });
+
+        var result = await eventBus.PublishAsync(new TestEvent("isolated"));
+        await subscription.DisposeAsync();
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(1, handled);
+        Assert.Equal(EventSubscriptionState.Disposed, subscription.State);
+        Assert.Equal(0, eventBus.GetSnapshot().ActiveSubscriptionCount);
+        Assert.True(eventBus.GetSnapshot().DiagnosticWriteFailureCount >= 4);
+    }
+
+    [Fact]
+    public async Task SuccessfulDeliveryWritesCompletedRecordWithCausalityOwnershipAndDuration()
+    {
+        var diagnostics = new InMemoryHostDiagnostics();
+        await using var eventBus = new InMemoryEventBus(diagnostics: diagnostics);
+        var subscription = eventBus.Subscribe<TestEvent>(_ => ValueTask.CompletedTask);
+
+        var result = await eventBus.PublishAsync(
+            new TestEvent("complete"),
+            new EventPublishOptions
+            {
+                CorrelationId = "operation-42",
+                CausationId = "command-7",
+                PublishDepth = 2
+            });
+
+        var record = Assert.Single(
+            diagnostics.Records,
+            item => item.Code == EventDiagnosticIds.EventDeliveryCompleted);
+        AssertContextValue(record, "correlationId", "operation-42");
+        AssertContextValue(record, "causationId", "command-7");
+        AssertContextValue(record, "publishDepth", "2");
+        AssertContextValue(record, "deliveryResult", EventDeliveryStatus.Succeeded.ToString());
+        AssertContextValue(record, "subscriptionId", subscription.Id.ToString());
+        AssertContextValue(record, "dispatchTarget", EventDispatchPolicy.Serialized.ToString());
+        Assert.False(string.IsNullOrWhiteSpace(record.Context["ownerScopeId"]));
+        Assert.False(string.IsNullOrWhiteSpace(record.Context["handlerTypeId"]));
+        Assert.True(double.Parse(record.Context["handlerDurationMs"]!, System.Globalization.CultureInfo.InvariantCulture) >= 0d);
+        Assert.Equal(result.Deliveries[0].Duration.TotalMilliseconds.ToString("F3", System.Globalization.CultureInfo.InvariantCulture), record.Context["handlerDurationMs"]);
+    }
+
+    [Fact]
+    public async Task NestedPublicationAutomaticallyInheritsCausality()
+    {
+        var diagnostics = new InMemoryHostDiagnostics();
+        await using var eventBus = new InMemoryEventBus(diagnostics: diagnostics);
+        EventContext<ChildEvent>? childContext = null;
+        eventBus.Subscribe<ChildEvent>(context =>
+        {
+            childContext = context;
+            return ValueTask.CompletedTask;
+        });
+        eventBus.Subscribe<TestEvent>(async parent =>
+        {
+            await eventBus.PublishAsync(new ChildEvent(parent.Event.Value));
+        });
+
+        var parentResult = await eventBus.PublishAsync(new TestEvent("parent"));
+
+        Assert.NotNull(childContext);
+        Assert.Equal(parentResult.EventId.ToString("D"), childContext.CorrelationId);
+        Assert.Equal(parentResult.EventId.ToString("D"), childContext.CausationId);
+        Assert.Equal(1, childContext.PublishDepth);
+        var childRecord = Assert.Single(
+            diagnostics.Records,
+            item => item.Code == EventDiagnosticIds.EventPublished &&
+                    item.Context["eventId"] == childContext.EventId.ToString("D"));
+        AssertContextValue(childRecord, "correlationId", childContext.CorrelationId);
+        AssertContextValue(childRecord, "causationId", childContext.CausationId!);
+        AssertContextValue(childRecord, "publishDepth", "1");
+    }
+
+    [Fact]
+    public async Task TraceSamplingCanBeDisabledWithoutSuppressingFailures()
+    {
+        var diagnostics = new InMemoryHostDiagnostics();
+        await using var eventBus = new InMemoryEventBus(
+            diagnostics: diagnostics,
+            diagnosticsOptions: new EventBusDiagnosticsOptions { TraceSamplingRate = 0d });
+        eventBus.Subscribe<TestEvent>(_ => throw new InvalidOperationException("sampled failure"));
+
+        var result = await eventBus.PublishAsync(new TestEvent("sampling"));
+
+        Assert.False(result.Succeeded);
+        Assert.DoesNotContain(diagnostics.Records, item => item.Code == EventDiagnosticIds.EventPublished);
+        Assert.DoesNotContain(diagnostics.Records, item => item.Code == EventDiagnosticIds.EventDeliveryStarted);
+        Assert.Contains(diagnostics.Records, item => item.Code == EventDiagnosticIds.EventDeliveryFailed);
+    }
+
+    [Fact]
+    public async Task PayloadProjectionIsExplicitBoundedAndDoesNotCallPayloadToString()
+    {
+        var diagnostics = new InMemoryHostDiagnostics();
+        var payload = new PayloadEvent("secret", "safe");
+        var descriptor = EventPayloadDiagnosticProjectorDescriptor.Create<PayloadEvent>(new SafePayloadProjector());
+        await using var eventBus = new InMemoryEventBus(
+            diagnostics: diagnostics,
+            diagnosticsOptions: new EventBusDiagnosticsOptions
+            {
+                EnablePayloadProjection = true,
+                MaximumPayloadFieldCount = 1,
+                MaximumPayloadValueLength = 4
+            },
+            payloadProjectors: [descriptor]);
+
+        await eventBus.PublishAsync(payload);
+
+        var record = Assert.Single(diagnostics.Records, item => item.Code == EventDiagnosticIds.EventPublished);
+        Assert.Equal("v1", record.Context["payloadSchemaVersion"]);
+        Assert.Equal("12", record.Context["payloadSizeEstimate"]);
+        Assert.Equal("safe", record.Context["payload.summary"]);
+        Assert.DoesNotContain(record.Context, item => item.Key == "payload.zz-second");
+        Assert.False(payload.ToStringCalled);
+    }
+
+    [Fact]
+    public async Task PayloadProjectorFailureIsIsolatedAndReported()
+    {
+        var diagnostics = new InMemoryHostDiagnostics();
+        var descriptor = EventPayloadDiagnosticProjectorDescriptor.Create<PayloadEvent>(new ThrowingPayloadProjector());
+        await using var eventBus = new InMemoryEventBus(
+            diagnostics: diagnostics,
+            diagnosticsOptions: new EventBusDiagnosticsOptions { EnablePayloadProjection = true },
+            payloadProjectors: [descriptor]);
+
+        var result = await eventBus.PublishAsync(new PayloadEvent("secret", "safe"));
+
+        Assert.True(result.Succeeded);
+        var record = Assert.Single(
+            diagnostics.Records,
+            item => item.Code == EventDiagnosticIds.EventPayloadProjectionFailed);
+        Assert.Equal(typeof(InvalidOperationException).FullName, record.Context["exceptionType"]);
+    }
+
+    [Fact]
+    public async Task MetricsSnapshotTracksDeliveriesAndDiagnosticFailures()
+    {
+        var diagnostics = new ThrowingHostDiagnostics();
+        await using var eventBus = new InMemoryEventBus(diagnostics: diagnostics);
+        eventBus.Subscribe<TestEvent>(_ => ValueTask.CompletedTask);
+        eventBus.Subscribe<TestEvent>(_ => throw new InvalidOperationException("metrics"));
+
+        await eventBus.PublishAsync(new TestEvent("metrics"));
+
+        var snapshot = eventBus.GetSnapshot();
+        Assert.Equal(2, snapshot.ActiveSubscriptionCount);
+        Assert.Equal(1, snapshot.PublicationCount);
+        Assert.Equal(1, snapshot.DeliverySucceededCount);
+        Assert.Equal(1, snapshot.DeliveryFailedCount);
+        Assert.True(snapshot.TotalHandlerDuration >= TimeSpan.Zero);
+        Assert.True(snapshot.DiagnosticWriteFailureCount > 0);
+    }
+
+    [Theory]
+    [InlineData(-0.01)]
+    [InlineData(1.01)]
+    [InlineData(double.NaN)]
+    public void DiagnosticsOptionsRejectInvalidSamplingRate(double value)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new EventBusDiagnosticsOptions { TraceSamplingRate = value });
+    }
+
+    [Fact]
+    public async Task ConcurrentDiagnosticSinkFailuresRemainIsolatedAndCounted()
+    {
+        var diagnostics = new ThrowingHostDiagnostics();
+        await using var eventBus = new InMemoryEventBus(
+            diagnostics: diagnostics,
+            channelOptions: new EventChannelOptions
+            {
+                Capacity = 256,
+                ExecutionMode = EventChannelExecutionMode.Concurrent,
+                MaximumConcurrency = 8
+            });
+        var handled = 0;
+        eventBus.Subscribe<TestEvent>(_ =>
+        {
+            Interlocked.Increment(ref handled);
+            return ValueTask.CompletedTask;
+        });
+
+        var publications = Enumerable.Range(0, 128)
+            .Select(index => eventBus.PublishAsync(new TestEvent(index.ToString())).AsTask())
+            .ToArray();
+        var results = await Task.WhenAll(publications);
+
+        Assert.All(results, result => Assert.True(result.Succeeded));
+        Assert.Equal(128, handled);
+        Assert.Equal(128, eventBus.GetSnapshot().PublicationCount);
+        Assert.True(eventBus.GetSnapshot().DiagnosticWriteFailureCount >= 385);
+    }
+
+    [Fact]
+    public async Task RejectedPublishWritesStableRejectionAndBackpressureDiagnostics()
+    {
+        var diagnostics = new InMemoryHostDiagnostics();
+        await using var eventBus = new InMemoryEventBus(
+            diagnostics: diagnostics,
+            channelOptions: new EventChannelOptions
+            {
+                Capacity = 1,
+                BackpressurePolicy = EventChannelBackpressurePolicy.Reject
+            });
+        var firstEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFirst = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        eventBus.Subscribe<TestEvent>(async context =>
+        {
+            if (context.Event.Value == "first")
+            {
+                firstEntered.TrySetResult();
+                await releaseFirst.Task;
+            }
+        });
+
+        Assert.True((await eventBus.PostAsync(new TestEvent("first"))).Accepted);
+        await firstEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.True((await eventBus.PostAsync(new TestEvent("queued"))).Accepted);
+
+        var exception = await Assert.ThrowsAsync<EventPublicationRejectedException>(
+            async () => await eventBus.PublishAsync(new TestEvent("rejected")));
+        releaseFirst.TrySetResult();
+
+        var rejected = Assert.Single(
+            diagnostics.Records,
+            item => item.Code == EventDiagnosticIds.EventRejected &&
+                    item.Context["eventId"] == exception.EventId.ToString("D"));
+        var backpressure = Assert.Single(
+            diagnostics.Records,
+            item => item.Code == EventDiagnosticIds.EventChannelBackpressure &&
+                    item.Context["eventId"] == exception.EventId.ToString("D"));
+        AssertContextValue(rejected, "backpressurePolicy", EventChannelBackpressurePolicy.Reject.ToString());
+        AssertContextValue(backpressure, "backpressurePolicy", EventChannelBackpressurePolicy.Reject.ToString());
+    }
+
     private sealed record TestEvent(string Value);
+
+    private sealed record ChildEvent(string Value);
+
+    private sealed class PayloadEvent(string secret, string summary)
+    {
+        public string Secret { get; } = secret;
+
+        public string Summary { get; } = summary;
+
+        public bool ToStringCalled { get; private set; }
+
+        public override string ToString()
+        {
+            ToStringCalled = true;
+            return Secret;
+        }
+    }
+
+    private sealed class SafePayloadProjector : IEventPayloadDiagnosticProjector<PayloadEvent>
+    {
+        public EventPayloadDiagnosticSnapshot Project(PayloadEvent eventData)
+        {
+            return new EventPayloadDiagnosticSnapshot(
+                new Dictionary<string, string?>
+                {
+                    ["summary"] = eventData.Summary,
+                    ["zz-second"] = "omitted"
+                },
+                schemaVersion: "v1",
+                sizeEstimate: 12);
+        }
+    }
+
+    private sealed class ThrowingPayloadProjector : IEventPayloadDiagnosticProjector<PayloadEvent>
+    {
+        public EventPayloadDiagnosticSnapshot Project(PayloadEvent eventData)
+        {
+            throw new InvalidOperationException("projection failed");
+        }
+    }
+
+    private sealed class ThrowingHostDiagnostics : IHostDiagnostics
+    {
+        public IReadOnlyList<HostDiagnosticRecord> Records => [];
+
+        public void Write(HostDiagnosticRecord record)
+        {
+            throw new InvalidOperationException("diagnostic sink unavailable");
+        }
+
+        public void Complete()
+        {
+        }
+    }
 
     private static void AssertDeliveryContext(
         HostDiagnosticRecord record,

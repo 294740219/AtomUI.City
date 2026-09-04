@@ -1,0 +1,16 @@
+<Project>
+
+  <Import Project="../../../../Directory.Build.props" />
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(MSBuildThisFileDirectory)../../../../src/AtomUI.City.Core/AtomUI.City.Core.csproj" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)../../../../src/AtomUI.City.Generators/AtomUI.City.Generators.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+</Project>

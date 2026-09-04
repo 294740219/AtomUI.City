@@ -14,6 +14,7 @@
 - 模块配置阶段禁止 BuildServiceProvider；常用入口由 runtime guard 拒绝，非测试 City 项目中的显式 Provider 创建和 Microsoft Generic Host 构建/启动入口由 `AUCANL0001` 阻止编译。运行期服务解析只能发生在 Provider 构建后的声明生命周期阶段。
 - IUiDispatcher 只定义抽象，Core 不提交真实 UI work。
 - 公共不可变模型必须在构造或接纳边界拒绝集合内部 null、未知枚举及 `default` struct；公开的进程级表必须使用真正的只读包装，不能只依赖 `IReadOnlyList<T>` 的静态类型。
+- `ApplicationInitializationContext.ApplicationScope` 是 Host 创建的 Core 通用生命周期能力，与当前 `IApplicationHost.ApplicationScope` 保持实例同一；它不是具体功能模块参数。Module 可以绑定资源或创建 child scope，但终止所有权保留给 Host。`ApplicationShutdownContext` 不重复注入该 Scope，模块关闭必须加入初始化阶段建立的唯一终止事务。
 
 ## API 兼容规则
 
@@ -79,6 +80,7 @@ builder.ConfigureServices(services => services.AddSingleton<AppService>());
 - `LifecyclePipelineBuilder.Use<TMiddleware>(...)`：允许显式声明稳定 middleware 诊断类型；现有 delegate overload 保留并使用兼容推断。
 - `HostDiagnosticIds.LifecycleMiddlewareFailed` (`AUCHOST108`)：定位 lifecycle middleware 的 stage、类型、operationId 和异常类型。
 - `HostDiagnosticIds.HostBuildCleanupFailed` (`AUCHOST109`)：定位 Build 失败回滚中的 Generic Host 或 Module 清理异常。
+- `ApplicationInitializationContext.ApplicationScope`：向运行期 Module 提供 Host 已创建的非空 ApplicationScope；初始化 context 构造函数同步要求显式传入该 Scope。当前尚无对外发布包，本次签名调整作为 1.0 前生命周期上下文收口进入 Public API baseline。
 
 `UseModule<TModule>()` 保留为显式附加根和无生成清单时的兼容入口；它与 generated default root 合并并去重。Library 和 Plugin 中的 `[ApplicationModule]` 现在由 `AUCGEN008` 拒绝。
 

@@ -1,3 +1,6 @@
+using System.Security.Cryptography;
+using System.Text;
+
 namespace AtomUI.City.EventBus;
 
 internal static class EventCorrelationIds
@@ -35,5 +38,16 @@ internal static class EventCorrelationIds
         }
 
         return value;
+    }
+
+    public static string? ToDiagnosticHash(string? value)
+    {
+        if (value is null)
+        {
+            return null;
+        }
+
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(value));
+        return Convert.ToHexString(hash.AsSpan(0, 8));
     }
 }

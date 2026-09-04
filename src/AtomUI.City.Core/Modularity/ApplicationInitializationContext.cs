@@ -1,4 +1,5 @@
 using AtomUI.City.Core.Hosting;
+using AtomUI.City.Core.Lifecycle;
 
 namespace AtomUI.City.Core.Modularity;
 
@@ -12,13 +13,16 @@ public sealed class ApplicationInitializationContext
     /// </summary>
     public ApplicationInitializationContext(
         IApplicationContext applicationContext,
-        IServiceProvider services)
+        IServiceProvider services,
+        LifecycleScope applicationScope)
     {
         ArgumentNullException.ThrowIfNull(applicationContext);
         ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(applicationScope);
 
         ApplicationContext = applicationContext;
         Services = services;
+        ApplicationScope = applicationScope;
     }
 
     /// <summary>
@@ -30,4 +34,9 @@ public sealed class ApplicationInitializationContext
     /// Gets the services value.
     /// </summary>
     public IServiceProvider Services { get; }
+
+    /// <summary>
+    /// Gets the Host-owned application lifecycle scope.
+    /// </summary>
+    public LifecycleScope ApplicationScope { get; }
 }

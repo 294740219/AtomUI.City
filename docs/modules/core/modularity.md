@@ -185,6 +185,10 @@ public abstract class Module
 
 运行时只调用 async 方法。同步方法只是开发便利入口。
 
+`ApplicationInitializationContext` 由 Host 在 `ApplicationScope` 创建完成后构造，并且必须携带该次运行期唯一、非空的 `ApplicationScope`。Module 可以使用它为运行时资源创建子 Scope 或建立 owner 绑定，但不得主动停止或释放 Host 拥有的 `ApplicationScope`。具体功能模块只能消费这一 Core 生命周期能力，Core 不得引用或识别 EventBus、Router、State 等上层模块类型。
+
+`ApplicationShutdownContext` 不重复携带 `ApplicationScope`。Module 在初始化阶段建立的资源所有权必须由自身 internal lifecycle controller 保存，并在 shutdown hook 中加入同一终止事务；不得依赖关闭阶段重新注入 owner，也不得建立第二套清理事务。
+
 ### 6. 模块标识
 
 模块 id 默认使用模块类型全名。

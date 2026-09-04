@@ -22,10 +22,28 @@ internal static class EventBusTestExtensions
 
     public static IEventSubscription Subscribe<TEvent>(
         this InMemoryEventBus eventBus,
+        EventChannel<TEvent> channel,
+        Func<EventContext<TEvent>, ValueTask> handler,
+        EventSubscriptionOptions? options = null)
+    {
+        return eventBus.Subscribe(ProcessOwner, channel, handler, options);
+    }
+
+    public static IEventSubscription Subscribe<TEvent>(
+        this InMemoryEventBus eventBus,
         Action<EventContext<TEvent>> handler,
         EventSubscriptionOptions? options = null)
     {
         return eventBus.Subscribe(ProcessOwner, handler, options);
+    }
+
+    public static IEventSubscription Subscribe<TEvent>(
+        this InMemoryEventBus eventBus,
+        EventChannel<TEvent> channel,
+        Action<EventContext<TEvent>> handler,
+        EventSubscriptionOptions? options = null)
+    {
+        return eventBus.Subscribe(ProcessOwner, channel, handler, options);
     }
 
     public static IEventSubscription Subscribe<TEvent>(

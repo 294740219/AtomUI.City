@@ -10,6 +10,7 @@
 - 释放、取消、超时、撤销、Unload 和 Dispose 后行为必须有断言。
 - 并发测试必须包含可控 barrier、高重复次数和唯一事务断言，不能用偶发 timing 作为证据。
 - CLI dogfood 验证真实产品组合，但不能替代 Feature 级测试。
+- Headless、NativeAOT 和外部包消费者进程必须遵守 `TEST-INFRA-001`：顶层异常写入 `stderr` 并返回非零退出码，启动器有界等待、收集双输出并在 Windows 下抑制仅属于测试子进程的系统错误框；不得吞异常或修改全局 WER。
 
 ## 完成口径
 
@@ -23,13 +24,13 @@
 | --- | --- | --- | --- | --- | --- |
 | AUC-EVENTBUS-001 | Unit + RuntimeLifecycle + Dogfood | EventPublicationTests | PublishAsync/PostAsync 完成语义、EventId、correlation/causation、publish depth、订阅快照时点、无订阅者、取消和 immutable result。 | null/default 输入、非法 options/result、预取消、bus/channel 停止、Post 拒绝。 | In Design |
 | AUC-EVENTBUS-002 | Unit + RuntimeLifecycle + Concurrency | EventSubscriptionLifecycleTests | 每条订阅唯一 owner；Window/Route/Application 同 event 隔离释放；强制 LifecycleScope owner；静态 ApplicationScope 和插件 Lease 绑定；六状态稳定值；注册/撤销原子性；Quiescing barrier；组合 token；in-flight drain；快速 Dispose；StopAsync/DisposeAsync 唯一终止事务。 | null/stopped owner；owner/EventBus stop 与注册提交竞争；owner cancellation 到达 handler；并发 publish/Dispose/StopAsync/DisposeAsync；等待取消或 drain timeout 后终止继续；handler 创建/释放失败；Faulted；重复调用；ownerless API 不进入目标合同。 | In Design |
-| AUC-EVENTBUS-003 | Unit + Contract + PluginContract | EventContractRegistryTests | 稳定 ContractId、版本/type/schema/assembly identity、精确匹配、配置冻结、动态 snapshot 和 Shared/Private plane 隔离。 | 重复/default id、重复 type、版本不兼容、错误 ALC、私有对象图进入 Shared Plane。 | In Design |
-| AUC-EVENTBUS-004 | Unit + Threading + RuntimeLifecycle | EventDispatchAndFailurePolicyTests | Current/UiThread/Background/Serialized、显式 dispatcher、delivery status、错误策略优先级、取消、timeout、cleanup 聚合和 Post 后台错误观察。 | dispatcher 不可用、handler failure/cancellation/timeout、StopPublication 并发边界、FailPublisher、DisableSubscription。 | In Design |
+| AUC-EVENTBUS-003 | Unit + Contract + Concurrency | EventContractRegistryTests; EventBusRegistrationTests | 稳定 ContractId、id/type/assembly/plane identity、精确双向匹配、排序只读快照、Register/Freeze 原子竞争、DI collected descriptor 汇入和生产冻结。 | 重复/default id、重复 type、冻结后写入/未知 contract、Shared/PluginPrivate 错误 ALC、自定义 Registry 丢失 descriptor。版本/schema/object graph 和 Plugin Private Registry 生命周期分别由 AUC-008/AUC-009 验收。 | In Design |
+| AUC-EVENTBUS-004 | Unit + Threading + RuntimeLifecycle | EventDispatchAndFailurePolicyTests | Current/UiThread/Background/Serialized、Post/InlineIfAllowed、显式 dispatcher、受管后台 scheduler、delivery status、订阅级错误策略、取消、timeout、cleanup 聚合和 Post 后台错误观察。 | dispatcher 不可用、handler failure/cancellation/timeout、忽略取消的 lingering handler、StopPublication 并发边界、FailPublisher、DisableSubscription。 | In Design |
 | AUC-EVENTBUS-005 | Unit + Concurrency + Diagnostics | EventDiagnosticsTests | 稳定诊断目录、因果链、最小 context、metrics snapshot、诊断限流、payload 安全投影和 sink 故障隔离。 | dropped/coalesced/rejected、递归、timeout、contract/capability 错误、诊断 sink 失败、插件对象残留。 | In Design |
-| AUC-EVENTBUS-006 | Integration + RuntimeLifecycle + Headless | EventBusHostIntegrationTests | Module/DI 注册、配置冻结、internal lifecycle controller 隔离、Build/Start/Stop/Dispose、Stop-before-Start、共享终止事务和 Host deadline。 | 重复注册、非法配置、启动回滚、并发 Stop/Dispose、worker/handler 清理失败。 | In Design |
-| AUC-EVENTBUS-007 | Unit + Concurrency + Stress + Benchmark | EventChannelRuntimeTests | Serialized/Partitioned/Concurrent、有界 capacity、最大并发/partition、顺序、Wait/Reject/Drop/Coalesce、重入拒绝、关闭和资源回收。 | queue full/closed、等待取消/timeout、serialized 自等待、partition 泄漏、shutdown drain。 | In Design |
-| AUC-EVENTBUS-008 | Generator + Build + Headless + NativeAOT | EventBusGeneratorTests; EventBusNativeAotProcessTests | Attribute 到 registrar/manifest/Host 的生产闭环、多程序集 catalog、稳定输出、强类型 invoker、trimming 和双 TFM NativeAOT。 | owner 缺失/冒充、ContractId/registrar 冲突、非法对象图/plane/capability、manifest 版本不支持。 | In Design |
-| AUC-EVENTBUS-009 | Contract + PluginLifecycle + ALC | EventBusPluginContractTests; EventBusPluginLifecycleTests | 受限 publisher/subscriber、capability、Shared/Private plane、领域 lease、激活回滚、quiescing/drain、配额和 ALC 可回收。 | capability denied、版本不兼容、半激活、drain timeout、private type/delegate/diagnostic cache 残留。 | In Design |
+| AUC-EVENTBUS-006 | Integration + RuntimeLifecycle + Headless | EventBusHostIntegrationTests | `EventBusModule` 无手工 `AddEventBus` 的 DI 闭环、普通 DI 立即可用与 Host-managed 隔离、internal lifecycle controller 不可见、Build 前后不启动、三个初始化阶段收到真实 ApplicationScope、Start 后开放、Stop/Dispose 后拒绝、Stop-before-Start、共享终止事务和 Host deadline。 | 重复注册、初始化前操作、非法 Scope、不同 Scope 重复启动、启动回滚、并发 Stop/Dispose、worker/handler 清理失败。 | In Design |
+| AUC-EVENTBUS-007 | Unit + Concurrency + Stress + Benchmark | EventChannelRuntimeTests | 默认/命名 channel 隔离；Publish/Post 共享 admission；Serialized/Partitioned/Concurrent；单 runtime capacity、全局 runtime 总量、最大并发和 active partition 回收；顺序；Wait/Reject/Drop/Coalesce；指标；重入拒绝；关闭和资源回收。 | 非法 channel/options/partition/runtime 上限；重复 descriptor；queue full/closed；动态 identity 并发超限；等待取消/timeout；自身 channel await；分区队首阻塞/丢失唤醒；shutdown drain。 | In Design |
+| AUC-EVENTBUS-008 | Generator + Build + Headless + NativeAOT | EventBusGeneratorTests; EventBusNativeAotProcessTests | Attribute 到唯一 Core registrar/manifest/Host 的生产闭环；同 owner 多 contribution、多程序集 registrar 去重、handler `TEvent` 到本地或引用 generated Shared catalog 的编译期闭包、实际选中 Module contribution 的 Build 闭包、封闭对象图白名单与 generated proof、稳定输出、强类型 invoker、ApplicationScope 自动释放、trimming 和双 TFM NativeAOT。 | owner 缺失/跨程序集冒充、ContractId 冲突、handler 指向无 attribute、无 manifest、manifest/registrar 不一致或未选中 Module 的 contract、`object`/interface/外部或可变对象图、手工 contract 冒充插件 Shared contract、非法 handler/channel/plane、manifest 版本不支持。 | Verified |
+| AUC-EVENTBUS-009 | Contract + PluginLifecycle + ALC | EventBusPluginContractTests; EventBusPluginLifecycleTests | 受限 publisher/subscriber、capability、Shared/Private plane、领域 lease、激活回滚、三阶段 subscription admission、pending registration barrier、quiescing、单一总 deadline drain、配额和 ALC 可回收；timeout 后 Faulted、稳定异常/诊断、迟到清理观察及 PluginId 保留。 | capability denied、版本不兼容、Subscribe/Stop 竞争、diagnostics 同步重入、锁内外部调用探测、半激活、忽略 cancellation 的 handler/operation、drain timeout、timeout 后同名重入、private type/delegate/diagnostic cache 残留。 | EventBus Contract Verified；完整 Verified 等待 PluginSystem |
 
 ## 横向产品验收
 
@@ -40,6 +41,17 @@ Application Plane MVP 还必须通过：
 - Host 冷启动、首次/重复 publish、队列压力、diagnostics on/off 和大规模订阅的 Benchmark。
 - `net8.0` 与 `net10.0` 的 Release build、trimming 和 Windows NativeAOT 真实进程测试。
 - Public API baseline、XML 文档、SourceLink 和 package validation。
+- 故障注入进程以非零退出码和完整异常栈结束，自动化期间不出现需要人工处理的 Windows 错误弹窗。
+
+### Benchmark 观察门禁
+
+首份可重复基线由 `benchmarks/AtomUI.City.EventBus.Benchmarks` 提供，使用 Release 构建执行：
+
+```powershell
+dotnet run --project benchmarks/AtomUI.City.EventBus.Benchmarks/AtomUI.City.EventBus.Benchmarks.csproj -c Release -- --exporters json markdown
+```
+
+当前场景覆盖无订阅/单订阅/多订阅 Publish、1/64/256 个已实例化 channel 下的重复 Publish，以及达到全局 runtime 上限后的拒绝成本。Benchmark 结果是观察数据，不提交机器相关的绝对耗时作为兼容性承诺；发布候选之间必须比较吞吐、延迟和分配量趋势，出现数量级退化时阻断并调查。
 
 ## 缺口处理
 

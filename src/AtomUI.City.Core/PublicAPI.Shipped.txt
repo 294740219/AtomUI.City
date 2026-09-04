@@ -180,7 +180,8 @@ AtomUI.City.Core.Lifecycle.LifecycleStages
 AtomUI.City.Core.Modularity.ApplicationHostBuilderModularityExtensions
 AtomUI.City.Core.Modularity.ApplicationInitializationContext
 AtomUI.City.Core.Modularity.ApplicationInitializationContext.ApplicationContext.get -> AtomUI.City.Core.Hosting.IApplicationContext!
-AtomUI.City.Core.Modularity.ApplicationInitializationContext.ApplicationInitializationContext(AtomUI.City.Core.Hosting.IApplicationContext! applicationContext, System.IServiceProvider! services) -> void
+AtomUI.City.Core.Modularity.ApplicationInitializationContext.ApplicationInitializationContext(AtomUI.City.Core.Hosting.IApplicationContext! applicationContext, System.IServiceProvider! services, AtomUI.City.Core.Lifecycle.LifecycleScope! applicationScope) -> void
+AtomUI.City.Core.Modularity.ApplicationInitializationContext.ApplicationScope.get -> AtomUI.City.Core.Lifecycle.LifecycleScope!
 AtomUI.City.Core.Modularity.ApplicationInitializationContext.Services.get -> System.IServiceProvider!
 AtomUI.City.Core.Modularity.ApplicationModuleAttribute
 AtomUI.City.Core.Modularity.ApplicationModuleAttribute.ApplicationModuleAttribute() -> void

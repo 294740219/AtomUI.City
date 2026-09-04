@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using AtomUI.City.Core.Diagnostics;
 using AtomUI.City.Core.Hosting;
+using AtomUI.City.Core.Lifecycle;
 using AtomUI.City.Core.Modularity;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -49,6 +50,7 @@ public sealed class ModuleRegistryConcurrencyTests
         Assert.Equal(1, GatedPhaseModule.Services.Count);
 
         await using var provider = services.BuildServiceProvider();
+        using var applicationScope = CreateApplicationScope();
         var configureContributions = Enumerable.Range(0, 64)
             .Select(_ => registry.ConfigureContributionsAsync(applicationContext, provider).AsTask())
             .ToArray();
@@ -59,7 +61,7 @@ public sealed class ModuleRegistryConcurrencyTests
         Assert.Equal(1, GatedPhaseModule.Contributions.Count);
 
         var initialize = Enumerable.Range(0, 64)
-            .Select(_ => registry.InitializeAsync(applicationContext, provider).AsTask())
+            .Select(_ => registry.InitializeAsync(applicationContext, provider, applicationScope).AsTask())
             .ToArray();
         await GatedPhaseModule.Initialization.Entered.Task.WaitAsync(TimeSpan.FromSeconds(2));
         Assert.All(initialize, task => Assert.False(task.IsCompleted));
@@ -71,11 +73,37 @@ public sealed class ModuleRegistryConcurrencyTests
     }
 
     [Fact]
+    public async Task InitializationRequiresOneApplicationScopeAcrossAllModuleStages()
+    {
+        ScopeRecordingModule.Reset();
+        var registry = ModuleRegistry.CreateForTesting([typeof(ScopeRecordingModule)]);
+        var applicationContext = ApplicationHostTestBuilder.CreateContext();
+        var services = new ServiceCollection();
+        registry.ConfigureServices(applicationContext, services);
+        await using var provider = services.BuildServiceProvider();
+        using var applicationScope = CreateApplicationScope();
+        await registry.ConfigureContributionsAsync(applicationContext, provider);
+
+        Assert.Throws<ArgumentNullException>(() =>
+            registry.InitializeAsync(applicationContext, provider, null!));
+
+        await registry.InitializeAsync(applicationContext, provider, applicationScope);
+
+        Assert.Equal(3, ScopeRecordingModule.ApplicationScopes.Count);
+        Assert.All(
+            ScopeRecordingModule.ApplicationScopes,
+            scope => Assert.Same(applicationScope, scope));
+
+        await registry.ShutdownAsync(applicationContext, provider);
+    }
+
+    [Fact]
     public async Task ShutdownFirstMakesDisposeJoinTheSameTerminalTransaction()
     {
         TerminalRecorder.Reset(TerminalGate.Shutdown);
-        var (registry, applicationContext, provider) = await CreateInitializedRegistryAsync();
+        var (registry, applicationContext, provider, applicationScope) = await CreateInitializedRegistryAsync();
         await using var providerLease = provider;
+        await using var applicationScopeLease = applicationScope;
 
         var shutdown = registry.ShutdownAsync(applicationContext, provider).AsTask();
         await TerminalRecorder.Entered.Task.WaitAsync(TimeSpan.FromSeconds(2));
@@ -99,8 +127,9 @@ public sealed class ModuleRegistryConcurrencyTests
     public async Task DisposeFirstMakesShutdownJoinWithoutRunningShutdownHooks()
     {
         TerminalRecorder.Reset(TerminalGate.Dispose);
-        var (registry, applicationContext, provider) = await CreateInitializedRegistryAsync();
+        var (registry, applicationContext, provider, applicationScope) = await CreateInitializedRegistryAsync();
         await using var providerLease = provider;
+        await using var applicationScopeLease = applicationScope;
 
         var dispose = registry.DisposeAsync().AsTask();
         await TerminalRecorder.Entered.Task.WaitAsync(TimeSpan.FromSeconds(2));
@@ -135,11 +164,12 @@ public sealed class ModuleRegistryConcurrencyTests
         GatedPhaseModule.Services.Release.TrySetResult();
         await configureServices;
         await using var provider = services.BuildServiceProvider();
+        using var applicationScope = CreateApplicationScope();
         var contributions = registry.ConfigureContributionsAsync(applicationContext, provider).AsTask();
         GatedPhaseModule.Contributions.Release.TrySetResult();
         await contributions;
 
-        var initialization = registry.InitializeAsync(applicationContext, provider).AsTask();
+        var initialization = registry.InitializeAsync(applicationContext, provider, applicationScope).AsTask();
         await GatedPhaseModule.Initialization.Entered.Task.WaitAsync(TimeSpan.FromSeconds(2));
         var shutdown = registry.ShutdownAsync(applicationContext, provider).AsTask();
 
@@ -163,13 +193,14 @@ public sealed class ModuleRegistryConcurrencyTests
         var services = new ServiceCollection();
         registry.ConfigureServices(applicationContext, services);
         await using var provider = services.BuildServiceProvider();
+        using var applicationScope = CreateApplicationScope();
 
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
             await registry.ConfigureContributionsAsync(applicationContext, provider));
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
             await registry.ConfigureContributionsAsync(applicationContext, provider));
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
-            await registry.InitializeAsync(applicationContext, provider));
+            await registry.InitializeAsync(applicationContext, provider, applicationScope));
 
         Assert.Equal(1, FailingContributionModule.Count);
         await registry.DisposeAsync();
@@ -179,7 +210,7 @@ public sealed class ModuleRegistryConcurrencyTests
         await Assert.ThrowsAsync<ObjectDisposedException>(async () =>
             await registry.ConfigureContributionsAsync(applicationContext, provider));
         await Assert.ThrowsAsync<ObjectDisposedException>(async () =>
-            await registry.InitializeAsync(applicationContext, provider));
+            await registry.InitializeAsync(applicationContext, provider, applicationScope));
     }
 
     [Fact]
@@ -192,8 +223,9 @@ public sealed class ModuleRegistryConcurrencyTests
         services.AddSingleton<IModuleLifecycleController>(registry);
         registry.ConfigureServices(applicationContext, services);
         await using var provider = services.BuildServiceProvider();
+        using var applicationScope = CreateApplicationScope();
         await registry.ConfigureContributionsAsync(applicationContext, provider);
-        await registry.InitializeAsync(applicationContext, provider);
+        await registry.InitializeAsync(applicationContext, provider, applicationScope);
 
         await registry.ShutdownAsync(applicationContext, provider);
 
@@ -202,7 +234,11 @@ public sealed class ModuleRegistryConcurrencyTests
         Assert.Equal(1, ReentrantDisposeModule.DisposeCount);
     }
 
-    private static async Task<(ModuleRegistry Registry, IApplicationContext Context, ServiceProvider Provider)>
+    private static async Task<(
+        ModuleRegistry Registry,
+        IApplicationContext Context,
+        ServiceProvider Provider,
+        LifecycleScope ApplicationScope)>
         CreateInitializedRegistryAsync()
     {
         var registry = ModuleRegistry.CreateForTesting(
@@ -212,9 +248,15 @@ public sealed class ModuleRegistryConcurrencyTests
         services.AddSingleton<IHostDiagnostics>(new InMemoryHostDiagnostics());
         registry.ConfigureServices(applicationContext, services);
         var provider = services.BuildServiceProvider();
+        var applicationScope = CreateApplicationScope();
         await registry.ConfigureContributionsAsync(applicationContext, provider);
-        await registry.InitializeAsync(applicationContext, provider);
-        return (registry, applicationContext, provider);
+        await registry.InitializeAsync(applicationContext, provider, applicationScope);
+        return (registry, applicationContext, provider, applicationScope);
+    }
+
+    private static LifecycleScope CreateApplicationScope()
+    {
+        return LifecycleScope.CreateRoot(LifecycleScopeKind.Application, "application");
     }
 
     private sealed class PhaseGate
@@ -240,6 +282,24 @@ public sealed class ModuleRegistryConcurrencyTests
             Entered.TrySetResult();
             Release.Task.GetAwaiter().GetResult();
         }
+    }
+
+    private sealed class ScopeRecordingModule : ModuleBase
+    {
+        private static readonly List<LifecycleScope> RecordedApplicationScopes = [];
+
+        public static IReadOnlyList<LifecycleScope> ApplicationScopes => RecordedApplicationScopes;
+
+        public static void Reset() => RecordedApplicationScopes.Clear();
+
+        public override void OnPreApplicationInitialization(ApplicationInitializationContext context) =>
+            RecordedApplicationScopes.Add(context.ApplicationScope);
+
+        public override void OnApplicationInitialization(ApplicationInitializationContext context) =>
+            RecordedApplicationScopes.Add(context.ApplicationScope);
+
+        public override void OnPostApplicationInitialization(ApplicationInitializationContext context) =>
+            RecordedApplicationScopes.Add(context.ApplicationScope);
     }
 
     private sealed class GatedPhaseModule : ModuleBase, IAsyncDisposable

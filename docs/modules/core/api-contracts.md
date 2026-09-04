@@ -223,6 +223,20 @@
 | Breaking Change Rules | 修改 hook 顺序、context 能力或默认 module id 规则属于 breaking change。 |
 | Tests | `ModuleBaseTests` 断言 hook 顺序、null context、取消、异常和 shutdown 行为。 |
 
+### `ApplicationInitializationContext`
+
+| Field | Contract |
+| --- | --- |
+| Type | `ApplicationInitializationContext` |
+| Feature | AUC-CORE-004 |
+| Purpose | 向 Module 的三个 application initialization hook 提供当前应用身份、Application DI provider 和由 Host 拥有的 ApplicationScope。 |
+| Construction | 构造函数要求 `applicationContext`、`services` 和 `applicationScope` 全部非 null；非法输入立即抛 `ArgumentNullException`。 |
+| `ApplicationScope` | 与当前 `IApplicationHost.ApplicationScope` 是同一实例，并且在 Module 初始化期间处于 `Running`；不得由 Module 主动 Stop 或 Dispose。 |
+| Ownership | Host 创建并终止 Scope；Module 只用它创建更小的 child scope 或绑定运行时资源。具体模块状态不得反向进入 Core context。 |
+| Lifecycle | 只在 ApplicationScope 成功创建后产生；Stop-before-Start 不会伪造 initialization context。shutdown hook 通过模块自身已保存的唯一终止事务清理资源。 |
+| Compatibility | 构造函数和只读属性属于 public API；变更必须同步 compatibility 和 Public API baseline。 |
+| Tests | `ModuleBaseTests`、`ModuleRegistryConcurrencyTests` 和 `ApplicationHostModuleLifecycleTests` 断言非空校验、实例同一性、阶段共享与 Host 所有权。 |
+
 ### `IModuleRegistry` / `IModuleLifecycleController` / `ModuleRegistry`
 
 | Field | Contract |

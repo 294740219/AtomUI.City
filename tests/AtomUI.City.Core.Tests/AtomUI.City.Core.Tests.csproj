@@ -22,6 +22,7 @@
                       ReferenceOutputAssembly="false" />
     <ProjectReference Include="../../fixtures/AtomUI.City.Core.Mvp/AtomUI.City.Core.MvpCli/AtomUI.City.Core.MvpCli.csproj"
                       ReferenceOutputAssembly="false" />
+    <Compile Include="../Shared/ProcessTestRunner.cs" Link="ProcessTestRunner.cs" />
   </ItemGroup>
 
 </Project>

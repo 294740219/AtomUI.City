@@ -5,6 +5,7 @@ public sealed class EventPublishOptions
     private string? _correlationId;
     private string? _causationId;
     private int _publishDepth;
+    private string? _partitionKey;
 
     public static EventPublishOptions Default { get; } = new();
 
@@ -35,5 +36,11 @@ public sealed class EventPublishOptions
 
             _publishDepth = value;
         }
+    }
+
+    public string? PartitionKey
+    {
+        get => _partitionKey;
+        init => _partitionKey = EventCorrelationIds.ValidateOptional(value, nameof(PartitionKey));
     }
 }

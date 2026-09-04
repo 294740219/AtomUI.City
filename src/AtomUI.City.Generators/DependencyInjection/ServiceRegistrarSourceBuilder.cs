@@ -1,4 +1,5 @@
 using System.Text;
+using AtomUI.City.Generators.EventBus;
 
 namespace AtomUI.City.Generators.DependencyInjection;
 
@@ -24,7 +25,8 @@ public static class ServiceRegistrarSourceBuilder
         string assemblyName,
         string? ownerModuleTypeName,
         IReadOnlyList<ServiceRegistrationMetadata> registrations,
-        IReadOnlyList<string> referencedRegistrarTypeNames)
+        IReadOnlyList<string> referencedRegistrarTypeNames,
+        EventGenerationManifest? eventManifest = null)
     {
         var typeName = GetRegistrarTypeName(assemblyName);
         var separator = typeName.LastIndexOf('.');
@@ -36,6 +38,11 @@ public static class ServiceRegistrarSourceBuilder
         builder.AppendLine("#nullable enable");
         builder.Append("[assembly: global::AtomUI.City.Core.DependencyInjection.GeneratedServiceManifestAttribute(typeof(global::")
             .Append(typeName).AppendLine("))]");
+        if (eventManifest is { IsEmpty: false })
+        {
+            builder.Append("[assembly: global::AtomUI.City.EventBus.GeneratedEventManifestAttribute(typeof(global::")
+                .Append(typeName).AppendLine("), global::AtomUI.City.EventBus.GeneratedEventManifestAttribute.CurrentVersion)]");
+        }
         builder.AppendLine();
         builder.Append("namespace ").Append(ns).AppendLine(";");
         builder.AppendLine();
@@ -74,6 +81,64 @@ public static class ServiceRegistrarSourceBuilder
             }
 
             builder.AppendLine("        });");
+        }
+
+        if (eventManifest is { IsEmpty: false })
+        {
+            foreach (var ownerGroup in eventManifest.Contracts.Select(value => value.OwnerTypeName)
+                         .Concat(eventManifest.Handlers.Select(value => value.OwnerTypeName))
+                         .Distinct(StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal))
+            {
+                builder.Append("        context.Register(typeof(global::").Append(ownerGroup).AppendLine("), static services =>");
+                builder.AppendLine("        {");
+                foreach (var contract in eventManifest.Contracts.Where(value => value.OwnerTypeName == ownerGroup)
+                             .OrderBy(value => value.ContractId, StringComparer.Ordinal))
+                {
+                    builder.Append("            services.Add(global::Microsoft.Extensions.DependencyInjection.ServiceDescriptor.Singleton(global::AtomUI.City.EventBus.EventContractDescriptor.GeneratedShared<global::")
+                        .Append(contract.EventTypeName).Append(">(new global::AtomUI.City.EventBus.EventContractId(")
+                        .Append(ToLiteral(contract.ContractId)).Append("), typeof(global::").Append(contract.EventTypeName)
+                        .Append(").Assembly, ").Append(contract.SchemaVersion).Append(", ")
+                        .Append(ToLiteral(contract.SchemaFingerprint)).AppendLine(")));");
+                    foreach (var channel in contract.Channels.OrderBy(value => value.Name, StringComparer.Ordinal))
+                    {
+                        builder.Append("            services.Add(global::Microsoft.Extensions.DependencyInjection.ServiceDescriptor.Singleton(global::AtomUI.City.EventBus.EventChannelDescriptor.Create(new global::AtomUI.City.EventBus.EventChannel<global::")
+                            .Append(contract.EventTypeName).Append(">(").Append(ToLiteral(channel.Name)).AppendLine("), new global::AtomUI.City.EventBus.EventChannelOptions");
+                        builder.AppendLine("            {");
+                        builder.Append("                Capacity = ").Append(channel.Capacity).AppendLine(",");
+                        builder.Append("                BackpressurePolicy = (global::AtomUI.City.EventBus.EventChannelBackpressurePolicy)").Append(channel.BackpressurePolicy).AppendLine(",");
+                        builder.Append("                ExecutionMode = (global::AtomUI.City.EventBus.EventChannelExecutionMode)").Append(channel.ExecutionMode).AppendLine(",");
+                        builder.Append("                MaximumConcurrency = ").Append(channel.MaximumConcurrency).AppendLine(",");
+                        if (channel.QueueWaitTimeoutMilliseconds > 0)
+                            builder.Append("                QueueWaitTimeout = global::System.TimeSpan.FromMilliseconds(").Append(channel.QueueWaitTimeoutMilliseconds).AppendLine("),");
+                        builder.AppendLine("            })));");
+                    }
+                }
+
+                foreach (var handler in eventManifest.Handlers.Where(value => value.OwnerTypeName == ownerGroup)
+                             .OrderBy(value => value.HandlerTypeName, StringComparer.Ordinal))
+                {
+                    builder.Append("            global::Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions.TryAddSingleton<global::")
+                        .Append(handler.HandlerTypeName).Append(">(services, static provider => new global::")
+                        .Append(handler.HandlerTypeName).Append('(');
+                    for (var index = 0; index < handler.ConstructorParameterTypeNames.Count; index++)
+                    {
+                        if (index > 0) builder.Append(", ");
+                        builder.Append("global::Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<global::")
+                            .Append(handler.ConstructorParameterTypeNames[index]).Append(">(provider)");
+                    }
+                    builder.AppendLine("));");
+                    builder.Append("            services.Add(global::Microsoft.Extensions.DependencyInjection.ServiceDescriptor.Singleton(global::AtomUI.City.EventBus.GeneratedEventHandlerDescriptor.Create<global::")
+                        .Append(handler.EventTypeName).Append(", global::").Append(handler.HandlerTypeName).Append(">(typeof(global::")
+                        .Append(handler.OwnerTypeName).Append("), ").Append(ToLiteral(handler.ChannelName))
+                        .Append(", (global::AtomUI.City.EventBus.EventDispatchPolicy)").Append(handler.DispatchPolicy)
+                        .Append(", (global::AtomUI.City.EventBus.EventDispatchMode)").Append(handler.DispatchMode)
+                        .Append(", (global::AtomUI.City.EventBus.EventErrorPolicy)").Append(handler.ErrorPolicy)
+                        .Append(", ").Append(handler.HandlerTimeoutMilliseconds)
+                        .Append(", ").Append(handler.DisableAfterFailures).AppendLine(")));");
+                }
+
+                builder.AppendLine("        });");
+            }
         }
 
         builder.AppendLine("    }");

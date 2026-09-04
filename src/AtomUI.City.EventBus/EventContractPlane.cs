@@ -2,6 +2,6 @@ namespace AtomUI.City.EventBus;
 
 public enum EventContractPlane
 {
-    Shared,
-    PluginPrivate,
+    Shared = 0,
+    PluginPrivate = 1,
 }

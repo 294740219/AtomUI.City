@@ -6,6 +6,15 @@ public sealed class EventPublishResult
         Guid eventId,
         EventContractId contractId,
         IReadOnlyList<EventDeliveryResult> deliveries)
+        : this(eventId, contractId, deliveries, TimeSpan.Zero)
+    {
+    }
+
+    public EventPublishResult(
+        Guid eventId,
+        EventContractId contractId,
+        IReadOnlyList<EventDeliveryResult> deliveries,
+        TimeSpan duration)
     {
         if (eventId == Guid.Empty)
         {
@@ -19,9 +28,15 @@ public sealed class EventPublishResult
             throw new ArgumentException("Event publish result deliveries cannot contain null entries.", nameof(deliveries));
         }
 
+        if (duration < TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(duration), duration, "Event publication duration cannot be negative.");
+        }
+
         EventId = eventId;
         ContractId = contractId;
         Deliveries = Array.AsReadOnly(deliveries.ToArray());
+        Duration = duration;
     }
 
     public Guid EventId { get; }
@@ -30,13 +45,23 @@ public sealed class EventPublishResult
 
     public IReadOnlyList<EventDeliveryResult> Deliveries { get; }
 
-    public int DeliveredCount => Deliveries.Count;
+    public TimeSpan Duration { get; }
 
-    public int FailedCount => Deliveries.Count(delivery => !delivery.Succeeded && !delivery.Canceled);
+    public int SubscriptionCount => Deliveries.Count;
 
-    public int CanceledCount => Deliveries.Count(delivery => delivery.Canceled);
+    public int DeliveredCount => Deliveries.Count(delivery => !delivery.Skipped);
 
-    public bool Succeeded => FailedCount == 0 && CanceledCount == 0;
+    public int FailedCount => Deliveries.Count(delivery =>
+        !delivery.Succeeded && !delivery.Canceled && !delivery.Skipped && !delivery.TimedOut);
+
+    public int CanceledCount => Deliveries.Count(delivery =>
+        delivery.Canceled && !delivery.Skipped && !delivery.TimedOut);
+
+    public int TimedOutCount => Deliveries.Count(delivery => delivery.TimedOut);
+
+    public int SkippedCount => Deliveries.Count(delivery => delivery.Skipped);
+
+    public bool Succeeded => FailedCount == 0 && CanceledCount == 0 && TimedOutCount == 0 && SkippedCount == 0;
 }
 
 public sealed record EventDeliveryResult(
@@ -46,6 +71,74 @@ public sealed record EventDeliveryResult(
     string? ErrorMessage = null,
     bool Canceled = false)
 {
+    private TimeSpan _duration;
+
+    public TimeSpan Duration
+    {
+        get => _duration;
+        init
+        {
+            if (value < TimeSpan.Zero)
+            {
+                throw new ArgumentOutOfRangeException(nameof(Duration), value, "Event delivery duration cannot be negative.");
+            }
+
+            _duration = value;
+        }
+    }
+
+    private bool _timedOut;
+
+    public bool TimedOut
+    {
+        get => _timedOut;
+        init
+        {
+            if (value && Succeeded)
+            {
+                throw new ArgumentException("Successful event delivery result cannot be timed out.", nameof(TimedOut));
+            }
+
+            if (value && Skipped)
+            {
+                throw new ArgumentException("Event delivery result cannot be both timed out and skipped.", nameof(TimedOut));
+            }
+
+            _timedOut = value;
+        }
+    }
+
+    private bool _skipped;
+
+    public bool Skipped
+    {
+        get => _skipped;
+        init
+        {
+            if (value && Succeeded)
+            {
+                throw new ArgumentException("Successful event delivery result cannot be skipped.", nameof(Skipped));
+            }
+
+            if (value && TimedOut)
+            {
+                throw new ArgumentException("Event delivery result cannot be both skipped and timed out.", nameof(Skipped));
+            }
+
+            _skipped = value;
+        }
+    }
+
+    public EventDeliveryStatus Status => Skipped
+        ? EventDeliveryStatus.Skipped
+        : TimedOut
+            ? EventDeliveryStatus.TimedOut
+            : Succeeded
+                ? EventDeliveryStatus.Succeeded
+                : Canceled
+                    ? EventDeliveryStatus.Canceled
+                    : EventDeliveryStatus.Failed;
+
     private EventSubscriptionId _subscriptionId = ValidateSubscriptionId(SubscriptionId);
 
     public EventSubscriptionId SubscriptionId
@@ -62,12 +155,12 @@ public sealed record EventDeliveryResult(
         init => _dispatchPolicy = ValidateDispatchPolicy(value);
     }
 
-    private bool _succeeded = ValidateSucceeded(Succeeded, Canceled, ErrorMessage);
+    private bool _succeeded = ValidateSucceeded(Succeeded, Canceled, ErrorMessage, timedOut: false, skipped: false);
 
     public bool Succeeded
     {
         get => _succeeded;
-        init => _succeeded = ValidateSucceeded(value, Canceled, ErrorMessage);
+        init => _succeeded = ValidateSucceeded(value, Canceled, ErrorMessage, TimedOut, Skipped);
     }
 
     private string? _errorMessage = ValidateErrorMessage(Succeeded, ErrorMessage);
@@ -129,7 +222,9 @@ public sealed record EventDeliveryResult(
     private static bool ValidateSucceeded(
         bool succeeded,
         bool canceled,
-        string? errorMessage)
+        string? errorMessage,
+        bool timedOut,
+        bool skipped)
     {
         if (succeeded && canceled)
         {
@@ -139,6 +234,16 @@ public sealed record EventDeliveryResult(
         if (succeeded && errorMessage is not null)
         {
             throw new ArgumentException("Successful event delivery result cannot include an error message.", nameof(ErrorMessage));
+        }
+
+        if (succeeded && timedOut)
+        {
+            throw new ArgumentException("Successful event delivery result cannot be timed out.", nameof(Succeeded));
+        }
+
+        if (succeeded && skipped)
+        {
+            throw new ArgumentException("Successful event delivery result cannot be skipped.", nameof(Succeeded));
         }
 
         return succeeded;

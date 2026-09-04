@@ -1,3 +1,4 @@
+using AtomUI.City.Core.Lifecycle;
 using AtomUI.City.Core.Modularity;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -7,6 +8,8 @@ public sealed class ModuleTestHost : IDisposable, IAsyncDisposable
 {
     private readonly TestHost _host;
     private readonly ServiceCollection _services = [];
+    private readonly LifecycleScope _applicationScope =
+        LifecycleScope.CreateRoot(LifecycleScopeKind.Application, "test-application");
     private ServiceProvider? _serviceProvider;
     private bool _disposed;
     private bool _initialized;
@@ -129,6 +132,8 @@ public sealed class ModuleTestHost : IDisposable, IAsyncDisposable
         cancellationToken.ThrowIfCancellationRequested();
         _shutdown = true;
 
+        await _applicationScope.StopAsync().ConfigureAwait(false);
+
         if (_initialized)
         {
             for (var index = Modules.Count - 1; index >= 0; index--)
@@ -146,6 +151,7 @@ public sealed class ModuleTestHost : IDisposable, IAsyncDisposable
 
         await _host.StopAsync().ConfigureAwait(false);
         await DisposeServiceProviderAsync().ConfigureAwait(false);
+        await _applicationScope.DisposeAsync().ConfigureAwait(false);
     }
 
     public void Dispose()
@@ -184,7 +190,10 @@ public sealed class ModuleTestHost : IDisposable, IAsyncDisposable
 
     private ApplicationInitializationContext CreateApplicationInitializationContext()
     {
-        return new ApplicationInitializationContext(_host.ApplicationContext, GetServiceProvider());
+        return new ApplicationInitializationContext(
+            _host.ApplicationContext,
+            GetServiceProvider(),
+            _applicationScope);
     }
 
     private ApplicationShutdownContext CreateApplicationShutdownContext()

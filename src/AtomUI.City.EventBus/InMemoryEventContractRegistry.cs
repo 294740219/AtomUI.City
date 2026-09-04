@@ -5,6 +5,32 @@ public sealed class InMemoryEventContractRegistry : IEventContractRegistry
     private readonly Dictionary<EventContractId, EventContractDescriptor> _byContractId = [];
     private readonly Dictionary<Type, EventContractDescriptor> _byEventType = [];
     private readonly object _syncRoot = new();
+    private IReadOnlyList<EventContractDescriptor> _descriptors = Array.Empty<EventContractDescriptor>();
+    private bool _isFrozen;
+
+    public bool IsFrozen
+    {
+        get
+        {
+            lock (_syncRoot)
+            {
+                return _isFrozen;
+            }
+        }
+    }
+
+    public IReadOnlyList<EventContractDescriptor> Descriptors
+    {
+        get
+        {
+            lock (_syncRoot)
+            {
+                return _isFrozen
+                    ? _descriptors
+                    : CreateSnapshot();
+            }
+        }
+    }
 
     public void Register(EventContractDescriptor descriptor)
     {
@@ -12,7 +38,42 @@ public sealed class InMemoryEventContractRegistry : IEventContractRegistry
 
         lock (_syncRoot)
         {
+            ThrowIfFrozen();
             RegisterCore(descriptor);
+        }
+    }
+
+    public void Freeze()
+    {
+        lock (_syncRoot)
+        {
+            if (_isFrozen)
+            {
+                return;
+            }
+
+            _descriptors = CreateSnapshot();
+            _isFrozen = true;
+        }
+    }
+
+    public bool TryGet(EventContractId contractId, out EventContractDescriptor? descriptor)
+    {
+        EventContractId.ThrowIfDefault(contractId, nameof(contractId));
+
+        lock (_syncRoot)
+        {
+            return _byContractId.TryGetValue(contractId, out descriptor);
+        }
+    }
+
+    public bool TryGet(Type eventType, out EventContractDescriptor? descriptor)
+    {
+        ArgumentNullException.ThrowIfNull(eventType);
+
+        lock (_syncRoot)
+        {
+            return _byEventType.TryGetValue(eventType, out descriptor);
         }
     }
 
@@ -25,6 +86,12 @@ public sealed class InMemoryEventContractRegistry : IEventContractRegistry
             if (_byEventType.TryGetValue(eventType, out var descriptor))
             {
                 return descriptor;
+            }
+
+            if (_isFrozen)
+            {
+                throw new InvalidOperationException(
+                    $"Event contract registry is frozen and does not contain event type '{eventType.FullName}'.");
             }
 
             descriptor = EventContractDescriptor.DefaultShared<TEvent>();
@@ -56,5 +123,22 @@ public sealed class InMemoryEventContractRegistry : IEventContractRegistry
 
         _byContractId[descriptor.ContractId] = descriptor;
         _byEventType[descriptor.EventType] = descriptor;
+    }
+
+    private IReadOnlyList<EventContractDescriptor> CreateSnapshot()
+    {
+        var descriptors = _byContractId.Values
+            .OrderBy(descriptor => descriptor.ContractId.Value, StringComparer.Ordinal)
+            .ToArray();
+
+        return Array.AsReadOnly(descriptors);
+    }
+
+    private void ThrowIfFrozen()
+    {
+        if (_isFrozen)
+        {
+            throw new InvalidOperationException("Event contract registry is frozen.");
+        }
     }
 }

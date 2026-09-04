@@ -14,7 +14,7 @@ public sealed class EventSubscriptionTests
             .Where(method => method.Name == nameof(IEventSubscriber.Subscribe))
             .ToArray();
 
-        Assert.Equal(2, subscribeMethods.Length);
+        Assert.Equal(4, subscribeMethods.Length);
         Assert.All(
             subscribeMethods,
             method => Assert.Equal(typeof(LifecycleScope), method.GetParameters()[0].ParameterType));

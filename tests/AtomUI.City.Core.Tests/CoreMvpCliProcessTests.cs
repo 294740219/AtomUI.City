@@ -1,9 +1,10 @@
-using System.Diagnostics;
 using System.Text.Json;
+using AtomUI.City.Testing.Processes;
 
 namespace AtomUI.City.Core.Tests;
 
 [Trait("Category", "Dogfood")]
+[Collection(ProcessTestCollection.Name)]
 public sealed class CoreMvpCliProcessTests
 {
 #if DEBUG
@@ -11,6 +12,16 @@ public sealed class CoreMvpCliProcessTests
 #else
     private const string BuildConfiguration = "Release";
 #endif
+
+    [Fact]
+    public async Task CoreMvpEntryFailureIsReportedWithoutUnhandledExceptionEscape()
+    {
+        var result = await RunProcessAsync("--test-entry-failure");
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains(typeof(InvalidOperationException).FullName!, result.StandardError, StringComparison.Ordinal);
+        Assert.Contains("Core MVP fixture entry failure.", result.StandardError, StringComparison.Ordinal);
+    }
 
     [Theory]
     [InlineData("baseline")]
@@ -57,6 +68,17 @@ public sealed class CoreMvpCliProcessTests
 
     private static async Task<ProcessResult> RunAsync(params string[] arguments)
     {
+        var processResult = await RunProcessAsync(arguments);
+        var output = processResult.StandardOutput;
+        var error = processResult.StandardError;
+        var jsonLine = output.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries).LastOrDefault();
+        Assert.False(string.IsNullOrWhiteSpace(jsonLine), $"Core MVP CLI returned no JSON. stderr: {error}");
+        using var document = JsonDocument.Parse(jsonLine);
+        return new ProcessResult(processResult.ExitCode, document.RootElement.Clone());
+    }
+
+    private static Task<TestProcessResult> RunProcessAsync(params string[] arguments)
+    {
         var executable = Path.Combine(
             FindRepositoryRoot(),
             "output",
@@ -66,41 +88,11 @@ public sealed class CoreMvpCliProcessTests
             "net10.0",
             "AtomUI.City.Core.MvpCli.dll");
         Assert.True(File.Exists(executable), $"Core MVP CLI was not built: {executable}");
-
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet",
-            RedirectStandardError = true,
-            RedirectStandardOutput = true,
-            UseShellExecute = false,
-            CreateNoWindow = true,
-        };
-        startInfo.ArgumentList.Add(executable);
-        foreach (var argument in arguments)
-            startInfo.ArgumentList.Add(argument);
-
-        using var process = Process.Start(startInfo)
-            ?? throw new InvalidOperationException("Could not start Core MVP CLI.");
-        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(2));
-        var outputTask = process.StandardOutput.ReadToEndAsync(timeout.Token);
-        var errorTask = process.StandardError.ReadToEndAsync(timeout.Token);
-
-        try
-        {
-            await process.WaitForExitAsync(timeout.Token);
-        }
-        catch (OperationCanceledException)
-        {
-            process.Kill(entireProcessTree: true);
-            throw new TimeoutException("Core MVP CLI did not exit within two minutes.");
-        }
-
-        var output = await outputTask;
-        var error = await errorTask;
-        var jsonLine = output.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries).LastOrDefault();
-        Assert.False(string.IsNullOrWhiteSpace(jsonLine), $"Core MVP CLI returned no JSON. stderr: {error}");
-        using var document = JsonDocument.Parse(jsonLine);
-        return new ProcessResult(process.ExitCode, document.RootElement.Clone());
+        return ProcessTestRunner.RunAsync(
+            Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet",
+            FindRepositoryRoot(),
+            TimeSpan.FromMinutes(2),
+            [executable, .. arguments]);
     }
 
     private static string FindRepositoryRoot()

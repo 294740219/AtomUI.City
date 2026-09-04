@@ -269,13 +269,21 @@ plugin.state-changed.v1
 
 Channel 用于表达同一个事件类型在不同语义通道中的投递边界。
 
-建议定义：
+1.0 public contract：
 
 ```csharp
-public readonly record struct EventChannel<TEvent>(string Name);
+public readonly record struct EventChannel<TEvent>
+{
+    public const string DefaultName = "default";
+    public static EventChannel<TEvent> Default { get; }
+    public EventChannel(string name);
+    public string Name { get; }
+}
 ```
 
 Channel 不是字符串 topic 的无类型替代品。它仍然与 `TEvent` 绑定。
+
+Identity 是精确 `TEvent` 与 ordinal `Name` 的组合。名称不得为空白、包含首尾空白或控制字符；`default(EventChannel<TEvent>)` 是未初始化非法值，所有 public 使用入口必须拒绝。
 
 Channel 可用于：
 
@@ -286,6 +294,8 @@ Channel 可用于：
 - 定义授权边界。
 
 默认 channel 为事件 contract 的 application channel。只有需要不同调度、隔离或授权语义时才创建额外 channel。
+
+默认 overload 委托给 `EventChannel<TEvent>.Default`；命名 channel 同时提供 PublishAsync、PostAsync、异步 delegate handler、`IEventHandler<TEvent>` 和同步 Action 便利扩展入口，不能只隔离发布而遗漏订阅。
 
 ### 10. Channel 执行模式
 
@@ -327,13 +337,13 @@ EventBus不保证：
 
 ### 12. 调度模型
 
-每个订阅必须声明 Core `DispatchPolicy`：
+每个订阅必须声明 EventBus `EventDispatchPolicy`：
 
 | Target | EventBus 语义 |
 |---|---|
-| `Current` | 在当前发布执行上下文运行。只适合轻量、确定性处理。 |
+| `Current` | 在当前 EventBus delivery worker 上运行，不承诺 publisher 调用线程。只适合轻量、确定性处理。 |
 | `UiThread` | 投递到 Presentation 提供的 UI Dispatcher。 |
-| `Background` | 通过 Core 后台调度器执行。 |
+| `Background` | 通过可注入的 `IEventBackgroundScheduler` 执行。 |
 | `Serialized` | 在订阅或指定 key 的串行队列执行。 |
 
 默认策略：
@@ -496,7 +506,11 @@ EventBus 发布热路径采用：
 
 ### 19. Lifecycle 集成
 
-EventBus 注册为 ApplicationScope 内的运行时服务。
+EventBus 的进程内实现由 Root Provider 作为单例持有，但 City Host-managed 模式的逻辑运行期所有权绑定当前 `ApplicationScope`。Root DI 共享实例不等于 Build 后立即开放操作，也不授予业务代码生命周期控制权。
+
+City 应用通过公开的 `EventBusModule` 接入；该类型只是无状态 composition/lifecycle adapter，负责调用 `AddEventBus` 并把 Core pre-application-initialization/shutdown hook 转发给同一 `internal IEventBusLifecycleController`。EventBus 在 pre-initialization 启动，使拓扑顺序中依赖它的 Module 从自己的 pre-initialization 起即可安全使用；Module 不保存队列、订阅、worker 或独立状态机，Core 也不得引用任何 EventBus 类型。
+
+`AddEventBus` 单独用于普通 Microsoft DI / Generic Host 时保留立即可用语义；由 `EventBusModule` 注册时，内部 runtime 被标记为 Host-managed，在收到包含真实 `ApplicationScope` 的初始化 hook 前拒绝 publish、post 和 subscribe。两种接入模式复用同一 `InMemoryEventBus` 和唯一终止事务，不允许同时建立 `IHostedService` 与 Module 两套生命周期控制。
 
 启动：
 
@@ -504,7 +518,8 @@ EventBus 注册为 ApplicationScope 内的运行时服务。
 Load generated event contract descriptors
 -> Register static handler descriptors
 -> Build channel definitions
--> Start channel workers
+-> Activate Host-managed runtime gate
+-> Allow channel workers to start lazily after first accepted work
 -> Accept publications
 ```
 

@@ -100,6 +100,8 @@ EventBus 复用 Core `DiagnosticContext`，并增加事件维度：
 - HandlerDuration。
 - DeliveryResult。
 
+Application Plane 1.0 已有上下文必须先落地；Publisher/Subscriber ModuleId、PluginId 和插件稳定身份由 `AUC-EVENTBUS-009` 的受限 publisher/subscriber 与 contribution lease 提供，不允许 Application Plane 通过持有插件对象提前伪造。
+
 不应默认记录敏感 partition key 原文。
 
 ### 3. EventId、CorrelationId 与 CausationId
@@ -113,6 +115,7 @@ EventBus 复用 Core `DiagnosticContext`，并增加事件维度：
 - 子事件的 CausationId 指向父 EventId。
 - PublishDepth 加一。
 - `PostAsync` 仍保留 correlation/causation 关系。
+- Handler 内部未显式提供关联选项时，EventBus 通过当前 delivery 上下文自动完成上述继承；上下文必须在 handler 结束时恢复，不得泄漏到无关异步链。
 
 事件链：
 
@@ -147,6 +150,8 @@ Command operation
 | `EventChannelBackpressure` | Queue 达到阈值。 |
 | `EventPluginDrainTimedOut` | 插件 handler 无法在时限内结束。 |
 
+`EventPluginDrainTimedOut` 的 code 在 `AUC-EVENTBUS-009` 冻结并实现；Application Plane 不得在尚无 plugin drain 事务时产生伪诊断。
+
 ### 5. Payload 记录
 
 默认不记录完整事件 payload。
@@ -170,6 +175,8 @@ Command operation
 当前 1.0 实现的 EventBus 结构化 context key 为 `contractId`、`eventId`、`subscriptionId`、`eventType`、`dispatchPolicy` 和 `errorPolicy`。Delivery failure 与 cancellation 必须至少包含 `contractId`、`eventId` 和 `subscriptionId`，posted FailPublisher 后台失败也必须保留这些 delivery 定位字段。
 
 Payload diagnostics 必须 opt-in，并通过 contract 提供的稳定 formatter 生成 Host-owned snapshot。
+
+Application Plane 1.0 使用强类型 `IEventPayloadDiagnosticProjector<TEvent>`。Projector 失败必须与发布事务隔离；插件 projector 的所有权、lease 和卸载在 `AUC-EVENTBUS-009` 收口。
 
 ### 6. Exception 记录
 
@@ -203,15 +210,7 @@ EventBus 错误策略：
 | `FailPublisher` | 传播 handler 异常给 publisher。 |
 | `DisableSubscription` | 订阅进入 quiescing 并移除。 |
 
-错误策略分层：
-
-- Global default。
-- Event contract。
-- Channel。
-- Subscription。
-- Plugin policy。
-
-更具体策略可以收紧错误处理，但插件不能自行把 Host 系统错误降级为忽略。
+1.0 Application Plane 只开放 subscription-level error policy，因此不存在运行时优先级合并或静默覆盖。Global、Event contract、Channel 和 Plugin policy 属于后续扩展；引入前必须先在 API contract 中定义“只能收紧”的合并规则，不能提前假设已经实现。
 
 ### 8. 连续失败
 
@@ -250,6 +249,8 @@ EventBus 可以维护订阅健康状态：
 
 指标标签必须受控，不能把 EventId、用户 id 或任意 partition key 作为高基数标签。
 
+Application Plane 1.0 必须公开线程安全的 EventBus 快照，至少包含 active subscription、publication、delivery 终止结果、diagnostic sink failure 与累计 handler duration；channel 快照继续承载 queue depth、capacity、backpressure 和 queue wait。
+
 ### 10. 日志级别
 
 建议：
@@ -267,6 +268,8 @@ EventBus 可以维护订阅健康状态：
 | Shared Contract 冲突 | Error/Fatal。 |
 
 高频事件不能默认逐条输出 Information 日志。
+
+EventBus Trace 记录采样决策必须基于 EventId 且在同一 publication 内保持一致；Warning/Error 和所有非成功终止记录不采样。
 
 ### 11. 诊断缓冲
 

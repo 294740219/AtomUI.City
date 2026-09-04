@@ -337,7 +337,8 @@ internal sealed class DefaultApplicationHost : IApplicationHost
         _genericHostStarted = true;
 
         _applicationServiceScope = Services.CreateScope();
-        ApplicationScope = HostScope.CreateChild(LifecycleScopeKind.Application, "application");
+        var applicationScope = HostScope.CreateChild(LifecycleScopeKind.Application, "application");
+        ApplicationScope = applicationScope;
         var applicationServices = _applicationServiceScope.ServiceProvider;
 
         await _moduleLifecycle.ConfigureContributionsAsync(
@@ -352,6 +353,7 @@ internal sealed class DefaultApplicationHost : IApplicationHost
                 await _moduleLifecycle.InitializeAsync(
                     Context,
                     applicationServices,
+                    applicationScope,
                     stageContext.CancellationToken).ConfigureAwait(false);
             },
             context.CancellationToken,

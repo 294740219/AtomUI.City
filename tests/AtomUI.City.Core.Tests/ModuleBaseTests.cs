@@ -1,4 +1,5 @@
 using AtomUI.City.Core.Hosting;
+using AtomUI.City.Core.Lifecycle;
 using AtomUI.City.Core.Modularity;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -23,6 +24,7 @@ public sealed class ModuleBaseTests
         var applicationContext = ApplicationHostTestBuilder.CreateContext();
         var services = new ServiceCollection();
         var serviceProvider = services.BuildServiceProvider();
+        using var applicationScope = CreateApplicationScope();
         var calls = new List<string>();
         var module = new RecordingModule(calls);
 
@@ -30,9 +32,9 @@ public sealed class ModuleBaseTests
         module.ConfigureServices(new ServiceConfigurationContext(applicationContext, services));
         module.PostConfigureServices(new ServiceConfigurationContext(applicationContext, services));
         await module.ConfigureContributionsAsync(new ContributionConfigurationContext(applicationContext, serviceProvider));
-        await module.OnPreApplicationInitializationAsync(new ApplicationInitializationContext(applicationContext, serviceProvider));
-        await module.OnApplicationInitializationAsync(new ApplicationInitializationContext(applicationContext, serviceProvider));
-        await module.OnPostApplicationInitializationAsync(new ApplicationInitializationContext(applicationContext, serviceProvider));
+        await module.OnPreApplicationInitializationAsync(new ApplicationInitializationContext(applicationContext, serviceProvider, applicationScope));
+        await module.OnApplicationInitializationAsync(new ApplicationInitializationContext(applicationContext, serviceProvider, applicationScope));
+        await module.OnPostApplicationInitializationAsync(new ApplicationInitializationContext(applicationContext, serviceProvider, applicationScope));
         await module.OnApplicationShutdownAsync(new ApplicationShutdownContext(applicationContext, serviceProvider));
 
         Assert.Equal(
@@ -55,15 +57,16 @@ public sealed class ModuleBaseTests
         var applicationContext = ApplicationHostTestBuilder.CreateContext();
         var services = new ServiceCollection();
         using var serviceProvider = services.BuildServiceProvider();
+        using var applicationScope = CreateApplicationScope();
         var module = new EmptyModule();
 
         module.PreConfigureServices(new ServiceConfigurationContext(applicationContext, services));
         module.ConfigureServices(new ServiceConfigurationContext(applicationContext, services));
         module.PostConfigureServices(new ServiceConfigurationContext(applicationContext, services));
         await module.ConfigureContributionsAsync(new ContributionConfigurationContext(applicationContext, serviceProvider));
-        await module.OnPreApplicationInitializationAsync(new ApplicationInitializationContext(applicationContext, serviceProvider));
-        await module.OnApplicationInitializationAsync(new ApplicationInitializationContext(applicationContext, serviceProvider));
-        await module.OnPostApplicationInitializationAsync(new ApplicationInitializationContext(applicationContext, serviceProvider));
+        await module.OnPreApplicationInitializationAsync(new ApplicationInitializationContext(applicationContext, serviceProvider, applicationScope));
+        await module.OnApplicationInitializationAsync(new ApplicationInitializationContext(applicationContext, serviceProvider, applicationScope));
+        await module.OnPostApplicationInitializationAsync(new ApplicationInitializationContext(applicationContext, serviceProvider, applicationScope));
         await module.OnApplicationShutdownAsync(new ApplicationShutdownContext(applicationContext, serviceProvider));
     }
 
@@ -88,6 +91,7 @@ public sealed class ModuleBaseTests
         var applicationContext = ApplicationHostTestBuilder.CreateContext();
         var services = new ServiceCollection();
         using var serviceProvider = services.BuildServiceProvider();
+        using var applicationScope = CreateApplicationScope();
         using var cancellation = new CancellationTokenSource();
         var calls = new List<string>();
         var module = new RecordingModule(calls);
@@ -99,21 +103,45 @@ public sealed class ModuleBaseTests
             calls,
             cancellation.Token);
         await AssertCanceledBeforeSyncCall(
-            token => module.OnPreApplicationInitializationAsync(new ApplicationInitializationContext(applicationContext, serviceProvider), token),
+            token => module.OnPreApplicationInitializationAsync(new ApplicationInitializationContext(applicationContext, serviceProvider, applicationScope), token),
             calls,
             cancellation.Token);
         await AssertCanceledBeforeSyncCall(
-            token => module.OnApplicationInitializationAsync(new ApplicationInitializationContext(applicationContext, serviceProvider), token),
+            token => module.OnApplicationInitializationAsync(new ApplicationInitializationContext(applicationContext, serviceProvider, applicationScope), token),
             calls,
             cancellation.Token);
         await AssertCanceledBeforeSyncCall(
-            token => module.OnPostApplicationInitializationAsync(new ApplicationInitializationContext(applicationContext, serviceProvider), token),
+            token => module.OnPostApplicationInitializationAsync(new ApplicationInitializationContext(applicationContext, serviceProvider, applicationScope), token),
             calls,
             cancellation.Token);
         await AssertCanceledBeforeSyncCall(
             token => module.OnApplicationShutdownAsync(new ApplicationShutdownContext(applicationContext, serviceProvider), token),
             calls,
             cancellation.Token);
+    }
+
+    [Fact]
+    public void ApplicationInitializationContextRequiresAndExposesApplicationScope()
+    {
+        var applicationContext = ApplicationHostTestBuilder.CreateContext();
+        using var serviceProvider = new ServiceCollection().BuildServiceProvider();
+        using var applicationScope = CreateApplicationScope();
+
+        var context = new ApplicationInitializationContext(
+            applicationContext,
+            serviceProvider,
+            applicationScope);
+
+        Assert.Same(applicationScope, context.ApplicationScope);
+        Assert.Throws<ArgumentNullException>(() => new ApplicationInitializationContext(
+            applicationContext,
+            serviceProvider,
+            null!));
+    }
+
+    private static LifecycleScope CreateApplicationScope()
+    {
+        return LifecycleScope.CreateRoot(LifecycleScopeKind.Application, "application");
     }
 
     private static async Task AssertCanceledBeforeSyncCall(

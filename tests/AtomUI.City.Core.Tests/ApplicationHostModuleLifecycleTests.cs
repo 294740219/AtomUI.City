@@ -1,5 +1,6 @@
 using AtomUI.City.Core.Diagnostics;
 using AtomUI.City.Core.Hosting;
+using AtomUI.City.Core.Lifecycle;
 using AtomUI.City.Core.Modularity;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -22,6 +23,13 @@ public sealed class ApplicationHostModuleLifecycleTests
         Assert.IsType<CoreService>(host.Services.GetRequiredService<ICoreService>());
 
         await host.StartAsync();
+
+        Assert.NotNull(host.ApplicationScope);
+        Assert.Equal(6, ModuleRecorder.ApplicationScopes.Count);
+        Assert.All(
+            ModuleRecorder.ApplicationScopes,
+            scope => Assert.Same(host.ApplicationScope, scope));
+
         await host.StopAsync();
 
         Assert.Equal(
@@ -662,16 +670,19 @@ public sealed class ApplicationHostModuleLifecycleTests
 
         public override void OnPreApplicationInitialization(ApplicationInitializationContext context)
         {
+            ModuleRecorder.RecordScope(context.ApplicationScope);
             ModuleRecorder.Record($"{name}:OnPreApplicationInitialization");
         }
 
         public override void OnApplicationInitialization(ApplicationInitializationContext context)
         {
+            ModuleRecorder.RecordScope(context.ApplicationScope);
             ModuleRecorder.Record($"{name}:OnApplicationInitialization");
         }
 
         public override void OnPostApplicationInitialization(ApplicationInitializationContext context)
         {
+            ModuleRecorder.RecordScope(context.ApplicationScope);
             ModuleRecorder.Record($"{name}:OnPostApplicationInitialization");
         }
 
@@ -685,16 +696,27 @@ public sealed class ApplicationHostModuleLifecycleTests
     {
         private static readonly List<string> RecordedCalls = [];
 
+        private static readonly List<LifecycleScope> RecordedApplicationScopes = [];
+
         public static IReadOnlyList<string> Calls => RecordedCalls;
+
+        public static IReadOnlyList<LifecycleScope> ApplicationScopes =>
+            RecordedApplicationScopes;
 
         public static void Record(string call)
         {
             RecordedCalls.Add(call);
         }
 
+        public static void RecordScope(LifecycleScope applicationScope)
+        {
+            RecordedApplicationScopes.Add(applicationScope);
+        }
+
         public static void Reset()
         {
             RecordedCalls.Clear();
+            RecordedApplicationScopes.Clear();
         }
     }
 

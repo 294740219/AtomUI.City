@@ -63,12 +63,11 @@ Dispatching 决定事件从 publisher 到 handler 的执行路径。
 
 线程安全集合只能保证内部数据结构不损坏，不能保证应用观察到的事件顺序、handler 重入、插件停用屏障和发布完成语义。EventBus 必须把这些行为明确为公共 contract。
 
-Dispatching 复用 Core Threading：
+Dispatching 复用 Core 的 `IUiDispatcher` 和 lifecycle cancellation，并由 EventBus 提供：
 
-- `IExecutionDispatcher`
-- `IUiDispatcher`
-- `IBackgroundTaskScheduler`
-- `DispatchPolicy`
+- `IEventBackgroundScheduler`
+- `EventDispatchPolicy`
+- `EventDispatchMode`
 - Lifecycle cancellation
 - Diagnostics/ErrorPolicy
 
@@ -127,11 +126,12 @@ PublishAndWait(...)
 
 ### 4. DispatchPolicy
 
-每个订阅声明 Core `DispatchPolicy`。
+每个订阅声明 EventBus `EventDispatchPolicy`。
 
 #### Current
 
-- Handler 在当前发布执行上下文运行。
+- Handler 在当前 EventBus delivery worker 执行上下文运行；它不承诺回到调用 `PublishAsync` 的线程。
+- Channel worker 不继承首次创建 runtime 的 `ExecutionContext`，避免把某个 publisher 的 `AsyncLocal` 状态泄漏给后续 publication。
 - 只适合轻量、无阻塞、无需线程切换的框架内部 handler。
 - 不允许执行长耗时 IO。
 - 发布方会直接承受 handler 延迟。
@@ -146,7 +146,7 @@ PublishAndWait(...)
 
 #### Background
 
-- 通过 Core 受管后台调度器运行。
+- 通过可注入的 `IEventBackgroundScheduler` 运行。
 - 绑定订阅 owner Scope。
 - Handler 异常被观察。
 - 不允许使用裸 `Task.Run` 逃逸生命周期。
@@ -159,7 +159,7 @@ PublishAndWait(...)
 
 ### 5. InlineIfAllowed 与 Post
 
-`DispatchMode`：
+`EventDispatchMode`：
 
 | Mode | 语义 |
 |---|---|
@@ -226,6 +226,7 @@ Partition B: Event 2 -> Event 4
 
 - 同 key 内按接受顺序执行。
 - 不同 key 可以并行。
+- 同时 active 的 partition 数量不超过 `MaximumConcurrency`。
 
 要求：
 
@@ -233,6 +234,8 @@ Partition B: Event 2 -> Event 4
 - Partition key 不能引用插件私有对象。
 - Partition 数量必须受控。
 - 空闲 partition worker 必须回收。
+
+1.0 runtime 不为 key 建立永久 worker 或永久字典项：只记录当前 in-flight key，并在该 delivery 结束时删除。因此 active partition 上限由 `MaximumConcurrency` 控制，等待中的不同 key 数量由 `Capacity` 控制，空闲 key 不残留资源。队首 key 正在运行时，调度器必须继续寻找其他可运行 key；新 key 入队和 active key 完成都会唤醒分区调度条件，不能产生队首阻塞或丢失唤醒。
 
 适合多个独立文档、会话或资源实例的事件处理。
 
@@ -301,6 +304,8 @@ Snapshot 允许发布与注册/撤销并发，但不能绕过 Quiescing barrier�
 
 同一事件的多个订阅默认可以独立调度，但发布结果需要等待它们完成。
 
+单个 publication 同时启动的 delivery 数量由 `EventBusDispatchOptions.MaximumConcurrentDeliveriesPerPublication` 限制，默认 `16`，合法范围为 `1..1024`。该限制与 channel 的 publication 并发上限是两个不同层次。
+
 默认不要求 handler 逐个串行完成，因为：
 
 - 不同订阅之间没有业务顺序。
@@ -367,6 +372,16 @@ Snapshot 允许发布与注册/撤销并发，但不能绕过 Quiescing barrier�
 - 插件不能创建无限 capacity。
 - Drop/Coalesce 必须显式声明。
 
+当前 1.0 public fallback 使用 `EventChannelOptions`：`Capacity=256`、`BackpressurePolicy=Wait`、`ExecutionMode=Serialized`、`MaximumConcurrency=1`、`QueueWaitTimeout=null`。`AddEventBus(EventChannelOptions)` 在 DI 配置阶段设置 fallback；`ConfigureEventChannel<TEvent>` 可为精确默认或命名 channel 设置 override；直接构造 `InMemoryEventBus` 时可传入同样的 fallback 和 descriptor 集合。重复的精确 type/channel descriptor 必须拒绝。每个精确 event contract + ordinal channel name 创建自己的 runtime，因而同一 identity 的 PublishAsync 与 PostAsync 共享 admission 和顺序，但不同 identity 不被错误串成一个全局队列。generated descriptor 后续接入同一配置入口，不能创建无界队列。
+
+单条队列有界并不足以保证 EventBus 整体有界。`EventBusRuntimeOptions.MaximumChannelRuntimes` 同时限制一个 EventBus 实例能够持有的精确 runtime 数量，默认 256，合法范围为 1..65536。已有 runtime 的查找、上限检查和新 runtime 提交必须在同一锁内完成。达到上限时不得驱逐正在使用的 runtime：`PublishAsync` 明确抛 `EventPublicationRejectedException`，`PostAsync` 返回 rejected result，并写 `EventRejected`；已有 identity 继续可用。配置期精确 channel descriptor 的数量已经超过上限时，EventBus 必须在构造阶段失败。动态业务实体 id 不应直接作为 channel name；此类隔离应优先使用有界 partition key。
+
+`Wait` 在容量释放、调用方取消、EventBus shutdown 或 `QueueWaitTimeout` 到期四者中竞争；timeout 产生明确 TimedOut rejection。`Reject` 和 `DropNewest` 不等待；`DropOldest` 只能替换尚未开始的最老 publication，不能取消已经 in-flight 的 handler；`CoalesceLatest` 只替换同一 partition key（非 Partitioned 时均为 null）最新的 pending publication。
+
+`PublishAsync` 和 `PostAsync` 都不得绕过 runtime 直接调用 delivery engine。前者在成功 admission 后等待 publication completion；后者仅等待 admission。`DropOldest`/`CoalesceLatest` 替换已经 Accepted 的 Post 时必须写 `EventDropped`；如果被替换的是仍在等待结果的 Publish，则以 `EventPublicationRejectedException` 完成该 Publish，不能静默悬挂。
+
+同一 runtime handler 内再次 `await PublishAsync` 到自身 channel 一律拒绝，避免 Serialized、满载 Partitioned 或满载 Concurrent 形成自等待；需要递归触发时使用 `PostAsync`（仍受 capacity/policy 约束）或显式选择另一个 channel。
+
 ### 15. UI Thread 约束
 
 UI handler：
@@ -412,6 +427,8 @@ EventBus shutdown token
 - Subscription drain timeout。
 - EventBus shutdown timeout。
 
+当前 1.0 `EventSubscriptionOptions` 的 handler execution timeout 默认为 `30s`；可以为单条订阅设置其他正值，或显式设为 `null` 表示不建立 handler deadline。允许的非 null 上限为 `Int32.MaxValue ms`。
+
 Timeout 不等于强制终止 handler。
 
 超时后：
@@ -419,6 +436,7 @@ Timeout 不等于强制终止 handler。
 - 触发 cancellation。
 - 标记 timeout 诊断。
 - 根据错误策略继续 drain、隔离订阅或进入 Plugin `UnloadPending`。
+- `PublishAsync` 返回 `TimedOut` delivery；如果 handler 忽略 cancellation，订阅仍保持真实 in-flight 计数和串行门，直到 handler 实际退出，`StopAsync`/卸载不得谎报已经 drain。
 
 ### 18. 递归发布与重入
 
@@ -513,6 +531,7 @@ Benchmark 至少覆盖：
 - 注册/撤销与发布竞争。
 - 插件批量撤销。
 - 诊断开启/关闭。
+- channel identity 从 1 增长到 runtime 上限及超限拒绝。
 
 关注指标：
 

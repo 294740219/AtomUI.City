@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/AtomUI.City.EventBus.Benchmarks/AtomUI.City.EventBus.Benchmarks.csproj" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/AtomUI.City.Build/AtomUI.City.Build.csproj" />
     <Project Path="src/AtomUI.City.Cli/AtomUI.City.Cli.csproj" />
