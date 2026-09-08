@@ -1,35 +1,31 @@
 # AtomUI.City.Routing Testing
 
-## 测试原则
+## Matrix
 
-- 每个 Feature ID 至少有 Unit 或 Contract 测试。
-- 集成测试不能替代单元测试。
-- 生命周期、线程、插件、订阅、连接、dispatcher、source generator、build 和 template 行为必须有专项测试。
-- 诊断码必须断言 code 和关键 context。
-- 释放、取消、unload、Dispose 后行为必须有断言。
-
-## 产品级测试门禁
-
-| 必须证明的行为 | 最低测试要求 |
+| Feature | Required assertions |
 | --- | --- |
-| Routing 只负责 Route -> ViewModel Target，不创建 View，不提交 VisualTree。 | Route graph 和 navigation 测试必须断言输出 target descriptor 后停止。 |
-| RouteGraphSnapshot 发布后不可变，插件撤销只能发布新 snapshot。 | 必须断言旧 snapshot 只读、新 snapshot 不含撤销 route。 |
-| 导航是事务，失败、取消或 guard 拒绝都不能提交半导航。 | 必须断言失败后 current snapshot 未变化。 |
-| 所有 route discovery 必须有 AOT 友好的 manifest 或显式注册路径。 | 必须断言 generator 或显式注册路径，不依赖 runtime scan。 |
+| 001 | valid/invalid templates, escaped regex parentheses/comma quantifier, constrained defaults/catch-all, inherited typed members, generator output compilation, generic/manual/multi-attribute declarations rejected without generator crash |
+| 002 | immutability, null descriptor/contribution member, all graph errors, structured ordinal identity, effective full-template conflicts, policy/fallback cardinality, parent/redirect cycles and navigable redirect target, version monotonicity |
+| 003 | match priority, named outlet, structural matcher boundary, read-only values, typed binding, path/query/fragment, percent encoding |
+| 004 | no partial commit including middleware post-next and detached-next failure, per-layer late/repeated-next rejection, foreign middleware result rejection, timeout, token-correlated cancellation, pre-cancel isolation, all concurrency policies, newest-wins, active/stale ExecutionContext reentrancy, dispose/admission race |
+| 005 | guard hierarchy, policy candidates before unconditional fallback including static redirect, static/dynamic redirect, cumulative context preservation, structural loop identity/limit, cancellation |
+| 006 | target metadata and no ViewModel construction; no Presentation reference |
+| 007 | atomic add/remove, generated descriptor ownership stamping, conflicting/empty contribution rejection, failed candidate isolation, extension mount, service resolver, lease retry |
+| 008 | Push/Replace/Reset, Back/Forward, cancelled journal rollback, capacity, missing-route skip after contribution-id reuse, redirected current-entry refresh, complete scalar restore and non-scalar resolver rerun |
+| 009 | complete hierarchy resolver order/data/failure/NotFound/duplicate key/redirect/cancellation/service-resolution attribution |
+| 010 | middleware nesting/short circuit/post-next failure/repeated-next rejection/null result/failure |
+| 011 | repeated AddRouting aggregation, scoped router/singleton registry, captured graph-version AUCRT fields, AUCRT007 classification, broken diagnostic sink isolation |
+| 012 | Testing host delegates to production matcher/navigation behavior |
 
-## 测试矩阵
+## Required Suites
 
-| Feature ID | Test Type | Test File | Required Assertions | Failure Paths | Status |
-| --- | --- | --- | --- | --- | --- |
-| AUC-ROUTING-001 | RuntimeLifecycle | RouteTemplateTests; RouteDefinitionAttributeTests | 断言合法模板、非法模板、参数边界、属性默认值和稳定排序。 | 语法错误、重复参数名、非法 catch-all 位置、未知 constraint。 | Implemented |
-| AUC-ROUTING-002 | RuntimeLifecycle | RouteGraphAndMatcherTests | 断言 graph 不可变、冲突拒绝、plugin route revoke 后旧 snapshot 仍只读可用。 | 冲突、缺失父 route、重复 route id、插件撤销失败。 | Implemented |
-| AUC-ROUTING-003 | RuntimeLifecycle | RouteGraphAndMatcherTests; RoutingParameterBoundaryTests | 断言优先级、参数转换、constraint、并发匹配和非法输入。 | 参数缺失、格式不匹配、constraint 拒绝。 | Implemented |
-| AUC-ROUTING-004 | RuntimeLifecycle | NavigationScopeTests | 断言失败不改变 current snapshot、取消不提交、重复 dispose 幂等、并发策略稳定。 | 取消、并发策略拒绝、resolver 失败、commit 失败。 | Implemented |
-| AUC-ROUTING-005 | RuntimeLifecycle | RouteGuardTests | 断言 enter/leave 顺序、deny、redirect、loop detection、异常映射和取消。 | guard 抛异常、redirect loop、deny。 | Implemented |
-| AUC-ROUTING-006 | RuntimeLifecycle | RouteGraphAndMatcherTests; RoutingAssemblyTests | 断言 target descriptor 内容完整、Routing 不依赖 Presentation、失败不创建 ViewModel。 | 缺失 ViewModel target、target type 不可构造、参数无法绑定。 | Implemented |
-| AUC-ROUTING-007 | RuntimeLifecycle | RouteGraphAndMatcherTests | 断言插件贡献、冲突隔离、卸载撤销、旧 snapshot 只读。 | 插件 route 冲突、插件卸载并发导航。 | Implemented |
-| AUC-ROUTING-008 | RuntimeLifecycle | NavigationScopeTests | 断言 push/replace/back/forward、容量裁剪、失败不写历史和 reuse key。 | journal 容量溢出、失败导航、replace/back 边界。 | Implemented |
+- `tests/AtomUI.City.Routing.Tests`: production runtime contracts.
+- `tests/AtomUI.City.Generators.Tests`: metadata, manifest, diagnostics, deterministic generated source.
+- `tests/AtomUI.City.Testing.Tests`: test-host parity.
+- Release builds for every target framework with zero warnings.
 
-## 缺口处理
+Tests involving Source Generator compilations run without class-level parallelism because their metadata reference sets are built from process-loaded assemblies; this removes cross-test dynamic-assembly pollution.
 
-如果现有测试只覆盖 smoke 或 happy path，[全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 必须把缺口标为 `Required`。无法单元测试的功能必须提供 Contract、RuntimeLifecycle、PluginLifecycle、Generator、Build、PlatformIntegration、TemplateSmoke 或 Dogfood 测试替代。
+`RoutingAuditRegressionTests`, `RoutingFreezeAuditTests` and `RoutingFinalFreezeTests` directly lock the repair contracts found by repeated four-round audits: delayed commit, per-layer detached/late/repeated middleware next, result correlation, static registration aggregation, full resolver data, pre-cancel isolation, token-correlated cancellation, stale AsyncLocal context, disposal admission, journal rollback/redirect refresh, redirect context/identity, policy fallback order, named outlets, contribution ownership, graph validation/identity and diagnostic attribution/versioning. Generator tests directly cover inherited/indexer/write-only members, ambiguous members, invalid identity/default diagnostics, route-kind validation, open generics, handwritten implementations, multiple definition attributes, stable extension-point references, effective path conflicts, regex boundaries, escaped identifiers, partial deduplication, policy candidates, semantic signatures and LF output.
+
+No UI/headless Avalonia process is required because Routing has no UI dependency. Integration with Presentation must be tested in Presentation.

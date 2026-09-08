@@ -1,42 +1,31 @@
 # AtomUI.City.Routing Compatibility
 
-## 兼容性范围
+## Stable 1.0 Surface
 
-本模块兼容面包括 public API、options、attribute、diagnostics code、manifest/schema、generated output、MSBuild property、CLI envelope、template layout、snapshot 或 plugin contract 中实际适用的部分。
+Breaking changes include:
 
-## 模块兼容性硬边界
+- public type/member removal, rename, default value or nullability change;
+- route template parsing, built-in constraint or match-priority changes;
+- default/named outlet selection and `NavigationOptions.OutletName` changes;
+- generated route method, manifest type/name/content or AUCGEN diagnostic changes;
+- `RouteGraphError`, `NavigationResultStatus`, `CITY-NAVIGATION-*` or `AUCRT*` semantic changes;
+- guard/resolver/middleware order changes;
+- graph version, contribution lease, journal or Dispose behavior changes;
+- DI lifetime changes: Registry singleton, Router/NavigationScope scoped;
+- changing Routing to reference Presentation or Avalonia.
 
-- Routing 只负责 Route -> ViewModel Target。
-- RouteGraphSnapshot 发布后不可变。
-- 导航是事务，失败不提交半导航。
-- 插件路由撤销必须发布新 graph。
+## Generated Output
 
-## API 兼容规则
+Generation is deterministic, uses LF line endings and is AOT-oriented. Static route discovery is compile-time only. A route map must be a non-generic top-level public static partial class; route methods must be non-generic public static partial parameterless definitions without handwritten implementations, with exactly one definition attribute and the required return type. Generated ViewModel and behavior references must be closed types.
 
-- public 类型、成员、枚举值、attribute 参数和扩展方法默认视为兼容性承诺。
-- 删除、重命名、改变默认行为、异常类型、Result status 或诊断码语义属于 breaking change。
-- 新增 API 可以 minor 版本发布，但必须有文档、测试和迁移说明。
+## Supported Constraints
 
-## 数据格式兼容
+1.0 supports `bool`, `datetime`, `decimal`, `double`, `float`, `guid`, `int`, `long`, `alpha`, `min`, `max`, `range`, `length`, `minlength`, `maxlength`, and `regex`. Unknown/custom constraints are rejected.
 
-- manifest、snapshot、generated output、CLI JSON、template variables 和 MSBuild properties 必须有版本或稳定字段说明。
-- reader 必须拒绝高于支持版本的不可理解格式，并输出稳定诊断。
-- 生成输出 hint name、type name 和 field name 改变属于兼容性风险。
-- 1.0 起 `RouteTemplate.Parse` 必须拒绝 malformed brace、重复参数、非末尾 catch-all 和未知 constraint；放宽这些失败行为属于兼容性风险。
-- 1.0 起 `RouteDescriptor.ContributionId`、`RouteGraphSnapshot.GetContributionRoutes` 和 `RouteGraphSnapshot.WithoutContribution` 属于 graph contribution 兼容 contract。
-- 1.0 起 `RouteGraphSnapshot.WithContribution` 的 contribution owner 校验、冲突隔离和旧 snapshot 不变语义属于 graph contribution 兼容 contract。
-- 同级同 template 路由只有在至少一个候选声明 match policy 时才可共存；改变该冲突规则属于兼容性风险。
-- `RouteTemplate.TryMatch` 和 `RouteMatcher.Match/MatchAll` 的 null path 边界、constraint 拒绝语义和并发读能力属于 1.0 兼容 contract。
-- `NavigationOptions.JournalCapacity`、`NavigationSnapshot.ReuseKey`、Back/Forward journal 移动和失败导航不写历史属于 1.0 兼容 contract。
-- `NavigationConcurrencyPolicy` 的 `CancelPrevious`、`Queue`、`RejectIfBusy` 语义和 `NavigationScope` Dispose 后拒绝新导航属于 1.0 兼容 contract。
-- Guard hierarchy 顺序、redirect loop 诊断码、`NavigationResult.RedirectTarget` 和 Redirected 结果携带最终 route 的行为属于 1.0 兼容 contract。
-- `ViewModelTargetDescriptor` 的 ViewModelType、ParameterBindings、ReuseKey、ActivationHint 以及缺失或不可构造 target 的导航失败诊断码属于 1.0 兼容 contract。
+## Evolution
 
-## 插件兼容
+New constraints, route kinds, middleware stages, journal payload kinds, diagnostics or plugin policies require a new Feature ID and compatibility review. Documentation cannot claim a capability before API and tests exist.
 
-- 跨插件边界 contract 必须来自 Host 共享程序集。
-- 插件依赖的 capability id、manifest 字段、event contract、route target、state key、permission id 改变必须提供迁移策略。
+## Pre-1.0 Freeze Decisions
 
-## 废弃规则
-
-废弃 API 必须说明 Deprecated Since、Replacement、Removal Earliest Version、Migration、Analyzer Diagnostic。
+The final Routing audits removed never-produced `NavigationResultStatus.StaleRouteGraph` / `ContributionRevoked` and unused `NavigationTargetKind.Redirect`, made the journal-target factory non-public, and internalized the externally ineffective `NavigationOptions.RestoreState` marker. They also froze policy-candidate-before-fallback ordering, effective full-template conflict validation, cumulative redirect context, per-middleware `next` ownership, committed-route journal identity and disposal/admission linearization. These decisions are part of the frozen 1.0 behavior in `api-contracts.md`.

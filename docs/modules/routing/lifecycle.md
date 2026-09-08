@@ -1,43 +1,28 @@
 # AtomUI.City.Routing Lifecycle
 
-## 生命周期范围
+## 状态模型
 
-执行边界：Host runtime navigation graph。
+Route Graph：`Candidate -> Validated -> Published -> Superseded`。候选验证失败时旧 graph 保持 Published。
 
-AtomUI.City.Routing 作为 Host 服务或模块贡献接入 Core 生命周期，必须在 Host start/stop/dispose 中遵守本模块状态机。
+单次导航成功路径：`Created -> Waiting -> Matching -> MiddlewareEnter/Guarding -> Resolving -> Prepared -> MiddlewareExit -> Committing -> Success|Redirected`。任一阶段可在 commit 前结束为 Rejected/Cancelled/Failed/NotFound。
 
-## 模块特有状态机
+这些是行为阶段，不是当前 public enum。`NavigationResultStatus` 是调用完成状态。
 
-- RouteGraph: Building -> Validated -> Published -> Superseded
-- Navigation: Created -> Matching -> Guarding -> Resolving -> TargetReady -> Committed 或 Cancelled 或 Failed
+## NavigationScope
 
-## 生命周期流程
+- 创建时捕获初始 graph version 并发布 empty snapshot。
+- 每次事务开始时从 `IRouteGraphProvider` 捕获最新 snapshot。
+- 事务完成前不切换 graph。
+- `Dispose` 标记停止并发起取消；不等待。
+- `DisposeAsync` 标记停止、取消等待和运行中的事务，并等待用户 Guard/Resolver/Middleware 退出。
+- 重复 `Dispose`/`DisposeAsync` 幂等；Dispose 后新导航返回 `CITY-NAVIGATION-SCOPE-DISPOSED`。
 
-- Route declaration 进入 graph builder。
-- RouteMatcher 在 immutable graph 上匹配。
-- NavigationScope 执行 guard 和 resolver。
-- 成功输出 NavigationTarget。
+Routing 不创建 provisional RouteScope 或 ActivationScope。相关生命周期属于 Presentation/MVVM。
 
-## Host Shutdown / 执行结束行为
+## Contribution
 
-- Host 停止时阻止新操作进入。
-- 取消未完成后台任务。
-- 从 leaf owner 到 root owner 释放资源。
-- 释放失败记录诊断并继续释放其他资源。
-
-## 插件动态变更行为
-
-- 插件来源对象必须绑定 plugin owner。
-- 插件停用时先拒绝新贡献，再撤销现有贡献，最后释放对象。
-- 跨插件 contract 类型必须来自 Host 共享程序集。
-
-## 异常中断行为
-
-- 模板语法错误：graph build 失败。
-- 路由冲突：拒绝发布 graph。
-- 参数绑定失败：NavigationResult Failed。
-- Guard 拒绝或重定向。
-
-## 生命周期测试要求
-
-生命周期测试必须覆盖：正常路径、重复调用、取消、失败中断、释放、插件撤销或执行边界结束。具体用例见 [testing.md](testing.md)。
+- `AddContribution` 先构建和验证候选 graph，再原子发布。
+- `RouteContributionLease.Dispose` 撤销 contribution；失败时 lease 可重试。
+- 撤销失败不替换 graph，也不丢失 service resolver。
+- 成功撤销同时删除 Registry 对 contribution service resolver 的引用。
+- 正在执行的事务继续使用其已捕获旧 snapshot；snapshot 本身不租赁 contribution service resolver，因此 PluginSystem 或直接 Registry 调用方必须在 revoke 和释放插件 Provider/ALC 前完成 drain。

@@ -1,5 +1,7 @@
 namespace AtomUI.City.Testing;
 
+using AtomUI.City.Routing;
+
 public sealed class RoutingTestHostBuilder
 {
     private readonly List<RouteTestDefinition> _routes = [];
@@ -20,10 +22,16 @@ public sealed class RoutingTestHostBuilder
     public RoutingTestHost Build()
     {
         ThrowIfBuilt();
-        ThrowIfRouteConflicts();
         _built = true;
 
-        return new RoutingTestHost(_routes.ToArray());
+        try
+        {
+            return new RoutingTestHost(_routes.ToArray());
+        }
+        catch (RouteGraphException exception)
+        {
+            throw new InvalidOperationException("The routing test graph is invalid.", exception);
+        }
     }
 
     private void ThrowIfBuilt()
@@ -34,34 +42,4 @@ public sealed class RoutingTestHostBuilder
         }
     }
 
-    private void ThrowIfRouteConflicts()
-    {
-        var duplicateName = _routes
-            .GroupBy(route => route.Name, StringComparer.Ordinal)
-            .FirstOrDefault(group => group.Count() > 1);
-
-        if (duplicateName is not null)
-        {
-            throw new InvalidOperationException($"Duplicate route name '{duplicateName.Key}'.");
-        }
-
-        var duplicatePattern = _routes
-            .GroupBy(route => NormalizePattern(route.Pattern), StringComparer.OrdinalIgnoreCase)
-            .FirstOrDefault(group => group.Count() > 1);
-
-        if (duplicatePattern is not null)
-        {
-            throw new InvalidOperationException($"Duplicate route pattern '{duplicatePattern.Key}'.");
-        }
-    }
-
-    private static string NormalizePattern(string pattern)
-    {
-        var segments = pattern
-            .Trim('/')
-            .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(segment => segment.StartsWith('{') && segment.EndsWith('}') ? "{}" : segment.ToLowerInvariant());
-
-        return "/" + string.Join("/", segments);
-    }
 }

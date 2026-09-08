@@ -1,0 +1,8 @@
+namespace AtomUI.City.Routing;
+
+[AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = false)]
+public sealed class RouteResolversAttribute(params Type[] resolverTypes) : Attribute
+{
+    public IReadOnlyList<Type> ResolverTypes { get; } = Array.AsReadOnly(
+        (resolverTypes ?? throw new ArgumentNullException(nameof(resolverTypes))).ToArray());
+}

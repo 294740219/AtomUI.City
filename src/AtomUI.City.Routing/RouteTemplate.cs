@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 
 namespace AtomUI.City.Routing;
 
@@ -37,14 +38,28 @@ public sealed class RouteTemplate
 
         var routeValues = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var pathSegments = NormalizePattern(path)
-            .Split('/', StringSplitOptions.RemoveEmptyEntries);
+            .Split('/', StringSplitOptions.RemoveEmptyEntries)
+            .Select(Uri.UnescapeDataString)
+            .ToArray();
         var pathIndex = 0;
 
         foreach (var segment in Segments)
         {
             if (segment.Kind == RouteTemplateSegmentKind.CatchAll)
             {
-                routeValues[segment.Name!] = string.Join('/', pathSegments.Skip(pathIndex));
+                var catchAllValue = string.Join('/', pathSegments.Skip(pathIndex));
+                if (catchAllValue.Length == 0 && segment.DefaultValue is not null)
+                {
+                    catchAllValue = segment.DefaultValue;
+                }
+
+                if (!SatisfiesConstraints(catchAllValue, segment.Constraints))
+                {
+                    values = RouteParameters.Empty();
+                    return false;
+                }
+
+                routeValues[segment.Name!] = catchAllValue;
                 pathIndex = pathSegments.Length;
                 continue;
             }
@@ -62,7 +77,7 @@ public sealed class RouteTemplate
                     continue;
                 }
 
-                values = EmptyValues.Instance;
+                values = RouteParameters.Empty();
 
                 return false;
             }
@@ -73,7 +88,7 @@ public sealed class RouteTemplate
             {
                 if (!string.Equals(segment.Literal, pathSegment, StringComparison.OrdinalIgnoreCase))
                 {
-                    values = EmptyValues.Instance;
+                    values = RouteParameters.Empty();
 
                     return false;
                 }
@@ -84,7 +99,7 @@ public sealed class RouteTemplate
 
             if (!SatisfiesConstraints(pathSegment, segment.Constraints))
             {
-                values = EmptyValues.Instance;
+                values = RouteParameters.Empty();
 
                 return false;
             }
@@ -95,13 +110,50 @@ public sealed class RouteTemplate
 
         if (pathIndex != pathSegments.Length)
         {
-            values = EmptyValues.Instance;
+            values = RouteParameters.Empty();
 
             return false;
         }
 
-        values = routeValues;
+        values = RouteParameters.Copy(routeValues);
 
+        return true;
+    }
+
+    public bool TryBindParameters(
+        IReadOnlyDictionary<string, string> parameters,
+        out IReadOnlyDictionary<string, string> boundParameters)
+    {
+        ArgumentNullException.ThrowIfNull(parameters);
+        var values = new Dictionary<string, string>(parameters, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var segment in Segments.Where(segment => segment.Kind != RouteTemplateSegmentKind.Literal))
+        {
+            if (!values.TryGetValue(segment.Name!, out var value))
+            {
+                if (segment.DefaultValue is not null)
+                {
+                    values[segment.Name!] = segment.DefaultValue;
+                    continue;
+                }
+
+                if (segment.IsOptional || segment.Kind == RouteTemplateSegmentKind.CatchAll)
+                {
+                    continue;
+                }
+
+                boundParameters = RouteParameters.Empty();
+                return false;
+            }
+
+            if (!SatisfiesConstraints(value, segment.Constraints))
+            {
+                boundParameters = RouteParameters.Empty();
+                return false;
+            }
+        }
+
+        boundParameters = RouteParameters.Copy(values);
         return true;
     }
 
@@ -179,7 +231,7 @@ public sealed class RouteTemplate
         }
 
         string? defaultValue = null;
-        var defaultSeparatorIndex = body.IndexOf('=', StringComparison.Ordinal);
+        var defaultSeparatorIndex = FindTopLevelCharacter(body, '=');
 
         if (defaultSeparatorIndex >= 0)
         {
@@ -187,7 +239,7 @@ public sealed class RouteTemplate
             body = body[..defaultSeparatorIndex];
         }
 
-        var parts = body.Split(':');
+        var parts = SplitParameterParts(body);
 
         if (parts.Length == 0 || parts.Any(string.IsNullOrWhiteSpace))
         {
@@ -218,6 +270,13 @@ public sealed class RouteTemplate
             }
         }
 
+        if (defaultValue is not null && !SatisfiesConstraints(defaultValue, constraints))
+        {
+            throw new RouteGraphException(
+                RouteGraphError.InvalidRouteTemplate,
+                $"Default value '{defaultValue}' does not satisfy the constraints for route parameter '{name}'.");
+        }
+
         return RouteTemplateSegment.ParameterSegment(
             kind,
             name,
@@ -241,6 +300,55 @@ public sealed class RouteTemplate
 
     private static bool SatisfiesConstraint(string value, string constraint)
     {
+        if (TryReadConstraintArgument(constraint, "min", out var min))
+        {
+            return TryParseDecimal(value, out var numeric) && TryParseDecimal(min, out var bound) && numeric >= bound;
+        }
+
+        if (TryReadConstraintArgument(constraint, "max", out var max))
+        {
+            return TryParseDecimal(value, out var numeric) && TryParseDecimal(max, out var bound) && numeric <= bound;
+        }
+
+        if (TryReadConstraintArguments(constraint, "range", 2, out var range))
+        {
+            return TryParseDecimal(value, out var numeric) &&
+                TryParseDecimal(range[0], out var minimum) &&
+                TryParseDecimal(range[1], out var maximum) &&
+                numeric >= minimum && numeric <= maximum;
+        }
+
+        if (TryReadIntConstraint(constraint, "length", out var length))
+        {
+            return value.Length == length;
+        }
+
+        if (TryReadIntConstraint(constraint, "minlength", out var minimumLength))
+        {
+            return value.Length >= minimumLength;
+        }
+
+        if (TryReadIntConstraint(constraint, "maxlength", out var maximumLength))
+        {
+            return value.Length <= maximumLength;
+        }
+
+        if (TryReadConstraintArgument(constraint, "regex", out var pattern))
+        {
+            try
+            {
+                return Regex.IsMatch(value, pattern, RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
+            }
+            catch (ArgumentException)
+            {
+                return false;
+            }
+            catch (RegexMatchTimeoutException)
+            {
+                return false;
+            }
+        }
+
         return constraint switch
         {
             "bool" => bool.TryParse(value, out _),
@@ -251,13 +359,50 @@ public sealed class RouteTemplate
             "guid" => Guid.TryParse(value, out _),
             "int" => int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out _),
             "long" => long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out _),
-            "alpha" => value.All(char.IsLetter),
+            "alpha" => value.Length > 0 && value.All(char.IsLetter),
             _ => false,
         };
     }
 
     private static bool IsKnownConstraint(string constraint)
     {
+        if (TryReadConstraintArgument(constraint, "min", out var min))
+        {
+            return TryParseDecimal(min, out _);
+        }
+
+        if (TryReadConstraintArgument(constraint, "max", out var max))
+        {
+            return TryParseDecimal(max, out _);
+        }
+
+        if (TryReadConstraintArguments(constraint, "range", 2, out var range))
+        {
+            return TryParseDecimal(range[0], out var minimum) &&
+                TryParseDecimal(range[1], out var maximum) &&
+                minimum <= maximum;
+        }
+
+        if (TryReadIntConstraint(constraint, "length", out _) ||
+            TryReadIntConstraint(constraint, "minlength", out _) ||
+            TryReadIntConstraint(constraint, "maxlength", out _))
+        {
+            return true;
+        }
+
+        if (TryReadConstraintArgument(constraint, "regex", out var pattern))
+        {
+            try
+            {
+                _ = new Regex(pattern, RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
+                return true;
+            }
+            catch (ArgumentException)
+            {
+                return false;
+            }
+        }
+
         return constraint is
             "bool" or
             "datetime" or
@@ -270,18 +415,170 @@ public sealed class RouteTemplate
             "alpha";
     }
 
+    private static string[] SplitParameterParts(string body)
+    {
+        var parts = new List<string>();
+        var start = 0;
+        var depth = 0;
+        var escaped = false;
+        var inCharacterClass = false;
+
+        for (var index = 0; index < body.Length; index++)
+        {
+            var current = body[index];
+            if (escaped)
+            {
+                escaped = false;
+                continue;
+            }
+
+            if (current == '\\')
+            {
+                escaped = true;
+                continue;
+            }
+
+            if (current == '[')
+            {
+                inCharacterClass = true;
+                continue;
+            }
+
+            if (current == ']' && inCharacterClass)
+            {
+                inCharacterClass = false;
+                continue;
+            }
+
+            if (!inCharacterClass)
+            {
+                depth += current switch
+                {
+                    '(' => 1,
+                    ')' => -1,
+                    _ => 0,
+                };
+            }
+
+            if (depth < 0)
+            {
+                throw new RouteGraphException(RouteGraphError.InvalidRouteTemplate, "Route constraint has unbalanced parentheses.");
+            }
+
+            if (current == ':' && depth == 0 && !inCharacterClass)
+            {
+                parts.Add(body[start..index]);
+                start = index + 1;
+            }
+        }
+
+        if (depth != 0 || inCharacterClass)
+        {
+            throw new RouteGraphException(RouteGraphError.InvalidRouteTemplate, "Route constraint has unbalanced parentheses.");
+        }
+
+        parts.Add(body[start..]);
+        return parts.ToArray();
+    }
+
+    private static int FindTopLevelCharacter(string value, char character)
+    {
+        var depth = 0;
+        var escaped = false;
+        var inCharacterClass = false;
+        for (var index = 0; index < value.Length; index++)
+        {
+            var current = value[index];
+            if (escaped)
+            {
+                escaped = false;
+                continue;
+            }
+
+            if (current == '\\')
+            {
+                escaped = true;
+                continue;
+            }
+
+            if (current == '[')
+            {
+                inCharacterClass = true;
+                continue;
+            }
+
+            if (current == ']' && inCharacterClass)
+            {
+                inCharacterClass = false;
+                continue;
+            }
+
+            if (!inCharacterClass)
+            {
+                depth += current switch
+                {
+                    '(' => 1,
+                    ')' => -1,
+                    _ => 0,
+                };
+            }
+
+            if (current == character && depth == 0 && !inCharacterClass)
+            {
+                return index;
+            }
+        }
+
+        return -1;
+    }
+
+    private static bool TryReadIntConstraint(string constraint, string name, out int value)
+    {
+        value = 0;
+        return TryReadConstraintArgument(constraint, name, out var argument) &&
+            int.TryParse(argument, NumberStyles.None, CultureInfo.InvariantCulture, out value) &&
+            value >= 0;
+    }
+
+    private static bool TryReadConstraintArgument(string constraint, string name, out string argument)
+    {
+        if (TryReadConstraintArguments(constraint, name, 1, out var arguments))
+        {
+            argument = arguments[0];
+            return true;
+        }
+
+        argument = string.Empty;
+        return false;
+    }
+
+    private static bool TryReadConstraintArguments(
+        string constraint,
+        string name,
+        int count,
+        out string[] arguments)
+    {
+        var prefix = name + "(";
+        if (!constraint.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) ||
+            !constraint.EndsWith(')'))
+        {
+            arguments = [];
+            return false;
+        }
+
+        var body = constraint[prefix.Length..^1];
+        arguments = count == 1
+            ? [body.Trim()]
+            : body.Split(',', StringSplitOptions.TrimEntries);
+        return arguments.Length == count && arguments.All(argument => argument.Length > 0);
+    }
+
+    private static bool TryParseDecimal(string value, out decimal result) =>
+        decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out result);
+
     private static string NormalizePattern(string pattern)
     {
         return pattern.Trim().Trim('/');
     }
 
-    private sealed class EmptyValues : Dictionary<string, string>
-    {
-        public static readonly EmptyValues Instance = new();
-
-        private EmptyValues()
-            : base(StringComparer.OrdinalIgnoreCase)
-        {
-        }
-    }
 }

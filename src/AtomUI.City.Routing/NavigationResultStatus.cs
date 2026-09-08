@@ -8,6 +8,4 @@ public enum NavigationResultStatus
     Cancelled,
     Failed,
     NotFound,
-    StaleRouteGraph,
-    ContributionRevoked,
 }

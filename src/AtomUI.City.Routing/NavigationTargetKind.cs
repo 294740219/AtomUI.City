@@ -6,5 +6,4 @@ public enum NavigationTargetKind
     Path,
     DeepLink,
     Journal,
-    Redirect,
 }

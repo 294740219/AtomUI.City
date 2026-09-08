@@ -1,11 +1,20 @@
 namespace AtomUI.City.Testing;
 
+using AtomUI.City.Routing;
+
 public sealed class RoutingTestHost
 {
+    private readonly RouteGraphSnapshot _graph;
+    private readonly NavigationScope _navigationScope;
+    private readonly IReadOnlyDictionary<string, RouteTestDefinition> _routesByName;
+
     internal RoutingTestHost(IReadOnlyList<RouteTestDefinition> routes)
     {
         Routes = Array.AsReadOnly(routes.ToArray());
         Diagnostics = new TestDiagnostics();
+        _graph = RouteGraphSnapshot.Create(routes.Select(ToDescriptor).ToArray());
+        _routesByName = routes.ToDictionary(route => route.Name, StringComparer.Ordinal);
+        _navigationScope = new NavigationScope(_graph);
     }
 
     public IReadOnlyList<RouteTestDefinition> Routes { get; }
@@ -21,40 +30,10 @@ public sealed class RoutingTestHost
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
 
-        var pathSegments = SplitPath(path);
-
-        foreach (var route in Routes)
+        var match = _graph.Matcher.Match(path);
+        if (match.Status == RouteMatchStatus.Success && match.MatchedRoute is not null)
         {
-            var routeSegments = SplitPath(route.Pattern);
-
-            if (routeSegments.Length != pathSegments.Length)
-            {
-                continue;
-            }
-
-            var parameters = new Dictionary<string, string>(StringComparer.Ordinal);
-            var matched = true;
-
-            for (var index = 0; index < routeSegments.Length; index++)
-            {
-                var routeSegment = routeSegments[index];
-                var pathSegment = pathSegments[index];
-
-                if (routeSegment.StartsWith('{') && routeSegment.EndsWith('}'))
-                {
-                    parameters[routeSegment[1..^1]] = pathSegment;
-                }
-                else if (!string.Equals(routeSegment, pathSegment, StringComparison.OrdinalIgnoreCase))
-                {
-                    matched = false;
-                    break;
-                }
-            }
-
-            if (matched)
-            {
-                return RouteTestMatch.Success(route, parameters);
-            }
+            return RouteTestMatch.Success(_routesByName[match.Route.RouteId], match.Parameters);
         }
 
         Diagnostics.Add("AUCTEST501", $"Route not found for path '{path}'.");
@@ -62,20 +41,27 @@ public sealed class RoutingTestHost
         return RouteTestMatch.NotFound();
     }
 
-    public ValueTask<RouteTestMatch> NavigateAsync(
+    public async ValueTask<RouteTestMatch> NavigateAsync(
         string path,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         cancellationToken.ThrowIfCancellationRequested();
 
-        return ValueTask.FromResult(Match(path));
+        var result = await _navigationScope.NavigateByPathAsync(path, cancellationToken: cancellationToken);
+        if (result.Status == NavigationResultStatus.Success && result.ActiveRoute is not null)
+        {
+            return RouteTestMatch.Success(_routesByName[result.Route.RouteId], result.Parameters);
+        }
+
+        Diagnostics.Add("AUCTEST501", result.Error?.Message ?? $"Route not found for path '{path}'.");
+        return RouteTestMatch.NotFound();
     }
 
-    private static string[] SplitPath(string path)
-    {
-        return path
-            .Trim('/')
-            .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-    }
+    private static RouteDescriptor ToDescriptor(RouteTestDefinition route) =>
+        new(
+            route.Name,
+            RouteDefinitionKind.Route,
+            route.Pattern,
+            new ViewModelTargetDescriptor(route.ViewModelType));
 }

@@ -116,6 +116,108 @@ public sealed class RouteGraphAndMatcherTests
     }
 
     [Fact]
+    public void GraphRejectsSemanticallyEquivalentParameterTemplates()
+    {
+        var exception = Assert.Throws<RouteGraphException>(
+            () => RouteGraphSnapshot.Create(
+                [
+                    Route("by-id", "items/{id}", typeof(SettingsViewModel)),
+                    Route("by-name", "items/{name}", typeof(ProfileViewModel)),
+                ]));
+
+        Assert.Equal(RouteGraphError.DuplicateRouteTemplate, exception.Error);
+    }
+
+    [Fact]
+    public void GraphRejectsVersionRegression()
+    {
+        var graph = RouteGraphSnapshot.Create([Route("home", "home", typeof(SettingsViewModel))], version: 5);
+
+        var exception = Assert.Throws<RouteGraphException>(
+            () => graph.WithoutContribution("unknown", version: 5));
+
+        Assert.Equal(RouteGraphError.InvalidVersion, exception.Error);
+    }
+
+    [Fact]
+    public void MatcherPrefersIndexRouteOverLayoutForSamePath()
+    {
+        var graph = RouteGraphSnapshot.Create(
+            [
+                Layout("shell", typeof(ShellViewModel)),
+                new RouteDescriptor(
+                    "home",
+                    RouteDefinitionKind.Index,
+                    template: null,
+                    new ViewModelTargetDescriptor(typeof(SettingsViewModel)),
+                    parentRouteId: "shell"),
+            ]);
+
+        Assert.Equal("home", graph.Matcher.Match(string.Empty).Route.RouteId);
+    }
+
+    [Fact]
+    public void GraphRejectsStaticRedirectLoop()
+    {
+        var exception = Assert.Throws<RouteGraphException>(
+            () => RouteGraphSnapshot.Create(
+                [
+                    Redirect("old-a", "old-a", "old-b"),
+                    Redirect("old-b", "old-b", "old-a"),
+                ]));
+
+        Assert.Equal(RouteGraphError.CircularRedirect, exception.Error);
+    }
+
+    [Fact]
+    public void GraphRejectsCircularParentHierarchy()
+    {
+        var exception = Assert.Throws<RouteGraphException>(
+            () => RouteGraphSnapshot.Create(
+                [
+                    Route("route-a", "a", typeof(SettingsViewModel), parentRouteId: "route-b"),
+                    Route("route-b", "b", typeof(ProfileViewModel), parentRouteId: "route-a"),
+                ]));
+
+        Assert.Equal(RouteGraphError.CircularParentRoute, exception.Error);
+        Assert.Contains("route-a -> route-b -> route-a", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void GraphRejectsSelfReferencingParent()
+    {
+        var exception = Assert.Throws<RouteGraphException>(
+            () => RouteGraphSnapshot.Create(
+                [
+                    Route("self", "self", typeof(SettingsViewModel), parentRouteId: "self"),
+                ]));
+
+        Assert.Equal(RouteGraphError.CircularParentRoute, exception.Error);
+        Assert.Contains("self -> self", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ContributionCannotIntroduceCircularParentHierarchy()
+    {
+        var host = RouteGraphSnapshot.Create(
+            [
+                Route("home", "home", typeof(SettingsViewModel)),
+            ]);
+
+        var exception = Assert.Throws<RouteGraphException>(
+            () => host.WithContribution(
+                "plugin.circular",
+                [
+                    Route("plugin-a", "a", typeof(ProfileViewModel), parentRouteId: "plugin-b", contributionId: "plugin.circular"),
+                    Route("plugin-b", "b", typeof(DynamicViewModel), parentRouteId: "plugin-a", contributionId: "plugin.circular"),
+                ]));
+
+        Assert.Equal(RouteGraphError.CircularParentRoute, exception.Error);
+        Assert.False(host.TryGetRoute("plugin-a", out _));
+        Assert.Equal(1, host.Version);
+    }
+
+    [Fact]
     public void SnapshotRevokesContributionWithoutMutatingExistingSnapshot()
     {
         var snapshot = RouteGraphSnapshot.Create(
@@ -271,23 +373,18 @@ public sealed class RouteGraphAndMatcherTests
     }
 
     [Fact]
-    public async Task NavigationFailsBeforeCommitWhenRouteHasMissingViewModelTarget()
+    public void GraphRejectsRouteWithMissingViewModelTarget()
     {
-        var snapshot = RouteGraphSnapshot.Create(
-            [
+        var exception = Assert.Throws<RouteGraphException>(() => RouteGraphSnapshot.Create(
+        [
                 new RouteDescriptor(
                     "missing-target",
                     RouteDefinitionKind.Route,
                     "missing-target",
                     viewModelTarget: null),
-            ]);
-        var scope = new NavigationScope(snapshot);
+        ]));
 
-        var result = await scope.Router.NavigateByPathAsync("missing-target");
-
-        Assert.Equal(NavigationResultStatus.Failed, result.Status);
-        Assert.Equal("CITY-NAVIGATION-TARGET-MISSING", result.Error?.Code);
-        Assert.Null(scope.CurrentSnapshot.ActiveRoute);
+        Assert.Equal(RouteGraphError.InvalidRouteDefinition, exception.Error);
     }
 
     [Fact]
@@ -327,6 +424,85 @@ public sealed class RouteGraphAndMatcherTests
         Assert.Equal(0, ConstructedViewModel.ConstructorCalls);
     }
 
+    [Fact]
+    public void GraphReportsMissingParentRoute()
+    {
+        var exception = Assert.Throws<RouteGraphException>(() => RouteGraphSnapshot.Create(
+        [
+            Route("profile", "profile", typeof(ProfileViewModel), parentRouteId: "missing"),
+        ]));
+
+        Assert.Equal(RouteGraphError.MissingParentRoute, exception.Error);
+    }
+
+    [Fact]
+    public void GraphReportsInvalidContributionOwnership()
+    {
+        var graph = RouteGraphSnapshot.Create([]);
+        var route = Route(
+            "profile",
+            "profile",
+            typeof(ProfileViewModel),
+            contributionId: "plugin.other");
+
+        var exception = Assert.Throws<RouteGraphException>(() =>
+            graph.WithContribution("plugin.profile", [route]));
+
+        Assert.Equal(RouteGraphError.InvalidContribution, exception.Error);
+    }
+
+    [Fact]
+    public void GraphReportsDuplicateIndexRoute()
+    {
+        var exception = Assert.Throws<RouteGraphException>(() => RouteGraphSnapshot.Create(
+        [
+            Layout("shell", typeof(ShellViewModel)),
+            Index("home", "shell"),
+            Index("dashboard", "shell"),
+        ]));
+
+        Assert.Equal(RouteGraphError.DuplicateIndexRoute, exception.Error);
+    }
+
+    [Fact]
+    public void GraphReportsDuplicateExtensionPoint()
+    {
+        var exception = Assert.Throws<RouteGraphException>(() => RouteGraphSnapshot.Create(
+        [
+            ExtensionPoint("first-slot", "tools"),
+            ExtensionPoint("second-slot", "tools"),
+        ]));
+
+        Assert.Equal(RouteGraphError.DuplicateExtensionPoint, exception.Error);
+    }
+
+    [Fact]
+    public void GraphReportsMissingExtensionPoint()
+    {
+        var route = new RouteDescriptor(
+            "plugin-profile",
+            RouteDefinitionKind.Route,
+            "profile",
+            new ViewModelTargetDescriptor(typeof(ProfileViewModel)),
+            extensionPoint: "missing-slot",
+            contributionId: "plugin.profile");
+
+        var exception = Assert.Throws<RouteGraphException>(() => RouteGraphSnapshot.Create([route]));
+
+        Assert.Equal(RouteGraphError.MissingExtensionPoint, exception.Error);
+    }
+
+    [Fact]
+    public void GraphReportsMissingRedirectTarget()
+    {
+        var exception = Assert.Throws<RouteGraphException>(() => RouteGraphSnapshot.Create(
+        [
+            Redirect("legacy", "legacy", "missing"),
+        ]));
+
+        Assert.Equal(RouteGraphError.MissingRedirectTarget, exception.Error);
+    }
+
     private static RouteDescriptor Layout(string id, Type viewModelType)
     {
         return new RouteDescriptor(
@@ -351,6 +527,36 @@ public sealed class RouteGraphAndMatcherTests
             new ViewModelTargetDescriptor(viewModelType),
             parentRouteId,
             contributionId: contributionId);
+    }
+
+    private static RouteDescriptor Redirect(string id, string template, string target)
+    {
+        return new RouteDescriptor(
+            id,
+            RouteDefinitionKind.Redirect,
+            template,
+            viewModelTarget: null,
+            redirectTargetRouteId: target);
+    }
+
+    private static RouteDescriptor Index(string id, string parentRouteId)
+    {
+        return new RouteDescriptor(
+            id,
+            RouteDefinitionKind.Index,
+            template: null,
+            new ViewModelTargetDescriptor(typeof(ProfileViewModel)),
+            parentRouteId);
+    }
+
+    private static RouteDescriptor ExtensionPoint(string id, string extensionPoint)
+    {
+        return new RouteDescriptor(
+            id,
+            RouteDefinitionKind.ExtensionPoint,
+            template: null,
+            viewModelTarget: null,
+            extensionPoint: extensionPoint);
     }
 
     private sealed class ShellViewModel;

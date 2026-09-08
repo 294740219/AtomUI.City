@@ -34,4 +34,8 @@ public abstract class RouteDefinitionAttribute : Attribute
     public string? GroupKey { get; set; }
 
     public string? ErrorTitleKey { get; set; }
+
+    public string? ReuseKey { get; set; }
+
+    public string? ActivationHint { get; set; }
 }

@@ -10,7 +10,9 @@ public sealed class NavigationOptions
 
     public NavigationConcurrencyPolicy ConcurrencyPolicy { get; init; } = NavigationConcurrencyPolicy.CancelPrevious;
 
-    public bool RestoreState { get; init; }
+    public string OutletName { get; init; } = "primary";
+
+    internal bool RestoreState { get; init; }
 
     public bool ForceReload { get; init; }
 

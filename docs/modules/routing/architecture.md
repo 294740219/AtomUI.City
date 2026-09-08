@@ -1,70 +1,51 @@
 # AtomUI.City.Routing Architecture
 
-## 架构目标
+## 所有权地图
 
-AtomUI.City.Routing 的架构目标是把模块职责变成可实现、可测试、可 review 的产品级合同。
+| 对象 | 生命周期 | 所有者 |
+| --- | --- | --- |
+| `RouteDescriptor` | 不可变 | generated manifest / application |
+| `RouteGraphSnapshot` | 不可变、可被旧事务继续持有 | `RouteRegistry` 发布 |
+| `RouteContributionLease` | contribution 生命周期 | 模块或插件激活流程 |
+| `NavigationScope` | 窗口、Outlet 或应用定义的导航会话 | DI scope / application |
+| `NavigationSnapshot` | 每次成功提交替换 | `NavigationScope` |
+| `NavigationResult` | 单次调用 | 调用方 |
 
-- 声明式路由生成 AOT 友好的 RouteGraph。
-- 事务式导航、参数绑定、Guard 和历史记录。
+`NavigationScope` 不是“一次导航事务”。它是长期导航会话；每个 `Navigate*`、`Back`、`Forward` 调用才是一笔串行事务。
 
-## 核心不变量
+## 运行流程
 
-- Routing 只负责 Route -> ViewModel Target。
-- RouteGraphSnapshot 发布后不可变。
-- 导航是事务，失败不提交半导航。
-- 插件路由撤销必须发布新 graph。
-
-## 核心概念和所有权
-
-| 概念 | 职责 | 创建者 | 释放/失效规则 |
-| --- | --- | --- | --- |
-| RouteTemplate | 路径模板和参数约束。 | attribute/generator/runtime parser | 不可变。 |
-| RouteGraphSnapshot | 不可变路由图。 | builder 发布 | superseded 后只读。 |
-| NavigationScope | 一次导航事务。 | Router/Host | dispose 释放。 |
-
-## 产品级状态机
-
-- RouteGraph: Building -> Validated -> Published -> Superseded
-- Navigation: Created -> Matching -> Guarding -> Resolving -> TargetReady -> Committed 或 Cancelled 或 Failed
-
-## 关键运行流程
-
-- Route declaration 进入 graph builder。
-- RouteMatcher 在 immutable graph 上匹配。
-- NavigationScope 执行 guard 和 resolver。
-- 成功输出 NavigationTarget。
-
-## 失败矩阵
-
-- 模板语法错误：graph build 失败。
-- 路由冲突：拒绝发布 graph。
-- 参数绑定失败：NavigationResult Failed。
-- Guard 拒绝或重定向。
-
-## 性能和资源边界
-
-- Route matching 不重新解析所有模板。
-- Navigation journal 有容量策略。
-
-## 运行时对象模型
-
-```mermaid
-flowchart LR
-    Boundary["Host runtime navigation graph"] --> Module["AtomUI.City.Routing"]
-    Module --> Contracts["Public Contracts"]
-    Module --> State["State / Manifest / Snapshot"]
-    Module --> Diagnostics["Diagnostics"]
-    Module --> Tests["Product Contract Tests"]
+```text
+capture RouteGraphSnapshot
+-> match route / bind parameters
+-> match policies
+-> route middleware enter (root -> leaf)
+-> leave guards (leaf -> root)
+-> enter guards (root -> leaf)
+-> resolvers (root -> leaf, declaration order)
+-> prepare NavigationSnapshot and success result
+-> route middleware exit (leaf -> root)
+-> atomically publish NavigationSnapshot + journal entry
 ```
 
-## 扩展点模型
+任何非成功结果都不执行 commit。每层 Middleware 的 `next` 都有独立调用窗口，成功提交要求整条链与 terminal 均满足一次性调用合同；已经启动但未 await 的 `next` 仍属于当前事务，gate 会等待它结束；该层 middleware 返回后再调用捕获的 `next` 会失败。`next` 返回后 middleware 抛异常、返回非成功/外部 operation 结果或重复调用 `next`，prepared state 都会被丢弃。Resolver data 与 route、parameters、graph version 在同一个 `NavigationSnapshot` 中发布。
 
-- 扩展点只能通过 public API、DI、attribute、manifest、source generator 输出、MSBuild property、CLI command 或 template variable 暴露。
-- 新增扩展点必须同步更新 [features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 和 [compatibility.md](compatibility.md)。
-- 插件来源扩展点必须有 owner 和撤销路径。
+## 并发模型
 
-## AOT 和 Trimming 约束
+- 每个 `NavigationScope` 使用一个异步 gate 串行事务。
+- `CancelPrevious` 在锁外取消旧事务，并用世代号保证最新请求胜出。
+- `Queue` 异步等待 gate 并串行执行；1.0 不承诺线程调度公平性或严格 FIFO。
+- `RejectIfBusy` 不等待，返回 `CITY-NAVIGATION-BUSY`。
+- 同一笔仍活跃的异步调用链重入同一 scope 返回 `CITY-NAVIGATION-REENTRANT`；继承 ExecutionContext 的后台任务在原事务结束后不再被误判为重入。
+- 多线程读取 `CurrentSnapshot` 使用原子引用发布。
+- `DisposeAsync` 返回同一完成事务，并等待运行中的外部代码退出。
 
-- 运行时发现能力优先通过 source generator 或 manifest。
-- 产品实现不得把运行时反射扫描作为唯一发现机制。
-- 生成输出和 manifest 必须稳定排序，便于 snapshot test 和增量构建。
+## Commit 边界
+
+Routing commit 只包含 active route descriptor、只读 parameters、graph version、reuse key、resolver data 和 journal 更新。
+
+ViewModel activation、ActivationScope、DI child scope、Outlet 控件和 VisualTree commit 不在 Routing 事务内，由 Presentation/MVVM 在消费 target 后处理。Routing 只依据 `OutletName` 选择 route descriptor。
+
+## AOT
+
+Route Map 由 `AtomUI.City.Generators` 在编译期转换为 `GeneratedRoutingRouteManifest` 和 partial route methods。运行时只消费确定类型和 descriptor，不依赖程序集扫描、`Activator.CreateInstance` 或命名约定。

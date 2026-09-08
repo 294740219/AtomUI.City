@@ -15,7 +15,9 @@ public sealed class RouteDescriptor
         IReadOnlyList<Type>? leaveGuardTypes = null,
         IReadOnlyList<Type>? matchPolicyTypes = null,
         RouteMetadataDescriptor? metadata = null,
-        string? contributionId = null)
+        string? contributionId = null,
+        IReadOnlyList<Type>? resolverTypes = null,
+        IReadOnlyList<Type>? middlewareTypes = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(routeId);
         ArgumentException.ThrowIfNullOrWhiteSpace(outletName);
@@ -33,6 +35,8 @@ public sealed class RouteDescriptor
         MatchPolicyTypes = AsReadOnly(matchPolicyTypes);
         Metadata = metadata ?? RouteMetadataDescriptor.Empty;
         ContributionId = string.IsNullOrWhiteSpace(contributionId) ? null : contributionId;
+        ResolverTypes = AsReadOnly(resolverTypes);
+        MiddlewareTypes = AsReadOnly(middlewareTypes);
     }
 
     public string RouteId { get; }
@@ -61,10 +65,50 @@ public sealed class RouteDescriptor
 
     public string? ContributionId { get; }
 
+    public IReadOnlyList<Type> ResolverTypes { get; }
+
+    public IReadOnlyList<Type> MiddlewareTypes { get; }
+
     private static IReadOnlyList<Type> AsReadOnly(IReadOnlyList<Type>? values)
     {
         return values is null
             ? Array.Empty<Type>()
             : Array.AsReadOnly(values.ToArray());
     }
+
+    internal RouteDescriptor WithParentRouteId(string? parentRouteId) =>
+        new(
+            RouteId,
+            Kind,
+            Template?.Pattern,
+            ViewModelTarget,
+            parentRouteId,
+            OutletName,
+            ExtensionPoint,
+            RedirectTargetRouteId,
+            EnterGuardTypes,
+            LeaveGuardTypes,
+            MatchPolicyTypes,
+            Metadata,
+            ContributionId,
+            ResolverTypes,
+            MiddlewareTypes);
+
+    internal RouteDescriptor WithContributionId(string contributionId) =>
+        new(
+            RouteId,
+            Kind,
+            Template?.Pattern,
+            ViewModelTarget,
+            ParentRouteId,
+            OutletName,
+            ExtensionPoint,
+            RedirectTargetRouteId,
+            EnterGuardTypes,
+            LeaveGuardTypes,
+            MatchPolicyTypes,
+            Metadata,
+            contributionId,
+            ResolverTypes,
+            MiddlewareTypes);
 }

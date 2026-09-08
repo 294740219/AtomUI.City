@@ -1,36 +1,24 @@
 # AtomUI.City.Routing Threading
 
-## 线程模型范围
+## Rules
 
-执行边界：Host runtime navigation graph。
+- Route descriptors, templates, graphs, matches and snapshots are immutable and safe for concurrent reads.
+- Registry graph publication and contribution resolver maps are synchronized; diagnostic callbacks run outside Registry/lifecycle monitor locks.
+- Navigation user code never runs under `_lifecycleGate`.
+- One asynchronous gate serializes snapshot and journal mutation per `NavigationScope`.
+- Navigation diagnostics remain inside the transaction gate lifetime to preserve event ordering; a slow sink can delay queued navigation but cannot change its result.
+- Cancellation callbacks are triggered outside internal locks.
+- The current snapshot is published with volatile reference semantics.
+- A navigation captures one graph version and never consults a newer graph for matching or commit.
+- Routing does not marshal to a UI thread. Guard, resolver and middleware preserve normal async continuation behavior.
+- Admission and disposal are linearized by `_lifecycleGate`: once disposal publishes disposed state, no caller can begin waiting on or acquiring primitives that disposal may release.
 
-## 模块线程硬约束
+## Deadlock Prevention
 
-- Routing 只负责 Route -> ViewModel Target。
-- RouteGraphSnapshot 发布后不可变。
-- 导航是事务，失败不提交半导航。
-- 插件路由撤销必须发布新 graph。
+Same-chain reentrant navigation is rejected while the owning transaction is active. The AsyncLocal marker carries an explicit active lifetime, so a delayed child task that inherited ExecutionContext can navigate after the owner finishes. Different callers may await the same serialized scope safely. `DisposeAsync` from the scope's own active execution chain throws because waiting for itself cannot complete.
 
-## 并发冲突策略
+`Queue` guarantees serialization, not scheduler fairness or strict FIFO ordering.
 
-- 模板语法错误：graph build 失败。
-- 路由冲突：拒绝发布 graph。
-- 参数绑定失败：NavigationResult Failed。
+## Cancellation
 
-## UI 线程规则
-
-- 非 Presentation 模块不得直接操作 Avalonia visual tree。
-- 需要 UI 更新的结果必须通过 Presentation dispatcher、State 或 EventBus contract 间接到达 UI。
-- Presentation 的 VisualTree 修改必须在 UI dispatcher 上执行。
-
-## 后台任务和取消
-
-- IO、网络、子进程、编译分析、插件扫描、缓存清理、streaming 和 handler 调用必须可取消。
-- 取消后不得提交后续状态、缓存、事件、UI 或 generated output。
-- 长生命周期后台任务必须绑定 owner；owner 释放时取消。
-
-## 死锁规避
-
-- 不在 UI 线程同步等待异步操作。
-- 不在 lock 内调用用户 handler、插件代码、dispatcher、transport 或外部 process。
-- 释放顺序从 leaf owner 到 parent owner。
+`CancelPrevious` observes an already-cancelled caller token before cancelling the prior transaction, and cancellation is generation-checked so a queued older replacement cannot cancel a newer request. Scope disposal cancels both gate waiters and running user code; post-dispose admission deterministically returns `CITY-NAVIGATION-SCOPE-DISPOSED` without touching disposed synchronization primitives. Stubborn user code delays `DisposeAsync` by design.

@@ -18,6 +18,11 @@ public interface IRouter
         NavigationOptions? options = null,
         CancellationToken cancellationToken = default);
 
+    ValueTask<NavigationResult> NavigateByUriAsync(
+        Uri uri,
+        NavigationOptions? options = null,
+        CancellationToken cancellationToken = default);
+
     ValueTask<NavigationResult> BackAsync(CancellationToken cancellationToken = default);
 
     ValueTask<NavigationResult> ForwardAsync(CancellationToken cancellationToken = default);

@@ -7,4 +7,12 @@ public enum RouteGraphError
     MissingParentRoute,
     InvalidRouteTemplate,
     InvalidContribution,
+    CircularParentRoute,
+    InvalidRouteDefinition,
+    DuplicateIndexRoute,
+    DuplicateExtensionPoint,
+    MissingExtensionPoint,
+    MissingRedirectTarget,
+    CircularRedirect,
+    InvalidVersion,
 }

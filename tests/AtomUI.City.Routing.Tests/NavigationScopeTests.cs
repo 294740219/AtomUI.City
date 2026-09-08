@@ -67,6 +67,67 @@ public sealed class NavigationScopeTests
     }
 
     [Fact]
+    public async Task RouteReferenceRejectsMissingOrInvalidTemplateParameters()
+    {
+        var graph = RouteGraphSnapshot.Create(
+            [
+                Route("profile", "profile/{id:int}", typeof(ProfileViewModel)),
+            ]);
+        var scope = new NavigationScope(graph);
+
+        var missing = await scope.NavigateAsync(new RouteReference("profile"));
+        var invalid = await scope.NavigateAsync(
+            new RouteReference<ProfileParameters>(
+                "profile",
+                _ => new Dictionary<string, string> { ["id"] = "invalid" }),
+            new ProfileParameters(0));
+
+        Assert.Equal("CITY-NAVIGATION-PARAMETER-BINDING-FAILED", missing.Error?.Code);
+        Assert.Equal("CITY-NAVIGATION-PARAMETER-BINDING-FAILED", invalid.Error?.Code);
+        Assert.Null(scope.CurrentSnapshot.ActiveRoute);
+    }
+
+    [Fact]
+    public async Task StaticRedirectNavigatesToConfiguredTarget()
+    {
+        var graph = RouteGraphSnapshot.Create(
+            [
+                new RouteDescriptor(
+                    "old-settings",
+                    RouteDefinitionKind.Redirect,
+                    "old-settings",
+                    viewModelTarget: null,
+                    redirectTargetRouteId: "settings"),
+                Route("settings", "settings", typeof(SettingsViewModel)),
+            ]);
+        var scope = new NavigationScope(graph);
+
+        var result = await scope.NavigateByPathAsync("old-settings");
+
+        Assert.Equal(NavigationResultStatus.Redirected, result.Status);
+        Assert.Equal("settings", result.Route.RouteId);
+        Assert.Equal("settings", scope.CurrentSnapshot.Route.RouteId);
+    }
+
+    [Fact]
+    public async Task NavigationTimeoutCancelsRunningGuardWithoutCommit()
+    {
+        var guard = new BlockingEnterGuard();
+        var graph = RouteGraphSnapshot.Create(
+            [
+                Route("slow", "slow", typeof(SettingsViewModel), enterGuardTypes: [typeof(BlockingEnterGuard)]),
+            ]);
+        var scope = ScopeWithBlockingGuard(graph, guard);
+
+        var result = await scope.NavigateByPathAsync(
+            "slow",
+            new NavigationOptions { Timeout = TimeSpan.FromMilliseconds(50) });
+
+        Assert.Equal(NavigationResultStatus.Cancelled, result.Status);
+        Assert.Null(scope.CurrentSnapshot.ActiveRoute);
+    }
+
+    [Fact]
     public async Task NavigateByPathReturnsNotFoundWithoutChangingCurrentSnapshot()
     {
         var graph = RouteGraphSnapshot.Create(
@@ -177,6 +238,52 @@ public sealed class NavigationScopeTests
     }
 
     [Fact]
+    public async Task NewestCancelPreviousRequestSupersedesAlreadyQueuedReplacement()
+    {
+        var guard = new StubbornBlockingGuard();
+        var graph = RouteGraphSnapshot.Create(
+            [
+                Route("slow", "slow", typeof(SettingsViewModel), enterGuardTypes: [typeof(StubbornBlockingGuard)]),
+                Route("middle", "middle", typeof(ProfileViewModel)),
+                Route("latest", "latest", typeof(ShellViewModel)),
+            ]);
+        var scope = new NavigationScope(graph, type => type == typeof(StubbornBlockingGuard) ? guard : null);
+        var first = scope.NavigateByPathAsync("slow").AsTask();
+        await guard.Entered.Task;
+
+        var middle = scope.NavigateByPathAsync("middle").AsTask();
+        var latest = scope.NavigateByPathAsync("latest").AsTask();
+        guard.Allow.SetResult();
+
+        var results = await Task.WhenAll(first, middle, latest);
+
+        Assert.Equal(NavigationResultStatus.Cancelled, results[0].Status);
+        Assert.Equal(NavigationResultStatus.Cancelled, results[1].Status);
+        Assert.Equal(NavigationResultStatus.Success, results[2].Status);
+        Assert.Equal("latest", scope.CurrentSnapshot.Route.RouteId);
+    }
+
+    [Fact]
+    public async Task ReentrantNavigationFromGuardIsRejectedInsteadOfDeadlocking()
+    {
+        var guard = new ReentrantEnterGuard();
+        var graph = RouteGraphSnapshot.Create(
+            [
+                Route("guarded", "guarded", typeof(SettingsViewModel), enterGuardTypes: [typeof(ReentrantEnterGuard)]),
+                Route("nested", "nested", typeof(ProfileViewModel)),
+            ]);
+        var scope = new NavigationScope(graph, type => type == typeof(ReentrantEnterGuard) ? guard : null);
+        guard.Router = scope;
+
+        var outer = await scope.NavigateByPathAsync("guarded").AsTask().WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.Equal(NavigationResultStatus.Success, outer.Status);
+        Assert.NotNull(guard.NestedResult);
+        Assert.Equal(NavigationResultStatus.Rejected, guard.NestedResult.Status);
+        Assert.Equal("CITY-NAVIGATION-REENTRANT", guard.NestedResult.Error?.Code);
+    }
+
+    [Fact]
     public async Task QueueConcurrencyPolicyWaitsForRunningNavigationToComplete()
     {
         var guard = new BlockingEnterGuard();
@@ -250,6 +357,27 @@ public sealed class NavigationScopeTests
     }
 
     [Fact]
+    public async Task DisposeAsyncWaitsForRunningUserCodeToExit()
+    {
+        var guard = new StubbornBlockingGuard();
+        var graph = RouteGraphSnapshot.Create(
+            [
+                Route("slow", "slow", typeof(SettingsViewModel), enterGuardTypes: [typeof(StubbornBlockingGuard)]),
+            ]);
+        var scope = new NavigationScope(graph, type => type == typeof(StubbornBlockingGuard) ? guard : null);
+        var running = scope.NavigateByPathAsync("slow").AsTask();
+        await guard.Entered.Task;
+
+        var disposing = scope.DisposeAsync().AsTask();
+        Assert.NotSame(disposing, await Task.WhenAny(disposing, Task.Delay(100)));
+
+        guard.Allow.SetResult();
+        await disposing;
+
+        Assert.Equal(NavigationResultStatus.Cancelled, (await running).Status);
+    }
+
+    [Fact]
     public async Task BackAndForwardNavigateThroughRecordedJournal()
     {
         var graph = RouteGraphSnapshot.Create(
@@ -276,6 +404,28 @@ public sealed class NavigationScopeTests
         Assert.Equal(NavigationResultStatus.Success, forwardToProfile.Status);
         Assert.Equal("profile", forwardToProfile.Route.RouteId);
         Assert.Equal("profile", scope.CurrentSnapshot.Route.RouteId);
+    }
+
+    [Fact]
+    public async Task ConcurrentBackRequestsAreSerializedWithJournalMutation()
+    {
+        var graph = RouteGraphSnapshot.Create(
+            [
+                Route("home", "home", typeof(ShellViewModel)),
+                Route("profile", "profile", typeof(ProfileViewModel)),
+                Route("settings", "settings", typeof(SettingsViewModel)),
+            ]);
+        var scope = new NavigationScope(graph);
+        await scope.NavigateByPathAsync("home");
+        await scope.NavigateByPathAsync("profile");
+        await scope.NavigateByPathAsync("settings");
+
+        var results = await Task.WhenAll(
+            scope.BackAsync().AsTask(),
+            scope.BackAsync().AsTask());
+
+        Assert.All(results, result => Assert.Equal(NavigationResultStatus.Success, result.Status));
+        Assert.Equal("home", scope.CurrentSnapshot.Route.RouteId);
     }
 
     [Fact]
@@ -398,6 +548,37 @@ public sealed class NavigationScopeTests
             Entered.TrySetResult();
             await Allow.Task.WaitAsync(cancellationToken);
 
+            return RouteGuardResult.Allow();
+        }
+    }
+
+    private sealed class StubbornBlockingGuard : IRouteEnterGuard
+    {
+        public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource Allow { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async ValueTask<RouteGuardResult> CanEnterAsync(
+            RouteGuardContext context,
+            CancellationToken cancellationToken)
+        {
+            Entered.TrySetResult();
+            await Allow.Task;
+            return RouteGuardResult.Allow();
+        }
+    }
+
+    private sealed class ReentrantEnterGuard : IRouteEnterGuard
+    {
+        public IRouter? Router { get; set; }
+
+        public NavigationResult? NestedResult { get; private set; }
+
+        public async ValueTask<RouteGuardResult> CanEnterAsync(
+            RouteGuardContext context,
+            CancellationToken cancellationToken)
+        {
+            NestedResult = await Router!.NavigateByPathAsync("nested", cancellationToken: CancellationToken.None);
             return RouteGuardResult.Allow();
         }
     }

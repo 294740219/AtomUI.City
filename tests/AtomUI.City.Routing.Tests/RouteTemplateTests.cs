@@ -5,6 +5,43 @@ namespace AtomUI.City.Routing.Tests;
 public sealed class RouteTemplateTests
 {
     [Theory]
+    [InlineData("orders/{id:min(10)}", "orders/10", true)]
+    [InlineData("orders/{id:min(10)}", "orders/9", false)]
+    [InlineData("orders/{id:max(10)}", "orders/11", false)]
+    [InlineData("orders/{id:range(10,20)}", "orders/15", true)]
+    [InlineData("code/{value:length(4)}", "code/1234", true)]
+    [InlineData("code/{value:minlength(3):maxlength(5)}", "code/123456", false)]
+    [InlineData("slug/{value:regex(^[a-z]+$)}", "slug/atom", true)]
+    [InlineData("slug/{value:regex(^[a-z]+$)}", "slug/123", false)]
+    public void BuiltInArgumentConstraintsAreEnforced(string pattern, string path, bool expected)
+    {
+        var template = RouteTemplate.Parse(pattern);
+
+        Assert.Equal(expected, template.TryMatch(path, out _));
+    }
+
+    [Theory]
+    [InlineData("orders/{id:range(20,10)}")]
+    [InlineData("orders/{id:min(nope)}")]
+    [InlineData("orders/{id:length(-1)}")]
+    [InlineData("orders/{id:regex([)}")]
+    public void InvalidConstraintArgumentsAreRejectedWhenTemplateIsParsed(string pattern)
+    {
+        Assert.Throws<RouteGraphException>(() => RouteTemplate.Parse(pattern));
+    }
+
+    [Fact]
+    public void EncodedSlashRemainsInsideOneCapturedPathSegment()
+    {
+        var template = RouteTemplate.Parse("files/{name}");
+
+        var matched = template.TryMatch("files/a%2Fb", out var parameters);
+
+        Assert.True(matched);
+        Assert.Equal("a/b", parameters["name"]);
+    }
+
+    [Theory]
     [InlineData("")]
     [InlineData("/")]
     public void ParseSupportsRootTemplate(string pattern)
@@ -105,5 +142,16 @@ public sealed class RouteTemplateTests
         var template = RouteTemplate.Parse("docs/{id:int}");
 
         Assert.Throws<ArgumentNullException>(() => template.TryMatch(null!, out _));
+    }
+
+    [Fact]
+    public void TryMatchReturnsReadonlyParameterDictionary()
+    {
+        var template = RouteTemplate.Parse("profile/{id:int}");
+
+        Assert.True(template.TryMatch("profile/42", out var values));
+        var dictionary = Assert.IsAssignableFrom<IDictionary<string, string>>(values);
+
+        Assert.Throws<NotSupportedException>(() => dictionary["id"] = "99");
     }
 }

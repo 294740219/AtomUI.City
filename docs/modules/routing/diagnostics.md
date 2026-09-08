@@ -1,34 +1,25 @@
 # AtomUI.City.Routing Diagnostics
 
-## 诊断原则
+## AUCRT 诊断码
 
-- 诊断码稳定，不能复用。
-- 文档必须区分“当前源码已有诊断码”和“产品级目标诊断”。
-- message 可以优化，但 code 含义不能漂移。
-- 重要失败路径必须有诊断、Result 或声明异常。
-- 测试必须断言 code 和至少一个定位字段。
+| Code | 语义 | 关键字段 |
+| --- | --- | --- |
+| `AUCRT001` | navigation started | operationId, target, targetKind, graphVersion |
+| `AUCRT002` | navigation success/redirect completed | operationId, target, graphVersion, elapsedMilliseconds |
+| `AUCRT003` | navigation non-success completed | operationId, target, graphVersion, errorCode, elapsedMilliseconds |
+| `AUCRT004` | contribution graph published | contributionId, operation, graphVersion, routeCount |
+| `AUCRT005` | resolver returned Failed | operationId, routeId, resolverType, errorCode |
+| `AUCRT006` | pipeline component threw | operationId, routeId, componentType, stage, errorCode |
+| `AUCRT007` | guard returned Reject or match policy returned false | operationId, routeId, componentType, stage, errorCode |
+| `AUCRT008` | contribution graph rejected | contributionId, operation, graphVersion, graphError |
 
-## 当前源码诊断码
+诊断码只表达观测事件；导航业务错误仍由 `NavigationResult.Error.Code` 承载。
 
-当前源码没有模块专属诊断 ID。产品级实现如果新增诊断，必须先在本文件登记。
+## 可靠性合同
 
-## 产品级必须诊断的失败
-
-- 模板语法错误：graph build 失败。
-- 路由冲突：拒绝发布 graph。
-- 参数绑定失败：NavigationResult Failed。
-- Guard 拒绝或重定向。
-
-## 上下文字段
-
-推荐字段：`operationId`、`scopeId`、`module`、`pluginId`、`routeId`、`stateKey`、`eventType`、`handlerType`、`assembly`、`path`、`featureId`、`threadId`、`attempt`、`transportKind`。
-
-## 诊断缺口处理
-
-- 如果当前源码没有对应诊断码，必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中标记为 product gap。
-- 新增诊断码必须同时更新源码、本文档、测试矩阵和 compatibility。
-- 已存在诊断码不能因为重构改变语义。
-
-## 测试门禁
-
-`tests/AtomUI.City.Routing.Tests` 必须断言当前源码诊断码；产品级目标诊断补齐后必须增加对应测试。
+- 诊断写入不发生在 Registry 或 lifecycle monitor lock 内；导航事件仍位于 transaction gate 生命周期中，以保持同一事务的事件顺序。
+- `IHostDiagnostics.Write` 抛异常或已经 Complete 时，不改变 graph/navigation 结果。
+- 取消不是 pipeline component failure。
+- AUCRT001/002/003 的 graphVersion 是该导航捕获的版本；事务期间 Registry 发布新图不会改写完成事件版本。
+- Behavior 的 DI/service-resolver 解析失败归属于其真实 stage，不归因给外层 middleware。
+- message 可优化；code 语义和字段名属于兼容合同。
