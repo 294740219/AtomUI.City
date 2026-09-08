@@ -1,17 +1,52 @@
 using System.Runtime.CompilerServices;
+using AtomUI.City.Core.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace AtomUI.City.Mvvm;
 
 public abstract class ViewModelBase : ObservableValidator, IActivatable, IDisposable
 {
+    private readonly IHostDiagnostics? _diagnostics;
+    private readonly object _stateSyncRoot = new();
     private bool _disposed;
+    private ActivationState _activationState = ActivationState.Constructed;
 
-    public ActivationState ActivationState { get; private set; } = ActivationState.Constructed;
+    protected ViewModelBase(IHostDiagnostics? diagnostics = null)
+    {
+        _diagnostics = diagnostics;
+    }
+
+    public ActivationState ActivationState
+    {
+        get
+        {
+            lock (_stateSyncRoot)
+            {
+                return _activationState;
+            }
+        }
+
+        private set
+        {
+            lock (_stateSyncRoot)
+            {
+                _activationState = value;
+            }
+        }
+    }
 
     public bool IsActive => ActivationState == ActivationState.Active;
 
-    public bool IsDisposed => _disposed;
+    public bool IsDisposed
+    {
+        get
+        {
+            lock (_stateSyncRoot)
+            {
+                return _disposed;
+            }
+        }
+    }
 
     public IActivationScope? CurrentActivationScope => ActivationContext?.Scope;
 
@@ -37,21 +72,31 @@ public abstract class ViewModelBase : ObservableValidator, IActivatable, IDispos
     public async ValueTask ActivateAsync(ActivationContext context, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
-        ThrowIfDisposed();
 
-        if (ActivationState == ActivationState.Active)
+        lock (_stateSyncRoot)
         {
-            return;
-        }
+            ThrowIfDisposed();
 
-        if (cancellationToken.IsCancellationRequested)
-        {
-            AbortActivation(context);
-            cancellationToken.ThrowIfCancellationRequested();
-        }
+            if (ActivationState == ActivationState.Active)
+            {
+                return;
+            }
 
-        ActivationState = ActivationState.Activating;
-        ActivationContext = context;
+            if (ActivationState is ActivationState.Activating or ActivationState.Deactivating)
+            {
+                throw new InvalidOperationException(
+                    $"ViewModel activation is already in progress ({ActivationState}).");
+            }
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                AbortActivation(context);
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+
+            ActivationState = ActivationState.Activating;
+            ActivationContext = context;
+        }
 
         try
         {
@@ -60,8 +105,13 @@ public abstract class ViewModelBase : ObservableValidator, IActivatable, IDispos
             await OnActivatedAsync(context, cancellationToken).ConfigureAwait(false);
 
             cancellationToken.ThrowIfCancellationRequested();
-            context.Scope.CancellationToken.ThrowIfCancellationRequested();
-            ActivationState = ActivationState.Active;
+
+            lock (_stateSyncRoot)
+            {
+                ThrowIfDisposed();
+                context.Scope.CancellationToken.ThrowIfCancellationRequested();
+                ActivationState = ActivationState.Active;
+            }
         }
         catch (OperationCanceledException)
         {
@@ -71,6 +121,7 @@ public abstract class ViewModelBase : ObservableValidator, IActivatable, IDispos
         catch (Exception exception)
         {
             EnrichActivationException(exception, context, "Activating");
+            WriteActivationFailedDiagnostic(exception, context);
             AbortActivation(context);
             throw;
         }
@@ -83,49 +134,71 @@ public abstract class ViewModelBase : ObservableValidator, IActivatable, IDispos
 
     public async ValueTask DeactivateAsync(CancellationToken cancellationToken)
     {
-        if (_disposed)
+        lock (_stateSyncRoot)
         {
-            return;
+            ThrowIfDisposed();
+
+            if (ActivationState is ActivationState.Constructed
+                or ActivationState.Deactivated
+                or ActivationState.Deactivating)
+            {
+                return;
+            }
+
+            if (ActivationState is ActivationState.Activating)
+            {
+                throw new InvalidOperationException(
+                    "ViewModel deactivation conflicts with an activation in progress.");
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            ActivationState = ActivationState.Deactivating;
         }
-
-        if (ActivationState is ActivationState.Deactivated or ActivationState.Constructed)
-        {
-            return;
-        }
-
-        cancellationToken.ThrowIfCancellationRequested();
-
-        ActivationState = ActivationState.Deactivating;
 
         try
         {
             await OnDeactivatedAsync(cancellationToken).ConfigureAwait(false);
         }
+        catch (Exception exception)
+        {
+            WriteDeactivationFailedDiagnostic(exception);
+            throw;
+        }
         finally
         {
             ActivationContext?.Scope.Dispose();
-            ActivationContext = null;
-            ActivationState = ActivationState.Deactivated;
+
+            lock (_stateSyncRoot)
+            {
+                ActivationContext = null;
+                ActivationState = ActivationState.Deactivated;
+            }
         }
     }
 
     public void Dispose()
     {
-        if (_disposed)
-        {
-            return;
-        }
+        IActivationScope? scope;
 
-        _disposed = true;
+        lock (_stateSyncRoot)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            scope = ActivationContext?.Scope;
+            ActivationContext = null;
+            ActivationState = ActivationState.Disposed;
+        }
 
         try
         {
-            ActivationContext?.Scope.Dispose();
+            scope?.Dispose();
         }
         finally
         {
-            ActivationContext = null;
-            ActivationState = ActivationState.Disposed;
             OnDisposed();
             GC.SuppressFinalize(this);
         }
@@ -204,7 +277,7 @@ public abstract class ViewModelBase : ObservableValidator, IActivatable, IDispos
 
     protected void ThrowIfDisposed()
     {
-        if (_disposed)
+        if (IsDisposed)
         {
             throw new ObjectDisposedException(GetType().FullName);
         }
@@ -212,9 +285,13 @@ public abstract class ViewModelBase : ObservableValidator, IActivatable, IDispos
 
     private void AbortActivation(ActivationContext context)
     {
-        ActivationContext = null;
         context.Scope.Dispose();
-        ActivationState = ActivationState.Deactivated;
+
+        lock (_stateSyncRoot)
+        {
+            ActivationContext = null;
+            ActivationState = ActivationState.Deactivated;
+        }
     }
 
     private void EnrichActivationException(
@@ -225,6 +302,36 @@ public abstract class ViewModelBase : ObservableValidator, IActivatable, IDispos
         AddExceptionData(exception, "AtomUI.City.Mvvm.ViewModelType", GetType().FullName);
         AddExceptionData(exception, "AtomUI.City.Mvvm.ActivationStage", stage);
         AddExceptionData(exception, "AtomUI.City.Mvvm.ScopeId", context.Scope.Id);
+    }
+
+    private void WriteActivationFailedDiagnostic(Exception exception, ActivationContext context)
+    {
+        _diagnostics?.Write(new HostDiagnosticRecord(
+            MvvmDiagnosticIds.ActivationFailed,
+            $"ViewModel activation failed for '{GetType().FullName}' at stage 'Activating': {exception.Message}",
+            HostDiagnosticSeverity.Error)
+        {
+            Context = new Dictionary<string, string?>
+            {
+                ["viewModelType"] = GetType().FullName,
+                ["scopeId"] = context.Scope.Id.ToString(),
+                ["stage"] = "Activating",
+            }
+        });
+    }
+
+    private void WriteDeactivationFailedDiagnostic(Exception exception)
+    {
+        _diagnostics?.Write(new HostDiagnosticRecord(
+            MvvmDiagnosticIds.DeactivationFailed,
+            $"ViewModel deactivation handler failed for '{GetType().FullName}': {exception.Message}",
+            HostDiagnosticSeverity.Error)
+        {
+            Context = new Dictionary<string, string?>
+            {
+                ["viewModelType"] = GetType().FullName,
+            }
+        });
     }
 
     private static void AddExceptionData(Exception exception, string key, object? value)

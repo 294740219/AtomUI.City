@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using AtomUI.City.Core.Diagnostics;
 
 namespace AtomUI.City.Mvvm;
 
@@ -6,35 +7,103 @@ public sealed class ValidationScope : IDisposable
 {
     private readonly Dictionary<string, IReadOnlyList<string>> _errors = new(StringComparer.Ordinal);
     private readonly Dictionary<string, IReadOnlyList<ValidationMessage>> _messages = new(StringComparer.Ordinal);
-    private readonly ReadOnlyDictionary<string, IReadOnlyList<string>> _readOnlyErrors;
-    private readonly ReadOnlyDictionary<string, IReadOnlyList<ValidationMessage>> _readOnlyMessages;
+    private readonly IHostDiagnostics? _diagnostics;
+    private readonly object _syncRoot = new();
     private Guid? _ownerScopeId;
     private bool _disposed;
+    private ValidationStatus _status = ValidationStatus.Valid;
+    private Exception? _exception;
 
-    public ValidationScope()
+    public ValidationScope(IHostDiagnostics? diagnostics = null)
     {
-        _readOnlyErrors = new ReadOnlyDictionary<string, IReadOnlyList<string>>(_errors);
-        _readOnlyMessages = new ReadOnlyDictionary<string, IReadOnlyList<ValidationMessage>>(_messages);
+        _diagnostics = diagnostics;
     }
 
     public event EventHandler<ValidationChangedEventArgs>? ValidationChanged;
 
-    public ValidationStatus Status { get; private set; } = ValidationStatus.Valid;
+    public ValidationStatus Status
+    {
+        get
+        {
+            lock (_syncRoot)
+            {
+                return _status;
+            }
+        }
 
-    public bool IsDisposed => _disposed;
+        private set
+        {
+            lock (_syncRoot)
+            {
+                _status = value;
+            }
+        }
+    }
 
-    public IReadOnlyDictionary<string, IReadOnlyList<string>> Errors => _readOnlyErrors;
+    public bool IsDisposed
+    {
+        get
+        {
+            lock (_syncRoot)
+            {
+                return _disposed;
+            }
+        }
+    }
 
-    public IReadOnlyDictionary<string, IReadOnlyList<ValidationMessage>> Messages => _readOnlyMessages;
+    public IReadOnlyDictionary<string, IReadOnlyList<string>> Errors
+    {
+        get
+        {
+            lock (_syncRoot)
+            {
+                return new ReadOnlyDictionary<string, IReadOnlyList<string>>(
+                    _errors.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal));
+            }
+        }
+    }
 
-    public Exception? Exception { get; private set; }
+    public IReadOnlyDictionary<string, IReadOnlyList<ValidationMessage>> Messages
+    {
+        get
+        {
+            lock (_syncRoot)
+            {
+                return new ReadOnlyDictionary<string, IReadOnlyList<ValidationMessage>>(
+                    _messages.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal));
+            }
+        }
+    }
+
+    public Exception? Exception
+    {
+        get
+        {
+            lock (_syncRoot)
+            {
+                return _exception;
+            }
+        }
+
+        private set
+        {
+            lock (_syncRoot)
+            {
+                _exception = value;
+            }
+        }
+    }
 
     public void BindTo(IActivationScope activationScope)
     {
         ArgumentNullException.ThrowIfNull(activationScope);
         ThrowIfDisposed();
 
-        _ownerScopeId = activationScope.Id;
+        lock (_syncRoot)
+        {
+            _ownerScopeId = activationScope.Id;
+        }
+
         activationScope.Add(new DelegateDisposable(Cancel));
     }
 
@@ -82,32 +151,43 @@ public sealed class ValidationScope : IDisposable
             }
         }
 
-        Exception = null;
+        ValidationChangedEventArgs args;
 
-        if (uniqueMessages.Count == 0)
+        lock (_syncRoot)
         {
-            _errors.Remove(normalizedKey);
-            _messages.Remove(normalizedKey);
-        }
-        else
-        {
-            _errors[normalizedKey] = Array.AsReadOnly(uniqueMessages.Select(message => message.Message).ToArray());
-            _messages[normalizedKey] = Array.AsReadOnly(uniqueMessages.ToArray());
+            if (uniqueMessages.Count == 0)
+            {
+                _errors.Remove(normalizedKey);
+                _messages.Remove(normalizedKey);
+            }
+            else
+            {
+                _errors[normalizedKey] = Array.AsReadOnly(uniqueMessages.Select(message => message.Message).ToArray());
+                _messages[normalizedKey] = Array.AsReadOnly(uniqueMessages.ToArray());
+            }
+
+            _exception = null;
+            _status = _messages.Count == 0 ? ValidationStatus.Valid : ValidationStatus.Invalid;
+            args = CaptureChangedEventArgs(normalizedKey);
         }
 
-        Status = _messages.Count == 0
-            ? ValidationStatus.Valid
-            : ValidationStatus.Invalid;
-        RaiseChanged(normalizedKey);
+        RaiseChanged(args);
     }
 
     public void SetPending()
     {
         ThrowIfDisposed();
 
-        Exception = null;
-        Status = ValidationStatus.Pending;
-        RaiseChanged(string.Empty);
+        ValidationChangedEventArgs args;
+
+        lock (_syncRoot)
+        {
+            _exception = null;
+            _status = ValidationStatus.Pending;
+            args = CaptureChangedEventArgs(string.Empty);
+        }
+
+        RaiseChanged(args);
     }
 
     public void SetFailed(Exception exception)
@@ -115,53 +195,72 @@ public sealed class ValidationScope : IDisposable
         ArgumentNullException.ThrowIfNull(exception);
         ThrowIfDisposed();
 
-        _errors.Clear();
-        _messages.Clear();
-        Exception = exception;
-        Status = ValidationStatus.Failed;
-        RaiseChanged(string.Empty);
+        ValidationChangedEventArgs args;
+
+        lock (_syncRoot)
+        {
+            _errors.Clear();
+            _messages.Clear();
+            _exception = exception;
+            _status = ValidationStatus.Failed;
+            args = CaptureChangedEventArgs(string.Empty);
+        }
+
+        _diagnostics?.Write(new HostDiagnosticRecord(
+            MvvmDiagnosticIds.ValidationFailed,
+            $"Validation scope failed: {exception.Message}",
+            HostDiagnosticSeverity.Error)
+        {
+            Context = new Dictionary<string, string?>
+            {
+                ["ownerScopeId"] = _ownerScopeId?.ToString(),
+                ["exceptionType"] = exception.GetType().FullName,
+            }
+        });
+
+        RaiseChanged(args);
     }
 
     public void Cancel()
     {
-        if (_disposed)
+        ThrowIfDisposed();
+
+        ValidationChangedEventArgs args;
+
+        lock (_syncRoot)
         {
-            return;
+            _exception = null;
+            _status = ValidationStatus.Canceled;
+            args = CaptureChangedEventArgs(string.Empty);
         }
 
-        Exception = null;
-        Status = ValidationStatus.Canceled;
-        RaiseChanged(string.Empty);
+        RaiseChanged(args);
     }
 
     public void Dispose()
     {
-        if (_disposed)
+        lock (_syncRoot)
         {
-            return;
+            _disposed = true;
         }
-
-        _disposed = true;
     }
 
-    private static string NormalizeKey(string? key)
-    {
-        return key is null ? string.Empty : key;
-    }
-
-    private void RaiseChanged(string key)
+    private ValidationChangedEventArgs CaptureChangedEventArgs(string key)
     {
         _errors.TryGetValue(key, out var errors);
         _messages.TryGetValue(key, out var messages);
 
-        ValidationChanged?.Invoke(
-            this,
-            new ValidationChangedEventArgs(
-                key,
-                Status,
-                errors ?? Array.Empty<string>(),
-                messages ?? Array.Empty<ValidationMessage>(),
-                _ownerScopeId));
+        return new ValidationChangedEventArgs(
+            key,
+            _status,
+            errors ?? Array.Empty<string>(),
+            messages ?? Array.Empty<ValidationMessage>(),
+            _ownerScopeId);
+    }
+
+    private void RaiseChanged(ValidationChangedEventArgs args)
+    {
+        ValidationChanged?.Invoke(this, args);
     }
 
     private void ThrowIfDisposed()
@@ -170,6 +269,11 @@ public sealed class ValidationScope : IDisposable
         {
             throw new ObjectDisposedException(GetType().FullName);
         }
+    }
+
+    private static string NormalizeKey(string? key)
+    {
+        return key is null ? string.Empty : key;
     }
 
     private sealed class DelegateDisposable : IDisposable

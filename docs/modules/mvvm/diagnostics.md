@@ -10,13 +10,36 @@
 
 ## 当前源码诊断码
 
-当前源码没有模块专属诊断 ID。产品级实现如果新增诊断，必须先在本文件登记。
+| Current Code | Name | Source |
+| --- | --- | --- |
+| `AUCMVVM001` | ActivationFailed | `src/AtomUI.City.Mvvm/MvvmDiagnosticIds.cs` |
+| `AUCMVVM002` | DeactivationFailed | `src/AtomUI.City.Mvvm/MvvmDiagnosticIds.cs` |
+| `AUCMVVM003` | CommandFailed | `src/AtomUI.City.Mvvm/MvvmDiagnosticIds.cs` |
+| `AUCMVVM004` | CommandRejected | `src/AtomUI.City.Mvvm/MvvmDiagnosticIds.cs` |
+| `AUCMVVM005` | InteractionNotHandled | `src/AtomUI.City.Mvvm/MvvmDiagnosticIds.cs` |
+| `AUCMVVM006` | InteractionFailed | `src/AtomUI.City.Mvvm/MvvmDiagnosticIds.cs` |
+| `AUCMVVM007` | ActivationScopeDisposeFailed | `src/AtomUI.City.Mvvm/MvvmDiagnosticIds.cs` |
+| `AUCMVVM008` | ValidationFailed | `src/AtomUI.City.Mvvm/MvvmDiagnosticIds.cs` |
+
+## 上下文 key 合同
+
+| Code | Required Context |
+| --- | --- |
+| `AUCMVVM001` | `viewModelType`、`scopeId`、`stage`。 |
+| `AUCMVVM002` | `viewModelType`。 |
+| `AUCMVVM003`/`AUCMVVM004` | `commandName`、`ownerType`、`operationId`。 |
+| `AUCMVVM005`/`AUCMVVM006` | `requestType`、`resultType`、`activationScopeId`、`exceptionType`。 |
+| `AUCMVVM007` | `scopeId`。 |
+| `AUCMVVM008` | `ownerScopeId`、`exceptionType`。 |
 
 ## 产品级必须诊断的失败
 
-- CanDeactivate 拒绝：导航或关闭中止。
-- Command 抛异常：OperationResult Failed。
-- Interaction 无 handler：返回 Failed。
+- Activation 失败或取消：写 `AUCMVVM001`（取消为 OCE，不作为失败统计）。
+- Deactivation handler 异常：写 `AUCMVVM002`，释放继续。
+- Command 执行异常：写 `AUCMVVM003`；并发拒绝：写 `AUCMVVM004`（Warning 级语义由承载方决定）。
+- Interaction 无 handler：写 `AUCMVVM005`；handler 异常：写 `AUCMVVM006`。
+- ActivationScope 资源释放失败：写 `AUCMVVM007`。
+- Validation 逻辑异常：写 `AUCMVVM008`。
 
 ## 上下文字段
 

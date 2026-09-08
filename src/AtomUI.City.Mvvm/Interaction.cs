@@ -1,9 +1,17 @@
+using AtomUI.City.Core.Diagnostics;
+
 namespace AtomUI.City.Mvvm;
 
 public sealed class Interaction<TRequest, TResult>
 {
     private readonly object _gate = new();
     private readonly List<HandlerRegistration> _handlers = [];
+    private readonly IHostDiagnostics? _diagnostics;
+
+    public Interaction(IHostDiagnostics? diagnostics = null)
+    {
+        _diagnostics = diagnostics;
+    }
 
     public IDisposable RegisterHandler(
         Func<InteractionContext<TRequest>, CancellationToken, ValueTask<TResult>> handler,
@@ -36,6 +44,13 @@ public sealed class Interaction<TRequest, TResult>
 
         if (registration is null)
         {
+            WriteInteractionDiagnostic(
+                MvvmDiagnosticIds.InteractionNotHandled,
+                $"Interaction request of type '{typeof(TRequest).FullName}' has no registered handler.",
+                HostDiagnosticSeverity.Warning,
+                request,
+                null,
+                null);
             return InteractionResult<TResult>.NotHandled();
         }
 
@@ -72,8 +87,38 @@ public sealed class Interaction<TRequest, TResult>
         }
         catch (Exception exception)
         {
+            WriteInteractionDiagnostic(
+                MvvmDiagnosticIds.InteractionFailed,
+                $"Interaction request of type '{typeof(TRequest).FullName}' handler failed: {exception.Message}",
+                HostDiagnosticSeverity.Error,
+                request,
+                registration.ActivationScope?.Id,
+                exception);
             return InteractionResult<TResult>.Failed(exception);
         }
+    }
+
+    private void WriteInteractionDiagnostic(
+        string code,
+        string message,
+        HostDiagnosticSeverity severity,
+        TRequest request,
+        Guid? activationScopeId,
+        Exception? exception)
+    {
+        _diagnostics?.Write(new HostDiagnosticRecord(
+            code,
+            message,
+            severity)
+        {
+            Context = new Dictionary<string, string?>
+            {
+                ["requestType"] = typeof(TRequest).FullName,
+                ["resultType"] = typeof(TResult).FullName,
+                ["activationScopeId"] = activationScopeId?.ToString(),
+                ["exceptionType"] = exception?.GetType().FullName,
+            }
+        });
     }
 
     private void Remove(HandlerRegistration registration)

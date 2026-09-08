@@ -8,7 +8,7 @@
 | --- | --- | --- | --- | --- |
 | AUC-MVVM-001 | ViewModel Base and Notification | Completed | ViewModelBase | ViewModelBaseTests |
 | AUC-MVVM-002 | Activation and Deactivation | Completed | IActivatable, ICanDeactivate, ActivationScope | ActivationScopeTests; DeactivationTests |
-| AUC-MVVM-003 | Command Execution | Completed | CommandFactory, OperationScope, OperationResult | CommandTests |
+| AUC-MVVM-003 | Command Execution | Completed | CommandFactory, OperationScope, OperationResult, CommandExecutionState, CommandGroup | CommandTests |
 | AUC-MVVM-004 | Interaction Requests | Completed | Interaction<TRequest, TResult>, InteractionContext<TRequest> | InteractionTests |
 | AUC-MVVM-005 | Validation Model | Completed | ValidationScope, ValidationMessage, ValidationStatus | ValidationScopeTests |
 | AUC-MVVM-006 | Operation and Cancellation Scope | Completed | OperationScope, CommandExecutionState | CommandTests |

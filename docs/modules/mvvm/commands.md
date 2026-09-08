@@ -152,7 +152,7 @@ Mvvm 应支持组合命令，用于菜单、工具栏、全局快捷键和 Shell
 - 可执行状态由 active 子命令共同决定。
 - 执行结果和错误需要进入 OperationScope 诊断。
 
-建议类型可以命名为 `CompositeCommand` 或 `CommandGroup`，具体命名在实现前再定。
+实现类型定名为 `CommandGroup`（ICommand 聚合，子命令可随 ActivationScope 注册和释放，Execute 经 OperationScope 记录结果与错误）。
 
 ### 7. 取消策略
 

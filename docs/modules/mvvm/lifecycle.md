@@ -8,8 +8,8 @@ AtomUI.City.Mvvm 作为 Host 服务或模块贡献接入 Core 生命周期，必
 
 ## 模块特有状态机
 
-- ViewModel: Created -> Activating -> Active -> Deactivating -> Inactive -> Disposed
-- Command: Idle -> Running -> Completed 或 Failed 或 Canceled 或 Rejected
+- ViewModel: Constructed -> Activating -> Active -> Deactivating -> Deactivated -> Disposed
+- Command: Idle -> Running -> Completed 或 Failed 或 Canceled 或 Rejected 或 Rejected
 - OperationScope: Running -> Completed、Failed、Canceled 或 Rejected；首次终态胜出，Dispose 后保持只读结果。
 
 ## 生命周期流程

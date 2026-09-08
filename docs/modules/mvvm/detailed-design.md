@@ -111,7 +111,7 @@ ReactiveUI / Rx 可以作为适配层，但不是默认核心依赖。
 | 类型 | 职责 |
 |---|---|
 | `ViewModelBase` | 默认 ViewModel 基类。 |
-| `IActivatableViewModel` | 支持激活/停用的 ViewModel contract。 |
+| `IActivatable` | 支持激活/停用的 ViewModel contract。 |
 | `ActivationContext` | ViewModel 激活上下文。 |
 | `ActivationScope` | ViewModel 激活期资源和取消边界。 |
 | `IActivationScopeAccessor` | 当前 ActivationScope 访问入口。 |
@@ -215,7 +215,7 @@ Mvvm 应支持组合命令，用于菜单、工具栏、全局快捷键和 Shell
 - 可执行状态由 active 子命令共同决定。
 - 执行结果和错误需要进入 OperationScope 诊断。
 
-建议类型可以命名为 `CompositeCommand` 或 `CommandGroup`，具体命名在实现前再定。
+实现类型定名为 `CommandGroup`（ICommand 聚合，子命令可随 ActivationScope 注册和释放，Execute 经 OperationScope 记录结果与错误）。
 
 ### 9. Deactivation 确认
 

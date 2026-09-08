@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using AtomUI.City.Core.Diagnostics;
 using CommunityToolkit.Mvvm.Input;
 
 namespace AtomUI.City.Mvvm;
@@ -8,21 +9,23 @@ public static class CommandFactory
     public static IRelayCommand Create(
         Action execute,
         Func<bool>? canExecute = null,
-        CommandExecutionState? state = null)
+        CommandExecutionState? state = null,
+        IHostDiagnostics? diagnostics = null)
     {
         ArgumentNullException.ThrowIfNull(execute);
 
         var executionState = state ?? new CommandExecutionState();
 
         return canExecute is null
-            ? new RelayCommand(() => Execute(execute, executionState))
-            : new RelayCommand(() => Execute(execute, executionState), canExecute);
+            ? new RelayCommand(() => Execute(execute, executionState, diagnostics))
+            : new RelayCommand(() => Execute(execute, executionState, diagnostics), canExecute);
     }
 
     public static IAsyncRelayCommand CreateAsync(
         Func<CancellationToken, Task> execute,
         CommandExecutionState? state = null,
-        IActivationScope? activationScope = null)
+        IActivationScope? activationScope = null,
+        IHostDiagnostics? diagnostics = null)
     {
         ArgumentNullException.ThrowIfNull(execute);
 
@@ -33,19 +36,23 @@ public static class CommandFactory
                 execute,
                 executionState,
                 activationScope,
+                diagnostics,
                 cancellationToken),
             executionState);
     }
 
     private static void Execute(
         Action execute,
-        CommandExecutionState state)
+        CommandExecutionState state,
+        IHostDiagnostics? diagnostics)
     {
         using var operation = OperationScope.Start(CancellationToken.None);
 
         if (!state.TryBegin(operation.CancellationToken))
         {
-            state.Reject(operation.Reject());
+            var rejected = operation.Reject();
+            state.Reject(rejected);
+            WriteCommandDiagnostic(diagnostics, MvvmDiagnosticIds.CommandRejected, state, operation, null);
             return;
         }
 
@@ -56,7 +63,9 @@ public static class CommandFactory
         }
         catch (Exception exception)
         {
-            state.Complete(operation.Fail(exception));
+            var failed = operation.Fail(exception);
+            state.Complete(failed);
+            WriteCommandDiagnostic(diagnostics, MvvmDiagnosticIds.CommandFailed, state, operation, exception);
         }
     }
 
@@ -64,6 +73,7 @@ public static class CommandFactory
         Func<CancellationToken, Task> execute,
         CommandExecutionState state,
         IActivationScope? activationScope,
+        IHostDiagnostics? diagnostics,
         CancellationToken cancellationToken)
     {
         using var linkedCancellationTokenSource = activationScope is null
@@ -73,7 +83,9 @@ public static class CommandFactory
 
         if (!state.TryBegin(operation.CancellationToken))
         {
-            state.Reject(operation.Reject());
+            var rejected = operation.Reject();
+            state.Reject(rejected);
+            WriteCommandDiagnostic(diagnostics, MvvmDiagnosticIds.CommandRejected, state, operation, null);
             return;
         }
 
@@ -89,8 +101,31 @@ public static class CommandFactory
         }
         catch (Exception exception)
         {
-            state.Complete(operation.Fail(exception));
+            var failed = operation.Fail(exception);
+            state.Complete(failed);
+            WriteCommandDiagnostic(diagnostics, MvvmDiagnosticIds.CommandFailed, state, operation, exception);
         }
+    }
+
+    private static void WriteCommandDiagnostic(
+        IHostDiagnostics? diagnostics,
+        string code,
+        CommandExecutionState state,
+        OperationScope operation,
+        Exception? exception)
+    {
+        diagnostics?.Write(new HostDiagnosticRecord(
+            code,
+            $"Command '{state.CommandName ?? "<unnamed>"}' on '{state.OwnerType?.FullName ?? "<unknown>"}' finished as {operation.Status}: {exception?.Message ?? "no exception"}.",
+            HostDiagnosticSeverity.Error)
+        {
+            Context = new Dictionary<string, string?>
+            {
+                ["commandName"] = state.CommandName,
+                ["ownerType"] = state.OwnerType?.FullName,
+                ["operationId"] = operation.Id.ToString(),
+            }
+        });
     }
 
     private sealed class TrackedAsyncRelayCommand : IAsyncRelayCommand, INotifyPropertyChanged

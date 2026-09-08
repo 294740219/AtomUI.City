@@ -42,6 +42,7 @@ public sealed class CommandGroup : IRelayCommand
 
     public void Execute(object? parameter)
     {
+        using var operation = OperationScope.Start(CancellationToken.None);
         CommandRegistration[] registrations;
 
         lock (_gate)
@@ -49,12 +50,22 @@ public sealed class CommandGroup : IRelayCommand
             registrations = _registrations.ToArray();
         }
 
-        foreach (var registration in registrations)
+        try
         {
-            if (registration.IsActive() && registration.Command.CanExecute(parameter))
+            foreach (var registration in registrations)
             {
-                registration.Command.Execute(parameter);
+                if (registration.IsActive() && registration.Command.CanExecute(parameter))
+                {
+                    registration.Command.Execute(parameter);
+                }
             }
+
+            operation.Complete();
+        }
+        catch (Exception exception)
+        {
+            operation.Fail(exception);
+            throw;
         }
     }
 
@@ -86,11 +97,17 @@ public sealed class CommandGroup : IRelayCommand
             _group = group;
             Command = command;
             IsActive = isActive;
+            command.CanExecuteChanged += OnCommandCanExecuteChanged;
         }
 
         public ICommand Command { get; }
 
         public Func<bool> IsActive { get; }
+
+        private void OnCommandCanExecuteChanged(object? sender, EventArgs e)
+        {
+            _group.NotifyCanExecuteChanged();
+        }
 
         public void Dispose()
         {
@@ -100,6 +117,7 @@ public sealed class CommandGroup : IRelayCommand
             }
 
             _disposed = true;
+            Command.CanExecuteChanged -= OnCommandCanExecuteChanged;
             _group.Remove(this);
         }
     }

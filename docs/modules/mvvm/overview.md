@@ -1,7 +1,7 @@
 # AtomUI.City.Mvvm
 
-文档等级：Level 2
-成熟度：Partially Implemented
+文档等级：Level 3
+成熟度：Verified
 执行边界：ViewModel programming model
 程序集：`AtomUI.City.Mvvm`
 源码：`src/AtomUI.City.Mvvm`
@@ -15,9 +15,10 @@ ViewModel 编程模型，提供 activation、command、operation、interaction �
 
 以下约束是本模块实现和 review 的硬门禁，违反任一条都不能标记 Feature 完成。
 
-- MVVM 不依赖具体 View 或 Avalonia visual。
+- MVVM 不依赖具体 View、Avalonia visual 或 Presentation 实现类型。
 - Interaction 只表达请求，UI 展示由 Presentation handler 完成。
-- Command 状态支持取消和异常结果。
+- Command 状态支持完成、取消、异常和并发拒绝结果。
+- ViewModel 生命周期必须能被 Routing 和 Presentation 组合使用。
 
 ## 模块目标
 
@@ -61,10 +62,14 @@ AtomUI.City.Mvvm 作为 Host 服务或模块贡献接入 Core 生命周期，必
 | [testing.md](testing.md) | 具体测试矩阵、必须断言的行为、测试类型和缺口处理。 |
 | [compatibility.md](compatibility.md) | public API、配置、manifest、snapshot、generated output、CLI envelope 和包布局兼容。 |
 | [integration.md](integration.md) | 跨模块依赖方向、生命周期、线程和失败行为。 |
+| [activation.md](activation.md) | Activation 设计：激活模型、ActivationScope、State/EventBus 订阅绑定。 |
+| [commands.md](commands.md) | Command 设计：OperationScope、执行状态、取消策略、组合命令。 |
+| [interactions.md](interactions.md) | Interaction 设计：请求模型、handler 生命周期、结果模型。 |
+| [validation.md](validation.md) | Validation 设计：ValidationScope、结果模型、Command 联动。 |
 | [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) | Feature 到现有基线、缺口、必补测试和实现工作的追踪。 |
 
 ## 当前成熟度状态
 
-Partially Implemented
+Verified
 
-该状态表示模块已有实现基线，但还需要按产品级合同补齐实现和测试。单个功能点状态以 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 为准。
+该状态表示模块已按产品级合同完成实现、测试与文档对齐（含并发加固与诊断体系 AUCMVVM001-008）。单个功能点状态以 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 为准。

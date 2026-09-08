@@ -12,6 +12,7 @@ AtomUI.City.Mvvm 的架构目标是把模块职责变成可实现、可测试、
 - MVVM 不依赖具体 View 或 Avalonia visual。
 - Interaction 只表达请求，UI 展示由 Presentation handler 完成。
 - Command 状态支持完成、取消、异常和并发拒绝结果。
+- ViewModel 生命周期必须能被 Routing 和 Presentation 组合使用。
 
 ## 核心概念和所有权
 
@@ -19,12 +20,12 @@ AtomUI.City.Mvvm 的架构目标是把模块职责变成可实现、可测试、
 | --- | --- | --- | --- |
 | ViewModelBase | 属性通知、IDisposable 释放入口和 disposed 状态。 | 应用或 DI | Dispose 幂等释放当前 ActivationScope；释放后 mutation 抛 `ObjectDisposedException`。 |
 | ActivationScope | ViewModel 激活边界、取消 token 和诊断 scope id。 | Presentation/MVVM | Deactivate 或 Dispose；重复释放幂等。 |
-| Interaction | ViewModel 请求 UI 交互。 | ViewModel | handler 完成释放。 |
+| Interaction | ViewModel 请求 UI 交互。 | ViewModel | handler 完成即终；未完成请求随 ActivationScope 释放取消。 |
 
 ## 产品级状态机
 
-- ViewModel: Created -> Activating -> Active -> Deactivating -> Inactive -> Disposed
-- Command: Idle -> Executing -> Completed 或 Failed 或 Cancelled
+- ViewModel: Constructed -> Activating -> Active -> Deactivating -> Deactivated -> Disposed
+- Command: Idle -> Executing -> Completed 或 Failed 或 Canceled 或 Rejected
 
 ## 关键运行流程
 

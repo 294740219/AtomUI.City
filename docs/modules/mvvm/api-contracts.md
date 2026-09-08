@@ -17,7 +17,8 @@
 | Method | Purpose | Parameters | Return | Failure Behavior | Cancellation | Concurrency / Idempotency |
 | --- | --- | --- | --- | --- | --- | --- |
 | ViewModelBase.SetProperty | 更新属性并触发通知。 | propertyName 必须稳定且非空白，比较器可选。 | bool 表示是否变化。 | Dispose 后抛 `ObjectDisposedException`；空白 propertyName 抛 `ArgumentException`。 | 同步 API 无 token。 | 相等值不重复通知；调用线程发布通知，UI marshal 由 Presentation 负责。 |
-| ViewModelBase.Dispose | 释放 ViewModel 生命周期资源。 | 无。 | void。 | 重复 Dispose 幂等；释放当前 ActivationScope。 | 同步 API 无 token。 | 进入 Disposed 终态，后续 mutation 被拒绝。 |
+| Interaction<TRequest, TResult>.RegisterHandler | 注册 Interaction handler。 | handler 不得为 null；activationScope 可选。 | IDisposable（随 ActivationScope 释放或手动解除）。 | handler 为 null 抛 `ArgumentNullException`；scope 已释放时立即释放 handler。 | handler 持 activationScope token，停用时取消。 | 多 handler 时最后注册者优先（last-wins）；释放后不再接收请求。 |
+| ViewModelBase.Dispose | 释放 ViewModel 生命周期资源。 | 无。 | void。 | 重复 Dispose 幂等；释放当前 ActivationScope。 | 同步 API 无 token。 | 进入 Disposed 终态，后续 mutation 被拒绝；**不执行 Deactivating/OnDeactivatedAsync 钩子**——需要停用语义时先调 DeactivateAsync 再 Dispose。 |
 | ViewModelBase.ActivateAsync | 激活 ViewModel。 | ActivationContext 不得为 null；scope 不得为 null。 | ValueTask。 | 激活异常不进入 Active，释放 ActivationScope，并在 exception data 写入 ViewModel type、scope id 和 stage。 | 必须观察 token；预取消释放候选 scope 后抛 `OperationCanceledException`。 | Active 状态下重复 Activate 幂等返回。 |
 | ViewModelBase.DeactivateAsync | 停用 ViewModel。 | CancellationToken 可选。 | ValueTask。 | 取消在进入 Deactivating 前抛出并保持 Active scope；已进入停用后释放当前 scope。 | 必须观察 token。 | Constructed、Deactivated 或 Disposed 状态下幂等返回。 |
 | DeactivationGuard.CanDeactivateAsync | 离开前确认。 | viewModel 不得为 null；可实现 ICanDeactivate 或 IConfirmDeactivate。 | DeactivationResult。 | 拒绝返回 Reject；取消返回 Cancel；异常映射 Failed，不抛业务异常。 | 预取消跳过 viewModel 并返回 Cancel。 | 先执行 ICanDeactivate，Allow 后再执行 IConfirmDeactivate。 |

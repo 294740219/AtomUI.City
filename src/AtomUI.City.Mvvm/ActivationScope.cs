@@ -1,96 +1,184 @@
+using AtomUI.City.Core.Diagnostics;
+
 namespace AtomUI.City.Mvvm;
 
 public sealed class ActivationScope : IActivationScope
 {
-    public Guid Id { get; } = Guid.NewGuid();
-
     private readonly CancellationTokenSource _cancellationTokenSource = new();
     private readonly List<IAsyncDisposable> _asyncDisposables = [];
     private readonly List<IDisposable> _disposables = [];
+    private readonly IHostDiagnostics? _diagnostics;
+    private readonly object _syncRoot = new();
     private bool _isDisposed;
 
-    public ActivationScope()
+    public ActivationScope(IHostDiagnostics? diagnostics = null)
     {
         CancellationToken = _cancellationTokenSource.Token;
+        _diagnostics = diagnostics;
     }
+
+    public Guid Id { get; } = Guid.NewGuid();
 
     public CancellationToken CancellationToken { get; }
 
-    public bool IsDisposed => _isDisposed;
+    public bool IsDisposed
+    {
+        get
+        {
+            lock (_syncRoot)
+            {
+                return _isDisposed;
+            }
+        }
+    }
 
     public void Add(IDisposable disposable)
     {
         ArgumentNullException.ThrowIfNull(disposable);
 
-        if (_isDisposed)
+        lock (_syncRoot)
         {
-            disposable.Dispose();
-            return;
+            if (!_isDisposed)
+            {
+                _disposables.Add(disposable);
+                return;
+            }
         }
 
-        _disposables.Add(disposable);
+        DisposeSubscription(disposable);
     }
 
     public void AddAsync(IAsyncDisposable disposable)
     {
         ArgumentNullException.ThrowIfNull(disposable);
 
-        if (_isDisposed)
+        lock (_syncRoot)
         {
-            disposable.DisposeAsync().AsTask().GetAwaiter().GetResult();
-            return;
+            if (!_isDisposed)
+            {
+                _asyncDisposables.Add(disposable);
+                return;
+            }
         }
 
-        _asyncDisposables.Add(disposable);
+        DisposeSubscriptionSync(disposable);
     }
 
     public void Dispose()
     {
-        if (_isDisposed)
+        IAsyncDisposable[] asyncDisposables;
+        IDisposable[] disposables;
+
+        lock (_syncRoot)
         {
-            return;
+            if (_isDisposed)
+            {
+                return;
+            }
+
+            _isDisposed = true;
+            asyncDisposables = _asyncDisposables.ToArray();
+            disposables = _disposables.ToArray();
+            _asyncDisposables.Clear();
+            _disposables.Clear();
         }
 
-        _isDisposed = true;
         _cancellationTokenSource.Cancel();
 
-        for (var i = _asyncDisposables.Count - 1; i >= 0; i--)
+        for (var i = asyncDisposables.Length - 1; i >= 0; i--)
         {
-            _asyncDisposables[i].DisposeAsync().AsTask().GetAwaiter().GetResult();
+            DisposeSubscriptionSync(asyncDisposables[i]);
         }
 
-        for (var i = _disposables.Count - 1; i >= 0; i--)
+        for (var i = disposables.Length - 1; i >= 0; i--)
         {
-            _disposables[i].Dispose();
+            DisposeSubscription(disposables[i]);
         }
 
-        _asyncDisposables.Clear();
-        _disposables.Clear();
         _cancellationTokenSource.Dispose();
     }
 
     public async ValueTask DisposeAsync()
     {
-        if (_isDisposed)
+        IAsyncDisposable[] asyncDisposables;
+        IDisposable[] disposables;
+
+        lock (_syncRoot)
         {
-            return;
+            if (_isDisposed)
+            {
+                return;
+            }
+
+            _isDisposed = true;
+            asyncDisposables = _asyncDisposables.ToArray();
+            disposables = _disposables.ToArray();
+            _asyncDisposables.Clear();
+            _disposables.Clear();
         }
 
-        _isDisposed = true;
         await _cancellationTokenSource.CancelAsync().ConfigureAwait(false);
 
-        for (var i = _asyncDisposables.Count - 1; i >= 0; i--)
+        for (var i = asyncDisposables.Length - 1; i >= 0; i--)
         {
-            await _asyncDisposables[i].DisposeAsync().ConfigureAwait(false);
+            await DisposeSubscriptionAsync(asyncDisposables[i]).ConfigureAwait(false);
         }
 
-        for (var i = _disposables.Count - 1; i >= 0; i--)
+        for (var i = disposables.Length - 1; i >= 0; i--)
         {
-            _disposables[i].Dispose();
+            DisposeSubscription(disposables[i]);
         }
 
-        _asyncDisposables.Clear();
-        _disposables.Clear();
         _cancellationTokenSource.Dispose();
+    }
+
+    private void DisposeSubscriptionSync(IAsyncDisposable disposable)
+    {
+        try
+        {
+            disposable.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        }
+        catch (Exception exception)
+        {
+            WriteDisposeFailedDiagnostic(exception);
+        }
+    }
+
+    private void DisposeSubscription(IDisposable disposable)
+    {
+        try
+        {
+            disposable.Dispose();
+        }
+        catch (Exception exception)
+        {
+            WriteDisposeFailedDiagnostic(exception);
+        }
+    }
+
+    private async ValueTask DisposeSubscriptionAsync(IAsyncDisposable disposable)
+    {
+        try
+        {
+            await disposable.DisposeAsync().ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            WriteDisposeFailedDiagnostic(exception);
+        }
+    }
+
+    private void WriteDisposeFailedDiagnostic(Exception exception)
+    {
+        _diagnostics?.Write(new HostDiagnosticRecord(
+            MvvmDiagnosticIds.ActivationScopeDisposeFailed,
+            $"Activation scope '{Id}' resource disposal failed: {exception.Message}",
+            HostDiagnosticSeverity.Error)
+        {
+            Context = new Dictionary<string, string?>
+            {
+                ["scopeId"] = Id.ToString(),
+            }
+        });
     }
 }

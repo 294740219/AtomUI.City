@@ -6,9 +6,10 @@
 
 ## 模块兼容性硬边界
 
-- MVVM 不依赖具体 View 或 Avalonia visual。
+- MVVM 不依赖具体 View、Avalonia visual 或 Presentation 实现类型。
 - Interaction 只表达请求，UI 展示由 Presentation handler 完成。
-- Command 状态支持取消和异常结果。
+- Command 状态支持完成、取消、异常和并发拒绝结果。
+- ViewModel 生命周期必须能被 Routing 和 Presentation 组合使用。
 
 ## API 兼容规则
 

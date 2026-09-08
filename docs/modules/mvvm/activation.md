@@ -91,7 +91,7 @@ Activation 不负责：
 | `IActivationScopeAccessor` | 当前 ActivationScope 访问入口。 |
 | `ActivationState` | ViewModel 当前激活状态。 |
 
-ViewModel 默认可以继承 `ViewModelBase`，也可以只实现 `IActivatableViewModel`。
+ViewModel 默认可以继承 `ViewModelBase`，也可以只实现 `IActivatable`。
 
 ### 4. 生命周期状态
 
