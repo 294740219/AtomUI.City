@@ -37,14 +37,14 @@
 | Testing | 9 | 0 | 9 | 已完成 |
 | Build | 8 | 0 | 8 | 已完成 |
 | Generators | 8 | 0 | 8 | 已完成 |
-| Routing | 8 | 0 | 8 | 已完成 |
+| Routing | 12 | 0 | 12 | 已完成 |
 | Presentation | 8 | 0 | 8 | 已完成 |
 | MVVM | 6 | 0 | 6 | 已完成 |
 | State | 8 | 0 | 8 | 已完成 |
 | EventBus | 6 | 0 | 6 | 已完成 |
 | PluginSystem | 8 | 0 | 8 | 已完成 |
 | Data | 9 | 0 | 9 | 已完成 |
-| Localization | 7 | 0 | 7 | 已完成 |
+| Localization | 8 | 0 | 8 | 已完成 |
 | Security | 7 | 0 | 7 | 已完成 |
 | CLI | 6 | 0 | 6 | 已完成 |
 | Templates | 5 | 0 | 5 | 已完成 |
@@ -90,7 +90,7 @@
 - [x] AUC-GENERATORS-003 DI Manifest。验收重点：lifetime、ExposeServices、显式注册和冲突诊断。
 - [x] AUC-GENERATORS-004 Route Manifest。验收重点：route attribute、template、target、排序和诊断。
 - [x] AUC-GENERATORS-005 Plugin Manifest。验收重点：plugin metadata、capability、dependency、contribution。
-- [x] AUC-GENERATORS-006 Localization Manifest。验收重点：culture、resource、fallback、重复 key 诊断。
+- [x] AUC-GENERATORS-006 Localization Manifest。验收重点：culture、resource、fallback、空 attribute 参数、未知 enum、重复 key 诊断和原子 registrar。
 - [x] AUC-GENERATORS-007 Presentation View Manifest。验收重点：ViewFor、constructor、registrar source 和诊断。
 - [x] AUC-GENERATORS-008 Diagnostics。验收重点：diagnostic id、severity、message args 和 source location。
 
@@ -104,6 +104,10 @@
 - [x] AUC-ROUTING-006 ViewModel Target Resolution。验收重点：target descriptor 内容完整、Routing 不依赖 Presentation、失败不创建 ViewModel。
 - [x] AUC-ROUTING-007 Plugin Route Contribution。验收重点：插件贡献、冲突隔离、卸载撤销、旧 snapshot 只读。
 - [x] AUC-ROUTING-008 Navigation Journal and Reuse。验收重点：push/replace/back/forward、容量裁剪、失败不写历史和 reuse key。
+- [x] AUC-ROUTING-009 Resolver Transaction Data。验收重点：顺序、原子提交、失败、重定向、重复 key 和取消。
+- [x] AUC-ROUTING-010 Route Middleware。验收重点：父子嵌套顺序、短路、异常和取消。
+- [x] AUC-ROUTING-011 Host DI and Diagnostics。验收重点：服务生命周期、AUCRT 字段和诊断故障隔离。
+- [x] AUC-ROUTING-012 Routing Test Host Parity。验收重点：Testing host 委托生产 matcher/navigation 实现。
 
 ## Presentation
 
@@ -128,13 +132,13 @@
 ## State
 
 - [x] AUC-STATE-001 Writable State。验收重点：原子更新、version、提交后通知、相等值不通知、订阅 dispose、disposed mutation rejection、updater 异常诊断和写拒绝/access policy。
-- [x] AUC-STATE-002 Application State。验收重点：注册、读取、writer、not registered、StateDefinition enum 和 schema version 边界。
-- [x] AUC-STATE-003 Computed State。验收重点：lazy invalidation、依赖失效、缓存、异常诊断、null dependency 拒绝。
+- [x] AUC-STATE-002 Application State。验收重点：并发注册/读取、DI、factory/scope accessor、五种 access policy writer、not registered、StateDefinition enum/schema/授权元数据边界。
+- [x] AUC-STATE-003 Computed State。验收重点：lazy invalidation、循环依赖拒绝、锁外计算、失效世代提交、首次失败重抛、缓存和异常诊断。
 - [x] AUC-STATE-004 State Subscription。验收重点：dispose 后不通知、Background 不阻塞状态提交、Background handler 失败诊断。
-- [x] AUC-STATE-005 State Snapshot。验收重点：不可变、过滤、restore diagnostics、entry version/schema 边界、entries 不含 null。
-- [x] AUC-STATE-006 Collection State。验收重点：change kind、item version、collection version、快照不可变、非法构造参数、dispose 幂等、dispose 后读 API 可用、mutation/restore/subscription API 拒绝。
-- [x] AUC-STATE-007 Diagnostics。验收重点：AUCSTA001-010。
-- [x] AUC-STATE-008 Threading。验收重点：不隐式 UI。
+- [x] AUC-STATE-005 State Snapshot。验收重点：不可变、过滤、scope kind、restore diagnostics、entry version/schema 边界、entries 不含 null。
+- [x] AUC-STATE-006 Collection State。验收重点：change kind、item/collection version、重复 key 合并、restore 版本纪律、快照不可变和 dispose 合同。
+- [x] AUC-STATE-007 Diagnostics。验收重点：AUCSTA001-011。
+- [x] AUC-STATE-008 Threading。验收重点：不隐式 UI、延迟通知串行 FIFO、有界队列与溢出诊断。
 
 ## EventBus
 
@@ -170,13 +174,14 @@
 
 ## Localization
 
-- [x] AUC-LOCALIZATION-001 Culture State and Fallback。验收重点：默认 culture、fallback 顺序、非法 culture 和重复切换。
-- [x] AUC-LOCALIZATION-002 Language Package Provider。验收重点：provider 注册、重复拒绝、取消、格式错误和 owner revoke。
-- [x] AUC-LOCALIZATION-003 Lazy Package Loading。验收重点：按需加载、并发合并、失败 fallback、不同 culture 独立缓存。
-- [x] AUC-LOCALIZATION-004 Lookup and Missing Key Fallback。验收重点：scope lookup、fallback、缺失 key、参数格式化和订阅更新。
-- [x] AUC-LOCALIZATION-005 Assembly Language Packages。验收重点：独立 assembly、属性声明、资源读取、缺失资源和 unload owner。
-- [x] AUC-LOCALIZATION-006 Presentation Refresh Bridge。验收重点：bridge 调用、局部失败、批量刷新和不依赖 Avalonia 类型。
-- [x] AUC-LOCALIZATION-007 Plugin Package Revocation。验收重点：撤销后不可 lookup、旧 snapshot 稳定、订阅释放和重复 revoke。
+- [x] AUC-LOCALIZATION-001 Culture State and Fallback。验收重点：City.State 发布、深只读 culture/集合快照、递归 fallback、任意长度 cycle、缓存/撤销后的 loaded package state 和重复切换。
+- [x] AUC-LOCALIZATION-002 Language Package Provider。验收重点：三个默认 provider、provider kind、原子批量注册、16 MiB 上限、重复根属性、必填 schema 与 id/culture/version/checksum/path/resource 校验、取消和 owner revoke。
+- [x] AUC-LOCALIZATION-003 Lazy Package Loading。验收重点：按需加载、并发合并、waiter 取消隔离、失败 fallback、culture/package cache identity 和共享 Dispose 完成事务。
+- [x] AUC-LOCALIZATION-004 Lookup and Missing Key Fallback。验收重点：scope lookup、context-specific fallback 隔离、缺失 key、任意 formatter 异常和订阅更新。
+- [x] AUC-LOCALIZATION-005 Assembly Language Packages。验收重点：独立 assembly、属性声明、精确/唯一资源解析、缺失资源和 unload owner。
+- [x] AUC-LOCALIZATION-006 Presentation Refresh Bridge。验收重点：bridge 调用、局部失败、提交后 service-owned 完成、批量刷新和不依赖 Avalonia 类型。
+- [x] AUC-LOCALIZATION-007 Plugin Package Revocation。验收重点：撤销后不可 lookup、旧 snapshot 稳定、持有文本刷新、提交后取消一致性、fallback state 清理、在途 load 不复活和重复 revoke。
+- [x] AUC-LOCALIZATION-008 Generated Localization Manifest。验收重点：主 Generator 接线、原子 registrar、规范化 culture/package identity、声明 ALC、强类型 key constant、critical key、fallback cycle、空参数和未知 enum 诊断。
 
 ## Security
 

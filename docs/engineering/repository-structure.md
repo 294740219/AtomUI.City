@@ -14,6 +14,7 @@
 |---|---|
 | `src/` | 框架源码项目。 |
 | `tests/` | 框架测试项目。 |
+| `fixtures/` | 联合实战测试夹具（HeadlessApp/Dogfood/Mvp/六模块压测 CLI）——非产品代码，不进入 slnx，经 `dotnet run --project` 独立运行。 |
 | `docs/` | 正式设计文档、工程规范、ADR 和参考资料。 |
 | `build/` | 仓库级 MSBuild props/targets 和输出规则。 |
 | `output/` | 框架构建、包、发布和诊断输出根目录。 |
