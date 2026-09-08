@@ -101,7 +101,9 @@ public sealed class IncrementalGeneratorInfrastructureTests
         var runResult = driver.RunGenerators(compilation).GetRunResult();
         var generatorResult = Assert.Single(runResult.Results);
 
-        Assert.Empty(generatorResult.GeneratedSources);
+        Assert.All(
+            generatorResult.GeneratedSources,
+            source => Assert.Contains("/Modularity/", source.HintName, StringComparison.Ordinal));
         Assert.Empty(generatorResult.Diagnostics);
     }
 

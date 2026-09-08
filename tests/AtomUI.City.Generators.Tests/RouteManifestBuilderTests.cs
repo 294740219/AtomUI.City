@@ -67,6 +67,79 @@ public sealed class RouteManifestBuilderTests
     }
 
     [Fact]
+    public void BuildUsesStructuredOrdinalParentAndOutletIdentity()
+    {
+        var result = RouteManifestBuilder.Build(
+        [
+            Route(
+                "Sample.App.AppRoutes",
+                "Parent",
+                "Parent",
+                RouteDefinitionMetadataKind.Group,
+                "upper",
+                viewModelTypeName: null),
+            Route(
+                "Sample.App.AppRoutes",
+                "parent",
+                "parent",
+                RouteDefinitionMetadataKind.Group,
+                "lower",
+                viewModelTypeName: null),
+            new RouteDefinitionMetadata(
+                "Sample.App.AppRoutes",
+                "UpperItem",
+                "upper-item",
+                RouteDefinitionMetadataKind.Route,
+                "item",
+                "Sample.App.ViewModel",
+                "Parent",
+                "Side",
+                null,
+                null),
+            new RouteDefinitionMetadata(
+                "Sample.App.AppRoutes",
+                "LowerItem",
+                "lower-item",
+                RouteDefinitionMetadataKind.Route,
+                "item",
+                "Sample.App.ViewModel",
+                "parent",
+                "side",
+                null,
+                null),
+        ]);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.Equal(4, result.Manifest.Routes.Count);
+    }
+
+    [Fact]
+    public void BuildReportsInvalidRouteKindCombinations()
+    {
+        var result = RouteManifestBuilder.Build(
+        [
+            Route("Sample.App.AppRoutes", "MissingTemplate", "missing-template", RouteDefinitionMetadataKind.Route, null),
+            new RouteDefinitionMetadata(
+                "Sample.App.AppRoutes",
+                "InvalidGroup",
+                "invalid-group",
+                RouteDefinitionMetadataKind.Group,
+                null,
+                "Sample.App.ViewModel",
+                null,
+                "primary",
+                null,
+                null),
+        ]);
+
+        Assert.Empty(result.Manifest.Routes);
+        Assert.Contains(result.Diagnostics, diagnostic =>
+            diagnostic.Message.Contains("Routes require a template", StringComparison.Ordinal));
+        Assert.Contains(result.Diagnostics, diagnostic =>
+            diagnostic.Message.Contains("Route groups require a template", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void BuildReportsInvalidTemplatesAndMissingRouteTargets()
     {
         var result = RouteManifestBuilder.Build(

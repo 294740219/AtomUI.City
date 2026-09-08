@@ -129,6 +129,141 @@ public sealed class LocalizationManifestBuilderTests
     }
 
     [Fact]
+    public void BuildUsesCultureAndPackageIdAsPackageIdentity()
+    {
+        var result = LocalizationManifestBuilder.Build(
+            [
+                Package("Settings", "en-US"),
+                Package("Settings", "zh-CN"),
+            ],
+            [
+                Resource("Settings.Title", "Settings", "en-US"),
+                Resource("Settings.Title", "Settings", "zh-CN"),
+            ]);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.Equal(2, result.Manifest.Packages.Count);
+        Assert.Equal(["en-US", "zh-CN"], result.Manifest.Resources.Select(resource => resource.Culture));
+    }
+
+    [Fact]
+    public void BuildRejectsAmbiguousResourcePackageIdWithoutCulture()
+    {
+        var result = LocalizationManifestBuilder.Build(
+            [
+                Package("Settings", "en-US"),
+                Package("Settings", "zh-CN"),
+            ],
+            [Resource("Settings.Title", "Settings")]);
+
+        Assert.Contains(
+            result.Diagnostics,
+            diagnostic => diagnostic.Message.Contains("must specify Culture", StringComparison.Ordinal));
+        Assert.Empty(result.Manifest.Resources);
+    }
+
+    [Fact]
+    public void BuildRejectsCultureIdentityDuplicatesWithDifferentCasing()
+    {
+        var result = LocalizationManifestBuilder.Build(
+            [
+                Package("Settings", "en-US"),
+                Package("Settings", "en-us"),
+            ],
+            []);
+
+        Assert.Contains(
+            result.Diagnostics,
+            diagnostic => diagnostic.Message.Contains("declared more than once", StringComparison.Ordinal));
+        Assert.Empty(result.Manifest.Packages);
+    }
+
+    [Fact]
+    public void BuildRejectsFallbackCycles()
+    {
+        var result = LocalizationManifestBuilder.Build(
+            [
+                Package("Settings.zh-CN", "zh-CN", fallbackCulture: "en-US"),
+                Package("Settings.en-US", "en-US", fallbackCulture: "zh-CN"),
+            ],
+            []);
+
+        Assert.Contains(
+            result.Diagnostics,
+            diagnostic => diagnostic.Message.Contains("fallback graph contains a cycle", StringComparison.Ordinal));
+        Assert.Empty(result.Manifest.Packages);
+    }
+
+    [Fact]
+    public void BuildRequiresAssemblyResourceBaseName()
+    {
+        var result = LocalizationManifestBuilder.Build(
+            [new LanguagePackageMetadata(
+                "Settings.en-US",
+                "en-US",
+                ResourceScopeMetadata.Host,
+                resourceBaseName: null,
+                fallbackCulture: null,
+                version: null,
+                checksum: null)],
+            []);
+
+        Assert.Contains(
+            result.Diagnostics,
+            diagnostic => diagnostic.Message.Contains("resource base name", StringComparison.Ordinal));
+        Assert.Empty(result.Manifest.Packages);
+    }
+
+    [Fact]
+    public void BuildRejectsUnknownPackageAndResourceScopes()
+    {
+        var result = LocalizationManifestBuilder.Build(
+            [new LanguagePackageMetadata(
+                "Settings.en-US",
+                "en-US",
+                (ResourceScopeMetadata)999,
+                resourceBaseName: "Sample.App.Resources.Settings",
+                fallbackCulture: null,
+                version: null,
+                checksum: null)],
+            [new LocalizedResourceMetadata(
+                "Settings.Title",
+                "Settings.en-US",
+                LocalizedResourceMetadataKind.String,
+                (ResourceScopeMetadata)999,
+                version: null,
+                critical: false)]);
+
+        Assert.Contains(
+            result.Diagnostics,
+            diagnostic => diagnostic.Message.Contains("unknown resource scope", StringComparison.Ordinal));
+        Assert.Empty(result.Manifest.Packages);
+    }
+
+    [Theory]
+    [InlineData(LocalizedResourceMetadataKind.Pluralization)]
+    [InlineData(LocalizedResourceMetadataKind.ResourceObject)]
+    [InlineData(LocalizedResourceMetadataKind.FlowDirection)]
+    [InlineData(LocalizedResourceMetadataKind.CultureMetadata)]
+    public void BuildRejectsResourceKindsWithoutRuntimeContract(LocalizedResourceMetadataKind kind)
+    {
+        var result = LocalizationManifestBuilder.Build(
+            [Package("Settings.zh-CN", "zh-CN")],
+            [new LocalizedResourceMetadata(
+                "Settings.Value",
+                "Settings.zh-CN",
+                kind,
+                ResourceScopeMetadata.Module,
+                version: null,
+                critical: false,
+                scopeId: "settings.module")]);
+
+        Assert.Contains(
+            result.Diagnostics,
+            diagnostic => diagnostic.Message.Contains("no runtime execution contract", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void LocalizationMetadataCollectionsRejectExternalMutation()
     {
         var packageList = new List<LanguagePackageMetadata> { Package("Settings.en-US", "en-US") };
@@ -157,10 +292,14 @@ public sealed class LocalizationManifestBuilderTests
             resourceBaseName: "Sample.App.Resources." + packageId,
             fallbackCulture,
             version: null,
-            checksum: null);
+            checksum: null,
+            scopeId: "settings.module");
     }
 
-    private static LocalizedResourceMetadata Resource(string key, string packageId)
+    private static LocalizedResourceMetadata Resource(
+        string key,
+        string packageId,
+        string? culture = null)
     {
         return new LocalizedResourceMetadata(
             key,
@@ -168,6 +307,8 @@ public sealed class LocalizationManifestBuilderTests
             LocalizedResourceMetadataKind.String,
             ResourceScopeMetadata.Module,
             version: null,
-            critical: false);
+            critical: false,
+            scopeId: "settings.module",
+            culture: culture);
     }
 }

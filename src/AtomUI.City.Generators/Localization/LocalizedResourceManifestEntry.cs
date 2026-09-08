@@ -9,7 +9,8 @@ public sealed class LocalizedResourceManifestEntry
         LocalizedResourceMetadataKind kind,
         ResourceScopeMetadata scope,
         string? version,
-        bool critical)
+        bool critical,
+        string? scopeId = null)
     {
         if (string.IsNullOrWhiteSpace(key))
         {
@@ -33,6 +34,7 @@ public sealed class LocalizedResourceManifestEntry
         Scope = scope;
         Version = version;
         Critical = critical;
+        ScopeId = scopeId;
     }
 
     public string Key { get; }
@@ -48,4 +50,6 @@ public sealed class LocalizedResourceManifestEntry
     public string? Version { get; }
 
     public bool Critical { get; }
+
+    public string? ScopeId { get; }
 }

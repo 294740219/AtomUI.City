@@ -22,6 +22,7 @@ public sealed class LocalizationMetadataReaderTests
 
         Assert.Empty(metadata.Packages);
         Assert.Empty(metadata.Resources);
+        Assert.Empty(metadata.Diagnostics);
     }
 
     [Fact]
@@ -31,8 +32,8 @@ public sealed class LocalizationMetadataReaderTests
             """
             using AtomUI.City.Localization;
 
-            [assembly: LanguagePackage("Settings.zh-CN", "zh-CN", Scope = ResourceScope.Module, ResourceBaseName = "Sample.App.Resources.Settings", FallbackCulture = "zh-Hans")]
-            [assembly: LocalizedResource("Settings.Title", "Settings.zh-CN", Kind = LocalizedResourceKind.String, Scope = ResourceScope.Module, Critical = true)]
+            [assembly: LanguagePackage("Settings.zh-CN", "zh-CN", Scope = ResourceScope.Module, ScopeId = "settings.module", ResourceBaseName = "Sample.App.Resources.Settings", FallbackCulture = "zh-Hans")]
+            [assembly: LocalizedResource("Settings.Title", "Settings.zh-CN", Kind = LocalizedResourceKind.String, Scope = ResourceScope.Module, ScopeId = "settings.module", Culture = "zh-CN", Critical = true)]
 
             namespace Sample.App;
 
@@ -45,15 +46,41 @@ public sealed class LocalizationMetadataReaderTests
         var package = Assert.Single(metadata.Packages);
         var resource = Assert.Single(metadata.Resources);
 
+        Assert.Empty(metadata.Diagnostics);
         Assert.Equal("Settings.zh-CN", package.PackageId);
         Assert.Equal("zh-CN", package.Culture);
         Assert.Equal(ResourceScopeMetadata.Module, package.Scope);
+        Assert.Equal("settings.module", package.ScopeId);
         Assert.Equal("Sample.App.Resources.Settings", package.ResourceBaseName);
         Assert.Equal("zh-Hans", package.FallbackCulture);
         Assert.Equal("Settings.Title", resource.Key);
         Assert.Equal("Settings.zh-CN", resource.PackageId);
         Assert.Equal(LocalizedResourceMetadataKind.String, resource.Kind);
+        Assert.Equal("settings.module", resource.ScopeId);
+        Assert.Equal("zh-CN", resource.Culture);
         Assert.True(resource.Critical);
+    }
+
+    [Fact]
+    public void ReadReportsEmptyAttributeArgumentsWithoutPublishingInvalidMetadata()
+    {
+        var compilation = CreateCompilation(
+            """
+            using AtomUI.City.Localization;
+
+            [assembly: LanguagePackage("", "en-US")]
+            [assembly: LocalizedResource("Settings.Title", "")]
+
+            namespace Sample.App;
+            public sealed class Marker;
+            """);
+
+        var metadata = LocalizationMetadataReader.Read(compilation);
+
+        Assert.Empty(metadata.Packages);
+        Assert.Empty(metadata.Resources);
+        Assert.Equal(2, metadata.Diagnostics.Count);
+        Assert.All(metadata.Diagnostics, diagnostic => Assert.Equal("AUCGEN005", diagnostic.Id));
     }
 
     private static CSharpCompilation CreateCompilation(string source)

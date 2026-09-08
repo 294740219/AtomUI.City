@@ -17,7 +17,17 @@ public sealed class RouteDefinitionMetadata
         string? descriptionKey = null,
         string? breadcrumbKey = null,
         string? groupKey = null,
-        string? errorTitleKey = null)
+        string? errorTitleKey = null,
+        string? routeReferenceTypeName = null,
+        string? parameterTypeName = null,
+        IReadOnlyList<RouteParameterBindingMetadata>? parameterBindings = null,
+        IReadOnlyList<string>? enterGuardTypeNames = null,
+        IReadOnlyList<string>? leaveGuardTypeNames = null,
+        IReadOnlyList<string>? matchPolicyTypeNames = null,
+        IReadOnlyList<string>? resolverTypeNames = null,
+        IReadOnlyList<string>? middlewareTypeNames = null,
+        string? reuseKey = null,
+        string? activationHint = null)
     {
         if (string.IsNullOrWhiteSpace(routeMapTypeName))
         {
@@ -29,14 +39,14 @@ public sealed class RouteDefinitionMetadata
             throw new ArgumentException("Route method name cannot be empty.", nameof(methodName));
         }
 
-        if (string.IsNullOrWhiteSpace(id))
+        if (id is null)
         {
-            throw new ArgumentException("Route id cannot be empty.", nameof(id));
+            throw new ArgumentNullException(nameof(id));
         }
 
-        if (string.IsNullOrWhiteSpace(outletName))
+        if (outletName is null)
         {
-            throw new ArgumentException("Outlet name cannot be empty.", nameof(outletName));
+            throw new ArgumentNullException(nameof(outletName));
         }
 
         RouteMapTypeName = routeMapTypeName;
@@ -54,6 +64,16 @@ public sealed class RouteDefinitionMetadata
         BreadcrumbKey = breadcrumbKey;
         GroupKey = groupKey;
         ErrorTitleKey = errorTitleKey;
+        RouteReferenceTypeName = routeReferenceTypeName;
+        ParameterTypeName = parameterTypeName;
+        ParameterBindings = Array.AsReadOnly((parameterBindings ?? []).ToArray());
+        EnterGuardTypeNames = Array.AsReadOnly((enterGuardTypeNames ?? []).ToArray());
+        LeaveGuardTypeNames = Array.AsReadOnly((leaveGuardTypeNames ?? []).ToArray());
+        MatchPolicyTypeNames = Array.AsReadOnly((matchPolicyTypeNames ?? []).ToArray());
+        ResolverTypeNames = Array.AsReadOnly((resolverTypeNames ?? []).ToArray());
+        MiddlewareTypeNames = Array.AsReadOnly((middlewareTypeNames ?? []).ToArray());
+        ReuseKey = reuseKey;
+        ActivationHint = activationHint;
     }
 
     public string RouteMapTypeName { get; }
@@ -85,4 +105,18 @@ public sealed class RouteDefinitionMetadata
     public string? GroupKey { get; }
 
     public string? ErrorTitleKey { get; }
+
+    public string? RouteReferenceTypeName { get; }
+
+    public string? ParameterTypeName { get; }
+
+    public IReadOnlyList<RouteParameterBindingMetadata> ParameterBindings { get; }
+
+    public IReadOnlyList<string> EnterGuardTypeNames { get; }
+    public IReadOnlyList<string> LeaveGuardTypeNames { get; }
+    public IReadOnlyList<string> MatchPolicyTypeNames { get; }
+    public IReadOnlyList<string> ResolverTypeNames { get; }
+    public IReadOnlyList<string> MiddlewareTypeNames { get; }
+    public string? ReuseKey { get; }
+    public string? ActivationHint { get; }
 }

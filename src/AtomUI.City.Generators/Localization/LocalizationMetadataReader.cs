@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using AtomUI.City.Generators.Diagnostics;
 
 namespace AtomUI.City.Generators.Localization;
 
@@ -15,26 +16,33 @@ public static class LocalizationMetadataReader
         }
 
         var attributes = compilation.Assembly.GetAttributes();
+        var diagnostics = new List<GeneratorDiagnostic>();
         var packages = attributes
             .Where(attribute => string.Equals(GetAttributeTypeName(attribute), LanguagePackageAttributeName, StringComparison.Ordinal))
-            .Select(ReadLanguagePackage)
+            .Select(attribute => ReadLanguagePackage(attribute, diagnostics))
             .Where(package => package is not null)
             .Cast<LanguagePackageMetadata>()
             .ToArray();
         var resources = attributes
             .Where(attribute => string.Equals(GetAttributeTypeName(attribute), LocalizedResourceAttributeName, StringComparison.Ordinal))
-            .Select(ReadLocalizedResource)
+            .Select(attribute => ReadLocalizedResource(attribute, diagnostics))
             .Where(resource => resource is not null)
             .Cast<LocalizedResourceMetadata>()
             .ToArray();
 
-        return new LocalizationMetadata(packages, resources);
+        return new LocalizationMetadata(packages, resources, diagnostics);
     }
 
-    private static LanguagePackageMetadata? ReadLanguagePackage(AttributeData attribute)
+    private static LanguagePackageMetadata? ReadLanguagePackage(
+        AttributeData attribute,
+        ICollection<GeneratorDiagnostic> diagnostics)
     {
         if (attribute.ConstructorArguments.Length < 2)
         {
+            diagnostics.Add(new GeneratorDiagnostic(
+                GeneratorDiagnostics.InvalidManifestInput,
+                "LanguagePackage requires package id and culture constructor arguments.",
+                "LanguagePackage"));
             return null;
         }
 
@@ -43,6 +51,10 @@ public static class LocalizationMetadataReader
 
         if (string.IsNullOrWhiteSpace(packageId) || string.IsNullOrWhiteSpace(culture))
         {
+            diagnostics.Add(new GeneratorDiagnostic(
+                GeneratorDiagnostics.InvalidManifestInput,
+                "LanguagePackage package id and culture cannot be empty.",
+                packageId ?? "LanguagePackage"));
             return null;
         }
 
@@ -53,13 +65,21 @@ public static class LocalizationMetadataReader
             ReadNamedString(attribute, "ResourceBaseName"),
             ReadNamedString(attribute, "FallbackCulture"),
             ReadNamedString(attribute, "Version"),
-            ReadNamedString(attribute, "Checksum"));
+            ReadNamedString(attribute, "Checksum"),
+            ReadNamedString(attribute, "ScopeId"),
+            ReadNamedString(attribute, "ContributionId"));
     }
 
-    private static LocalizedResourceMetadata? ReadLocalizedResource(AttributeData attribute)
+    private static LocalizedResourceMetadata? ReadLocalizedResource(
+        AttributeData attribute,
+        ICollection<GeneratorDiagnostic> diagnostics)
     {
         if (attribute.ConstructorArguments.Length < 2)
         {
+            diagnostics.Add(new GeneratorDiagnostic(
+                GeneratorDiagnostics.InvalidManifestInput,
+                "LocalizedResource requires key and package id constructor arguments.",
+                "LocalizedResource"));
             return null;
         }
 
@@ -68,6 +88,10 @@ public static class LocalizationMetadataReader
 
         if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(packageId))
         {
+            diagnostics.Add(new GeneratorDiagnostic(
+                GeneratorDiagnostics.InvalidManifestInput,
+                "LocalizedResource key and package id cannot be empty.",
+                key ?? "LocalizedResource"));
             return null;
         }
 
@@ -77,14 +101,16 @@ public static class LocalizationMetadataReader
             ReadKind(attribute),
             ReadScope(attribute),
             ReadNamedString(attribute, "Version"),
-            ReadNamedBoolean(attribute, "Critical"));
+            ReadNamedBoolean(attribute, "Critical"),
+            ReadNamedString(attribute, "ScopeId"),
+            ReadNamedString(attribute, "Culture"));
     }
 
     private static LocalizedResourceMetadataKind ReadKind(AttributeData attribute)
     {
         var value = ReadNamedEnumValue(attribute, "Kind");
 
-        return value.HasValue && Enum.IsDefined(typeof(LocalizedResourceMetadataKind), value.Value)
+        return value.HasValue
             ? (LocalizedResourceMetadataKind)value.Value
             : LocalizedResourceMetadataKind.String;
     }
@@ -93,7 +119,7 @@ public static class LocalizationMetadataReader
     {
         var value = ReadNamedEnumValue(attribute, "Scope");
 
-        return value.HasValue && Enum.IsDefined(typeof(ResourceScopeMetadata), value.Value)
+        return value.HasValue
             ? (ResourceScopeMetadata)value.Value
             : ResourceScopeMetadata.Module;
     }

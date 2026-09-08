@@ -9,7 +9,9 @@ public sealed class LanguagePackageMetadata
         string? resourceBaseName,
         string? fallbackCulture,
         string? version,
-        string? checksum)
+        string? checksum,
+        string? scopeId = null,
+        string? contributionId = null)
     {
         if (string.IsNullOrWhiteSpace(packageId))
         {
@@ -28,6 +30,8 @@ public sealed class LanguagePackageMetadata
         FallbackCulture = fallbackCulture;
         Version = version;
         Checksum = checksum;
+        ScopeId = scopeId;
+        ContributionId = contributionId;
     }
 
     public string PackageId { get; }
@@ -43,4 +47,8 @@ public sealed class LanguagePackageMetadata
     public string? Version { get; }
 
     public string? Checksum { get; }
+
+    public string? ScopeId { get; }
+
+    public string? ContributionId { get; }
 }

@@ -1,8 +1,14 @@
 namespace AtomUI.City.Generators.Routing;
 
+using Microsoft.CodeAnalysis;
+
 public sealed class RouteMapMetadata
 {
-    public RouteMapMetadata(string typeName, IReadOnlyList<RouteDefinitionMetadata> routes)
+    public RouteMapMetadata(
+        string typeName,
+        IReadOnlyList<RouteDefinitionMetadata> routes,
+        Location? location = null,
+        IReadOnlyList<string>? issues = null)
     {
         if (string.IsNullOrWhiteSpace(typeName))
         {
@@ -11,9 +17,15 @@ public sealed class RouteMapMetadata
 
         TypeName = typeName;
         Routes = Array.AsReadOnly((routes ?? throw new ArgumentNullException(nameof(routes))).ToArray());
+        Location = location;
+        Issues = Array.AsReadOnly((issues ?? []).ToArray());
     }
 
     public string TypeName { get; }
 
     public IReadOnlyList<RouteDefinitionMetadata> Routes { get; }
+
+    public Location? Location { get; }
+
+    public IReadOnlyList<string> Issues { get; }
 }

@@ -15,7 +15,15 @@ public sealed class RouteManifestRoute
         string? descriptionKey = null,
         string? breadcrumbKey = null,
         string? groupKey = null,
-        string? errorTitleKey = null)
+        string? errorTitleKey = null,
+        IReadOnlyList<string>? enterGuardTypeNames = null,
+        IReadOnlyList<string>? leaveGuardTypeNames = null,
+        IReadOnlyList<string>? matchPolicyTypeNames = null,
+        IReadOnlyList<string>? resolverTypeNames = null,
+        IReadOnlyList<string>? middlewareTypeNames = null,
+        IReadOnlyList<string>? parameterBindingNames = null,
+        string? reuseKey = null,
+        string? activationHint = null)
     {
         if (string.IsNullOrWhiteSpace(id))
         {
@@ -40,6 +48,14 @@ public sealed class RouteManifestRoute
         BreadcrumbKey = breadcrumbKey;
         GroupKey = groupKey;
         ErrorTitleKey = errorTitleKey;
+        EnterGuardTypeNames = Array.AsReadOnly((enterGuardTypeNames ?? []).ToArray());
+        LeaveGuardTypeNames = Array.AsReadOnly((leaveGuardTypeNames ?? []).ToArray());
+        MatchPolicyTypeNames = Array.AsReadOnly((matchPolicyTypeNames ?? []).ToArray());
+        ResolverTypeNames = Array.AsReadOnly((resolverTypeNames ?? []).ToArray());
+        MiddlewareTypeNames = Array.AsReadOnly((middlewareTypeNames ?? []).ToArray());
+        ParameterBindingNames = Array.AsReadOnly((parameterBindingNames ?? []).ToArray());
+        ReuseKey = reuseKey;
+        ActivationHint = activationHint;
     }
 
     public string Id { get; }
@@ -67,4 +83,12 @@ public sealed class RouteManifestRoute
     public string? GroupKey { get; }
 
     public string? ErrorTitleKey { get; }
+    public IReadOnlyList<string> EnterGuardTypeNames { get; }
+    public IReadOnlyList<string> LeaveGuardTypeNames { get; }
+    public IReadOnlyList<string> MatchPolicyTypeNames { get; }
+    public IReadOnlyList<string> ResolverTypeNames { get; }
+    public IReadOnlyList<string> MiddlewareTypeNames { get; }
+    public IReadOnlyList<string> ParameterBindingNames { get; }
+    public string? ReuseKey { get; }
+    public string? ActivationHint { get; }
 }

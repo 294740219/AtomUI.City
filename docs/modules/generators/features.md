@@ -11,7 +11,7 @@
 | AUC-GENERATORS-003 | DI Manifest | 已实现并通过产品合同测试 | ServiceRegistrationMetadataReader, ServiceRegistrationManifestBuilder | ServiceRegistrationManifestBuilderTests; ServiceRegistrationMetadataReaderTests |
 | AUC-GENERATORS-004 | Route Manifest | 已实现并通过产品合同测试 | RouteMetadataReader, RouteManifestBuilder | RouteManifestBuilderTests; RouteMetadataReaderTests |
 | AUC-GENERATORS-005 | Plugin Manifest | 已实现并通过产品合同测试 | PluginMetadataReader, PluginManifestBuilder | PluginManifestBuilderTests; PluginMetadataReaderTests |
-| AUC-GENERATORS-006 | Localization Manifest | 已实现并通过产品合同测试 | LocalizationMetadataReader, LocalizationManifestBuilder | LocalizationManifestBuilderTests; LocalizationMetadataReaderTests |
+| AUC-GENERATORS-006 | Localization Manifest | 已实现并通过产品合同测试 | LocalizationMetadataReader, LocalizationManifestBuilder, LocalizationRegistrarSourceBuilder | AtomUICityIncrementalGeneratorLocalizationTests; LocalizationManifestBuilderTests; LocalizationMetadataReaderTests |
 | AUC-GENERATORS-007 | Presentation View Manifest | 已实现并通过产品合同测试 | PresentationViewMetadataReader, PresentationViewManifestBuilder | PresentationViewManifestBuilderTests; PresentationViewRegistrarSourceBuilderTests |
 | AUC-GENERATORS-008 | Diagnostics | 已实现并通过产品合同测试 | GeneratorDiagnosticIds, GeneratorDiagnostics | GeneratorDiagnosticTests |
 
@@ -107,13 +107,13 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 Feature ID: `AUC-GENERATORS-006`
 Status: 已实现并通过产品合同测试
 Goal: 编译期生成 localization resource manifest。
-Public Contract: LocalizationMetadataReader, LocalizationManifestBuilder
-Runtime / Build Behavior: 读取 LanguagePackage、LocalizedResource 和 fallback metadata，输出 culture/resource 清单。
-Failure Behavior: culture 非法、重复 key、resource 缺失输出 diagnostic。
+Public Contract: LocalizationMetadataReader, LocalizationMetadata.Diagnostics, LocalizationManifestBuilder, LocalizationRegistrarSourceBuilder
+Runtime / Build Behavior: 读取 LanguagePackage、LocalizedResource 和 fallback metadata，输出 culture/resource 清单、稳定 key 与通过单次 `RegisterRange` 原子注册的 registrar source。
+Failure Behavior: 空 attribute 参数、culture 非法、显式未知 enum、重复 key、resource 缺失输出 diagnostic；reader 或 builder 有错误时不得生成 Localization source。
 Threading / Cancellation: additional files 读取由 Roslyn 输入提供。
 Diagnostics: diagnostic 必须包含 culture、resource key、scope。
-Tests: `LocalizationManifestBuilderTests; LocalizationMetadataReaderTests`
-Required Assertions: 断言 culture、resource、fallback、重复 key 诊断。
+Tests: `AtomUICityIncrementalGeneratorLocalizationTests; LocalizationManifestBuilderTests; LocalizationMetadataReaderTests`
+Required Assertions: 断言 culture、resource、fallback、原子 registrar、空 attribute 参数、未知 enum 和重复 key 诊断。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 
 ## AUC-GENERATORS-007 Presentation View Manifest

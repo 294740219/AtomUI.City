@@ -3,8 +3,10 @@ using AtomUI.City.Generators.Common;
 using AtomUI.City.Generators.DependencyInjection;
 using AtomUI.City.Generators.Diagnostics;
 using AtomUI.City.Generators.EventBus;
+using AtomUI.City.Generators.Localization;
 using AtomUI.City.Generators.Modularity;
 using AtomUI.City.Generators.Presentation;
+using AtomUI.City.Generators.Routing;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
@@ -35,7 +37,62 @@ public sealed class AtomUICityIncrementalGenerator : IIncrementalGenerator
     {
         InitializeDependencyInjection(context);
         InitializeModularity(context);
+        InitializeRouting(context);
         InitializePresentation(context);
+        InitializeLocalization(context);
+    }
+
+    private static void InitializeLocalization(IncrementalGeneratorInitializationContext context)
+    {
+        context.RegisterSourceOutput(
+            context.CompilationProvider,
+            static (sourceContext, compilation) =>
+            {
+                var metadata = LocalizationMetadataReader.Read(compilation);
+                foreach (var diagnostic in metadata.Diagnostics)
+                {
+                    sourceContext.ReportDiagnostic(
+                        GeneratorDiagnostics.CreateRoslynDiagnostic(
+                            GeneratorFeature.Localization,
+                            diagnostic));
+                }
+
+                if (metadata.Diagnostics.Count > 0)
+                {
+                    return;
+                }
+
+                if (metadata.Packages.Count == 0 && metadata.Resources.Count == 0)
+                {
+                    return;
+                }
+
+                var result = LocalizationManifestBuilder.Build(metadata.Packages, metadata.Resources);
+                foreach (var diagnostic in result.Diagnostics)
+                {
+                    sourceContext.ReportDiagnostic(
+                        GeneratorDiagnostics.CreateRoslynDiagnostic(
+                            GeneratorFeature.Localization,
+                            diagnostic));
+                }
+
+                if (result.Diagnostics.Count > 0)
+                {
+                    return;
+                }
+
+                var assemblyName = string.IsNullOrWhiteSpace(compilation.AssemblyName)
+                    ? "Assembly"
+                    : compilation.AssemblyName!;
+                sourceContext.AddSource(
+                    GeneratedCodeNames.CreateHintName(
+                        GeneratorFeature.Localization,
+                        assemblyName,
+                        "LocalizationManifest"),
+                    SourceText.From(
+                        LocalizationRegistrarSourceBuilder.Build(result.Manifest),
+                        Encoding.UTF8));
+            });
     }
 
     private static void InitializeDependencyInjection(IncrementalGeneratorInitializationContext context)
@@ -388,6 +445,11 @@ public sealed class AtomUICityIncrementalGenerator : IIncrementalGenerator
                 continue;
             }
 
+            if (string.Equals(assembly.Identity.Name, compilation.AssemblyName, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
             foreach (var attribute in assembly.GetAttributes())
             {
                 if (string.Equals(
@@ -485,11 +547,13 @@ public sealed class AtomUICityIncrementalGenerator : IIncrementalGenerator
                     .OrderBy(candidate => candidate.TypeName, StringComparer.Ordinal)
                     .ToArray();
                 var validCandidates = new List<ModuleGenerationCandidate>(candidates.Length);
+                var hasInvalidCandidate = false;
 
                 foreach (var candidate in candidates)
                 {
                     if (candidate.Metadata is null)
                     {
+                        hasInvalidCandidate = true;
                         ReportInvalidGeneratedModule(
                             sourceContext,
                             candidate,
@@ -500,6 +564,7 @@ public sealed class AtomUICityIncrementalGenerator : IIncrementalGenerator
                     if (candidate.IsApplicationRoot &&
                         !IsExecutableOutput(compilation.Options.OutputKind))
                     {
+                        hasInvalidCandidate = true;
                         ReportInvalidGeneratedModule(
                             sourceContext,
                             candidate,
@@ -515,11 +580,17 @@ public sealed class AtomUICityIncrementalGenerator : IIncrementalGenerator
 
                     if (candidate.IsApplicationRoot)
                     {
+                        hasInvalidCandidate = true;
                         ReportInvalidGeneratedModule(
                             sourceContext,
                             candidate,
                             $"Module '{candidate.TypeName}' cannot be emitted with a strong-typed factory.");
                     }
+                }
+
+                if (hasInvalidCandidate)
+                {
+                    return;
                 }
 
                 var applicationRoots = validCandidates
@@ -639,6 +710,72 @@ public sealed class AtomUICityIncrementalGenerator : IIncrementalGenerator
             });
     }
 
+    private static void InitializeRouting(IncrementalGeneratorInitializationContext context)
+    {
+        var routeMaps = context.SyntaxProvider
+            .CreateSyntaxProvider(
+                static (node, _) => node is TypeDeclarationSyntax declaration && declaration.AttributeLists.Count > 0,
+                static (syntaxContext, _) => ReadRouteMap(syntaxContext))
+            .Where(static routeMap => routeMap is not null)
+            .Collect();
+
+        context.RegisterSourceOutput(
+            context.CompilationProvider.Combine(routeMaps),
+            static (sourceContext, value) =>
+            {
+                var maps = value.Right
+                    .Where(routeMap => routeMap is not null)
+                    .Select(routeMap => routeMap!)
+                    .GroupBy(routeMap => routeMap.TypeName, StringComparer.Ordinal)
+                    .Select(group => group.First())
+                    .OrderBy(routeMap => routeMap.TypeName, StringComparer.Ordinal)
+                    .ToArray();
+                if (maps.Length == 0)
+                {
+                    return;
+                }
+
+                var invalidMaps = maps.Where(map => map.Issues.Count > 0).ToArray();
+                if (invalidMaps.Length > 0)
+                {
+                    foreach (var map in invalidMaps)
+                    {
+                        foreach (var issue in map.Issues)
+                        {
+                            sourceContext.ReportDiagnostic(GeneratorDiagnostics.CreateRoslynDiagnostic(
+                                GeneratorFeature.Routing,
+                                new GeneratorDiagnostic(GeneratorDiagnostics.InvalidManifestInput, issue, map.TypeName),
+                                map.Location));
+                        }
+                    }
+
+                    return;
+                }
+
+                var manifest = RouteManifestBuilder.Build(maps.SelectMany(routeMap => routeMap.Routes).ToArray());
+                if (manifest.Diagnostics.Count > 0)
+                {
+                    foreach (var diagnostic in manifest.Diagnostics)
+                    {
+                        sourceContext.ReportDiagnostic(GeneratorDiagnostics.CreateRoslynDiagnostic(
+                            GeneratorFeature.Routing,
+                            diagnostic,
+                            maps.FirstOrDefault(map => map.Routes.Any(route =>
+                                string.Equals(route.Id, diagnostic.Target, StringComparison.Ordinal)))?.Location));
+                    }
+
+                    return;
+                }
+
+                var assemblyName = string.IsNullOrWhiteSpace(value.Left.AssemblyName)
+                    ? "Assembly"
+                    : value.Left.AssemblyName!;
+                sourceContext.AddSource(
+                    GeneratedCodeNames.CreateHintName(GeneratorFeature.Routing, assemblyName, "Routes"),
+                    SourceText.From(RouteSourceBuilder.Build(maps, manifest.Manifest), Encoding.UTF8));
+            });
+    }
+
     private static ModuleGenerationCandidate? ReadModuleCandidate(GeneratorSyntaxContext context)
     {
         var symbol = context.SemanticModel.GetDeclaredSymbol(context.Node) as INamedTypeSymbol;
@@ -753,6 +890,11 @@ public sealed class AtomUICityIncrementalGenerator : IIncrementalGenerator
                 continue;
             }
 
+            if (string.Equals(assembly.Identity.Name, compilation.AssemblyName, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
             foreach (var attribute in assembly.GetAttributes())
             {
                 if (!string.Equals(
@@ -778,6 +920,13 @@ public sealed class AtomUICityIncrementalGenerator : IIncrementalGenerator
         var symbol = context.SemanticModel.GetDeclaredSymbol(context.Node) as INamedTypeSymbol;
 
         return symbol is null ? [] : PresentationViewMetadataReader.Read(symbol);
+    }
+
+    private static RouteMapMetadata? ReadRouteMap(GeneratorSyntaxContext context)
+    {
+        return context.SemanticModel.GetDeclaredSymbol(context.Node) is INamedTypeSymbol symbol
+            ? RouteMetadataReader.TryRead(symbol)
+            : null;
     }
 
     private static Diagnostic CreatePresentationDiagnostic(

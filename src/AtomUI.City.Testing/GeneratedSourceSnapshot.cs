@@ -21,9 +21,9 @@ public sealed class GeneratedSourceSnapshot
         {
             builder.Append("// <generated-source hint=\"");
             builder.Append(source.HintName);
-            builder.AppendLine("\">");
-            builder.AppendLine(NormalizeSourceText(source.SourceText));
-            builder.AppendLine("// </generated-source>");
+            builder.Append("\">\n");
+            builder.Append(NormalizeSourceText(source.SourceText));
+            builder.Append("\n// </generated-source>\n");
         }
 
         return new GeneratedSourceSnapshot(builder.ToString().TrimEnd());

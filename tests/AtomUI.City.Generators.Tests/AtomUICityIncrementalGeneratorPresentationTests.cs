@@ -48,7 +48,7 @@ public sealed class AtomUICityIncrementalGeneratorPresentationTests
 
         var runResult = driver.RunGenerators(compilation).GetRunResult();
         var generatorResult = Assert.Single(runResult.Results);
-        var generatedSource = Assert.Single(generatorResult.GeneratedSources);
+        var generatedSource = Assert.Single(PresentationSources(generatorResult));
 
         Assert.Equal("AtomUI.City/Presentation/Sample.App.Views.g.cs", generatedSource.HintName);
         Assert.Contains("GeneratedPresentationViewRegistrar", generatedSource.SourceText.ToString(), StringComparison.Ordinal);
@@ -105,7 +105,7 @@ public sealed class AtomUICityIncrementalGeneratorPresentationTests
         var generatorResult = Assert.Single(runResult.Results);
         var diagnostic = Assert.Single(generatorResult.Diagnostics);
 
-        Assert.Empty(generatorResult.GeneratedSources);
+        Assert.Empty(PresentationSources(generatorResult));
         Assert.Equal(GeneratorDiagnosticIds.DuplicatePresentationView, diagnostic.Id);
         Assert.Contains("Sample.App.SettingsViewModel", diagnostic.GetMessage(), StringComparison.Ordinal);
         Assert.True(diagnostic.Location.IsInSource);
@@ -174,12 +174,15 @@ public sealed class AtomUICityIncrementalGeneratorPresentationTests
             compilation,
             out var outputCompilation,
             out var generatorDiagnostics);
-        var generatedSource = Assert.Single(Assert.Single(driver.GetRunResult().Results).GeneratedSources);
+        var generatedSource = Assert.Single(PresentationSources(Assert.Single(driver.GetRunResult().Results)));
 
         Assert.Empty(generatorDiagnostics);
         Assert.Empty(outputCompilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
         Assert.Contains("context.Services.GetService(typeof(global::Sample.App.SettingsService))", generatedSource.SourceText.ToString(), StringComparison.Ordinal);
     }
+
+    private static IEnumerable<GeneratedSourceResult> PresentationSources(GeneratorRunResult result) =>
+        result.GeneratedSources.Where(source => source.HintName.Contains("/Presentation/", StringComparison.Ordinal));
 
     private static CSharpCompilation CreateCompilation(
         string source,

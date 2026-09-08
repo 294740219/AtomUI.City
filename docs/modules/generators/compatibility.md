@@ -19,6 +19,8 @@
 - `PresentationViewMetadata.HasAmbiguousConstructors` 是 1.0 前新增 metadata 成员；后续不能删除或改为允许 ambiguous registrar generation。
 - generated presentation view registrar 输出 `constructorParameterTypes` 传递属于 1.0 兼容 contract。
 - `GeneratorDiagnostics.CreateRoslynDiagnostic` 是 1.0 前新增 diagnostic factory；category、severity、message formatting 和 location fallback 属于兼容行为。
+- `LocalizationMetadata.Diagnostics`、空 attribute 参数/显式未知 enum 的 build diagnostic，以及有 reader diagnostic 时不生成 Localization source 的行为进入 1.0 兼容承诺。
+- `LocalizationRegistrarSourceBuilder` 生成的 `GeneratedLocalizationManifest` 成员、稳定排序和单次 `LanguagePackageRegistry.RegisterRange` 原子注册行为进入 1.0 兼容承诺。
 - `AUCANL0001` 默认以 Error 阻止非测试 City 项目调用或引用 `BuildServiceProvider`、主动调用 `IServiceProviderFactory<T>.CreateServiceProvider`，以及调用或引用 Microsoft Generic Host 构建/启动入口；诊断 ID、默认 severity、City ApplicationHost、已有 IHost 启动、测试项目和 generated code 豁免属于兼容行为。
 
 ## 数据格式兼容

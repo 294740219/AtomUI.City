@@ -7,9 +7,9 @@
 | API Family | 关键类型 | 职责 | 硬性行为 |
 | --- | --- | --- | --- |
 | Incremental Entry | AtomUICityIncrementalGenerator, GeneratorFeature, GeneratorFeatureNames | Roslyn incremental generator 入口和 feature 选择。 | 不引用运行时包；输出稳定；无关输入不触发无关输出变化。 |
-| Metadata Readers | ModuleMetadataReader, ServiceRegistrationMetadataReader, RouteMetadataReader, PluginMetadataReader, LocalizationMetadataReader, PresentationViewMetadataReader | 从 syntax/semantic model 读取声明。 | reader 不做业务生成；非法声明输出 diagnostic metadata。 |
+| Metadata Readers | ModuleMetadataReader, ServiceRegistrationMetadataReader, RouteMetadataReader, PluginMetadataReader, LocalizationMetadataReader, PresentationViewMetadataReader | 从 syntax/semantic model 读取声明。 | reader 不做业务生成；非法声明输出 diagnostic metadata；`LocalizationMetadata.Diagnostics` 保存 attribute 读取阶段错误。 |
 | Manifest Builders | ModuleDependencyGraphBuilder, ServiceRegistrationManifestBuilder, RouteManifestBuilder, PluginManifestBuilder, LocalizationManifestBuilder, PresentationViewManifestBuilder | 校验 metadata 并生成 manifest result。 | result 不可变；排序确定；失败不生成不完整 success manifest。 |
-| Source Builders | PresentationViewRegistrarSourceBuilder | 生成 C# 注册代码。 | hint name 稳定；生成代码不依赖 runtime reflection。 |
+| Source Builders | LocalizationRegistrarSourceBuilder, PresentationViewRegistrarSourceBuilder | 生成 C# 注册代码。 | hint name 稳定；生成代码不依赖 runtime reflection；Localization registrar 通过单次 `RegisterRange` 原子注册 manifest。 |
 | Diagnostics | GeneratorDiagnosticIds, GeneratorDiagnostics, GeneratorDiagnosticDefinition | 编译期诊断定义和创建。 | diagnostic id、severity、category 和 message args 稳定。 |
 
 ## Presentation View Metadata 合同
@@ -26,6 +26,8 @@
 | AtomUICityIncrementalGenerator.Initialize | 注册 incremental pipeline。 | IncrementalGeneratorInitializationContext。 | void。 | 初始化不得抛出非 Roslyn 管控异常；feature pipeline 错误输出 diagnostic。 | 由编译器控制。 | Initialize 可被编译器多次调用，注册必须无全局可变状态。 |
 | MetadataReader.Read | 从声明读取 metadata。 | syntax node、semantic model、cancellation token。 | metadata 或 diagnostic result。 | symbol 缺失、attribute 参数非法、类型不可访问输出 diagnostic。 | 必须传递 Roslyn token。 | reader 必须无共享 mutable cache。 |
 | ManifestBuilder.Build | 校验 metadata 并生成 manifest。 | metadata collection。 | manifest result。 | 冲突、重复、循环、缺失依赖返回 failed result 和 diagnostics。 | 纯 CPU，批量 build 应观察 token。 | 同一输入输出 byte-stable。 |
+| LocalizationMetadataReader.Read | 读取 assembly-level Localization attributes。 | Compilation。 | `LocalizationMetadata`，含 packages、resources 和 reader diagnostics。 | 空 package id/culture/resource key/package reference 产生 diagnostic metadata，不得静默丢弃声明；显式未知 enum 原值交由 manifest builder 拒绝。 | 由 CompilationProvider 控制。 | 无共享 mutable cache；有 reader diagnostic 时主 pipeline 不生成 Localization source。 |
+| LocalizationRegistrarSourceBuilder.Build | 生成 Localization manifest、key 和 registrar source。 | 成功的 LocalizationManifest。 | C# source text。 | failed manifest 不得调用；运行时任一注册冲突由生成入口抛 `InvalidOperationException`，Registry 保持整批未发布。 | 纯 CPU。 | source ordering 稳定；registrar 单次调用 `RegisterRange`。 |
 | PresentationViewRegistrarSourceBuilder.Build | 生成 view registrar source。 | PresentationViewManifest。 | Generated source text 和 hint name。 | manifest failed 时不得生成 registrar source。 | 纯 CPU。 | hint name 和 source ordering 稳定。 |
 | GeneratorDiagnostics.CreateRoslynDiagnostic | 创建 Roslyn diagnostic。 | feature、generator diagnostic、location、message args。 | Diagnostic。 | 参数数量不匹配按 Roslyn Diagnostic 格式化规则稳定失败。 | 同步 API 无 token。 | diagnostic definition 不可变，可并发读取。 |
 
@@ -57,6 +59,7 @@
 | `LocalizationManifestResult` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `LocalizationMetadata` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `LocalizationMetadataReader` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
+| `LocalizationRegistrarSourceBuilder` | 支持类型 | 生成类型名、成员、排序或原子注册行为变化必须更新本文档和 compatibility。 |
 | `LocalizedResourceManifestEntry` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `LocalizedResourceMetadata` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
 | `LocalizedResourceMetadataKind` | 支持类型 | 新增、删除、重命名或默认行为变化必须更新本文档和 compatibility。 |
