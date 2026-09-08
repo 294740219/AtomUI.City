@@ -69,7 +69,7 @@ State Core 不直接依赖 UI。Presentation 负责 UI 线程安全更新。
 
 规则：
 
-- UI 订阅使用 `DispatchPolicy.UiThread`。
+- UI 订阅使用 `StateDispatchPolicy.Dispatcher`。
 - State 到 UI 的订阅必须绑定 Scope。
 - View detached 后停止 UI 更新。
 - 插件 View 相关订阅随插件停用释放。

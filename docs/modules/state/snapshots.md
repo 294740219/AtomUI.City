@@ -79,10 +79,10 @@ Snapshot 必须包含：
 - State id。
 - Owner module。
 - Plugin id。
-- Scope kind。
+- Lifetime（State 生命周期）。
 - Version。
 - Schema version。
-- Serialized value。
+- Value。
 - Timestamp。
 
 不是所有 state 都默认可持久化。需要显式声明 snapshot policy。
@@ -117,11 +117,12 @@ Load snapshot
 -> validate owner/module/plugin
 -> validate schema version
 -> deserialize value
--> apply migration if needed
--> commit state or fallback default value
+-> commit state or retain current value
 ```
 
-恢复失败不应阻止应用启动，默认使用初始值并记录诊断。
+1.0 不提供运行时 snapshot migration contract。schema version 不一致时拒绝恢复、保留当前值并记录 `AUCSTA007`。可注册迁移器属于后续版本规划，在公开迁移接口、执行顺序、失败和 AOT 合同完成前不得宣称已实现。
+
+恢复失败不应阻止应用启动；必须保留恢复前的当前值和 version，并记录诊断。恢复逻辑不得静默覆盖启动后已经产生的运行时状态。
 
 Transient state 不允许通过 snapshot restore 写回。恢复流程遇到非 Persisted definition 时必须保留当前值和 version，并写入 `AUCSTA007`。
 
@@ -132,7 +133,7 @@ Transient state 不允许通过 snapshot restore 写回。恢复流程遇到非 
 插件 state restore 必须经过：
 
 - 插件版本兼容检查。
-- 插件 schema migration 检查。
+- 插件 schema version 检查；1.0 不兼容版本直接拒绝恢复。
 - Host trust policy 检查。
 - 插件已启用检查。
 
@@ -155,7 +156,7 @@ Generator 负责：
 |---|---|---|
 | 保存 snapshot | Unit | 输出包含 state id、version、schema。 |
 | 恢复 snapshot | Unit | 值正确恢复。 |
-| schema 不兼容 | Unit | 使用默认值并记录诊断。 |
+| schema 不兼容 | Unit | 保留当前值和 version 并记录诊断。 |
 | 不持久化状态 | Unit | 不写入持久化 snapshot。 |
 | policy 拒绝 | Unit | Transient state restore 保留当前值并记录诊断。 |
 | 插件 snapshot | Unit | 带 PluginId 和版本信息。 |

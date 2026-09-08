@@ -9,6 +9,8 @@ public sealed class ApplicationStateRegistry :
 {
     private readonly IHostDiagnostics? _diagnostics;
     private readonly Dictionary<string, StateRegistration> _registrations = new(StringComparer.Ordinal);
+    private readonly object _syncRoot = new();
+    private static readonly StateWriteAuthority HostAuthority = StateWriteAuthority.Host();
 
     public ApplicationStateRegistry(IHostDiagnostics? diagnostics = null)
     {
@@ -18,23 +20,34 @@ public sealed class ApplicationStateRegistry :
     public void Add<T>(StateDefinition<T> definition)
     {
         ArgumentNullException.ThrowIfNull(definition);
+        var alreadyRegistered = false;
 
-        if (_registrations.ContainsKey(definition.Key.Name))
+        lock (_syncRoot)
+        {
+            if (_registrations.ContainsKey(definition.Key.Name))
+            {
+                alreadyRegistered = true;
+            }
+            else
+            {
+                _registrations.Add(
+                    definition.Key.Name,
+                    new StateRegistration<T>(
+                        definition,
+                        new WritableState<T>(
+                            definition.DefaultValue,
+                            definition.Comparer,
+                            _diagnostics,
+                            definition.Key.Name,
+                            definition.Access)));
+            }
+        }
+
+        if (alreadyRegistered)
         {
             WriteAlreadyRegisteredDiagnostic(definition.Key.Name, typeof(T));
             throw new InvalidOperationException($"State '{definition.Key.Name}' is already registered.");
         }
-
-        _registrations.Add(
-            definition.Key.Name,
-            new StateRegistration<T>(
-                definition,
-                new WritableState<T>(
-                    definition.DefaultValue,
-                    definition.Comparer,
-                    _diagnostics,
-                    definition.Key.Name,
-                    definition.Access)));
     }
 
     public IReadOnlyState<T> Get<T>(StateKey<T> key)
@@ -45,9 +58,16 @@ public sealed class ApplicationStateRegistry :
     public IWritableState<T> GetWritable<T>(StateKey<T> key)
     {
         var registration = GetRegistration<T>(key);
-        ThrowIfWriteDenied(registration);
+        ThrowIfWriteDenied(registration, HostAuthority);
 
         return registration.State;
+    }
+
+    public IApplicationStateWriter CreateWriter(StateWriteAuthority authority)
+    {
+        ArgumentNullException.ThrowIfNull(authority);
+
+        return new AuthorizedApplicationStateWriter(this, authority);
     }
 
     public IStateSubscription OnChange<T>(
@@ -73,8 +93,14 @@ public sealed class ApplicationStateRegistry :
 
     public StateSnapshot CreateSnapshot()
     {
-        var entries = _registrations
-            .Values
+        StateRegistration[] registrations;
+
+        lock (_syncRoot)
+        {
+            registrations = _registrations.Values.ToArray();
+        }
+
+        var entries = registrations
             .Where(registration => registration.Definition.SnapshotPolicy == StateSnapshotPolicy.Persisted)
             .OrderBy(registration => registration.Definition.Name, StringComparer.Ordinal)
             .Select(registration => registration.CreateSnapshotEntry())
@@ -89,7 +115,14 @@ public sealed class ApplicationStateRegistry :
 
         foreach (var entry in snapshot.Entries)
         {
-            if (!_registrations.TryGetValue(entry.StateName, out var registration))
+            StateRegistration? registration;
+
+            lock (_syncRoot)
+            {
+                _registrations.TryGetValue(entry.StateName, out registration);
+            }
+
+            if (registration is null)
             {
                 WriteSnapshotRestoreFailedDiagnostic(entry, "state is not registered");
                 continue;
@@ -103,7 +136,14 @@ public sealed class ApplicationStateRegistry :
     {
         StateKey<T>.ThrowIfDefault(key, nameof(key));
 
-        if (!_registrations.TryGetValue(key.Name, out var registration))
+        StateRegistration? registration;
+
+        lock (_syncRoot)
+        {
+            _registrations.TryGetValue(key.Name, out registration);
+        }
+
+        if (registration is null)
         {
             WriteNotRegisteredDiagnostic(key.Name, typeof(T));
             throw new StateNotRegisteredException(key.Name);
@@ -120,15 +160,44 @@ public sealed class ApplicationStateRegistry :
         throw new InvalidOperationException(message);
     }
 
-    private void ThrowIfWriteDenied<T>(StateRegistration<T> registration)
+    private IWritableState<T> GetWritable<T>(
+        StateKey<T> key,
+        StateWriteAuthority authority)
     {
-        if (registration.Definition.Access == StateAccessPolicy.ReadOnly)
+        var registration = GetRegistration<T>(key);
+        ThrowIfWriteDenied(registration, authority);
+
+        return registration.State;
+    }
+
+    private void ThrowIfWriteDenied<T>(
+        StateRegistration<T> registration,
+        StateWriteAuthority authority)
+    {
+        var definition = registration.Definition;
+        var allowed = definition.Access switch
+        {
+            StateAccessPolicy.ReadOnly => false,
+            StateAccessPolicy.OwnerWrite =>
+                authority.Kind == StateWriteAuthorityKind.Module &&
+                string.Equals(authority.ModuleName, definition.OwnerModule, StringComparison.Ordinal),
+            StateAccessPolicy.HostWrite => authority.Kind == StateWriteAuthorityKind.Host,
+            StateAccessPolicy.AuthorizedWrite =>
+                authority.HasCapability(definition.WriteCapability!),
+            StateAccessPolicy.PluginIsolated =>
+                authority.Kind == StateWriteAuthorityKind.Plugin &&
+                string.Equals(authority.PluginId, definition.PluginId, StringComparison.Ordinal),
+            _ => false,
+        };
+
+        if (!allowed)
         {
             WriteWriteDeniedDiagnostic(
-                registration.Definition.Key.Name,
+                definition.Key.Name,
                 typeof(T),
-                registration.Definition.Access);
-            throw new StateAccessDeniedException(registration.Definition.Key.Name);
+                definition.Access,
+                authority);
+            throw new StateAccessDeniedException(definition.Key.Name);
         }
     }
 
@@ -161,7 +230,8 @@ public sealed class ApplicationStateRegistry :
     private void WriteWriteDeniedDiagnostic(
         string stateName,
         Type valueType,
-        StateAccessPolicy access)
+        StateAccessPolicy access,
+        StateWriteAuthority authority)
     {
         _diagnostics?.Write(new HostDiagnosticRecord(
             StateDiagnosticIds.ApplicationStateWriteDenied,
@@ -170,6 +240,9 @@ public sealed class ApplicationStateRegistry :
         {
             Context = StateDiagnosticContext.Create(
                 ("accessPolicy", access.ToString()),
+                ("writerKind", authority.Kind.ToString()),
+                ("writerModule", authority.ModuleName),
+                ("writerPlugin", authority.PluginId),
                 ("stateKey", stateName),
                 ("valueType", StateDiagnosticContext.TypeName(valueType)))
         });
@@ -224,14 +297,17 @@ public sealed class ApplicationStateRegistry :
 
         public override StateSnapshotEntry CreateSnapshotEntry()
         {
+            var snapshot = State.CaptureSnapshot();
+
             return new StateSnapshotEntry(
                 Definition.Key.Name,
                 typeof(T),
-                State.Value,
-                State.Version,
+                snapshot.Value,
+                snapshot.Version,
                 Definition.SchemaVersion,
                 Definition.OwnerModule,
-                Definition.PluginId);
+                Definition.PluginId,
+                Definition.Lifetime);
         }
 
         public override void Restore(
@@ -262,6 +338,15 @@ public sealed class ApplicationStateRegistry :
                     diagnostics,
                     entry,
                     $"schema version '{entry.SchemaVersion}' does not match expected schema version '{Definition.SchemaVersion}'");
+                return;
+            }
+
+            if (entry.Lifetime != Definition.Lifetime)
+            {
+                WriteRestoreFailedDiagnostic(
+                    diagnostics,
+                    entry,
+                    $"state lifetime '{entry.Lifetime}' does not match expected state lifetime '{Definition.Lifetime}'");
                 return;
             }
 
@@ -326,6 +411,36 @@ public sealed class ApplicationStateRegistry :
                     ("stateKey", entry.StateName),
                     ("valueType", StateDiagnosticContext.TypeName(entry.ValueType)))
             });
+        }
+    }
+
+    private sealed class AuthorizedApplicationStateWriter : IApplicationStateWriter
+    {
+        private readonly ApplicationStateRegistry _registry;
+        private readonly StateWriteAuthority _authority;
+
+        public AuthorizedApplicationStateWriter(
+            ApplicationStateRegistry registry,
+            StateWriteAuthority authority)
+        {
+            _registry = registry;
+            _authority = authority;
+        }
+
+        public IWritableState<T> GetWritable<T>(StateKey<T> key)
+        {
+            return _registry.GetWritable(key, _authority);
+        }
+
+        public bool Set<T>(StateKey<T> key, T value)
+        {
+            return GetWritable(key).SetValue(value);
+        }
+
+        public bool Update<T>(StateKey<T> key, Func<T, T> updater)
+        {
+            ArgumentNullException.ThrowIfNull(updater);
+            return GetWritable(key).Update(updater);
         }
     }
 }

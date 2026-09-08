@@ -20,11 +20,20 @@
 - `WritableState<T>` 的 optional `stateName`、`access` 构造参数、ReadOnly 写拒绝、`AUCSTA004` 诊断、原子提交后通知、相等值不通知和 Dispose 后 mutation 拒绝进入 1.0 兼容承诺。
 - `ApplicationStateRegistry` 的显式注册、未注册诊断、重复注册诊断、读写入口分离、ReadOnly 写拒绝、Update null updater 优先拒绝和 `StateDefinition<T>` enum/schema 边界进入 1.0 兼容承诺。
 - `ComputedState<T>` 的 lazy invalidation、缓存、依赖变更通知、compute 失败诊断、Dispose 后读取拒绝、null dependency 先校验后订阅和依赖订阅释放进入 1.0 兼容承诺。
+- `ComputedState<T>` 首次计算失败重新抛出原异常、循环依赖拒绝、锁外计算和失效世代提交校验进入 1.0 兼容承诺。
+- `StateSubscriptionOptions` 的延迟队列容量默认值为 1024；溢出丢弃最旧通知并记录 `AUCSTA011`。
+- `StateSnapshotEntry.ScopeKind` 及 restore scope kind 校验进入 1.0 快照合同。
 - `StateSubscriptionOptions` 的 Immediate、Dispatcher、Background、Queued 调度语义、subscription Dispose 幂等、延迟回调释放抑制、handler 失败诊断和 StateScope 反向释放进入 1.0 兼容承诺。
 - `StateDispatchPolicy` 的 `Immediate=0`、`Queued=1`、`Dispatcher=2`、`Background=3` 枚举值，以及不可用 dispatcher 失败被诊断隔离且不回滚已提交状态进入 1.0 兼容承诺。
 - `StateSnapshot` 和 `StateSnapshotEntry` 的不可变 entries、version/schema 边界、Persisted 过滤、restore 诊断、owner/plugin/type/schema 校验和 Transient restore 拒绝进入 1.0 兼容承诺。
 - `StateCollection<TKey,TItem>` 的 collection version、item version、快照不可变、无变化不通知、Dispose 幂等、Dispose 后读 API 可用、mutation/restore/subscription API 拒绝，以及 `StateCollectionChange`、`StateCollectionSnapshot` 和 `StateCollectionChangedEventArgs` 的 null、空列表、未知 change kind 与负 version 边界进入 1.0 兼容承诺。
-- `StateDiagnosticIds` 的 `AUCSTA001` 到 `AUCSTA010` code、severity 语义和稳定定位 context key 进入 1.0 兼容承诺。
+- `StateDiagnosticIds` 的 `AUCSTA001` 到 `AUCSTA011` code、severity 语义和稳定定位 context key 进入 1.0 兼容承诺。
+- `Changed` 是同步 CLR event，先于可调度的 `OnChange` subscriptions；`OnChange` 返回 `IStateSubscription` 并承担调度与 Scope 生命周期语义。
+- `Dispatcher` subscription 使用非阻塞投递，不允许同步等待 UI callback。
+- `StateWriteAuthority`、`StateWriteAuthorityKind` 和五种 `StateAccessPolicy` 的身份/capability 判定进入 1.0 兼容承诺。
+- Host authority 铸造限于框架内部（internal）；Module/Plugin authority 为进程内自声明凭据——访问策略是纪律级约束而非安全边界（与插件系统"AssemblyLoadContext 不是安全边界"的立场一致），跨信任边界隔离必须依赖进程隔离。
+- `IStateScopeAccessor`、`StateScopeAccessor`、`IStateFactory`、`StateFactory` 和 `AddState()` DI 入口进入 1.0 兼容承诺。
+- Snapshot 恢复失败保留恢复前的当前值和 version，并写入 `AUCSTA007`。
 
 ## 数据格式兼容
 

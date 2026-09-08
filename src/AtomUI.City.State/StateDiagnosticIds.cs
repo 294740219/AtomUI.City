@@ -12,4 +12,5 @@ public static class StateDiagnosticIds
     public const string ApplicationStateAlreadyRegistered = "AUCSTA008";
     public const string StateScopeDisposeFailed = "AUCSTA009";
     public const string ComputedStateDisposeFailed = "AUCSTA010";
+    public const string SubscriptionQueueOverflow = "AUCSTA011";
 }

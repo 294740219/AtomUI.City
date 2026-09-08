@@ -10,7 +10,8 @@ internal sealed class StateSubscription : IStateSubscription
     private readonly StateSubscriptionOptions _options;
     private readonly Queue<StateChangedEventArgs> _queuedNotifications = [];
     private readonly object _queueSyncRoot = new();
-    private bool _disposed;
+    private readonly object _executionSyncRoot = new();
+    private int _disposed;
     private bool _isProcessingQueue;
 
     public StateSubscription(
@@ -25,7 +26,7 @@ internal sealed class StateSubscription : IStateSubscription
 
     public void Notify(StateChangedEventArgs args)
     {
-        if (_disposed)
+        if (Volatile.Read(ref _disposed) != 0)
         {
             return;
         }
@@ -35,16 +36,12 @@ internal sealed class StateSubscription : IStateSubscription
             switch (_options.DispatchPolicy)
             {
                 case StateDispatchPolicy.Dispatcher:
-                    _options.UiDispatcher?.InvokeAsync(() => NotifyDispatched(args)).AsTask().GetAwaiter().GetResult();
-                    break;
                 case StateDispatchPolicy.Background:
-                    _ = Task.Run(() => NotifyBackground(args));
-                    break;
                 case StateDispatchPolicy.Queued:
                     Enqueue(args);
                     break;
                 default:
-                    _handler(args);
+                    NotifyImmediate(args);
                     break;
             }
         }
@@ -56,24 +53,38 @@ internal sealed class StateSubscription : IStateSubscription
 
     public void Dispose()
     {
-        _disposed = true;
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
 
         lock (_queueSyncRoot)
         {
             _queuedNotifications.Clear();
             _isProcessingQueue = false;
         }
+
+        lock (_executionSyncRoot)
+        {
+        }
     }
 
     private void Enqueue(StateChangedEventArgs args)
     {
         var shouldStartProcessing = false;
+        var queueOverflowed = false;
 
         lock (_queueSyncRoot)
         {
-            if (_disposed)
+            if (Volatile.Read(ref _disposed) != 0)
             {
                 return;
+            }
+
+            if (_queuedNotifications.Count == _options.MaxPendingNotifications)
+            {
+                _queuedNotifications.Dequeue();
+                queueOverflowed = true;
             }
 
             _queuedNotifications.Enqueue(args);
@@ -85,13 +96,25 @@ internal sealed class StateSubscription : IStateSubscription
             }
         }
 
+        if (queueOverflowed)
+        {
+            WriteQueueOverflowDiagnostic(args);
+        }
+
         if (shouldStartProcessing)
         {
-            _ = Task.Run(ProcessQueue);
+            if (_options.DispatchPolicy == StateDispatchPolicy.Dispatcher)
+            {
+                _ = ProcessQueueAsync();
+            }
+            else
+            {
+                _ = Task.Run(ProcessQueueAsync);
+            }
         }
     }
 
-    private void ProcessQueue()
+    private async Task ProcessQueueAsync()
     {
         while (true)
         {
@@ -99,7 +122,7 @@ internal sealed class StateSubscription : IStateSubscription
 
             lock (_queueSyncRoot)
             {
-                if (_disposed || _queuedNotifications.Count == 0)
+                if (Volatile.Read(ref _disposed) != 0 || _queuedNotifications.Count == 0)
                 {
                     _isProcessingQueue = false;
                     return;
@@ -108,20 +131,27 @@ internal sealed class StateSubscription : IStateSubscription
                 args = _queuedNotifications.Dequeue();
             }
 
-            NotifyQueued(args);
+            if (_options.DispatchPolicy == StateDispatchPolicy.Dispatcher)
+            {
+                await DispatchQueuedAsync(args).ConfigureAwait(false);
+            }
+            else
+            {
+                NotifyQueued(args);
+            }
         }
     }
 
-    private void NotifyQueued(StateChangedEventArgs args)
+    private async Task DispatchQueuedAsync(StateChangedEventArgs args)
     {
-        if (_disposed)
-        {
-            return;
-        }
-
         try
         {
-            _handler(args);
+            await _options.UiDispatcher!.PostAsync(
+                _ =>
+                {
+                    NotifyDispatched(args);
+                    return ValueTask.CompletedTask;
+                }).ConfigureAwait(false);
         }
         catch (Exception exception)
         {
@@ -129,9 +159,29 @@ internal sealed class StateSubscription : IStateSubscription
         }
     }
 
-    private void NotifyBackground(StateChangedEventArgs args)
+    private void NotifyQueued(StateChangedEventArgs args)
     {
-        if (_disposed)
+        lock (_executionSyncRoot)
+        {
+            if (Volatile.Read(ref _disposed) != 0)
+            {
+                return;
+            }
+
+            try
+            {
+                _handler(args);
+            }
+            catch (Exception exception)
+            {
+                WriteHandlerFailedDiagnostic(args, exception);
+            }
+        }
+    }
+
+    private void NotifyImmediate(StateChangedEventArgs args)
+    {
+        if (Volatile.Read(ref _disposed) != 0)
         {
             return;
         }
@@ -148,19 +198,36 @@ internal sealed class StateSubscription : IStateSubscription
 
     private void NotifyDispatched(StateChangedEventArgs args)
     {
-        if (_disposed)
+        lock (_executionSyncRoot)
         {
-            return;
-        }
+            if (Volatile.Read(ref _disposed) != 0)
+            {
+                return;
+            }
 
-        try
-        {
-            _handler(args);
+            try
+            {
+                _handler(args);
+            }
+            catch (Exception exception)
+            {
+                WriteHandlerFailedDiagnostic(args, exception);
+            }
         }
-        catch (Exception exception)
+    }
+
+    private void WriteQueueOverflowDiagnostic(StateChangedEventArgs args)
+    {
+        _diagnostics?.Write(new HostDiagnosticRecord(
+            StateDiagnosticIds.SubscriptionQueueOverflow,
+            $"State subscription queue reached its capacity of {_options.MaxPendingNotifications}; the oldest notification was discarded.",
+            HostDiagnosticSeverity.Warning)
         {
-            WriteHandlerFailedDiagnostic(args, exception);
-        }
+            Context = StateDiagnosticContext.Create(
+                ("dispatchPolicy", _options.DispatchPolicy.ToString()),
+                ("maxPendingNotifications", StateDiagnosticContext.Version(_options.MaxPendingNotifications)),
+                ("version", StateDiagnosticContext.Version(args.Version)))
+        });
     }
 
     private void WriteHandlerFailedDiagnostic(
@@ -194,40 +261,73 @@ public sealed class StateSubscriptionOptions
 {
     private StateSubscriptionOptions(
         StateDispatchPolicy dispatchPolicy,
-        IUiDispatcher? dispatcher)
+        IUiDispatcher? dispatcher,
+        int maxPendingNotifications)
     {
+        if (maxPendingNotifications < 1)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(maxPendingNotifications),
+                maxPendingNotifications,
+                "Pending notification capacity must be greater than 0.");
+        }
+
         DispatchPolicy = dispatchPolicy;
         UiDispatcher = dispatcher;
+        MaxPendingNotifications = maxPendingNotifications;
     }
 
     public static StateSubscriptionOptions Immediate { get; } = new(
         StateDispatchPolicy.Immediate,
-        dispatcher: null);
+        dispatcher: null,
+        maxPendingNotifications: 1);
 
     public StateDispatchPolicy DispatchPolicy { get; }
 
     public IUiDispatcher? UiDispatcher { get; }
 
+    public int MaxPendingNotifications { get; }
+
     public static StateSubscriptionOptions Dispatcher(IUiDispatcher dispatcher)
+    {
+        return Dispatcher(dispatcher, maxPendingNotifications: 1024);
+    }
+
+    public static StateSubscriptionOptions Dispatcher(
+        IUiDispatcher dispatcher,
+        int maxPendingNotifications)
     {
         ArgumentNullException.ThrowIfNull(dispatcher);
 
         return new StateSubscriptionOptions(
             StateDispatchPolicy.Dispatcher,
-            dispatcher);
+            dispatcher,
+            maxPendingNotifications);
     }
 
     public static StateSubscriptionOptions Background()
     {
+        return Background(maxPendingNotifications: 1024);
+    }
+
+    public static StateSubscriptionOptions Background(int maxPendingNotifications)
+    {
         return new StateSubscriptionOptions(
             StateDispatchPolicy.Background,
-            dispatcher: null);
+            dispatcher: null,
+            maxPendingNotifications);
     }
 
     public static StateSubscriptionOptions Queued()
     {
+        return Queued(maxPendingNotifications: 1024);
+    }
+
+    public static StateSubscriptionOptions Queued(int maxPendingNotifications)
+    {
         return new StateSubscriptionOptions(
             StateDispatchPolicy.Queued,
-            dispatcher: null);
+            dispatcher: null,
+            maxPendingNotifications);
     }
 }

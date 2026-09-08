@@ -62,4 +62,23 @@ public sealed class StateDefinitionTests
                 "value",
                 schemaVersion: schemaVersion));
     }
+
+    [Fact]
+    public void RestrictedAccessPoliciesRequireTheirAuthorizationMetadata()
+    {
+        var key = new StateKey<string>("AtomUI.City.Tests.Restricted");
+
+        Assert.Throws<ArgumentException>(() => StateDefinition.Create(
+            key,
+            "value",
+            access: StateAccessPolicy.OwnerWrite));
+        Assert.Throws<ArgumentException>(() => StateDefinition.Create(
+            key,
+            "value",
+            access: StateAccessPolicy.AuthorizedWrite));
+        Assert.Throws<ArgumentException>(() => StateDefinition.Create(
+            key,
+            "value",
+            access: StateAccessPolicy.PluginIsolated));
+    }
 }

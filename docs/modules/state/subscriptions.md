@@ -66,7 +66,7 @@
 
 ```text
 state.OnChange(...)
--> returns IDisposable / IStateSubscription
+-> returns IStateSubscription
 -> registered in StateScope / ActivationScope
 ```
 
@@ -114,11 +114,15 @@ subscription 抛异常时：
 | 策略 | 说明 |
 |---|---|
 | Immediate | 当前线程通知。 |
-| Queued | 排队后统一通知。 |
-| Dispatcher | 切到 UI dispatcher。 |
-| Background | 后台调度。 |
+| Queued | 每个 subscription 通过有界串行 FIFO 队列通知。 |
+| Dispatcher | 通过有界串行队列投递到 UI dispatcher。 |
+| Background | 通过有界串行 FIFO 后台通知。 |
 
 调度语义见：[threading-and-dispatch.md](threading-and-dispatch.md)。
+
+`Queued()`、`Dispatcher(...)` 和 `Background()` 的默认等待容量为 1024。容量必须大于 0；溢出时丢弃最旧通知并记录 `AUCSTA011`。
+
+`Changed` CLR event 与 `OnChange` 不承担相同角色：`Changed` 在提交线程同步执行，面向低层 .NET 事件互操作；`OnChange` 返回可释放句柄，支持调度策略和 Scope 生命周期。一次变更先调用 `Changed` handlers，再按注册顺序投递 `OnChange` subscriptions。
 
 ### 6. 插件卸载
 

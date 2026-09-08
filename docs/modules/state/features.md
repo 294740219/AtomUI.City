@@ -7,7 +7,7 @@
 | Feature ID | 名称 | 状态 | 公开合同 | 主测试 |
 | --- | --- | --- | --- | --- |
 | AUC-STATE-001 | Writable State | Completed | IWritableState<T>, WritableState<T> | WritableStateTests |
-| AUC-STATE-002 | Application State | Completed | IApplicationState, ApplicationStateRegistry, StateDefinition<T> | ApplicationStateTests; StateDefinitionTests |
+| AUC-STATE-002 | Application State | Completed | IApplicationState, IApplicationStateWriter, ApplicationStateRegistry, StateWriteAuthority, IStateFactory, IStateScopeAccessor, StateDefinition<T> | ApplicationStateTests; StateDefinitionTests; StateFactoryTests |
 | AUC-STATE-003 | Computed State | Completed | IComputedState<T>, ComputedState<T> | ComputedStateTests |
 | AUC-STATE-004 | State Subscription | Completed | IStateSubscription, IStateReaction, StateSubscriptionOptions | StateScopeTests; StateThreadingTests |
 | AUC-STATE-005 | State Snapshot | Completed | StateSnapshot, StateSnapshotEntry | StateSnapshotTests |
@@ -51,13 +51,13 @@ Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤�
 Feature ID: `AUC-STATE-002`
 Status: Completed
 Goal: 通过 DI 访问应用级共享状态。
-Public Contract: IApplicationState, ApplicationStateRegistry
-Runtime / Build Behavior: 通过 DI 访问应用级共享状态。
-Failure Behavior: 未注册、重复注册、写入拒绝、Update null updater、StateDefinition enum 和 schema version 边界。
+Public Contract: IApplicationState, IApplicationStateWriter, ApplicationStateRegistry, StateWriteAuthority, IStateFactory, IStateScopeAccessor
+Runtime / Build Behavior: 通过 `AddState()` 注册 DI 服务；Host、Module、Plugin writer 按访问策略执行身份和 capability 检查；factory 创建的对象绑定当前 StateScope。
+Failure Behavior: 未注册、重复注册、身份/capability 写入拒绝、Update null updater、StateDefinition enum、schema version 和授权元数据边界。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
-Tests: `ApplicationStateTests`。
-Required Assertions: 断言注册、读取、writer、not registered、Update 参数边界、StateDefinition enum 和 schema version 边界。
+Tests: `ApplicationStateTests; StateDefinitionTests; StateFactoryTests`。
+Required Assertions: 断言注册、读取、DI、factory/scope accessor、五种访问策略、not registered、Update 参数边界、StateDefinition enum/schema/授权元数据边界。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 ## AUC-STATE-003 Computed State
 
@@ -83,7 +83,7 @@ Failure Behavior: 重复释放、owner dispose、callback 失败；Background �
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `StateScopeTests; StateThreadingTests`。
-Required Assertions: 断言 dispose 后不通知、Dispatcher pending callback 释放抑制、Background 不阻塞状态提交、Background handler 失败诊断。
+Required Assertions: 断言 dispose 后不通知、Dispatcher pending callback 释放抑制、Dispatcher/Background 不阻塞状态提交、Background handler 失败诊断。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 ## AUC-STATE-005 State Snapshot
 
@@ -117,12 +117,12 @@ Feature ID: `AUC-STATE-007`
 Status: Completed
 Goal: 稳定诊断码、关键失败路径诊断和定位上下文。
 Public Contract: StateDiagnosticIds
-Runtime / Build Behavior: AUCSTA001-010 诊断码稳定；失败记录包含 code、severity、message 和定位 context。
+Runtime / Build Behavior: AUCSTA001-011 诊断码稳定；失败记录包含 code、severity、message 和定位 context。
 Failure Behavior: diagnostics collector 缺失时不得影响主流程；handler、update、restore、dispose 和 access failure 必须写入对应诊断。
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `StateDiagnosticsTests`。
-Required Assertions: 断言 AUCSTA001-010、唯一性、格式、severity 和定位 context。
+Required Assertions: 断言 AUCSTA001-011、唯一性、格式、severity 和定位 context。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 ## AUC-STATE-008 Threading
 
@@ -135,5 +135,5 @@ Failure Behavior: 并发写串行化；不可用 dispatcher 失败被 diagnostic
 Threading / Cancellation: 遵守 [threading.md](threading.md)；涉及异步、IO、dispatcher、plugin、connection、process 或 generator 的操作必须显式处理 cancellation。
 Diagnostics: 现有诊断码见 [diagnostics.md](diagnostics.md)；产品级缺口必须在 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 中追踪。
 Tests: `StateThreadingTests`。
-Required Assertions: 断言不隐式 UI、并发写、锁外通知、dispatcher unavailable diagnostics、Background 不阻塞和 Queued 顺序。
+Required Assertions: 断言不隐式 UI、并发写、锁外通知、dispatcher unavailable diagnostics、Dispatcher/Background 不阻塞和 Queued 顺序。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。

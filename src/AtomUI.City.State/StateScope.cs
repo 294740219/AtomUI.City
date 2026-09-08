@@ -6,7 +6,9 @@ public sealed class StateScope : IStateScope
 {
     private readonly IHostDiagnostics? _diagnostics;
     private readonly List<IDisposable> _subscriptions = [];
+    private readonly object _syncRoot = new();
     private bool _disposed;
+    private StateScopeState _state = StateScopeState.Active;
 
     public StateScope(string id, IHostDiagnostics? diagnostics = null)
     {
@@ -18,38 +20,59 @@ public sealed class StateScope : IStateScope
 
     public string Id { get; }
 
-    public StateScopeState State { get; private set; } = StateScopeState.Active;
+    public StateScopeState State
+    {
+        get
+        {
+            lock (_syncRoot)
+            {
+                return _state;
+            }
+        }
+    }
 
     public void Add(IDisposable subscription)
     {
         ArgumentNullException.ThrowIfNull(subscription);
 
-        if (_disposed)
+        lock (_syncRoot)
         {
-            DisposeSubscription(subscription);
-            return;
+            if (!_disposed)
+            {
+                _subscriptions.Add(subscription);
+                return;
+            }
         }
 
-        _subscriptions.Add(subscription);
+        DisposeSubscription(subscription);
     }
 
     public void Dispose()
     {
-        if (_disposed)
+        IDisposable[] subscriptions;
+
+        lock (_syncRoot)
         {
-            return;
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            _state = StateScopeState.Disposing;
+            subscriptions = _subscriptions.ToArray();
+            _subscriptions.Clear();
         }
 
-        _disposed = true;
-        State = StateScopeState.Disposing;
-
-        for (var i = _subscriptions.Count - 1; i >= 0; i--)
+        for (var i = subscriptions.Length - 1; i >= 0; i--)
         {
-            DisposeSubscription(_subscriptions[i]);
+            DisposeSubscription(subscriptions[i]);
         }
 
-        _subscriptions.Clear();
-        State = StateScopeState.Disposed;
+        lock (_syncRoot)
+        {
+            _state = StateScopeState.Disposed;
+        }
     }
 
     private void WriteDisposeFailedDiagnostic(Exception exception)

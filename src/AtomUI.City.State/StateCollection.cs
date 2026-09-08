@@ -12,6 +12,7 @@ public sealed class StateCollection<TKey, TItem> : IStateCollection<TKey, TItem>
     private readonly List<StateSubscription> _subscriptions = [];
     private readonly object _syncRoot = new();
     private bool _disposed;
+    private long _version;
 
     public StateCollection(
         IEqualityComparer<TKey>? keyComparer = null,
@@ -25,7 +26,16 @@ public sealed class StateCollection<TKey, TItem> : IStateCollection<TKey, TItem>
 
     public event EventHandler<StateCollectionChangedEventArgs<TKey, TItem>>? Changed;
 
-    public long Version { get; private set; }
+    public long Version
+    {
+        get
+        {
+            lock (_syncRoot)
+            {
+                return _version;
+            }
+        }
+    }
 
     public IReadOnlyDictionary<TKey, TItem> Items
     {
@@ -73,7 +83,7 @@ public sealed class StateCollection<TKey, TItem> : IStateCollection<TKey, TItem>
                     item.Value.Version))
                 .ToArray();
 
-            return new StateCollectionSnapshot<TKey, TItem>(Version, items);
+            return new StateCollectionSnapshot<TKey, TItem>(_version, items);
         }
     }
 
@@ -136,7 +146,7 @@ public sealed class StateCollection<TKey, TItem> : IStateCollection<TKey, TItem>
                     item.Value.Version + 1));
             }
 
-            if (changes.Count == 0 && Version == snapshot.CollectionVersion)
+            if (changes.Count == 0)
             {
                 return false;
             }
@@ -148,12 +158,7 @@ public sealed class StateCollection<TKey, TItem> : IStateCollection<TKey, TItem>
                 _items.Add(item.Key, item.Value);
             }
 
-            Version = snapshot.CollectionVersion;
-
-            if (changes.Count == 0)
-            {
-                return false;
-            }
+            _version = snapshot.CollectionVersion;
 
             args = new StateCollectionChangedEventArgs<TKey, TItem>(changes);
             subscriptions = _subscriptions.ToArray();
@@ -185,7 +190,7 @@ public sealed class StateCollection<TKey, TItem> : IStateCollection<TKey, TItem>
                 }
 
                 var itemVersion = currentItem.Version + 1;
-                Version++;
+                _version++;
                 _items[key] = new CollectionItem(item, itemVersion);
                 change = new StateCollectionChange<TKey, TItem>(
                     StateCollectionChangeKind.Updated,
@@ -194,12 +199,12 @@ public sealed class StateCollection<TKey, TItem> : IStateCollection<TKey, TItem>
                     currentItem.Value,
                     HasNewItem: true,
                     item,
-                    Version,
+                    _version,
                     itemVersion);
             }
             else
             {
-                Version++;
+                _version++;
                 _items.Add(key, new CollectionItem(item, Version: 1));
                 change = new StateCollectionChange<TKey, TItem>(
                     StateCollectionChangeKind.Added,
@@ -208,7 +213,7 @@ public sealed class StateCollection<TKey, TItem> : IStateCollection<TKey, TItem>
                     OldItem: default,
                     HasNewItem: true,
                     item,
-                    Version,
+                    _version,
                     ItemVersion: 1);
             }
 
@@ -232,43 +237,58 @@ public sealed class StateCollection<TKey, TItem> : IStateCollection<TKey, TItem>
         {
             ThrowIfDisposed();
 
-            var nextItems = new Dictionary<TKey, CollectionItem>(_items, _items.Comparer);
-            var nextVersion = Version + 1;
-            var changes = new List<StateCollectionChange<TKey, TItem>>();
+            var pendingItems = new Dictionary<TKey, TItem>(_items.Comparer);
+            var pendingOrder = new List<TKey>();
 
             foreach (var item in items)
             {
                 ArgumentNullException.ThrowIfNull(item.Key);
 
-                if (nextItems.TryGetValue(item.Key, out var currentItem))
+                if (!pendingItems.ContainsKey(item.Key))
                 {
-                    if (_itemComparer.Equals(currentItem.Value, item.Value))
+                    pendingOrder.Add(item.Key);
+                }
+
+                pendingItems[item.Key] = item.Value;
+            }
+
+            var nextItems = new Dictionary<TKey, CollectionItem>(_items, _items.Comparer);
+            var nextVersion = _version + 1;
+            var changes = new List<StateCollectionChange<TKey, TItem>>();
+
+            foreach (var key in pendingOrder)
+            {
+                var value = pendingItems[key];
+
+                if (nextItems.TryGetValue(key, out var currentItem))
+                {
+                    if (_itemComparer.Equals(currentItem.Value, value))
                     {
                         continue;
                     }
 
                     var itemVersion = currentItem.Version + 1;
-                    nextItems[item.Key] = new CollectionItem(item.Value, itemVersion);
+                    nextItems[key] = new CollectionItem(value, itemVersion);
                     changes.Add(new StateCollectionChange<TKey, TItem>(
                         StateCollectionChangeKind.Updated,
-                        item.Key,
+                        key,
                         HasOldItem: true,
                         currentItem.Value,
                         HasNewItem: true,
-                        item.Value,
+                        value,
                         nextVersion,
                         itemVersion));
                 }
                 else
                 {
-                    nextItems.Add(item.Key, new CollectionItem(item.Value, Version: 1));
+                    nextItems.Add(key, new CollectionItem(value, Version: 1));
                     changes.Add(new StateCollectionChange<TKey, TItem>(
                         StateCollectionChangeKind.Added,
-                        item.Key,
+                        key,
                         HasOldItem: false,
                         OldItem: default,
                         HasNewItem: true,
-                        item.Value,
+                        value,
                         nextVersion,
                         ItemVersion: 1));
                 }
@@ -279,7 +299,7 @@ public sealed class StateCollection<TKey, TItem> : IStateCollection<TKey, TItem>
                 return false;
             }
 
-            Version = nextVersion;
+            _version = nextVersion;
             _items.Clear();
 
             foreach (var item in nextItems)
@@ -313,7 +333,7 @@ public sealed class StateCollection<TKey, TItem> : IStateCollection<TKey, TItem>
             }
 
             var itemVersion = currentItem.Version + 1;
-            Version++;
+            _version++;
             _items.Remove(key);
             var change = new StateCollectionChange<TKey, TItem>(
                 StateCollectionChangeKind.Removed,
@@ -322,7 +342,7 @@ public sealed class StateCollection<TKey, TItem> : IStateCollection<TKey, TItem>
                 currentItem.Value,
                 HasNewItem: false,
                 NewItem: default,
-                Version,
+                _version,
                 itemVersion);
 
             args = new StateCollectionChangedEventArgs<TKey, TItem>(change);
@@ -348,7 +368,7 @@ public sealed class StateCollection<TKey, TItem> : IStateCollection<TKey, TItem>
                 return false;
             }
 
-            Version++;
+            _version++;
             var changes = _items
                 .Select(item => new StateCollectionChange<TKey, TItem>(
                     StateCollectionChangeKind.Cleared,
@@ -357,7 +377,7 @@ public sealed class StateCollection<TKey, TItem> : IStateCollection<TKey, TItem>
                     item.Value.Value,
                     HasNewItem: false,
                     NewItem: default,
-                    Version,
+                    _version,
                     item.Value.Version + 1))
                 .ToArray();
             _items.Clear();
@@ -485,7 +505,7 @@ public sealed class StateCollection<TKey, TItem> : IStateCollection<TKey, TItem>
     {
         private readonly StateCollection<TKey, TItem> _collection;
         private readonly StateSubscription _subscription;
-        private bool _disposed;
+        private int _disposed;
 
         public RemovingStateSubscription(
             StateCollection<TKey, TItem> collection,
@@ -497,12 +517,11 @@ public sealed class StateCollection<TKey, TItem> : IStateCollection<TKey, TItem>
 
         public void Dispose()
         {
-            if (_disposed)
+            if (Interlocked.Exchange(ref _disposed, 1) != 0)
             {
                 return;
             }
 
-            _disposed = true;
             _subscription.Dispose();
             _collection.Remove(_subscription);
         }

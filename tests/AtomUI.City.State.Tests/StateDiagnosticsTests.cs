@@ -21,7 +21,7 @@ public sealed class StateDiagnosticsTests
             .Order(StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(10, codes.Length);
+        Assert.Equal(11, codes.Length);
         Assert.Equal(
             [
                 "AUCSTA001",
@@ -33,7 +33,8 @@ public sealed class StateDiagnosticsTests
                 "AUCSTA007",
                 "AUCSTA008",
                 "AUCSTA009",
-                "AUCSTA010"
+                "AUCSTA010",
+                "AUCSTA011"
             ],
             codes);
         Assert.Equal(codes.Length, codes.Distinct(StringComparer.Ordinal).Count());

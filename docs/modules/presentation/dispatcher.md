@@ -86,7 +86,7 @@ Core 只定义调度抽象，不依赖 Avalonia Dispatcher。
 State 和 EventBus 不直接依赖 Avalonia。
 
 ```text
-State/EventBus DispatchPolicy.UiThread
+StateDispatchPolicy.Dispatcher / EventDispatchPolicy.UiThread
 -> IUiDispatcher
 -> Presentation Avalonia dispatcher
 -> UI callback

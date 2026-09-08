@@ -1,7 +1,7 @@
 # AtomUI.City.State
 
 文档等级：Level 3
-成熟度：Partially Implemented
+成熟度：Verified
 执行边界：Host runtime state manager
 程序集：`AtomUI.City.State`
 源码：`src/AtomUI.City.State`
@@ -69,6 +69,6 @@ AtomUI.City.State 作为 Host 服务或模块贡献接入 Core 生命周期，�
 
 ## 当前成熟度状态
 
-Partially Implemented
+Verified
 
-该状态表示模块已有实现基线，但还需要按产品级合同补齐实现和测试。单个功能点状态以 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 为准。
+State 的 AUC-STATE-001 至 AUC-STATE-008 已完成实现和合同测试。单个功能点状态以 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 为准；后续 public contract 变化仍须通过兼容性与测试门禁。

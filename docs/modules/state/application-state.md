@@ -98,7 +98,7 @@ public interface IApplicationState
 {
     IReadOnlyState<T> Get<T>(StateKey<T> key);
 
-    IDisposable OnChange<T>(
+    IStateSubscription OnChange<T>(
         StateKey<T> key,
         Action<StateChangedEventArgs<T>> handler);
 }
@@ -129,6 +129,10 @@ public interface IApplicationStateWriter
 
 `IApplicationState` 和 `IApplicationStateWriter` 分离，方便 Host 给插件或普通模块只暴露只读接口。
 
+`ApplicationStateRegistry` 本身是 Host writer。模块和插件不得直接共享这个 writer；Host 根据模块身份、插件身份和已授予 capability 创建 `StateWriteAuthority`，再通过 `ApplicationStateRegistry.CreateWriter` 取得受约束 writer。
+
+`StateWriteAuthority` 是进程内可信代码的纪律级策略描述，不是不可伪造的安全凭据。公开工厂允许应用 Host 组装 writer；运行在同一进程且能够直接访问 registry 的代码也能自行构造 authority。需要承载不可信插件时必须使用进程隔离，不能依赖该类型建立安全边界。
+
 `Update` 必须在 registry lookup 前拒绝 null updater。这样缺参调用不会写入未注册 state 诊断，也不会隐式创建或访问 state。
 
 ### 5. 写入策略
@@ -139,9 +143,17 @@ public interface IApplicationStateWriter
 |---|---|
 | `ReadOnly` | 所有模块可读，只有 Owner 可初始化。 |
 | `OwnerWrite` | 只有声明模块可写。 |
-| `HostWrite` | Host 或授权服务可写。 |
+| `HostWrite` | 只有 Host writer 可写。 |
 | `AuthorizedWrite` | 通过权限或 capability 授权后可写。 |
 | `PluginIsolated` | 插件只能写自己的状态分区。 |
+
+执行规则：
+
+- `ReadOnly` 拒绝所有运行时 writer；默认值只在注册时初始化。
+- `OwnerWrite` 要求 definition 声明 `ownerModule`，且 writer 的模块身份必须匹配。
+- `HostWrite` 只允许 Host writer。
+- `AuthorizedWrite` 要求 definition 声明 `writeCapability`，且 writer 持有该 capability。
+- `PluginIsolated` 要求 definition 声明 `pluginId`，且 plugin writer 身份必须匹配。
 
 默认不允许隐式创建应用级状态。读取未注册 key 必须返回诊断错误。
 

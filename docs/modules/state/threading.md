@@ -13,6 +13,7 @@
 
 - 订阅回调失败：记录 subscriptionId，不回滚已提交状态。
 - `StateDispatchPolicy.Dispatcher` 使用的 dispatcher 不可用时，状态提交仍保持成功，handler 不执行，失败写入 `AUCSTA002` 并包含 dispatch policy、version 和 dispatcher type context。
+- `StateDispatchPolicy.Dispatcher` 必须非阻塞投递；状态提交线程不得同步等待 UI callback 完成。
 
 ## UI 线程规则
 

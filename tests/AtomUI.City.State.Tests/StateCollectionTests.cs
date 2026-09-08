@@ -288,6 +288,26 @@ public sealed class StateCollectionTests
     }
 
     [Fact]
+    public void AddOrUpdateRangeCoalescesDuplicateKeysToTheirFinalValues()
+    {
+        var collection = new StateCollection<string, int>();
+        var notifications = new List<StateCollectionChangedEventArgs<string, int>>();
+        collection.OnChange(notifications.Add);
+
+        var changed = collection.AddOrUpdateRange(
+            [
+                new KeyValuePair<string, int>("settings", 1),
+                new KeyValuePair<string, int>("settings", 2),
+            ]);
+
+        Assert.True(changed);
+        Assert.Equal(2, collection.Items["settings"]);
+        var change = Assert.Single(Assert.Single(notifications).Changes);
+        Assert.Equal(2, change.NewItem);
+        Assert.Equal(1, change.ItemVersion);
+    }
+
+    [Fact]
     public void AddOrUpdateRangeRejectsDisposedCollection()
     {
         var collection = new StateCollection<string, int>();
@@ -479,6 +499,24 @@ public sealed class StateCollectionTests
         Assert.False(restored);
         Assert.Equal(1, collection.Version);
         Assert.Equal(1, collection.Items["settings"]);
+        Assert.Empty(notifications);
+    }
+
+    [Fact]
+    public void RestoreSnapshotDoesNotChangeVersionWhenOnlySnapshotVersionDiffers()
+    {
+        var collection = new StateCollection<string, int>();
+        collection.AddOrUpdate("settings", 1);
+        var snapshot = new StateCollectionSnapshot<string, int>(
+            collectionVersion: 9,
+            [new StateCollectionSnapshotEntry<string, int>("settings", 1, ItemVersion: 1)]);
+        var notifications = new List<StateCollectionChangedEventArgs<string, int>>();
+        collection.OnChange(notifications.Add);
+
+        var restored = collection.RestoreSnapshot(snapshot);
+
+        Assert.False(restored);
+        Assert.Equal(1, collection.Version);
         Assert.Empty(notifications);
     }
 

@@ -105,6 +105,8 @@ public interface IReadOnlyState<T>
 ```csharp
 public interface IWritableState<T> : IReadOnlyState<T>
 {
+    event EventHandler<StateChangedEventArgs<T>>? Changed;
+
     bool SetValue(T value);
 
     bool Update(Func<T, T> updater);
@@ -112,6 +114,8 @@ public interface IWritableState<T> : IReadOnlyState<T>
     void Set(T value);
 }
 ```
+
+`Changed` 是低层同步 CLR event，用于 .NET 事件互操作；`OnChange` 是推荐的受管订阅入口，返回 `IStateSubscription` 并支持调度与 Scope 释放。一次提交先在当前线程调用 `Changed`，再投递 `OnChange` subscriptions。
 
 规则：
 

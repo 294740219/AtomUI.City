@@ -62,7 +62,29 @@ public sealed class StateThreadingTests
         state.SetValue(5);
 
         Assert.Equal(5, observed);
-        Assert.Equal(1, dispatcher.InvokeCount);
+        Assert.Equal(1, dispatcher.DispatchCount);
+    }
+
+    [Fact]
+    public async Task DispatcherSubscriptionDoesNotBlockStateCommitWhileUiWorkIsPending()
+    {
+        var dispatcher = new CompletingDeferredDispatcher();
+        var state = new WritableState<int>(0);
+        var observed = 0;
+        state.OnChange(
+            args => observed = args.NewValue,
+            StateSubscriptionOptions.Dispatcher(dispatcher));
+
+        var setValue = Task.Run(() => state.SetValue(5));
+
+        await dispatcher.WorkQueued.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.True(await setValue.WaitAsync(TimeSpan.FromSeconds(1)));
+        Assert.Equal(5, state.Value);
+        Assert.Equal(0, observed);
+
+        dispatcher.RunPending();
+
+        Assert.Equal(5, observed);
     }
 
     [Fact]
@@ -125,7 +147,7 @@ public sealed class StateThreadingTests
         ((IWritableState<int>)state).SetValue(7);
 
         Assert.Equal(7, observed);
-        Assert.Equal(1, dispatcher.InvokeCount);
+        Assert.Equal(1, dispatcher.DispatchCount);
     }
 
     [Fact]
@@ -247,15 +269,72 @@ public sealed class StateThreadingTests
         Assert.Equal(StateDispatchPolicy.Queued, options.DispatchPolicy);
     }
 
+    [Fact]
+    public async Task BackgroundSubscriptionIsFifoAndDropsOldestWhenBoundedQueueOverflows()
+    {
+        var diagnostics = new CompletingDiagnostics();
+        var state = new WritableState<int>(0, diagnostics: diagnostics);
+        var observed = new List<int>();
+        var syncRoot = new object();
+        using var releaseFirst = new ManualResetEventSlim(false);
+        var firstEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var completed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        state.OnChange(
+            args =>
+            {
+                if (args.NewValue == 1)
+                {
+                    firstEntered.TrySetResult();
+                    Assert.True(releaseFirst.Wait(TimeSpan.FromSeconds(5)));
+                }
+
+                lock (syncRoot)
+                {
+                    observed.Add(args.NewValue);
+                    if (observed.Count == 3)
+                    {
+                        completed.TrySetResult();
+                    }
+                }
+            },
+            StateSubscriptionOptions.Background(maxPendingNotifications: 2));
+
+        state.SetValue(1);
+        await firstEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        state.SetValue(2);
+        state.SetValue(3);
+        state.SetValue(4);
+        releaseFirst.Set();
+
+        await completed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal([1, 3, 4], observed);
+        Assert.Contains(
+            diagnostics.Records,
+            record => record.Code == StateDiagnosticIds.SubscriptionQueueOverflow &&
+                      record.Context["maxPendingNotifications"] == "2");
+    }
+
+    [Fact]
+    public void DelayedSubscriptionOptionsRejectNonPositiveCapacity()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => StateSubscriptionOptions.Background(maxPendingNotifications: 0));
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => StateSubscriptionOptions.Queued(maxPendingNotifications: 0));
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => StateSubscriptionOptions.Dispatcher(new RecordingDispatcher(), maxPendingNotifications: 0));
+    }
+
     private sealed class RecordingDispatcher : IUiDispatcher
     {
-        public int InvokeCount { get; private set; }
+        public int DispatchCount { get; private set; }
 
         public bool CheckAccess() => true;
 
         public ValueTask InvokeAsync(Action callback, CancellationToken cancellationToken = default)
         {
-            InvokeCount++;
+            DispatchCount++;
             callback();
 
             return ValueTask.CompletedTask;
@@ -263,7 +342,7 @@ public sealed class StateThreadingTests
 
         public ValueTask<T> InvokeAsync<T>(Func<T> callback, CancellationToken cancellationToken = default)
         {
-            InvokeCount++;
+            DispatchCount++;
 
             return ValueTask.FromResult(callback());
         }
@@ -272,7 +351,48 @@ public sealed class StateThreadingTests
             Func<CancellationToken, ValueTask> callback,
             CancellationToken cancellationToken = default)
         {
+            DispatchCount++;
             return callback(cancellationToken);
+        }
+    }
+
+    private sealed class CompletingDeferredDispatcher : IUiDispatcher
+    {
+        private readonly TaskCompletionSource _workQueued = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _workCompleted = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        private Func<CancellationToken, ValueTask>? _pending;
+
+        public Task WorkQueued => _workQueued.Task;
+
+        public bool CheckAccess() => false;
+
+        public ValueTask InvokeAsync(Action callback, CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask<T> InvokeAsync<T>(Func<T> callback, CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask PostAsync(
+            Func<CancellationToken, ValueTask> callback,
+            CancellationToken cancellationToken = default)
+        {
+            _pending = callback;
+            _workQueued.TrySetResult();
+            return new ValueTask(_workCompleted.Task);
+        }
+
+        public void RunPending()
+        {
+            var pending = _pending;
+            _pending = null;
+            pending?.Invoke(CancellationToken.None).GetAwaiter().GetResult();
+            _workCompleted.TrySetResult();
         }
     }
 

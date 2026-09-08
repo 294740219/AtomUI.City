@@ -6,6 +6,7 @@ public sealed record StateSnapshotEntry
     private Type _valueType = null!;
     private long _version;
     private int _schemaVersion;
+    private StateLifetime _lifetime;
 
     public StateSnapshotEntry(
         string stateName,
@@ -15,6 +16,27 @@ public sealed record StateSnapshotEntry
         int schemaVersion,
         string? ownerModule,
         string? pluginId)
+        : this(
+            stateName,
+            valueType,
+            value,
+            version,
+            schemaVersion,
+            ownerModule,
+            pluginId,
+            StateLifetime.Application)
+    {
+    }
+
+    public StateSnapshotEntry(
+        string stateName,
+        Type valueType,
+        object? value,
+        long version,
+        int schemaVersion,
+        string? ownerModule,
+        string? pluginId,
+        StateLifetime lifetime)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(stateName);
         ArgumentNullException.ThrowIfNull(valueType);
@@ -35,6 +57,11 @@ public sealed record StateSnapshotEntry
                 "State snapshot schema version must be greater than or equal to 1.");
         }
 
+        if (!Enum.IsDefined(lifetime))
+        {
+            throw new ArgumentOutOfRangeException(nameof(lifetime), lifetime, "State lifetime is not supported.");
+        }
+
         StateName = stateName;
         ValueType = valueType;
         Value = value;
@@ -42,6 +69,7 @@ public sealed record StateSnapshotEntry
         SchemaVersion = schemaVersion;
         OwnerModule = ownerModule;
         PluginId = pluginId;
+        Lifetime = lifetime;
     }
 
     public string StateName
@@ -105,6 +133,20 @@ public sealed record StateSnapshotEntry
     public string? OwnerModule { get; init; }
 
     public string? PluginId { get; init; }
+
+    public StateLifetime Lifetime
+    {
+        get => _lifetime;
+        init
+        {
+            if (!Enum.IsDefined(value))
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), value, "State lifetime is not supported.");
+            }
+
+            _lifetime = value;
+        }
+    }
 
     public DateTimeOffset Timestamp { get; init; } = DateTimeOffset.UtcNow;
 }

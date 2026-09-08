@@ -87,6 +87,10 @@
 
 即使暴露 writer，也必须经过 `StateAccessPolicy` 检查。
 
+Host 必须通过 `ApplicationStateRegistry.CreateWriter(StateWriteAuthority.Plugin(...))` 向插件提供受约束 writer。`PluginIsolated` 比较 writer plugin id 与 definition plugin id；`AuthorizedWrite` 比较 writer 已授予 capabilities 与 definition `writeCapability`。
+
+该检查用于可信进程内扩展的策略、诊断和误用防护，不是安全沙箱。插件若能直接取得 `ApplicationStateRegistry`，便处于 Host 信任边界内；不可信插件必须采用进程隔离。
+
 ### 4. 泄漏约束
 
 禁止：
@@ -120,7 +124,7 @@ Stop new plugin state access
 - State schema version。
 - Owner module。
 
-恢复前必须检查插件版本兼容。降级或回滚时必须按插件声明的迁移策略执行。
+恢复前必须检查插件版本兼容。1.0 对 schema 或插件版本不兼容的快照直接拒绝恢复并保留当前值；迁移器合同属于后续版本规划。
 
 ### 7. AOT 和 Source Generator
 

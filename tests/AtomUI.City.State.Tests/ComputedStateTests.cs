@@ -161,9 +161,10 @@ public sealed class ComputedStateTests
             diagnostics,
             source);
 
-        _ = computed.Value;
-        _ = computed.Value;
+        var firstFailure = Assert.Throws<InvalidOperationException>(() => computed.Value);
+        var secondFailure = Assert.Throws<InvalidOperationException>(() => computed.Value);
 
+        Assert.Same(firstFailure, secondFailure);
         Assert.Equal(1, computeCount);
         Assert.Single(diagnostics.Records);
 
@@ -171,6 +172,73 @@ public sealed class ComputedStateTests
 
         Assert.Equal(2, computed.Value);
         Assert.Equal(2, computeCount);
+    }
+
+    [Fact]
+    public void ComputedStateRejectsCircularDependencyWithoutRecursingUntilStackOverflow()
+    {
+        var diagnostics = new InMemoryHostDiagnostics();
+        ComputedState<int>? first = null;
+        ComputedState<string>? second = null;
+        first = new ComputedState<int>(() => second!.Value.Length, diagnostics);
+        second = new ComputedState<string>(() => first.Value.ToString(), diagnostics);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => first.Value);
+
+        Assert.Contains("circular", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.All(
+            diagnostics.Records,
+            record => Assert.Equal(StateDiagnosticIds.ComputedStateComputeFailed, record.Code));
+    }
+
+    [Fact]
+    public async Task ComputedStateDoesNotHoldStateLockWhileUserComputeRuns()
+    {
+        using var computeEntered = new ManualResetEventSlim(false);
+        using var releaseCompute = new ManualResetEventSlim(false);
+        var computed = new ComputedState<int>(() =>
+        {
+            computeEntered.Set();
+            Assert.True(releaseCompute.Wait(TimeSpan.FromSeconds(5)));
+            return 1;
+        });
+        var read = Task.Run(() => Assert.Throws<ObjectDisposedException>(() => computed.Value));
+
+        Assert.True(computeEntered.Wait(TimeSpan.FromSeconds(5)));
+        var dispose = Task.Run(computed.Dispose);
+        await dispose.WaitAsync(TimeSpan.FromSeconds(1));
+        releaseCompute.Set();
+        await read.WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task ComputedStateDiscardsResultInvalidatedWhileComputeIsRunning()
+    {
+        var source = new WritableState<int>(1);
+        using var staleComputeEntered = new ManualResetEventSlim(false);
+        using var releaseStaleCompute = new ManualResetEventSlim(false);
+        var computed = new ComputedState<int>(() =>
+        {
+            var value = source.Value;
+            if (value == 2)
+            {
+                staleComputeEntered.Set();
+                Assert.True(releaseStaleCompute.Wait(TimeSpan.FromSeconds(5)));
+            }
+
+            return value;
+        }, source);
+        var changes = new List<int>();
+        computed.OnChange(args => changes.Add(args.NewValue));
+
+        var staleWrite = Task.Run(() => source.SetValue(2));
+        Assert.True(staleComputeEntered.Wait(TimeSpan.FromSeconds(5)));
+        Assert.True(source.SetValue(3));
+        releaseStaleCompute.Set();
+        await staleWrite.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(3, computed.Value);
+        Assert.Equal([3], changes);
     }
 
     [Fact]

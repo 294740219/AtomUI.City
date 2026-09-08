@@ -1,3 +1,4 @@
+using System.Runtime.ExceptionServices;
 using AtomUI.City.Core.Diagnostics;
 
 namespace AtomUI.City.State;
@@ -9,10 +10,15 @@ public sealed class ComputedState<T> : IComputedState<T>, IDisposable
     private readonly IHostDiagnostics? _diagnostics;
     private readonly List<StateSubscription> _subscriptions = [];
     private readonly List<IStateSubscription> _dependencySubscriptions = [];
+    private readonly Queue<StateChangedEventArgs<T>> _pendingNotifications = [];
     private bool _hasComputeFailure;
     private bool _hasValue;
     private bool _isDirty = true;
     private bool _isDisposed;
+    private bool _notificationWorkerActive;
+    private long _invalidationVersion;
+    private long _version;
+    private Exception? _lastError;
     private T? _value;
 
     public ComputedState(Func<T> compute, params IReadOnlyState[] dependencies)
@@ -58,27 +64,33 @@ public sealed class ComputedState<T> : IComputedState<T>, IDisposable
         }
     }
 
-    public T Value
+    public T Value => EnsureValue().Value;
+
+    object? IReadOnlyState.Value => Value;
+
+    public long Version
     {
         get
         {
             lock (_syncRoot)
             {
-                ThrowIfDisposed();
-                EnsureValue();
-
-                return _value!;
+                return _version;
             }
         }
     }
 
-    object? IReadOnlyState.Value => Value;
-
-    public long Version { get; private set; }
-
     public Type ValueType => typeof(T);
 
-    public Exception? LastError { get; private set; }
+    public Exception? LastError
+    {
+        get
+        {
+            lock (_syncRoot)
+            {
+                return _lastError;
+            }
+        }
+    }
 
     public IStateSubscription OnChange(Action<StateChangedEventArgs<T>> handler)
     {
@@ -92,10 +104,11 @@ public sealed class ComputedState<T> : IComputedState<T>, IDisposable
         ArgumentNullException.ThrowIfNull(handler);
         ArgumentNullException.ThrowIfNull(options);
 
+        _ = EnsureValue();
+
         lock (_syncRoot)
         {
             ThrowIfDisposed();
-            EnsureValue();
 
             var subscription = new StateSubscription(
                 args => handler((StateChangedEventArgs<T>)args),
@@ -126,30 +139,7 @@ public sealed class ComputedState<T> : IComputedState<T>, IDisposable
 
     public void Dispose()
     {
-        if (_isDisposed)
-        {
-            return;
-        }
-
-        _isDisposed = true;
-
-        foreach (var subscription in _dependencySubscriptions)
-        {
-            DisposeSubscription(subscription);
-        }
-
-        foreach (var subscription in _subscriptions)
-        {
-            DisposeSubscription(subscription);
-        }
-
-        _dependencySubscriptions.Clear();
-        _subscriptions.Clear();
-    }
-
-    private void InvalidateAndNotify()
-    {
-        StateChangedEventArgs<T>? change = null;
+        IStateSubscription[] dependencySubscriptions;
         StateSubscription[] subscriptions;
 
         lock (_syncRoot)
@@ -159,95 +149,219 @@ public sealed class ComputedState<T> : IComputedState<T>, IDisposable
                 return;
             }
 
-            _isDirty = true;
-            if (_subscriptions.Count == 0)
-            {
-                return;
-            }
-
-            change = RecomputeForNotification();
+            _isDisposed = true;
+            dependencySubscriptions = _dependencySubscriptions.ToArray();
             subscriptions = _subscriptions.ToArray();
+            _dependencySubscriptions.Clear();
+            _subscriptions.Clear();
+            _pendingNotifications.Clear();
         }
 
-        if (change is null)
+        foreach (var subscription in dependencySubscriptions)
         {
-            return;
+            DisposeSubscription(subscription);
         }
 
         foreach (var subscription in subscriptions)
         {
-            subscription.Notify(change);
+            DisposeSubscription(subscription);
         }
     }
 
-    private void EnsureValue()
+    private void InvalidateAndNotify()
     {
-        if (!_isDirty && (_hasValue || _hasComputeFailure))
+        var shouldProcessNotifications = false;
+
+        lock (_syncRoot)
         {
-            return;
-        }
-
-        var oldValue = _value;
-        var hadValue = _hasValue;
-        var newValue = TryCompute();
-
-        if (_hasValue &&
-            hadValue &&
-            !EqualityComparer<T>.Default.Equals(oldValue, newValue))
-        {
-            Version++;
-        }
-    }
-
-    private StateChangedEventArgs<T>? RecomputeForNotification()
-    {
-        var oldValue = _value;
-        var hadValue = _hasValue;
-        var newValue = TryCompute();
-
-        if (!_hasValue)
-        {
-            return null;
-        }
-
-        if (hadValue && EqualityComparer<T>.Default.Equals(oldValue, newValue))
-        {
-            return null;
-        }
-
-        Version++;
-
-        return new StateChangedEventArgs<T>(oldValue!, newValue!, Version);
-    }
-
-    private T? TryCompute()
-    {
-        try
-        {
-            _value = _compute();
-            _hasComputeFailure = false;
-            _hasValue = true;
-            _isDirty = false;
-            LastError = null;
-
-            return _value;
-        }
-        catch (Exception exception)
-        {
-            _hasComputeFailure = true;
-            _isDirty = false;
-            LastError = exception;
-            _diagnostics?.Write(new HostDiagnosticRecord(
-                StateDiagnosticIds.ComputedStateComputeFailed,
-                $"Computed state failed to compute value type '{typeof(T).FullName}': {exception.Message}",
-                HostDiagnosticSeverity.Error)
+            if (_isDisposed)
             {
-                Context = StateDiagnosticContext.Create(
-                    ("valueType", StateDiagnosticContext.TypeName(typeof(T))))
-            });
+                return;
+            }
 
-            return _value;
+            _isDirty = true;
+            _invalidationVersion++;
+
+            if (_subscriptions.Count > 0 && !_notificationWorkerActive)
+            {
+                _notificationWorkerActive = true;
+                shouldProcessNotifications = true;
+            }
         }
+
+        if (shouldProcessNotifications)
+        {
+            ProcessInvalidations();
+        }
+    }
+
+    private void ProcessInvalidations()
+    {
+        while (true)
+        {
+            try
+            {
+                _ = EnsureValue();
+            }
+            catch
+            {
+                lock (_syncRoot)
+                {
+                    if (_isDisposed || !_isDirty)
+                    {
+                        _notificationWorkerActive = false;
+                        return;
+                    }
+                }
+
+                continue;
+            }
+
+            StateChangedEventArgs<T>? change;
+            StateSubscription[] subscriptions;
+
+            lock (_syncRoot)
+            {
+                if (_isDisposed)
+                {
+                    _notificationWorkerActive = false;
+                    return;
+                }
+
+                change = _pendingNotifications.Count == 0
+                    ? null
+                    : _pendingNotifications.Dequeue();
+                subscriptions = change is null ? [] : _subscriptions.ToArray();
+            }
+
+            if (change is not null)
+            {
+                foreach (var subscription in subscriptions)
+                {
+                    subscription.Notify(change);
+                }
+            }
+
+            lock (_syncRoot)
+            {
+                if (!_isDirty && _pendingNotifications.Count == 0)
+                {
+                    _notificationWorkerActive = false;
+                    return;
+                }
+            }
+        }
+    }
+
+    private EvaluationResult EnsureValue()
+    {
+        while (true)
+        {
+            long invalidationVersion;
+            T? oldValue;
+            bool hadValue;
+
+            lock (_syncRoot)
+            {
+                ThrowIfDisposed();
+
+                if (!_isDirty)
+                {
+                    if (_hasComputeFailure && !_hasValue)
+                    {
+                        ExceptionDispatchInfo.Capture(_lastError!).Throw();
+                    }
+
+                    return new EvaluationResult(_value!);
+                }
+
+                invalidationVersion = _invalidationVersion;
+                oldValue = _value;
+                hadValue = _hasValue;
+            }
+
+            T? computedValue = default;
+            Exception? computeError = null;
+
+            try
+            {
+                using var _ = ComputedStateEvaluationContext.Enter(this);
+                computedValue = _compute();
+            }
+            catch (Exception exception)
+            {
+                computeError = exception;
+            }
+
+            StateChangedEventArgs<T>? change = null;
+            var shouldWriteDiagnostic = false;
+            var shouldThrow = false;
+            T? committedValue;
+
+            lock (_syncRoot)
+            {
+                ThrowIfDisposed();
+
+                if (!_isDirty || invalidationVersion != _invalidationVersion)
+                {
+                    continue;
+                }
+
+                if (computeError is not null)
+                {
+                    _hasComputeFailure = true;
+                    _isDirty = false;
+                    _lastError = computeError;
+                    shouldWriteDiagnostic = true;
+                    shouldThrow = !_hasValue;
+                }
+                else
+                {
+                    _value = computedValue;
+                    _hasComputeFailure = false;
+                    _hasValue = true;
+                    _isDirty = false;
+                    _lastError = null;
+
+                    if (hadValue && !EqualityComparer<T>.Default.Equals(oldValue, computedValue))
+                    {
+                        _version++;
+                        change = new StateChangedEventArgs<T>(oldValue!, computedValue!, _version);
+
+                        if (_subscriptions.Count > 0)
+                        {
+                            _pendingNotifications.Enqueue(change);
+                        }
+                    }
+                }
+
+                committedValue = _value;
+            }
+
+            if (shouldWriteDiagnostic)
+            {
+                WriteComputeFailedDiagnostic(computeError!);
+            }
+
+            if (shouldThrow)
+            {
+                ExceptionDispatchInfo.Capture(computeError!).Throw();
+            }
+
+            return new EvaluationResult(committedValue!);
+        }
+    }
+
+    private void WriteComputeFailedDiagnostic(Exception exception)
+    {
+        _diagnostics?.Write(new HostDiagnosticRecord(
+            StateDiagnosticIds.ComputedStateComputeFailed,
+            $"Computed state failed to compute value type '{typeof(T).FullName}': {exception.Message}",
+            HostDiagnosticSeverity.Error)
+        {
+            Context = StateDiagnosticContext.Create(
+                ("valueType", StateDiagnosticContext.TypeName(typeof(T))))
+        });
     }
 
     private void ThrowIfDisposed()
@@ -285,11 +399,13 @@ public sealed class ComputedState<T> : IComputedState<T>, IDisposable
         }
     }
 
+    private sealed record EvaluationResult(T Value);
+
     private sealed class RemovingStateSubscription : IStateSubscription
     {
         private readonly ComputedState<T> _state;
         private readonly StateSubscription _subscription;
-        private bool _disposed;
+        private int _disposed;
 
         public RemovingStateSubscription(
             ComputedState<T> state,
@@ -301,12 +417,11 @@ public sealed class ComputedState<T> : IComputedState<T>, IDisposable
 
         public void Dispose()
         {
-            if (_disposed)
+            if (Interlocked.Exchange(ref _disposed, 1) != 0)
             {
                 return;
             }
 
-            _disposed = true;
             _subscription.Dispose();
             _state.Remove(_subscription);
         }

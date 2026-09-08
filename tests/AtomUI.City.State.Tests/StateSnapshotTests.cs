@@ -25,13 +25,38 @@ public sealed class StateSnapshotTests
                 Assert.Equal(counter.Name, entry.StateName);
                 Assert.Equal(1, entry.Value);
                 Assert.Equal(0, entry.Version);
+                Assert.Equal(StateLifetime.Application, entry.Lifetime);
             },
             entry =>
             {
                 Assert.Equal(theme.Name, entry.StateName);
                 Assert.Equal("dark", entry.Value);
                 Assert.Equal(1, entry.Version);
+                Assert.Equal(StateLifetime.Application, entry.Lifetime);
             });
+    }
+
+    [Fact]
+    public void SnapshotCapturesScopeKindAndRestoreRejectsMismatch()
+    {
+        var diagnostics = new InMemoryHostDiagnostics();
+        var key = new StateKey<string>("AtomUI.City.Tests.ModuleState");
+        var registry = new ApplicationStateRegistry(diagnostics);
+        registry.Add(StateDefinition.Create(
+            key,
+            "light",
+            lifetime: StateLifetime.Module,
+            snapshotPolicy: StateSnapshotPolicy.Persisted));
+
+        var entry = Assert.Single(registry.CreateSnapshot().Entries);
+        Assert.Equal(StateLifetime.Module, entry.Lifetime);
+
+        registry.Restore(new StateSnapshot([entry with { Lifetime = StateLifetime.Application, Value = "dark" }]));
+
+        Assert.Equal("light", registry.Get(key).Value);
+        Assert.Contains(diagnostics.Records, record =>
+            record.Code == StateDiagnosticIds.SnapshotRestoreFailed &&
+            record.Message.Contains("state lifetime", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -170,6 +195,22 @@ public sealed class StateSnapshotTests
     }
 
     [Fact]
+    public void SnapshotEntryRejectsInvalidScopeKindInit()
+    {
+        var entry = new StateSnapshotEntry(
+            "AtomUI.City.Tests.Theme",
+            typeof(string),
+            "light",
+            version: 0,
+            schemaVersion: 1,
+            ownerModule: null,
+            pluginId: null);
+
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => entry with { Lifetime = (StateLifetime)42 });
+    }
+
+    [Fact]
     public void SnapshotRejectsNullEntries()
     {
         Assert.Throws<ArgumentException>(() => new StateSnapshot([null!]));
@@ -283,6 +324,7 @@ public sealed class StateSnapshotTests
         var key = new StateKey<string>("AtomUI.City.Tests.Theme");
         var registry = new ApplicationStateRegistry(diagnostics);
         registry.Add(StateDefinition.Create(key, "light", snapshotPolicy: StateSnapshotPolicy.Persisted));
+        registry.Set(key, "blue");
         var snapshot = new StateSnapshot(
             [
                 new StateSnapshotEntry(
@@ -297,7 +339,8 @@ public sealed class StateSnapshotTests
 
         registry.Restore(snapshot);
 
-        Assert.Equal("light", registry.Get(key).Value);
+        Assert.Equal("blue", registry.Get(key).Value);
+        Assert.Equal(1, registry.Get(key).Version);
         var record = Assert.Single(diagnostics.Records);
         Assert.Equal(StateDiagnosticIds.SnapshotRestoreFailed, record.Code);
         Assert.Equal(HostDiagnosticSeverity.Warning, record.Severity);

@@ -12,6 +12,7 @@ public sealed class WritableState<T> : IWritableState<T>, IDisposable
     private readonly object _syncRoot = new();
     private T _value;
     private bool _disposed;
+    private long _version;
 
     public WritableState(
         T initialValue,
@@ -49,7 +50,16 @@ public sealed class WritableState<T> : IWritableState<T>, IDisposable
 
     object? IReadOnlyState.Value => Value;
 
-    public long Version { get; private set; }
+    public long Version
+    {
+        get
+        {
+            lock (_syncRoot)
+            {
+                return _version;
+            }
+        }
+    }
 
     public Type ValueType => typeof(T);
 
@@ -75,8 +85,8 @@ public sealed class WritableState<T> : IWritableState<T>, IDisposable
 
             var oldValue = _value;
             _value = value;
-            Version++;
-            args = new StateChangedEventArgs<T>(oldValue, value, Version);
+            _version++;
+            args = new StateChangedEventArgs<T>(oldValue, value, _version);
             subscriptions = _subscriptions.ToArray();
         }
 
@@ -116,8 +126,8 @@ public sealed class WritableState<T> : IWritableState<T>, IDisposable
 
             var oldValue = _value;
             _value = nextValue;
-            Version++;
-            args = new StateChangedEventArgs<T>(oldValue, nextValue, Version);
+            _version++;
+            args = new StateChangedEventArgs<T>(oldValue, nextValue, _version);
             subscriptions = _subscriptions.ToArray();
         }
 
@@ -200,19 +210,27 @@ public sealed class WritableState<T> : IWritableState<T>, IDisposable
         {
             ThrowIfDisposed();
 
-            if (_comparer.Equals(_value, value) && Version == version)
+            if (_comparer.Equals(_value, value) && _version == version)
             {
                 return;
             }
 
             var oldValue = _value;
             _value = value;
-            Version = version;
-            args = new StateChangedEventArgs<T>(oldValue, value, Version);
+            _version = version;
+            args = new StateChangedEventArgs<T>(oldValue, value, _version);
             subscriptions = _subscriptions.ToArray();
         }
 
         Notify(args, subscriptions);
+    }
+
+    internal (T Value, long Version) CaptureSnapshot()
+    {
+        lock (_syncRoot)
+        {
+            return (_value, _version);
+        }
     }
 
     private void Notify(
@@ -315,7 +333,7 @@ public sealed class WritableState<T> : IWritableState<T>, IDisposable
     {
         private readonly WritableState<T> _state;
         private readonly StateSubscription _subscription;
-        private bool _disposed;
+        private int _disposed;
 
         public RemovingStateSubscription(
             WritableState<T> state,
@@ -327,12 +345,11 @@ public sealed class WritableState<T> : IWritableState<T>, IDisposable
 
         public void Dispose()
         {
-            if (_disposed)
+            if (Interlocked.Exchange(ref _disposed, 1) != 0)
             {
                 return;
             }
 
-            _disposed = true;
             _subscription.Dispose();
             _state.Remove(_subscription);
         }

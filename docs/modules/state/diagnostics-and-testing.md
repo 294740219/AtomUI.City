@@ -89,7 +89,7 @@ State 诊断至少包含：
 | Computed 计算失败 | 保留上一有效值或标记 failed，记录诊断。 |
 | Subscription 失败 | 记录错误，不杀死 state。 |
 | Snapshot 保存失败 | 当前保存失败，不影响运行 state。 |
-| Snapshot 恢复失败 | 使用默认值，记录诊断。 |
+| Snapshot 恢复失败 | 保留恢复前的当前值和 version，记录诊断。 |
 | Plugin state 释放失败 | 进入插件卸载错误聚合。 |
 
 取消不是错误。OperationScope 取消后不应继续提交状态更新。

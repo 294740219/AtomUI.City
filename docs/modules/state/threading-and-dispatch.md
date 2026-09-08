@@ -101,11 +101,17 @@ State Core 不直接依赖 Avalonia Dispatcher。
 | 策略 | 说明 |
 |---|---|
 | Immediate | 当前线程通知。 |
-| Queued | 排队后统一通知。 |
-| Dispatcher | 切到 UI dispatcher。 |
-| Background | 后台投递；不得阻塞状态提交，handler 失败必须写 diagnostics。 |
+| Queued | 每个 subscription 使用串行 FIFO 后台队列。 |
+| Dispatcher | 每个 subscription 串行投递到 UI dispatcher，并等待上一投递完成后再投递下一条。 |
+| Background | 每个 subscription 使用串行 FIFO 后台队列；不得阻塞状态提交，handler 失败必须写 diagnostics。 |
 
 延迟调度回调必须在实际执行前重新检查 subscription 是否已 Dispose，避免 UI dispatcher 队列中的旧通知更新已经释放的 owner。
+
+`Dispatcher` 使用非阻塞 `PostAsync` 语义：状态值与 version 提交完成后，UI callback 进入 dispatcher 队列，`SetValue` / `Update` 不等待 callback 执行。投递失败或异步 dispatcher operation 失败写入 `AUCSTA002`，不回滚已提交状态。
+
+三种延迟策略默认最多保留 1024 条等待通知，可通过 `StateSubscriptionOptions` 调整。达到容量时丢弃最旧通知并记录 `AUCSTA011`，避免慢 handler 导致无界内存增长。这里的顺序是单个 subscription 的投递接受顺序；多个并发写入者之间不承诺线程先后顺序。
+
+依赖通知默认 `Immediate`：`SetValue` 的调用线程会同步完成整条下游 computed 链的重算与通知（有循环依赖哨兵，无深度上限）——长链场景下一次写入的延迟等于全图重算。需要与写入解耦时，在下游订阅使用 Queued/Dispatcher。
 
 Presentation 负责把 Dispatcher 接入 State。Core 只定义抽象。
 
@@ -115,7 +121,7 @@ State Core 不直接更新 UI。
 
 ```text
 State change committed
--> DispatchPolicy.UiThread
+-> StateDispatchPolicy.Dispatcher
 -> Presentation dispatcher
 -> ViewModel property change or binding refresh
 -> AtomUI/Avalonia visual refresh
@@ -144,5 +150,6 @@ OperationScope 取消后不应继续提交状态更新。
 | UI 调度不可用 | Unit | 不可用 dispatcher 不回滚状态提交，handler 不执行，诊断包含 dispatcher type。 |
 | UI 延迟回调释放 | Unit | Dispatcher pending callback 在 subscription Dispose 后不执行 handler。 |
 | Background 调度 | Unit | handler 阻塞时 SetValue 先返回，handler 失败写 diagnostics。 |
+| 延迟队列容量 | Unit | 队列有界、FIFO，溢出丢弃最旧通知并写 `AUCSTA011`。 |
 | Scope 停用 | Unit | 停用后不再投递 UI 更新。 |
 | late result | Unit | Operation 取消后不提交状态。 |

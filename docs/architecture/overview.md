@@ -244,12 +244,12 @@ AtomUI.City.State 使用 C# 风格的状态、计算状态、Reaction 和快照�
 
 | 概念 | 职责 |
 |---|---|
-| IStateValue<T> | 只读状态值，具有当前值语义 |
+| IReadOnlyState<T> / IStateValue<T> | 只读状态及其最小值视图，具有当前值语义 |
 | IWritableState<T> | 可写状态，支持 Set 和 Update |
 | IComputedState<T> | 计算状态，基于依赖状态自动更新 |
 | IStateReaction | 状态副作用订阅，必须可释放 |
 | IStateScope | 状态生命周期作用域 |
-| ICollectionState<TKey,TItem> | 集合状态，支持按 key 管理项目 |
+| IStateCollection<TKey,TItem> | 集合状态，支持按 key 管理项目 |
 | StateSnapshot | 状态快照，用于持久化、恢复和测试断言 |
 
 State 设计原则：

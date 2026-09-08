@@ -14,6 +14,8 @@ AtomUI.City.State 作为 Host 服务或模块贡献接入 Core 生命周期，�
 - Subscription: Active -> Disposed
 - Snapshot: Created -> Immutable
 
+Active 为构造后的初始可观察态（Created 是构造前概念态）。StateScope/ComputedState 的订阅释放失败不改变终态——Disposing 后无论是否失败都到达 Disposed，失败仅记录诊断（`AUCSTA009`/`AUCSTA010`）。
+
 ## 生命周期流程
 
 - Register 定义 StateKey、lifetime、default value、access policy 和 snapshot policy。

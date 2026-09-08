@@ -22,13 +22,14 @@
 | `AUCSTA008` | ApplicationStateAlreadyRegistered | `src/AtomUI.City.State/StateDiagnosticIds.cs` |
 | `AUCSTA009` | StateScopeDisposeFailed | `src/AtomUI.City.State/StateDiagnosticIds.cs` |
 | `AUCSTA010` | ComputedStateDisposeFailed | `src/AtomUI.City.State/StateDiagnosticIds.cs` |
+| `AUCSTA011` | SubscriptionQueueOverflow | `src/AtomUI.City.State/StateDiagnosticIds.cs` |
 
 ## 产品级必须诊断的失败
 
 - 未注册 key：抛 StateNotRegisteredException 并诊断。
 - 写入只读 state：抛 StateAccessDeniedException。
 - 订阅回调失败：记录 subscriptionId，不回滚已提交状态。
-- `AUCSTA001` 到 `AUCSTA010` 必须保持唯一、格式稳定，并覆盖 changed event、subscription、registry、access、computed、update、snapshot restore、scope dispose 和 computed dispose 失败。
+- `AUCSTA001` 到 `AUCSTA011` 必须保持唯一、格式稳定，并覆盖 changed event、subscription、registry、access、computed、update、snapshot restore、scope dispose、computed dispose 和 subscription queue overflow。
 
 ## 上下文字段
 
@@ -41,13 +42,14 @@
 | `AUCSTA001` | `valueType`、`version`；collection changed event 还应包含 `keyType`、`itemType`、`changeCount`。 |
 | `AUCSTA002` | `dispatchPolicy`、`version`；Dispatcher policy failure 还应包含 `dispatcherType`。 |
 | `AUCSTA003` | `stateKey`、`valueType`。 |
-| `AUCSTA004` | `accessPolicy`、`stateKey`、`valueType`。 |
+| `AUCSTA004` | `accessPolicy`、`stateKey`、`valueType`；registry writer 拒绝还包含 `writerKind`、`writerModule`、`writerPlugin`。 |
 | `AUCSTA005` | `valueType`。 |
 | `AUCSTA006` | `stateKey`、`valueType`、`version`。 |
 | `AUCSTA007` | `reason`、`stateKey`、`valueType`。 |
 | `AUCSTA008` | `stateKey`、`valueType`。 |
 | `AUCSTA009` | `scopeId`。 |
 | `AUCSTA010` | `valueType`。 |
+| `AUCSTA011` | `dispatchPolicy`、`maxPendingNotifications`、`version`。 |
 
 ## 诊断缺口处理
 

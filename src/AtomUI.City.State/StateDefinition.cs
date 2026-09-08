@@ -10,7 +10,8 @@ public abstract class StateDefinition
         StateSnapshotPolicy snapshotPolicy,
         int schemaVersion,
         string? ownerModule,
-        string? pluginId)
+        string? pluginId,
+        string? writeCapability)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(valueType);
@@ -38,6 +39,21 @@ public abstract class StateDefinition
                 "State schema version must be greater than or equal to 1.");
         }
 
+        if (access == StateAccessPolicy.OwnerWrite && string.IsNullOrWhiteSpace(ownerModule))
+        {
+            throw new ArgumentException("OwnerWrite state requires an owner module.", nameof(ownerModule));
+        }
+
+        if (access == StateAccessPolicy.AuthorizedWrite && string.IsNullOrWhiteSpace(writeCapability))
+        {
+            throw new ArgumentException("AuthorizedWrite state requires a write capability.", nameof(writeCapability));
+        }
+
+        if (access == StateAccessPolicy.PluginIsolated && string.IsNullOrWhiteSpace(pluginId))
+        {
+            throw new ArgumentException("PluginIsolated state requires a plugin id.", nameof(pluginId));
+        }
+
         Name = name;
         ValueType = valueType;
         Lifetime = lifetime;
@@ -46,6 +62,7 @@ public abstract class StateDefinition
         SchemaVersion = schemaVersion;
         OwnerModule = ownerModule;
         PluginId = pluginId;
+        WriteCapability = writeCapability;
     }
 
     public string Name { get; }
@@ -64,6 +81,8 @@ public abstract class StateDefinition
 
     public string? PluginId { get; }
 
+    public string? WriteCapability { get; }
+
     public static StateDefinition<T> Create<T>(
         StateKey<T> key,
         T defaultValue,
@@ -73,7 +92,8 @@ public abstract class StateDefinition
         int schemaVersion = 1,
         string? ownerModule = null,
         string? pluginId = null,
-        IEqualityComparer<T>? comparer = null)
+        IEqualityComparer<T>? comparer = null,
+        string? writeCapability = null)
     {
         return StateDefinition<T>.Create(
             key,
@@ -84,7 +104,8 @@ public abstract class StateDefinition
             schemaVersion,
             ownerModule,
             pluginId,
-            comparer);
+            comparer,
+            writeCapability);
     }
 }
 
@@ -99,7 +120,8 @@ public sealed class StateDefinition<T> : StateDefinition
         int schemaVersion,
         string? ownerModule,
         string? pluginId,
-        IEqualityComparer<T>? comparer)
+        IEqualityComparer<T>? comparer,
+        string? writeCapability)
         : base(
             key.Name,
             typeof(T),
@@ -108,7 +130,8 @@ public sealed class StateDefinition<T> : StateDefinition
             snapshotPolicy,
             schemaVersion,
             ownerModule,
-            pluginId)
+            pluginId,
+            writeCapability)
     {
         Key = key;
         DefaultValue = defaultValue;
@@ -130,7 +153,8 @@ public sealed class StateDefinition<T> : StateDefinition
         int schemaVersion = 1,
         string? ownerModule = null,
         string? pluginId = null,
-        IEqualityComparer<T>? comparer = null)
+        IEqualityComparer<T>? comparer = null,
+        string? writeCapability = null)
     {
         StateKey<T>.ThrowIfDefault(key, nameof(key));
 
@@ -143,6 +167,7 @@ public sealed class StateDefinition<T> : StateDefinition
             schemaVersion,
             ownerModule,
             pluginId,
-            comparer);
+            comparer,
+            writeCapability);
     }
 }

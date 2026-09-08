@@ -74,6 +74,25 @@ public sealed class StateScopeTests
         Assert.Contains("late dispose", record.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task StateScopeSerializesConcurrentAddAndDispose()
+    {
+        var scope = new StateScope("concurrent");
+        var disposeCount = 0;
+        var subscriptions = Enumerable.Range(0, 100)
+            .Select(_ => new TestSubscription(() => Interlocked.Increment(ref disposeCount)))
+            .ToArray();
+        var addTasks = subscriptions
+            .Select(subscription => Task.Run(() => scope.Add(subscription)))
+            .ToArray();
+        var disposeTask = Task.Run(scope.Dispose);
+
+        await Task.WhenAll([.. addTasks, disposeTask]);
+
+        Assert.Equal(100, disposeCount);
+        Assert.Equal(StateScopeState.Disposed, scope.State);
+    }
+
     private sealed class TestSubscription : IStateSubscription
     {
         private readonly Action _dispose;

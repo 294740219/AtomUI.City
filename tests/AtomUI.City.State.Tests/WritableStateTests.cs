@@ -6,6 +6,19 @@ namespace AtomUI.City.State.Tests;
 public sealed class WritableStateTests
 {
     [Fact]
+    public void ChangedRunsSynchronouslyBeforeManagedSubscriptions()
+    {
+        var state = new WritableState<int>(0);
+        var calls = new List<string>();
+        state.Changed += (_, _) => calls.Add("changed");
+        state.OnChange(_ => calls.Add("subscription"));
+
+        state.SetValue(1);
+
+        Assert.Equal(["changed", "subscription"], calls);
+    }
+
+    [Fact]
     public void SetUpdatesValueAndRaisesChangedOnce()
     {
         var state = new WritableState<int>(1);

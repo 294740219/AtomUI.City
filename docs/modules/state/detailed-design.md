@@ -141,7 +141,7 @@ IStateCollection<TKey, TItem>
 | `IComputedState<T>` | 派生状态，基于依赖状态计算并缓存。 |
 | `IStateScope` | 状态生命周期边界。 |
 | `IStateSubscription` | 状态变化订阅或副作用句柄。 |
-| `IStateFactory` | 创建 state/computed/subscription。 |
+| `IStateFactory` | 创建 writable/computed/scope，并绑定当前 StateScope。 |
 | `IStateRegistry` | 当前 scope 内的状态注册表。 |
 | `StateKey<T>` | 强类型状态键。 |
 | `IApplicationState` | 应用级共享状态读取和监听入口。 |
@@ -161,7 +161,7 @@ public interface IReadOnlyState<T>
 
     long Version { get; }
 
-    IDisposable OnChange(Action<StateChangedEventArgs<T>> handler);
+    IStateSubscription OnChange(Action<StateChangedEventArgs<T>> handler);
 }
 ```
 
@@ -283,7 +283,7 @@ public interface IApplicationState
 {
     IReadOnlyState<T> Get<T>(StateKey<T> key);
 
-    IDisposable OnChange<T>(
+    IStateSubscription OnChange<T>(
         StateKey<T> key,
         Action<StateChangedEventArgs<T>> handler);
 }
@@ -314,9 +314,11 @@ activationScope.OnStateChanged(ThemeStates.CurrentTheme, args => { });
 |---|---|
 | `ReadOnly` | 所有模块可读，只有 Owner 可初始化。 |
 | `OwnerWrite` | 只有声明模块可写。 |
-| `HostWrite` | Host 或授权服务可写。 |
+| `HostWrite` | 只有 Host writer 可写。 |
 | `AuthorizedWrite` | 通过权限或 capability 授权后可写。 |
 | `PluginIsolated` | 插件只能写自己的状态分区。 |
+
+`ApplicationStateRegistry` 是 Host writer。模块和插件由 Host 创建带 `StateWriteAuthority` 的受约束 writer；五种策略必须在返回 writable state 前执行身份或 capability 检查，不能只检查 `ReadOnly`。
 
 `IApplicationState` 和 `IApplicationStateWriter` 分离，方便 Host 给插件只暴露只读接口。
 
@@ -341,6 +343,9 @@ Dependencies
 - 计算异常不应杀死依赖状态。
 - 计算错误进入 Diagnostics。
 - 计算不应执行 IO。
+- 计算函数在状态锁外执行，提交时使用失效世代拒绝过期结果。
+- 首次计算失败重新抛出原异常；已有有效值时保留旧值并通过 `LastError` 暴露失败。
+- 运行时循环依赖抛 `InvalidOperationException` 并记录 `AUCSTA005`。
 
 第一版不建议依赖表达式树自动解析属性路径，因为这对 AOT/trimming 不友好。更推荐显式依赖或 generator 可识别声明。
 
@@ -372,7 +377,7 @@ Plugin service context
 
 ```text
 state.OnChange(...)
--> returns IDisposable / IStateSubscription
+-> returns IStateSubscription
 -> registered in StateScope / ActivationScope
 ```
 
@@ -441,7 +446,7 @@ Snapshot 必须包含：
 
 State Core 不直接依赖 Avalonia Dispatcher。
 
-State 调度必须遵守 Core 线程模型。线程模型、`IExecutionDispatcher` 和 `DispatchPolicy` 见：[Core Threading 设计](../core/threading.md)。
+State 调度必须遵守 Core 线程模型。线程模型、`IUiDispatcher` 和 `StateDispatchPolicy` 见：[Core Threading 设计](../core/threading.md)。
 
 建议提供调度抽象：
 
@@ -457,9 +462,9 @@ State change committed
 | 策略 | 说明 |
 |---|---|
 | Immediate | 当前线程通知。 |
-| Queued | 排队后统一通知。 |
-| Dispatcher | 切到 UI dispatcher。 |
-| Background | 后台调度。 |
+| Queued | 每个 subscription 使用有界串行 FIFO 后台队列。 |
+| Dispatcher | 每个 subscription 通过有界串行队列投递到 UI dispatcher。 |
+| Background | 每个 subscription 使用有界串行 FIFO 后台队列。 |
 
 Presentation 负责把 Dispatcher 接入 State。Core 只定义抽象。
 
@@ -468,7 +473,7 @@ State 必须满足：
 - `SetValue` 和 `Update` 原子化。
 - 状态提交和订阅通知分离。
 - 不在状态锁内调用订阅者。
-- 相同 state key 的变更通知保持顺序。
+- 相同 state key 的顺序写入按提交顺序通知；延迟策略在每个 subscription 内按投递接受顺序串行。并发写入者之间不承诺线程先后顺序。
 - 应用级共享状态绑定 ApplicationScope。
 - 插件状态绑定插件生命周期或插件贡献 lease。
 - 推荐状态值使用 immutable 或 replace-only 风格。
@@ -555,7 +560,7 @@ Generator/Analyzer 负责：
 | Computed 计算失败 | 保留上一有效值或标记 failed，记录诊断。 |
 | Subscription 失败 | 记录错误，不杀死 state。 |
 | Snapshot 保存失败 | 当前保存失败，不影响运行 state。 |
-| Snapshot 恢复失败 | 使用默认值，记录诊断。 |
+| Snapshot 恢复失败 | 保留恢复前的当前值和 version，记录诊断。 |
 | Plugin state 释放失败 | 进入插件卸载错误聚合。 |
 
 取消不是错误。OperationScope 取消后不应继续提交状态更新。

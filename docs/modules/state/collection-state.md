@@ -96,11 +96,14 @@ IStateCollection<TKey, TItem>
 - item 更新必须产生明确 change record。
 - 相同 key 的变更保持顺序。
 - 批量更新应合并通知。
+- 批量输入中的重复 key 合并为该 key 的最终值，变更顺序按 key 首次出现顺序确定。
+- restore 的内容和 item version 全部相同时，仅 snapshot collection version 不同不构成变更，不修改当前 collection version，也不通知。
 - 更新失败时保留旧集合。
 - public contract 载体必须在进入恢复或通知链路前拒绝 null key、null 条目、未知 change kind 和负 version。
 - 集合 Dispose 必须幂等，且释放现有 subscriptions。
 - Dispose 后 `Version`、`Items`、`TryGetItemVersion` 和 `CreateSnapshot` 仍可读取。
 - Dispose 后 `AddOrUpdate`、`AddOrUpdateRange`、`Remove`、`Clear`、`RestoreSnapshot` 和 `OnChange` 必须抛 `ObjectDisposedException`。
+- 具体类型的 `Changed` 是同步 CLR event；`OnChange` 是支持调度和 Scope 释放的受管订阅。一次集合变更先调用 `Changed`，再投递 `OnChange` subscriptions。
 
 ### 4. 变更记录
 
@@ -166,6 +169,8 @@ Generator/Analyzer 负责：
 | Clear | Unit | 清空产生 clear 记录。 |
 | 只读快照 | Unit | 外部不能修改内部集合。 |
 | 批量更新 | Unit | 通知合并且顺序稳定。 |
+| 批量重复 key | Unit | 合并为最终值，每个 key 只产生一条 change。 |
+| 仅快照版本不同 | Unit | 不修改当前 version，不通知并返回 false。 |
 | item version | Unit | item 更新递增版本。 |
 | collection snapshot | Unit | 保存和恢复集合。 |
 | collection dispose | Unit | 重复 Dispose 幂等，Dispose 后读 API 可用。 |

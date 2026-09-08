@@ -117,6 +117,9 @@ ComputedState
 - 依赖列表不能包含 null 项。
 - 构造函数必须先校验完整依赖列表，再建立订阅；遇到 null dependency 时不能留下半初始化订阅。
 - 无订阅者时依赖变化只标记 dirty，不立即运行计算函数。
+- `compute` 在状态锁外执行；提交结果前必须校验失效世代，过期计算结果不得覆盖较新的依赖状态。
+- 运行时计算链重复进入同一个 `ComputedState` 时视为循环依赖，抛 `InvalidOperationException` 并记录 `AUCSTA005`，不得递归到进程栈溢出。
+- 变更通知经内部中间队列排队后逐条投递；中间队列本身不设上限——慢 handler 遇到高频失效时会积压内存，最终投递受订阅自身调度策略与容量约束。
 
 ### 5. 错误策略
 
@@ -124,9 +127,10 @@ ComputedState
 
 默认处理：
 
-- 保留上一有效值，或进入 failed 状态。
+- 已存在有效值时保留上一有效值；首次计算失败、没有有效值时向读取方重新抛出原异常。
 - 记录 Diagnostics。
-- 通知订阅者计算失败状态。
+- `LastError` 保存最近一次计算异常；成功重算后清空。
+- 失败本身不伪造 value-change 通知。
 - 不重复无限重算同一个失败状态。
 
 ### 6. 生命周期
@@ -140,6 +144,7 @@ ComputedState
 - 订阅阶段部分失败时，已建立的依赖订阅必须释放。
 - 插件计算状态不能被 Host 长期持有。
 - RouteScope 或 ActivationScope 中的计算状态随对应 Scope 释放。
+- `Dispose` 幂等；Dispose 后 `Value` 和 `OnChange` 均抛 `ObjectDisposedException`，不得返回已缓存值或重新计算。
 
 ### 7. AOT 和 Source Generator
 
@@ -166,6 +171,9 @@ Analyzer 应提示：
 | Lazy invalidation | Unit | 无订阅者时依赖变化不立即重算，下一次读取才重算。 |
 | 相等结果 | Unit | 结果相等时不通知。 |
 | 计算异常 | Unit | 保留旧值或 failed 状态，诊断记录。 |
+| 首次计算异常 | Unit | 抛出原异常，同一失效世代不重复计算。 |
+| 循环依赖 | Unit | 抛 `InvalidOperationException` 并诊断，不发生 StackOverflow。 |
+| 并发计算与释放 | Unit | 用户 compute 不持状态锁，释放不与订阅列表并发修改。 |
 | null dependency | Unit | 构造函数拒绝 null dependency。 |
 | Scope 释放 | Unit | 释放后不再计算或通知。 |
 | 依赖无法静态分析 | Analyzer/Generator | 输出稳定诊断。 |

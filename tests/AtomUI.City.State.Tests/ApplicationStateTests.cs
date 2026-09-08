@@ -161,4 +161,94 @@ public sealed class ApplicationStateTests
         Assert.Equal(HostDiagnosticSeverity.Warning, record.Severity);
         Assert.Contains(key.Name, record.Message, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void OwnerWriterOnlyWritesStatesOwnedByItsModule()
+    {
+        var key = new StateKey<int>("AtomUI.City.Tests.Owner");
+        var registry = new ApplicationStateRegistry();
+        registry.Add(StateDefinition.Create(
+            key,
+            1,
+            access: StateAccessPolicy.OwnerWrite,
+            ownerModule: "Boxer.Documents"));
+
+        var owner = registry.CreateWriter(StateWriteAuthority.Module("Boxer.Documents"));
+        var other = registry.CreateWriter(StateWriteAuthority.Module("Boxer.Settings"));
+
+        Assert.True(owner.Set(key, 2));
+        Assert.Throws<StateAccessDeniedException>(() => other.Set(key, 3));
+        Assert.Throws<StateAccessDeniedException>(() => registry.Set(key, 3));
+        Assert.Equal(2, registry.Get(key).Value);
+    }
+
+    [Fact]
+    public void HostWriterOnlyWritesHostWriteStates()
+    {
+        var key = new StateKey<int>("AtomUI.City.Tests.Host");
+        var registry = new ApplicationStateRegistry();
+        registry.Add(StateDefinition.Create(key, 1, access: StateAccessPolicy.HostWrite));
+
+        Assert.True(registry.Set(key, 2));
+        Assert.Throws<StateAccessDeniedException>(
+            () => registry.CreateWriter(StateWriteAuthority.Module("Boxer.Documents")).Set(key, 3));
+    }
+
+    [Fact]
+    public void AuthorizedWriterRequiresDeclaredCapability()
+    {
+        var key = new StateKey<int>("AtomUI.City.Tests.Authorized");
+        var registry = new ApplicationStateRegistry();
+        registry.Add(StateDefinition.Create(
+            key,
+            1,
+            access: StateAccessPolicy.AuthorizedWrite,
+            writeCapability: "state.documents.write"));
+
+        var authorized = registry.CreateWriter(StateWriteAuthority.Module(
+            "Boxer.Documents",
+            ["state.documents.write"]));
+        var unauthorized = registry.CreateWriter(StateWriteAuthority.Module("Boxer.Documents"));
+
+        Assert.True(authorized.Set(key, 2));
+        Assert.Throws<StateAccessDeniedException>(() => unauthorized.Set(key, 3));
+        Assert.Throws<StateAccessDeniedException>(() => registry.Set(key, 3));
+    }
+
+    [Fact]
+    public void PluginWriterOnlyWritesItsIsolatedState()
+    {
+        var key = new StateKey<int>("AtomUI.City.Tests.Plugin");
+        var registry = new ApplicationStateRegistry();
+        registry.Add(StateDefinition.Create(
+            key,
+            1,
+            access: StateAccessPolicy.PluginIsolated,
+            pluginId: "boxer.catalog"));
+
+        var owner = registry.CreateWriter(StateWriteAuthority.Plugin("boxer.catalog"));
+        var other = registry.CreateWriter(StateWriteAuthority.Plugin("boxer.export"));
+
+        Assert.True(owner.Set(key, 2));
+        Assert.Throws<StateAccessDeniedException>(() => other.Set(key, 3));
+        Assert.Throws<StateAccessDeniedException>(() => registry.Set(key, 3));
+    }
+
+    [Fact]
+    public async Task RegistrySupportsConcurrentRegistrationAndLookup()
+    {
+        var registry = new ApplicationStateRegistry();
+        var keys = Enumerable.Range(0, 100)
+            .Select(index => new StateKey<int>($"AtomUI.City.Tests.Concurrent.{index}"))
+            .ToArray();
+
+        await Task.WhenAll(keys.Select((key, index) => Task.Run(() =>
+        {
+            registry.Add(StateDefinition.Create(key, index));
+            Assert.Equal(index, registry.Get(key).Value);
+            _ = registry.CreateSnapshot();
+        })));
+
+        Assert.All(keys, key => Assert.Equal(0, registry.Get(key).Version));
+    }
 }
