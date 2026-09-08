@@ -1,7 +1,7 @@
 # AtomUI.City.Localization
 
 文档等级：Level 3
-成熟度：Partially Implemented
+成熟度：Verified
 执行边界：Host runtime localization service
 程序集：`AtomUI.City.Localization`
 源码：`src/AtomUI.City.Localization`
@@ -45,6 +45,12 @@ AtomUI.City.Localization 作为 Host 服务或模块贡献接入 Core 生命周�
 
 插件可以通过 manifest 或 Host 共享 contract 贡献本模块能力；所有插件来源对象必须绑定 plugin owner 并可撤销。
 
+## 与 State、Generators 和 Presentation 的关系
+
+- State 提供 `CultureState` 的 writable 创建能力；Localization 对外只暴露 `IReadOnlyState<CultureState>`。
+- Generators 读取 Localization attributes 并生成稳定 manifest、key 常量和原子 Registry registrar。
+- Presentation 实现 Localization 定义的 bridge/binding contract，并负责把实际 Avalonia/AtomUI 修改调度到 UI 线程；Localization Core 不依赖 Presentation 或 Avalonia。
+
 ## 与 Testing 的关系
 
 `tests/AtomUI.City.Localization.Tests` 必须覆盖 [features.md](features.md) 中每个 Feature ID。产品级完成不能只看现有测试文件存在，必须补齐 [testing.md](testing.md) 中列出的必断言行为。
@@ -66,6 +72,6 @@ AtomUI.City.Localization 作为 Host 服务或模块贡献接入 Core 生命周�
 
 ## 当前成熟度状态
 
-Partially Implemented
+Verified
 
-该状态表示模块已有实现基线，但还需要按产品级合同补齐实现和测试。单个功能点状态以 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 为准。
+八个 Feature 均具备实现、失败路径、并发/释放测试和文档合同。冻结结论仍以全量 build、模块测试与 Generator 测试持续通过为前提；新增能力必须先更新 Feature/API/Testing/Compatibility。

@@ -3,7 +3,7 @@ namespace AtomUI.City.Localization;
 public sealed class LanguagePackage : IDisposable
 {
     private readonly IReadOnlyDictionary<string, string> _strings;
-    private bool _disposed;
+    private int _disposed;
 
     private LanguagePackage(
         LanguagePackageDescriptor descriptor,
@@ -15,7 +15,7 @@ public sealed class LanguagePackage : IDisposable
 
     public LanguagePackageDescriptor Descriptor { get; }
 
-    public bool IsDisposed => _disposed;
+    public bool IsDisposed => Volatile.Read(ref _disposed) != 0;
 
     public static LanguagePackage Create(
         LanguagePackageDescriptor descriptor,
@@ -23,13 +23,19 @@ public sealed class LanguagePackage : IDisposable
     {
         ArgumentNullException.ThrowIfNull(descriptor);
         ArgumentNullException.ThrowIfNull(strings);
+        if (strings.Any(resource => string.IsNullOrWhiteSpace(resource.Key) || resource.Value is null))
+        {
+            throw new ArgumentException(
+                "Language package resources require non-empty keys and non-null values.",
+                nameof(strings));
+        }
 
         return new LanguagePackage(descriptor, strings);
     }
 
     public bool TryGetString(string key, out string value)
     {
-        if (_disposed)
+        if (IsDisposed)
         {
             value = string.Empty;
 
@@ -41,6 +47,6 @@ public sealed class LanguagePackage : IDisposable
 
     public void Dispose()
     {
-        _disposed = true;
+        Interlocked.Exchange(ref _disposed, 1);
     }
 }

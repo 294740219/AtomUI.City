@@ -8,12 +8,12 @@ using AtomUI.City.Localization;
     ResourceBaseName = "AtomUI.City.Localization.Tests.Fixtures.Host.en-US.locpack.json",
     FallbackCulture = "en",
     Version = "1.0.0",
-    Checksum = "sha256:test",
     ContributionId = "host.localization")]
 [assembly: LanguagePackage(
     "Missing.en-US",
     "en-US",
     Scope = ResourceScope.Plugin,
+    ScopeId = "plugin.missing",
     ResourceBaseName = "AtomUI.City.Localization.Tests.Fixtures.Missing.en-US.locpack.json",
     ContributionId = "plugin.missing.localization")]
 
@@ -27,6 +27,7 @@ public sealed class LocalizationDeclarationAttributeTests
         var attribute = new LanguagePackageAttribute("Host.zh-CN", "zh-CN")
         {
             Scope = ResourceScope.Host,
+            ScopeId = null,
             ResourceBaseName = "Sample.App.Resources.Host",
             FallbackCulture = "zh-Hans",
             Version = "1.0.0",
@@ -37,6 +38,7 @@ public sealed class LocalizationDeclarationAttributeTests
         Assert.Equal("Host.zh-CN", attribute.PackageId);
         Assert.Equal("zh-CN", attribute.Culture);
         Assert.Equal(ResourceScope.Host, attribute.Scope);
+        Assert.Null(attribute.ScopeId);
         Assert.Equal("Sample.App.Resources.Host", attribute.ResourceBaseName);
         Assert.Equal("zh-Hans", attribute.FallbackCulture);
         Assert.Equal("1.0.0", attribute.Version);
@@ -51,6 +53,8 @@ public sealed class LocalizationDeclarationAttributeTests
         {
             Kind = LocalizedResourceKind.FormattedString,
             Scope = ResourceScope.Module,
+            ScopeId = "settings.module",
+            Culture = "zh-CN",
             Version = "1.0.0",
             Critical = true,
         };
@@ -59,6 +63,8 @@ public sealed class LocalizationDeclarationAttributeTests
         Assert.Equal("Settings.zh-CN", attribute.PackageId);
         Assert.Equal(LocalizedResourceKind.FormattedString, attribute.Kind);
         Assert.Equal(ResourceScope.Module, attribute.Scope);
+        Assert.Equal("settings.module", attribute.ScopeId);
+        Assert.Equal("zh-CN", attribute.Culture);
         Assert.Equal("1.0.0", attribute.Version);
         Assert.True(attribute.Critical);
     }
@@ -78,7 +84,7 @@ public sealed class LocalizationDeclarationAttributeTests
         Assert.Equal("AtomUI.City.Localization.Tests.Fixtures.Host.en-US.locpack.json", descriptor.ResourceBaseName);
         Assert.Equal(CultureInfo.GetCultureInfo("en"), descriptor.FallbackCulture);
         Assert.Equal("1.0.0", descriptor.Version);
-        Assert.Equal("sha256:test", descriptor.Checksum);
+        Assert.Null(descriptor.Checksum);
         Assert.Equal("host.localization", descriptor.ContributionId);
     }
 

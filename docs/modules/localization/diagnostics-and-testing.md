@@ -45,6 +45,8 @@
 | AUC-LOCALIZATION-004 | Lookup and Fallback | LocalizationServiceTests |
 | AUC-LOCALIZATION-005 | Assembly Language Packages | LanguagePackageProviderTests; LocalizationDeclarationAttributeTests |
 | AUC-LOCALIZATION-006 | Presentation Bridge | LocalizationServiceTests |
+| AUC-LOCALIZATION-007 | Plugin Package Revocation | LocalizationServiceTests |
+| AUC-LOCALIZATION-008 | Generated Localization Manifest | AtomUICityIncrementalGeneratorLocalizationTests; LocalizationMetadataReaderTests; LocalizationManifestBuilderTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -71,23 +73,18 @@ Localization 必须可诊断、可测试。
 
 ### 2. 诊断字段
 
-必须记录：
+诊断记录必须填写与当前事件适用的字段；不存在的上下文保持空值，不能伪造。可用字段包括：
 
-- Culture。
-- Fallback culture。
-- Resource key。
-- Resource type。
-- PackageId。
-- Package version。
-- Scope。
-- ModuleId。
-- PluginId。
-- ContributionId。
-- Lookup stage。
-- Missing reason。
-- Load duration。
-- Apply duration。
-- Culture revision。
+- operation id。
+- culture / fallback culture。
+- resource key。
+- package id。
+- scope / scope id。
+- provider kind / location。
+- contribution id / revoked package count。
+- error kind。
+- load attempt / elapsed milliseconds。
+- culture revision。
 
 敏感信息通常不应放入本地化资源 key。错误参数写入诊断时需要脱敏。
 
@@ -97,28 +94,24 @@ Localization 必须可诊断、可测试。
 |---|---|
 | ResourceMissing | 当前 culture 缺 key。 |
 | FallbackMissing | fallback 也缺 key。 |
-| PackageLoadFailed | 语言包加载失败。 |
-| PackageVersionMismatch | 语言包版本不兼容。 |
+| PackageLoadFailed | 语言包加载、完整性校验、超出大小上限或 critical key 校验失败。 |
 | FormatFailed | 格式化失败。 |
 | ResourceRevoked | 资源 contribution 已撤销。 |
 | AtomUiApplyFailed | AtomUI/Avalonia 资源应用失败。 |
-| CultureSwitchRolledBack | 文化切换已回滚。 |
-| PluginResourceLeak | 插件资源仍被引用。 |
+| CultureSwitchRejected | package load、critical validation、非法 culture 或 fallback cycle 导致提交前拒绝。 |
+
+`PackageVersionMismatch`、`FormatFailed`、`ResourceRevoked` 是 `LocalizationErrorKind`；稳定诊断 code 以 [diagnostics.md](diagnostics.md) 的 AUCLOC001-010 表为准。插件资源泄漏由 PluginSystem 诊断，不由 Localization 伪造独立 code。
 
 ### 4. Testing 包
 
-Testing 包应提供：
+当前 `tests/AtomUI.City.Localization.Tests` 使用模块私有 test double：
 
-- Fake culture state provider。
-- Fake language package provider。
-- Fake assembly package provider。
-- Fake locpack provider。
-- Test localization service。
-- Test presentation localization bridge。
-- Missing resource recorder。
-- Culture switch driver。
-- Plugin localization test host。
-- Resource leak assertion helper。
+- recording/blocking/throwing language package provider。
+- recording/throwing presentation bridge。
+- `InMemoryLocalizationDiagnostics`。
+- deterministic culture switch、scope、撤销、并发 load 和 dispose 驱动。
+
+Localization 专用 `AtomUI.City.Testing` public helper 尚无 Feature ID，不属于当前合同。
 
 ### 5. 测试场景
 
@@ -128,14 +121,17 @@ Testing 包应提供：
 - selected culture package lazy load。
 - fallback package lazy load。
 - culture switch success。
-- culture switch rollback。
+- culture switch 提交前拒绝，以及 bridge 提交后失败不回滚。
 - missing marker。
 - format error。
 - AtomUI bridge apply。
 - UI binding refresh。
 - plugin package revoke。
 - plugin assembly unload。
-- AOT locpack provider。
+- file locpack provider；Native AOT publish smoke 由 Build/Release Gate 后续立项。
+- locpack 16 MiB 上限、重复根属性拒绝和 provider 取消。
+- culture/revoke 提交后调用方取消仍完成 bridge 与文本刷新。
+- generated registrar 原子注册，空 attribute 参数与未知 enum 阻断生成。
 
 ### 6. 无 UI 测试
 

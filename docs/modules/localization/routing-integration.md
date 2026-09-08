@@ -43,6 +43,7 @@
 | AUC-LOCALIZATION-005 | Assembly Language Packages | LanguagePackageProviderTests; LocalizationDeclarationAttributeTests |
 | AUC-LOCALIZATION-006 | Presentation Bridge | LocalizationServiceTests |
 | AUC-LOCALIZATION-007 | Plugin Package Revocation | LocalizationServiceTests |
+| AUC-LOCALIZATION-008 | Generated Localization Manifest | AtomUICityIncrementalGeneratorLocalizationTests; LocalizationManifestBuilderTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -59,7 +60,7 @@
 
 ## AtomUI.City.Localization Routing Integration 设计
 
-适用范围：Route title、breadcrumb、错误路由、Resolver/Guard 文案、导航诊断和 route language package preload。
+适用范围：Route title、breadcrumb、错误路由、route scope package 按需加载，以及 Resolver/Guard 文案的集成边界。
 
 ### 1. 定位
 
@@ -83,29 +84,20 @@ Source Generator 将这些写入 Route descriptor。
 
 ### 3. 页面进入预加载
 
-Route activated 可以触发当前 culture 的 route language package 预加载。
+Presentation 绑定已匹配的 Route 时激活 `LocalizationLookupContext.RouteId` lease；创建 route text binding 的首次 lookup 按需加载当前 culture 的 route package。
 
 ```text
 Route matched
--> identify route localization package descriptors
--> load selected culture packages
--> continue Presentation binding
+-> Presentation LocalizedRouteTextBinding activates route scope
+-> CreateTextAsync loads selected culture package on demand
+-> bind localized metadata setters
 ```
 
-预加载失败按资源 criticality 决定是 fallback、missing marker 还是导航失败。
+查找失败按普通 Localization fallback/missing marker 处理；Localization 不把资源缺失转换为导航失败。
 
 ### 4. Guard / Resolver 文案
 
-Guard、Resolver 不返回显示文本。
-
-它们返回：
-
-- ErrorCode。
-- MessageKey。
-- MessageArgs。
-- Diagnostics。
-
-Presentation 或 ViewModel 通过 Localization 渲染。
+Routing 当前 `RouteGuardResult` / `RouteResolveResult` 提供 `Code` 和 `Message`，没有 Localization 专用 `MessageKey/MessageArgs` contract。业务可以约定把 `Code` 映射为 localization key；框架级强类型错误文案集成需由 Routing 另立 Feature ID。
 
 ### 5. Culture 切换
 
@@ -113,9 +105,7 @@ Presentation 或 ViewModel 通过 Localization 渲染。
 
 - 当前 route title。
 - breadcrumb。
-- navigation menu。
 - route error view。
-- navigation diagnostics display。
 
 Routing 的 NavigationSnapshot 不因 culture change 重新创建。
 
@@ -135,7 +125,6 @@ Routing 的 NavigationSnapshot 不因 culture change 重新创建。
 
 - Route title key。
 - breadcrumb refresh。
-- route language package preload。
-- Guard message key。
-- Resolver message key。
+- route scope activation 和按需 package load。
+- Route metadata setter refresh。
 - 插件 route resource revoke。

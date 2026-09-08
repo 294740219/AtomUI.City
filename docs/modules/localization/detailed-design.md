@@ -43,6 +43,7 @@
 | AUC-LOCALIZATION-005 | Assembly Language Packages | LanguagePackageProviderTests; LocalizationDeclarationAttributeTests |
 | AUC-LOCALIZATION-006 | Presentation Bridge | LocalizationServiceTests |
 | AUC-LOCALIZATION-007 | Plugin Package Revocation | LocalizationServiceTests |
+| AUC-LOCALIZATION-008 | Generated Localization Manifest | AtomUICityIncrementalGeneratorLocalizationTests; LocalizationManifestBuilderTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -74,8 +75,8 @@ Localization 不决定业务文案，不直接渲染 UI，不替代 Presentation
 ```text
 Localization manifest
 -> selected culture
--> lazy load active language packages
--> localized resource store
+-> first lookup or culture switch lazily loads visible language packages
+-> immutable LanguagePackage cache
 -> Presentation localization bridge
 -> AtomUI/Avalonia resources and bindings
 ```
@@ -87,7 +88,7 @@ Localization manifest
 - Assembly package capable：普通 .NET 运行时支持语言包独立 assembly 动态加载。
 - AOT compatible：Native AOT 模式使用 file-based locpack provider，不依赖动态 assembly loading。
 - AtomUI-integrated：文化变化最终通过 Presentation bridge 同步到 AtomUI/Avalonia。
-- Transactional culture switch：文化切换必须先准备资源，再提交状态，失败回滚。
+- Transactional culture switch：文化切换必须先准备并校验 package，再提交状态；提交前失败或调用方取消保留旧状态。Presentation bridge 位于提交后，改由 service lifetime token 完成本次刷新；失败返回 Result、记录诊断并继续本地文本刷新，不回滚已发布 CultureState。
 - Plugin-aware：插件语言包必须可撤销、可释放、可卸载。
 - Strong diagnostics：缺失 key、重复 key、fallback 失败和格式化错误必须可诊断。
 - Source-generator-first：资源 manifest、强类型 key 和 descriptor 由 source generator 生成。
@@ -110,14 +111,12 @@ Localization 不负责：
 | 类型 | 职责 |
 |---|---|
 | `ILocalizationService` | 当前文化、语言包加载、文化切换和资源查找入口。 |
-| `ICultureStateProvider` | 提供当前文化状态和 revision。 |
-| `ICultureManager` | 处理文化选择、用户偏好、系统文化和事务式切换。 |
+| `ILocalizationService.CultureState` | 通过 City.State `IReadOnlyState<CultureState>` 提供当前文化状态和 revision。 |
 | `ILanguagePackageProvider` | 加载指定 culture 的语言包。 |
-| `ILanguagePackage` | 已加载语言包。 |
-| `ILocalizedResourceStore` | 按 culture、scope、key 查找资源。 |
-| `IStringLocalizer` | 字符串查找和格式化入口。 |
+| `LanguagePackage` | 已加载、只读且可释放的语言包。 |
 | `ILocalizedText` | 可随文化变化刷新显示值的本地化文本句柄。 |
-| `ILocalizationContributionRegistry` | 管理 Host、Module、Plugin 的资源贡献。 |
+| `LanguagePackageRegistry` | 按 owner 管理 Host、Module、Plugin 的 descriptor 注册与撤销。 |
+| `LocalizationLookupContext` / `ILocalizationScopeLease` | 约束 Module、Plugin、Route、Window 资源可见性。 |
 | `IPresentationLocalizationBridge` | Presentation 侧 AtomUI/Avalonia 同步桥。 |
 | `ILocalizationDiagnostics` | 缺失资源、加载失败、fallback 和刷新诊断。 |
 
@@ -131,8 +130,8 @@ Localization 不负责：
 Host resources
 Module resources
 Plugin resources
-Theme / Presentation resources
-Feature resources
+Presentation resources
+Route / Window resources
 ```
 
 查找优先级：
@@ -160,7 +159,8 @@ Startup
 -> do not load language packages
 
 Current culture = zh-CN
--> load active zh-CN packages
+-> first lookup loads packages visible to its context
+-> culture switch loads global and active-lease zh-CN packages
 -> load fallback packages only when needed
 -> commit culture
 -> refresh UI
@@ -190,7 +190,7 @@ FileLanguagePackageProvider
 - `AssemblyLanguagePackageProvider`：普通 .NET / CoreCLR / 插件动态加载场景。
 - `FileLanguagePackageProvider`：Native AOT 或严格 AOT 模式，使用 `.locpack`、json 或 binary resource pack。
 
-语言包 assembly 应尽量是 resource-only，不放可执行代码。强类型 accessor 生成在模块或插件主 assembly 中，语言包 assembly 只提供资源数据。
+语言包 assembly 应尽量是 resource-only，不放可执行代码。生成的 key constants 和 registrar 位于模块或插件主 assembly，语言包 assembly 只提供资源数据。
 
 详细规则见：[language-package-assemblies.md](language-package-assemblies.md)。
 
@@ -202,7 +202,6 @@ FileLanguagePackageProvider
 SetCultureAsync("ja-JP")
 -> calculate active package set
 -> load ja-JP packages
--> load fallback packages
 -> validate critical resources
 -> prepare AtomUI resource dictionaries
 -> commit CurrentCultureState
@@ -237,6 +236,8 @@ LocalizationService.SetCultureAsync
 
 AtomUI/Avalonia 资源更新必须在 UI Thread。
 
+该 UI 线程保证由 Presentation bridge/adapter 提供；Localization Core 的普通 `ILocalizedText` handler 不保证执行线程。
+
 详细规则见：
 
 - [atomui-integration.md](atomui-integration.md)
@@ -249,16 +250,17 @@ AtomUI/Avalonia 资源更新必须在 UI Thread。
 ```csharp
 public sealed partial class SettingsViewModel
 {
-    private readonly IStringLocalizer<SettingsViewModel> _localizer;
+    private readonly ILocalizationService _localization;
 
-    public string Title => _localizer["Settings.Title"];
+    public ValueTask<LocalizedString> GetTitleAsync(CancellationToken cancellationToken) =>
+        _localization.GetStringAsync("Settings.Title", cancellationToken);
 }
 ```
 
-强类型 accessor 模式：
+生成 key 常量模式：
 
 ```csharp
-public string Title => _texts.Settings.Title();
+var title = await localization.GetStringAsync(GeneratedLocalizationManifest.Keys.Settings_Title);
 ```
 
 声明式 metadata：
@@ -270,13 +272,7 @@ public sealed partial class SettingsViewModel
 }
 ```
 
-XAML 目标语法：
-
-```xml
-<TextBlock Text="{loc:Text Settings.Title}" />
-```
-
-最终 API 细节在实现前确认，但必须同时支持字符串 key 和强类型 generated accessor。
+1.0 提供字符串 key、生成 key 常量以及 Presentation 的路由/窗口/通用 setter 绑定。XAML markup extension 和生成的强类型方法 accessor 尚无 Feature ID，不属于当前合同。
 
 详细规则见：[mvvm-integration.md](mvvm-integration.md)。
 
@@ -308,14 +304,12 @@ Localization generator 负责：
 
 - 生成 resource manifest。
 - 生成 language package descriptor。
-- 生成 strongly typed accessor。
 - 生成 key constants。
 - 生成 module/plugin resource descriptor。
-- 诊断缺失 key。
 - 诊断 fallback 不完整。
 - 诊断重复 key。
-- 诊断未声明资源引用。
-- 诊断插件资源类型泄漏。
+- 诊断空 attribute 参数、无效 culture、未知 enum、scope、package identity 和无运行时合同的 resource kind。
+- 生成 registrar 通过单次 `RegisterRange` 原子发布 descriptor。
 
 运行时默认不扫描程序集找资源。
 
@@ -328,33 +322,31 @@ Localization generator 负责：
 | 当前文化缺 key | 查找 fallback culture。 |
 | fallback 也缺 | 查找 invariant。 |
 | invariant 也缺 | missing marker + diagnostics。 |
-| 格式参数错误 | fallback raw template + diagnostics。 |
+| 格式执行异常 | fallback raw template + diagnostics。 |
 | 语言包加载失败 | rollback 到旧 culture。 |
 | 插件资源已撤销 | fallback 或清理对应 UI。 |
-| AtomUI resource apply 失败 | rollback UI resource swap 并记录错误。 |
+| AtomUI resource apply 失败 | 保留已提交 CultureState，返回失败 Result、记录错误并继续 LocalizedText 刷新；Presentation 自己负责其局部资源一致性。 |
 
 ### 14. 测试策略
 
-Testing 包应提供：
+当前单元测试工程提供私有 test double，未向 `AtomUI.City.Testing` 增加 Localization 专用 public API：
 
-- Fake culture state provider。
-- Fake language package provider。
-- Test localization service。
-- Test presentation localization bridge。
-- Missing resource recorder。
-- Plugin localization test host。
-- Deterministic culture switch driver。
+- recording/blocking language package provider。
+- recording/throwing Presentation localization bridge。
+- in-memory diagnostics。
+- deterministic culture switch、并发 load、撤销和 dispose 驱动。
 
 必须覆盖：
 
 - manifest-only startup。
 - selected culture language package lazy load。
 - fallback package lazy load。
-- culture switch rollback。
+- culture switch 提交前 package load/critical validation 失败保持旧状态；bridge 提交后失败不回滚状态。
 - AtomUI bridge apply。
 - binding refresh。
 - plugin package revoke。
-- AOT locpack provider。
+- file locpack provider。
+- locpack 16 MiB 上限和重复根属性拒绝。
 - missing key diagnostics。
 
 详细规则见：[diagnostics-and-testing.md](diagnostics-and-testing.md)。

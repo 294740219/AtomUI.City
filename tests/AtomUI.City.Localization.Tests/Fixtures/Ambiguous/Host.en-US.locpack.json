@@ -2,8 +2,7 @@
   "schemaVersion": 1,
   "packageId": "Host.en-US",
   "culture": "en-US",
-  "version": "1.0.0",
   "resources": {
-    "Settings.Title": "Settings"
+    "Settings.Title": "Ambiguous settings"
   }
 }

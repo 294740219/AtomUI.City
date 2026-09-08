@@ -43,6 +43,7 @@
 | AUC-LOCALIZATION-005 | Assembly Language Packages | LanguagePackageProviderTests; LocalizationDeclarationAttributeTests |
 | AUC-LOCALIZATION-006 | Presentation Bridge | LocalizationServiceTests |
 | AUC-LOCALIZATION-007 | Plugin Package Revocation | LocalizationServiceTests |
+| AUC-LOCALIZATION-008 | Generated Localization Manifest | AtomUICityIncrementalGeneratorLocalizationTests; LocalizationManifestBuilderTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -83,7 +84,7 @@ Diagnostics
 
 ### 3. Validation
 
-Validation message 必须支持 culture refresh。
+Localization 提供 `GetMessageAsync` 与 `CreateMessageTextAsync` 作为 Validation message 的查找/刷新原语；Validator 的 `MessageKey/MessageArgs` 结构由 MVVM owning module 定义。
 
 规则：
 
@@ -94,7 +95,7 @@ Validation message 必须支持 culture refresh。
 
 ### 4. Data / Security Error
 
-DataError 和 Security authorization result 不直接包含最终显示文本。
+建议 DataError 和 Security authorization result 不直接包含最终显示文本。Localization 不定义这两个模块的错误结果类型。
 
 示例：
 
@@ -120,17 +121,17 @@ Dialog、Toast、Notification 应传 MessageKey。
 | 场景 | 默认处理 |
 |---|---|
 | MessageKey 缺失 | missing marker + diagnostics。 |
-| MessageArgs 格式错误 | raw template + diagnostics。 |
+| MessageArgs 或自定义 formatter 执行异常 | raw template + diagnostics。 |
 | culture switch 时错误 UI 已关闭 | 忽略刷新。 |
 | plugin error key revoked | fallback 或 clear UI。 |
 
 ### 7. 测试策略
 
-测试必须覆盖：
+Localization 模块测试覆盖：
 
-- validation message key。
-- DataError message key。
-- Security forbidden message。
-- culture switch refresh。
+- message key + arguments 格式化以及任意 formatter 异常隔离。
+- message text culture switch refresh。
 - missing key marker。
 - plugin key revoked。
+
+Data/Security/Validation 专用结果到 MessageKey 的集成测试由相应 owning module 负责，不能由本文冒充已实现合同。

@@ -43,6 +43,7 @@
 | AUC-LOCALIZATION-005 | Assembly Language Packages | LanguagePackageProviderTests; LocalizationDeclarationAttributeTests |
 | AUC-LOCALIZATION-006 | Presentation Bridge | LocalizationServiceTests |
 | AUC-LOCALIZATION-007 | Plugin Package Revocation | LocalizationServiceTests |
+| AUC-LOCALIZATION-008 | Generated Localization Manifest | AtomUICityIncrementalGeneratorLocalizationTests; LocalizationManifestBuilderTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -137,7 +138,7 @@ Block new localization lookup
 | 场景 | 默认处理 |
 |---|---|
 | UI dispatcher 未 ready | 等待 ready 或返回明确错误。 |
-| ResourceDictionary apply failed | rollback Presentation resources。 |
+| ResourceDictionary apply failed | bridge 返回失败；Localization 保留已提交 CultureState、记录诊断并继续本地文本刷新。 |
 | FlowDirection apply failed | 保留旧方向并记录诊断。 |
 | 插件资源字典移除失败 | 进入插件卸载错误聚合。 |
 
@@ -150,4 +151,4 @@ Block new localization lookup
 - UI Thread enforcement。
 - FlowDirection change。
 - plugin resource dictionary revoke。
-- apply failed rollback。
+- apply failed 的局部资源一致性由 Presentation bridge 承担，Localization 不回滚 CultureState。

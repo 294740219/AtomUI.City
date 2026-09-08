@@ -43,6 +43,7 @@
 | AUC-LOCALIZATION-005 | Assembly Language Packages | LanguagePackageProviderTests; LocalizationDeclarationAttributeTests |
 | AUC-LOCALIZATION-006 | Presentation Bridge | LocalizationServiceTests |
 | AUC-LOCALIZATION-007 | Plugin Package Revocation | LocalizationServiceTests |
+| AUC-LOCALIZATION-008 | Generated Localization Manifest | AtomUICityIncrementalGeneratorLocalizationTests; LocalizationManifestBuilderTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -65,23 +66,22 @@
 
 Resource model 描述本地化资源如何被声明、索引、加载和查找。
 
-Localization 不是简单的字符串字典。它需要表达 Host、Module、Plugin、Route、Theme 和 Presentation 的资源贡献关系，并支持按 culture 懒加载。
+Localization 不是单个全局字符串字典。它表达 Host、Module、Plugin、Route、Window 和 Presentation 的资源贡献关系，并支持按 culture 懒加载。
 
 ### 2. Resource Descriptor
 
-Resource descriptor 应包含：
+生成期 `LocalizedResourceManifestEntry` 包含：
 
 | 字段 | 说明 |
 |---|---|
-| ResourceId | 稳定资源标识。 |
 | Key | 资源 key。 |
-| ResourceType | String、FormattedString、Object、FlowDirection 等类型。 |
+| Kind | String、FormattedString、ValidationMessage、ErrorMessage、CommandText 或 RouteTitle。 |
 | Culture | 所属 culture。 |
 | Scope | Host、Module、Plugin、Route、Window 等资源范围。 |
-| Contribution | 来源 Contribution。 |
 | PackageId | 语言包 id。 |
 | Version | 资源版本。 |
-| FallbackPolicy | fallback 策略。 |
+| Critical | culture commit 前是否必须存在。 |
+| ScopeId | 非全局 scope 的稳定实例 id。 |
 
 运行时不通过扫描程序集发现 descriptor，默认消费 Source Generator manifest。
 
@@ -98,7 +98,7 @@ Resource descriptor 应包含：
 | Window | 窗口级资源。 |
 | Presentation | AtomUI/Avalonia UI 资源桥。 |
 
-资源 Scope 决定加载时机、查找优先级和撤销边界。
+资源 Scope 决定加载时机、查找优先级和撤销边界。Host 与 Presentation 是全局 scope；Module、Plugin、Route、Window descriptor 必须携带稳定 `ScopeId`。后四类只有在 `ILocalizationService.ActivateScope` 返回的 lease 存活，并且 lookup 的 `LocalizationLookupContext` 携带相同 id 时才可见。
 
 ### 4. Language Package
 
@@ -107,9 +107,10 @@ Language package 是懒加载基本单位。
 规则：
 
 - 每个 package 只包含一个 culture。
-- package 可以来自独立 assembly 或 file-based locpack。
+- package 可以来自 in-memory resources、独立 assembly embedded locpack 或 file-based locpack。
 - package 必须有 descriptor。
-- package 加载后产生 `ILocalizedResourceStore`。
+- descriptor 的 `Culture`、`FallbackCulture`、资源字典和 critical key 集合均以只读快照保存，调用方后续修改输入不得改变 descriptor。
+- package 加载后产生只读 `LanguagePackage`，查找统一经 `ILocalizationService`。
 - package 必须支持释放。
 
 推荐命名：
@@ -122,20 +123,18 @@ SalesPlugin.zh-CN
 
 ### 5. 资源类型
 
-第一版必须支持字符串，架构预留更多类型：
+1.0 runtime 以字符串和格式化字符串为统一执行模型：
 
 | 类型 | 用途 |
 |---|---|
 | String | 普通文本。 |
 | FormattedString | 参数化文本。 |
-| Pluralization | 数量规则，后续增强。 |
-| ResourceObject | 图片、图标、字体、文档片段。 |
-| FlowDirection | RTL / LTR。 |
-| CultureMetadata | 日期、数字、货币格式 metadata。 |
 | ValidationMessage | 表单验证消息。 |
 | ErrorMessage | 错误展示。 |
 | CommandText | 菜单、按钮、快捷入口。 |
 | RouteTitle | 页面标题、面包屑。 |
+
+`Pluralization`、`ResourceObject`、`FlowDirection`、`CultureMetadata` 仍保留枚举值，但 Generator 在其获得独立运行时合同前必须报错拒绝。
 
 ### 6. 资源分层
 
@@ -160,7 +159,7 @@ route resources
 | 场景 | 默认处理 |
 |---|---|
 | descriptor 重复 | 构建期诊断。 |
-| resource type 不匹配 | fallback，并记录诊断。 |
+| resource kind 无运行时合同 | Generator build error。 |
 | package version 不兼容 | 拒绝加载 package。 |
 | contribution 已撤销 | 拒绝查找或 fallback。 |
 
@@ -172,4 +171,4 @@ route resources
 - Resource scope 查找优先级。
 - package 版本不兼容。
 - 插件资源撤销。
-- resource type mismatch。
+- unsupported resource kind build error。

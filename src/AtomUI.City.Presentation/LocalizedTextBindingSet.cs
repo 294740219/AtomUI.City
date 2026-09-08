@@ -27,20 +27,42 @@ internal sealed class LocalizedTextBindingSet
         List<IDisposable> resources,
         CancellationToken cancellationToken)
     {
+        await BindKeyAsync(
+                key,
+                setText,
+                resources,
+                LocalizationLookupContext.Global,
+                cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public async ValueTask BindKeyAsync(
+        string? key,
+        Action<string?> setText,
+        List<IDisposable> resources,
+        LocalizationLookupContext context,
+        CancellationToken cancellationToken)
+    {
         ArgumentNullException.ThrowIfNull(setText);
         ArgumentNullException.ThrowIfNull(resources);
+        ArgumentNullException.ThrowIfNull(context);
 
         if (key is null)
         {
             return;
         }
 
-        var text = await _localization.CreateTextAsync(key, cancellationToken).ConfigureAwait(false);
+        var text = await _localization.CreateTextAsync(key, context, cancellationToken).ConfigureAwait(false);
         resources.Add(text);
         var binding = await _textBinding
             .BindAsync(text, new TargetAdapter(setText), cancellationToken)
             .ConfigureAwait(false);
         resources.Add(binding);
+    }
+
+    public ILocalizationScopeLease ActivateScope(LocalizationLookupContext context)
+    {
+        return _localization.ActivateScope(context);
     }
 
     public async ValueTask BindMessageAsync(

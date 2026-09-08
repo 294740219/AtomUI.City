@@ -46,6 +46,7 @@
 | AUC-LOCALIZATION-005 | Assembly Language Packages | LanguagePackageProviderTests; LocalizationDeclarationAttributeTests |
 | AUC-LOCALIZATION-006 | Presentation Bridge | LocalizationServiceTests |
 | AUC-LOCALIZATION-007 | Plugin Package Revocation | LocalizationServiceTests |
+| AUC-LOCALIZATION-008 | Generated Localization Manifest | AtomUICityIncrementalGeneratorLocalizationTests; LocalizationManifestBuilderTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -66,7 +67,7 @@
 
 ### 1. 定位
 
-插件可以贡献本地化资源，但必须受 Host 生命周期、ContributionLease、文化切换和卸载约束管理。
+插件可以贡献本地化资源，但必须受 Host 生命周期、Registry owner/contribution id、文化切换和卸载顺序约束管理。
 
 插件启用不等于加载所有语言包。插件只注册 localization manifest，当前 culture 和活动 UI 决定实际加载哪个语言包。
 
@@ -82,7 +83,7 @@
 - Command text key。
 - Validation / error message key。
 
-所有贡献必须通过 Contribution Request 进入 registry。
+插件集成层调用生成的 `RegisterPackages(registry, ownerId)` 或 `LanguagePackageRegistry.Register` 进入 Registry。Localization 不声明 PluginSystem 的 Contribution Request 类型。
 
 ### 3. 插件加载流程
 
@@ -94,8 +95,8 @@ Plugin enable
 
 Plugin route opened under zh-CN
 -> load plugin zh-CN package
--> attach resource dictionary to plugin resource scope
--> refresh plugin UI
+-> resolve scoped text through active LocalizationScopeLease
+-> Presentation adapter refresh plugin UI
 ```
 
 ### 4. 插件停用流程
@@ -108,7 +109,7 @@ Plugin stopping
 -> revoke package descriptors
 -> clear plugin resource cache
 -> dispose language packages
--> release ContributionLease
+-> PluginSystem release its contribution/view leases
 ```
 
 ### 5. Assembly 卸载
@@ -136,7 +137,7 @@ Plugin stopping
 | 插件 package 缺失 | fallback 或 missing marker。 |
 | 插件 package 加载失败 | 记录诊断，不影响 Host。 |
 | 插件资源撤销失败 | 进入插件卸载错误聚合。 |
-| 卸载后仍有引用 | 标记 UnloadPending。 |
+| 卸载后仍有引用 | 由 PluginSystem 的 unload/lease 诊断承接；Localization 不声明 `UnloadPending` 状态。 |
 
 ### 8. 测试策略
 
@@ -145,6 +146,6 @@ Plugin stopping
 - 插件 manifest 注册。
 - 插件当前 culture package 懒加载。
 - 插件未选 culture package 不加载。
-- 插件 UI 资源撤销。
+- 插件 UI binding 先释放、资源 descriptor 后撤销。
 - 插件 package assembly 卸载。
 - Host 不持有插件私有引用。

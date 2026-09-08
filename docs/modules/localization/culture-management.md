@@ -43,6 +43,7 @@
 | AUC-LOCALIZATION-005 | Assembly Language Packages | LanguagePackageProviderTests; LocalizationDeclarationAttributeTests |
 | AUC-LOCALIZATION-006 | Presentation Bridge | LocalizationServiceTests |
 | AUC-LOCALIZATION-007 | Plugin Package Revocation | LocalizationServiceTests |
+| AUC-LOCALIZATION-008 | Generated Localization Manifest | AtomUICityIncrementalGeneratorLocalizationTests; LocalizationManifestBuilderTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -59,7 +60,7 @@
 
 ## AtomUI.City.Localization Culture Management 设计
 
-适用范围：当前文化状态、用户偏好、系统文化、事务式文化切换、失败回滚和通知。
+适用范围：当前文化状态、Host 配置的默认 culture、提交前事务式文化切换、提交后 bridge 失败和通知。用户偏好与系统文化选择策略由应用配置层负责。
 
 ### 1. 定位
 
@@ -89,13 +90,11 @@ Culture state 应包含：
 - Current UI culture。
 - Fallback culture chain。
 - Revision。
-- Source。
 - Loaded package set。
-- Diagnostics。
 
 Revision 用于让 binding、cache 和 localizer 判断是否需要刷新。
 
-`LocalizationOptions` 提供默认 culture、默认 UI culture 和全局 fallback culture。未配置时默认使用 invariant culture。fallback chain 的顺序是 language package descriptor fallback、全局 fallback、culture parent chain、invariant culture，并去重。
+`CultureState` 是深只读快照：集合会复制，暴露的 `CultureInfo` 是只读实例，构造后修改调用方传入的 culture 或集合不会改变已发布状态。`LocalizationOptions` 提供默认 culture、默认 UI culture 和全局 fallback culture。未配置时默认使用 invariant culture。fallback chain 的顺序是当前 lookup 可见 language package descriptor fallback、全局 fallback、culture parent chain、invariant culture，并去重。
 
 ### 4. 事务式切换
 
@@ -105,7 +104,6 @@ Revision 用于让 binding、cache 和 localizer 判断是否需要刷新。
 SetCultureAsync
 -> calculate active package set
 -> load target culture packages
--> load required fallback packages
 -> validate critical resources
 -> prepare Presentation resource swap
 -> commit culture state
@@ -113,32 +111,33 @@ SetCultureAsync
 -> notify subscribers
 ```
 
-失败回滚：
+提交前失败：
 
 ```text
-Load or apply failed
+Package load or critical validation failed
 -> keep previous culture state
 -> dispose partially loaded packages
--> restore previous Presentation resources
 -> emit diagnostics
 ```
 
 ### 5. 并发策略
 
-同一时间只能有一个 culture switch。
+同一时间只有一个 Localization mutation 执行；culture switch 与 contribution revoke 共用 FIFO 队列。
 
 规则：
 
-- 新切换请求可以排队或取消旧请求，策略由 Host 配置。
+- 新切换请求排队等待前一 mutation 完成。
 - 已进入 commit 阶段后不允许抢占。
 - 文化切换取消不是 fatal error。
-- 文化切换必须绑定 ApplicationScope。
+- 调用方取消只控制提交前阶段；`CultureState` 一旦发布，bridge 和 `LocalizedText` 刷新改用 service lifetime token 完成本次事务，避免已切换 culture 却只刷新部分 UI。
+- 文化切换和其 service-owned load 必须绑定 `LocalizationService` Host 生命周期。
+- provider、Presentation bridge 和 LocalizedText handler 均在框架锁外执行；这些 callback 中重入 mutation 必须快速失败，不能排队等待自身。
 
 ### 6. 线程模型
 
 资源加载可以在后台进行。
 
-AtomUI/Avalonia resource swap 和 binding refresh 必须在 UI Thread。
+Localization Core 在当前异步调用链执行 bridge 和 `LocalizedText` handler，不承诺 UI 线程。AtomUI/Avalonia resource swap 和实际 UI binding mutation 必须由 Presentation bridge/adapter 调度到 UI Thread。
 
 Localization Core 不依赖 Avalonia；Presentation 提供 bridge。
 
@@ -150,18 +149,18 @@ Localization Core 不依赖 Avalonia；Presentation 提供 bridge。
 | fallback 指向当前 culture | 拒绝切换，保留旧 culture。 |
 | 重复设置当前 culture | 返回成功，不重新加载 package，不递增 revision。 |
 | package 加载失败 | rollback。 |
-| fallback 加载失败 | rollback 或 missing marker，按 criticality。 |
-| UI apply 失败 | rollback Presentation resources。 |
-| 并发切换冲突 | queue 或 cancel previous。 |
+| fallback 懒加载失败 | 当前 lookup 继续后续 fallback，最终返回 missing marker；不回滚已提交 culture。 |
+| UI apply 失败 | 不回滚已提交 CultureState；返回失败 Result、诊断并继续本地文本刷新。 |
+| 并发切换冲突 | FIFO queue；callback 重入返回 `ReentrantOperation`。 |
 
 ### 8. 测试策略
 
 测试必须覆盖：
 
 - 默认 culture 选择。
-- 用户偏好覆盖系统 culture。
+- 应用配置得到的默认 culture。
 - 成功切换。
 - package 加载失败 rollback。
-- UI apply 失败 rollback。
+- UI apply 失败保留已提交 CultureState 并继续 LocalizedText 刷新。
 - 并发切换。
 - revision 递增。

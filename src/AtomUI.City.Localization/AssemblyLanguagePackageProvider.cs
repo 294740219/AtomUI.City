@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Reflection;
+using System.Runtime.Loader;
 
 namespace AtomUI.City.Localization;
 
@@ -22,6 +23,15 @@ public sealed class AssemblyLanguagePackageProvider : ILanguagePackageProvider
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(descriptor);
+
+        if (descriptor.ProviderKind != Kind)
+        {
+            return ValueTask.FromResult(
+                LanguagePackageLoadResult.Failed(
+                    new LocalizationError(
+                        LocalizationErrorKind.InvalidDescriptor,
+                        $"Language package '{descriptor.PackageId}' is not an assembly package.")));
+        }
 
         if (cancellationToken.IsCancellationRequested)
         {
@@ -49,7 +59,15 @@ public sealed class AssemblyLanguagePackageProvider : ILanguagePackageProvider
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var assembly = Assembly.LoadFrom(descriptor.Location);
+            var fullPath = Path.GetFullPath(descriptor.Location);
+            var loadContext = descriptor.LoadContext ?? AssemblyLoadContext.Default;
+            var assembly = loadContext.Assemblies.FirstOrDefault(candidate =>
+                    !string.IsNullOrWhiteSpace(candidate.Location)
+                    && string.Equals(
+                        Path.GetFullPath(candidate.Location),
+                        fullPath,
+                        StringComparison.OrdinalIgnoreCase))
+                ?? loadContext.LoadFromAssemblyPath(fullPath);
             cancellationToken.ThrowIfCancellationRequested();
             var resourceName = ResolveResourceName(assembly, descriptor.ResourceBaseName);
 
@@ -73,7 +91,7 @@ public sealed class AssemblyLanguagePackageProvider : ILanguagePackageProvider
                             $"Embedded localization resource '{resourceName}' was not found.")));
             }
 
-            return ValueTask.FromResult(LocPackReader.Read(stream, descriptor));
+            return ValueTask.FromResult(LocPackReader.Read(stream, descriptor, cancellationToken));
         }
         catch (OperationCanceledException exception)
         {
@@ -100,6 +118,8 @@ public sealed class AssemblyLanguagePackageProvider : ILanguagePackageProvider
             attribute.Scope)
         {
             ProviderKind = LanguagePackageProviderKind.Assembly,
+            ScopeId = attribute.ScopeId,
+            LoadContext = AssemblyLoadContext.GetLoadContext(assembly),
             FallbackCulture = string.IsNullOrWhiteSpace(attribute.FallbackCulture)
                 ? null
                 : CultureInfo.GetCultureInfo(attribute.FallbackCulture),
@@ -114,9 +134,19 @@ public sealed class AssemblyLanguagePackageProvider : ILanguagePackageProvider
     private static string? ResolveResourceName(Assembly assembly, string resourceBaseName)
     {
         var names = assembly.GetManifestResourceNames();
+        var exact = names.FirstOrDefault(name => string.Equals(name, resourceBaseName, StringComparison.Ordinal));
+        if (exact is not null)
+        {
+            return exact;
+        }
 
-        return names.FirstOrDefault(name => string.Equals(name, resourceBaseName, StringComparison.Ordinal))
-            ?? names.FirstOrDefault(name => name.EndsWith(resourceBaseName, StringComparison.Ordinal));
+        var suffix = "." + resourceBaseName;
+        var matches = names
+            .Where(name => name.EndsWith(suffix, StringComparison.Ordinal))
+            .Take(2)
+            .ToArray();
+
+        return matches.Length == 1 ? matches[0] : null;
     }
 
     private static LanguagePackageLoadResult Cancelled(

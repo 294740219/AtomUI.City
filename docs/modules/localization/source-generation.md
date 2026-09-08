@@ -46,6 +46,7 @@
 | AUC-LOCALIZATION-005 | Assembly Language Packages | LanguagePackageProviderTests; LocalizationDeclarationAttributeTests |
 | AUC-LOCALIZATION-006 | Presentation Bridge | LocalizationServiceTests |
 | AUC-LOCALIZATION-007 | Plugin Package Revocation | LocalizationServiceTests |
+| AUC-LOCALIZATION-008 | Generated Localization Manifest | AtomUICityIncrementalGeneratorLocalizationTests; LocalizationMetadataReaderTests; LocalizationManifestBuilderTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -62,13 +63,13 @@
 
 ## AtomUI.City.Localization Source Generation 设计
 
-适用范围：Resource manifest、language package descriptor、强类型 key、accessor、AOT、Analyzer 和构建期诊断。
+适用范围：Resource manifest、language package descriptor、强类型 key 常量、AOT 边界和构建期诊断。
 
 ### 1. 定位
 
 Localization 是 source-generator-first 模块。
 
-运行时默认不扫描程序集找资源，也不靠反射发现资源 key。Source Generator 生成 manifest、descriptor 和强类型访问入口。
+运行时默认不扫描程序集找资源 key。Source Generator 生成 manifest、descriptor 注册入口和强类型 key 常量；`AssemblyLanguagePackageProvider.Discover` 仅作为显式调用的反射式兼容入口。
 
 ### 2. 生成内容
 
@@ -78,36 +79,42 @@ Generator 负责：
 - Language package descriptor。
 - Supported culture manifest。
 - Fallback culture manifest。
-- Strongly typed accessor。
 - Key constants。
 - Module resource descriptor。
 - Plugin resource descriptor。
-- AtomUI resource bridge descriptor。
-- Locpack manifest。
 
-### 3. 强类型 Accessor
+当前生成入口为 `AtomUI.City.Generated.GeneratedLocalizationManifest`：`RegisterPackages` 通过一次 `LanguagePackageRegistry.RegisterRange` 原子注册全部 descriptor，任一冲突都不得留下部分注册；`SupportedCultures` 和 `ResourceKeys` 提供稳定 manifest，`Keys` 提供强类型常量。生成 descriptor 保存声明 assembly 的 `AssemblyLoadContext`。生成链由 `AtomUICityIncrementalGenerator.Initialize` 直接初始化，不允许仅存在独立 metadata/builder 而未接入 Roslyn pipeline。
 
-强类型 accessor 生成在模块或插件主 assembly 中，不生成在语言包 assembly 中。
+`LocalizationMetadataReader` 将 attribute 读取阶段错误写入 `LocalizationMetadata.Diagnostics`；主 pipeline 必须先报告这些错误并停止生成，不能把无效声明过滤后继续产生部分 manifest。
+
+1.0 package identity 固定为 `(culture, packageId)`；当相同 package id 存在多个 culture 时，`LocalizedResourceAttribute.Culture` 必填以消除歧义。resource scope/scope id 必须与目标 package 一致。
+
+`String`、`FormattedString`、`ValidationMessage`、`ErrorMessage`、`CommandText`、`RouteTitle` 生成字符串 key；`Pluralization`、`ResourceObject`、`FlowDirection`、`CultureMetadata` 尚无 1.0 runtime contract，Generator 必须报错而不是生成无效元数据。`Critical=true` 会写入 descriptor 的 `CriticalResourceKeys`，culture commit 前必须验证。
+
+### 3. 强类型 Key
+
+`Keys` 常量生成在声明 attribute 的模块或插件主 assembly 中，不生成在独立语言包 assembly 中。
 
 原因：
 
 - 语言包 assembly 应保持 resource-only。
-- 插件语言包卸载不能影响主插件 API。
+- 插件语言包卸载不能影响主插件的 key contract。
 - Host 不应持有语言包 assembly 类型。
 
 ### 4. Analyzer 诊断
 
 必须诊断：
 
-- 重复 key。
-- 未声明 key 引用。
+- 重复 package identity 和 key。
+- 缺失或歧义 package 引用。
 - fallback 不完整。
-- invariant 缺失。
-- culture package 缺失。
-- 格式化参数数量不匹配。
-- 插件资源覆盖 Host key。
-- 插件资源类型泄漏。
-- 运行时反射式资源扫描。
+- fallback cycle。
+- attribute 必填字符串为空。
+- invalid culture、未知 enum、scope、scope id 和 resource base name。
+- resource/package scope 不匹配。
+- 尚无运行时合同的 resource kind。
+
+源码中 key 引用存在性、格式参数数量、插件覆盖策略和资源类型泄漏 Analyzer 尚无 Feature ID，不属于 1.0 已交付范围。
 
 ### 5. AOT
 
@@ -115,8 +122,8 @@ Native AOT 模式：
 
 - 禁止依赖动态 assembly loading。
 - 使用 file-based locpack。
-- manifest 和 accessor 仍由 generator 生成。
-- 运行时消费强类型 descriptor。
+- manifest 和 key constants 仍由 generator 生成。
+- file locpack descriptor 由应用显式注册；当前 attribute registrar 生成的是 assembly provider descriptor。
 
 ### 6. Build 集成
 
@@ -135,9 +142,11 @@ Localization 文档只定义 contract。
 测试必须覆盖：
 
 - manifest 生成。
-- accessor 生成。
+- key constants 和 registrar 生成。
+- registrar 原子批量注册。
 - duplicate key 诊断。
-- missing key 诊断。
+- missing/ambiguous package 诊断。
 - fallback incomplete 诊断。
-- locpack manifest。
-- plugin resource leakage 诊断。
+- fallback cycle 诊断。
+- culture identity 规范化和碰撞诊断。
+- 空 attribute 参数、未知 enum、scope/resource kind/resource base name 诊断。

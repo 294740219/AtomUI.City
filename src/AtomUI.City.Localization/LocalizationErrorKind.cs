@@ -16,4 +16,12 @@ public enum LocalizationErrorKind
     PackageAlreadyRegistered,
     OwnerRevoked,
     ResourceRevoked,
+    InvalidDescriptor,
+    ReentrantOperation,
+    ServiceDisposed,
+    PackageIdentityMismatch,
+    PackageChecksumMismatch,
+    PackageSchemaMismatch,
+    PackageTooLarge,
+    InvalidResource,
 }

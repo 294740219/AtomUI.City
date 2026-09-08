@@ -42,6 +42,8 @@
 | AUC-LOCALIZATION-004 | Lookup and Fallback | LocalizationServiceTests |
 | AUC-LOCALIZATION-005 | Assembly Language Packages | LanguagePackageProviderTests; LocalizationDeclarationAttributeTests |
 | AUC-LOCALIZATION-006 | Presentation Bridge | LocalizationServiceTests |
+| AUC-LOCALIZATION-007 | Plugin Package Revocation | LocalizationServiceTests |
+| AUC-LOCALIZATION-008 | Generated Localization Manifest | AtomUICityIncrementalGeneratorLocalizationTests; LocalizationManifestBuilderTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -82,20 +84,16 @@ Language packages loaded
 
 必须支持刷新：
 
-- XAML localized binding。
-- Window title。
-- Route title。
-- Breadcrumb。
-- Command text。
-- Command tooltip。
-- Validation message。
-- Dialog / Interaction 文案。
-- Data / Security error message。
-- Notification / Toast 文案。
+- `ILocalizedText` 和 formatted message text。
+- Presentation `LocalizedTextBindingSet` 的任意 setter 目标。
+- Presentation Window title。
+- Presentation Route title、description、breadcrumb、group 和 error title。
+
+Command、Validation、Dialog、Data/Security error 和 Notification 可以通过通用 setter/`ILocalizedText` 接入；专用 adapter 需要各 owning module 单独分配 Feature ID。
 
 ### 4. Culture-aware Binding
 
-XAML 目标语法：
+下列 XAML markup extension 仅为后续候选语法，当前 1.0 未实现：
 
 ```xml
 <TextBlock Text="{loc:Text Settings.Title}" />
@@ -103,19 +101,19 @@ XAML 目标语法：
 
 规则：
 
-- Binding 订阅 CultureState revision。
+- 当前绑定句柄持有 `ILocalizedText.Changed` 订阅。
 - View detached 后释放订阅。
 - 插件 View 的 binding 随插件 UI 释放。
-- Binding refresh 必须在 UI Thread。
+- Localization Core 的 `ILocalizedText.Changed` 在当前异步调用链执行；Presentation binding adapter 必须把实际 UI mutation 调度到 UI Thread。
 
 ### 5. ViewModel 文本
 
-ViewModel 可以使用 `ILocalizedText` 或强类型 accessor。
+ViewModel 可以使用 `ILocalizedText` 或生成的 key constants；生成的强类型方法 accessor 尚不属于 1.0。
 
 规则：
 
 - `ILocalizedText` 可以随 culture change 刷新。
-- 简单字符串属性可以由 source generator 生成 culture-aware notification。
+- 简单字符串属性由调用方通过 `LocalizedTextBindingSet` setter 或 `ILocalizedText.Changed` 更新。
 - ViewModel 停用时释放 localization subscription。
 
 ### 6. 错误策略
@@ -132,9 +130,8 @@ ViewModel 可以使用 `ILocalizedText` 或强类型 accessor。
 
 测试必须覆盖：
 
-- XAML binding refresh。
+- `ILocalizedText` 和通用 setter refresh。
 - Window title refresh。
-- Command text refresh。
-- Validation message refresh。
+- Route metadata refresh。
 - plugin View detached 后不刷新。
 - missing key marker。

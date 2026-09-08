@@ -43,6 +43,7 @@
 | AUC-LOCALIZATION-005 | Assembly Language Packages | LanguagePackageProviderTests; LocalizationDeclarationAttributeTests |
 | AUC-LOCALIZATION-006 | Presentation Bridge | LocalizationServiceTests |
 | AUC-LOCALIZATION-007 | Plugin Package Revocation | LocalizationServiceTests |
+| AUC-LOCALIZATION-008 | Generated Localization Manifest | AtomUICityIncrementalGeneratorLocalizationTests; LocalizationManifestBuilderTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -74,7 +75,7 @@ Application startup
 -> load localization manifests only
 -> register package descriptors
 -> select initial culture
--> load required active packages for selected culture
+-> publish initial CultureState with an empty loaded-package set
 ```
 
 启动不加载：
@@ -84,16 +85,18 @@ Application startup
 - 未使用插件的 package。
 - 所有 fallback package。
 
+构造服务和注册 manifest 均不读取语言包正文。第一次 lookup 按其 context 加载可见 descriptor；切换到不同 culture 时，`SetCultureAsync` 加载 Host/Presentation 与当前存在活动 lease 的 scoped descriptor。激活 scope 后首次带对应 context 的 lookup 按需加载；最后一个 lease 释放后，后续 lookup 立即退回全局资源。
+
 ### 3. 加载策略
 
-| 策略 | 说明 |
+1.0 只有两种实际触发路径：
+
+| 触发 | 说明 |
 |---|---|
-| Eager | Host 核心资源启动加载。 |
-| OnDemand | 模块首次访问时加载。 |
-| RouteActivated | 路由进入时预加载页面资源。 |
-| PluginActivated | 插件启用时只注册 manifest，资源本体按需加载。 |
-| CultureSwitch | 切换文化时按当前活动资源集合加载。 |
-| PreloadHint | 模块声明预加载 hint。 |
+| Lookup | 首次查找时按 `LocalizationLookupContext` 加载当前 culture 的可见 package；缺失后再按需加载 fallback。 |
+| CultureSwitch | 切换到不同 culture 时加载全局 descriptor 与已有活动 lease 对应的 scoped descriptor。 |
+
+路由、窗口和插件只通过 `ActivateScope` lease 改变可见集合；1.0 没有独立的 `Eager`、route preload、plugin preload 或 `PreloadHint` API。
 
 ### 4. 当前文化懒加载
 
@@ -101,17 +104,17 @@ Application startup
 
 ```text
 CurrentCulture = zh-CN
-Active modules = Host, SettingsModule
-Active plugin = SalesPlugin
+Lookup context = SettingsModule
+Active leases = SettingsModule, SalesPlugin
 
 Load:
 Host.zh-CN
 SettingsModule.zh-CN
-SalesPlugin.zh-CN
 
 Do not load:
 Host.en-US
 SettingsModule.ja-JP
+SalesPlugin.zh-CN
 SalesPlugin.en-US
 ```
 
@@ -136,34 +139,22 @@ zh-CN -> zh-Hans -> zh -> invariant
 
 Active package set 由当前运行时状态决定：
 
-- ApplicationScope。
-- WindowScope。
-- NavigationScope。
-- RouteScope。
-- ActivationScope。
-- Plugin contribution。
-- Presentation resource scope。
+- `ResourceScope.Host` 和 `ResourceScope.Presentation` 始终全局可见。
+- `ResourceScope.Module`、`Plugin`、`Route`、`Window` 必须同时满足 descriptor `ScopeId`、活动 `ILocalizationScopeLease` 和 lookup context id 匹配。
 
-Route 离开、Window 关闭、Plugin 停用时，对应 package 可释放或降级为 weak cache。
+Route 离开、Window 关闭或 Plugin 停用时释放对应 lease，后续 lookup 立即不再看到该 scope。插件 contribution 撤销会清除对应 cache；单纯 lease 释放不会立即驱逐已加载 package。
 
 ### 7. 缓存
 
-缓存维度：
-
-```text
-Culture
-ContributionId
-PackageId
-PackageVersion
-ResourceRevision
-```
+package cache 与 in-flight load 的稳定键均为 `(culture, packageId)`。
 
 规则：
 
-- 当前活动 package 优先保留。
-- 非活动 package 可被内存压力释放。
-- culture switch 使 active cache revision 变化。
-- plugin unload 清理插件 package cache。
+- 成功 load 才能写入 cache；失败、取消、已撤销或 service 已 Dispose 的结果不得发布。
+- culture switch 可复用相同键的现有 package，并通过 `CultureState.LoadedPackageIds` 发布当前/回退链已加载集合。
+- registry owner/contribution revoke 清理对应 package cache。
+- service Dispose 取消 in-flight load 并释放全部 cache。
+- 1.0 没有弱引用缓存、内存压力驱逐或按 package version/resource revision 分层的策略。
 
 ### 8. 错误策略
 
@@ -171,8 +162,12 @@ ResourceRevision
 |---|---|
 | package not found | fallback 或 missing marker。 |
 | package load failed | culture switch 阶段 rollback；普通 lookup 阶段 fallback。 |
-| cache entry stale | 重新加载。 |
+| cache entry 已由 revoke 失效 | 丢弃旧条目；后续查找按当前 Registry snapshot 决定是否重新加载。 |
 | plugin package revoked | 清理 cache 并 fallback。 |
+
+并发 lookup 对同一 `(culture, packageId)` 共享由 service lifetime token 控制的 load task；调用方 token 仅取消自己的等待，不取消其他 waiter。load 完成时必须重验 descriptor 是否仍注册；已撤销或 service 已 Dispose 的 package 立即释放且不发布。
+
+File provider 在打开文件前规范化 `Location` 与 `AllowedRootPath`，拒绝 root 外路径；locpack reader 以 16 MiB 为硬上限并在复制期间观察取消，校验 schema version、package version、id、culture、SHA-256 checksum、resources object、重复根属性/资源 key 和非字符串值。
 
 ### 9. 测试策略
 
@@ -182,6 +177,6 @@ ResourceRevision
 - 当前 culture package 加载。
 - 未选择 culture package 不加载。
 - fallback 按需加载。
-- route activated 预加载。
-- plugin activated 不加载所有语言包。
-- plugin route opened 加载当前 culture package。
+- scope lease 激活本身不加载正文，首次带匹配 context 的 lookup 才加载。
+- culture switch 只预加载全局和已有活动 lease 对应的 package。
+- plugin contribution 撤销清理 cache，且在途 load 不得复活 package。

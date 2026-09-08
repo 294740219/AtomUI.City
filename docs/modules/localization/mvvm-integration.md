@@ -43,6 +43,7 @@
 | AUC-LOCALIZATION-005 | Assembly Language Packages | LanguagePackageProviderTests; LocalizationDeclarationAttributeTests |
 | AUC-LOCALIZATION-006 | Presentation Bridge | LocalizationServiceTests |
 | AUC-LOCALIZATION-007 | Plugin Package Revocation | LocalizationServiceTests |
+| AUC-LOCALIZATION-008 | Generated Localization Manifest | AtomUICityIncrementalGeneratorLocalizationTests; LocalizationManifestBuilderTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -59,7 +60,7 @@
 
 ## AtomUI.City.Localization MVVM Integration 设计
 
-适用范围：ViewModel localizer、强类型 accessor、Command 文本、Interaction、Validation 和 ActivationScope 绑定。
+适用范围：ViewModel 文本查找、生成 key constants、`ILocalizedText` 与 ActivationScope 绑定，以及 Command、Interaction、Validation 的集成边界。
 
 ### 1. 定位
 
@@ -67,23 +68,24 @@ MVVM 集成让 ViewModel、Command、Interaction 和 Validation 使用统一本�
 
 Mvvm 不实现资源查找。Localization 提供文本和 culture notification。Presentation 负责 UI 展示刷新。
 
-### 2. ViewModel Localizer
+### 2. ViewModel Lookup
 
 字符串 key 模式：
 
 ```csharp
 public sealed partial class SettingsViewModel
 {
-    private readonly IStringLocalizer<SettingsViewModel> _localizer;
+    private readonly ILocalizationService _localization;
 
-    public string Title => _localizer["Settings.Title"];
+    public ValueTask<LocalizedString> GetTitleAsync(CancellationToken cancellationToken) =>
+        _localization.GetStringAsync("Settings.Title", cancellationToken);
 }
 ```
 
-强类型模式：
+生成 key 常量模式：
 
 ```csharp
-public string Title => _texts.Settings.Title();
+var title = await localization.GetStringAsync(GeneratedLocalizationManifest.Keys.Settings_Title);
 ```
 
 ### 3. ActivationScope
@@ -92,14 +94,14 @@ Localization subscription 必须绑定 `ActivationScope`。
 
 规则：
 
-- ViewModel 激活时订阅 culture change。
+- ViewModel 激活时调用 `CreateTextAsync` 创建 `ILocalizedText`，并通过 `ActivationScope.Add` 持有。
 - ViewModel 停用时释放订阅。
 - ViewModel 构造函数不启动长期订阅。
 - 插件 ViewModel 的 localizer 不泄漏到 Host 静态缓存。
 
 ### 4. Command
 
-Command metadata 可以声明：
+Command 文本可在业务 metadata 中约定下列 key；Localization 1.0 不声明专用 Command metadata 类型：
 
 ```text
 TextKey
@@ -108,7 +110,7 @@ DescriptionKey
 IconKey
 ```
 
-Culture 变化后：
+业务层可以把 `ILocalizedText.Changed` 连接到 Command 属性通知；专用自动 adapter 需由 MVVM 模块另立 Feature：
 
 ```text
 CultureChanged
@@ -129,21 +131,21 @@ Interaction request 不应传固定显示文本。
 - ButtonKey。
 - MessageArgs。
 
-Presentation handler 在显示时查找当前 culture 文本。
+Presentation handler 在显示时通过 `ILocalizationService.GetMessageAsync` 查找当前 culture 文本。
 
 ### 6. Validation
 
 Validation message 应使用 MessageKey + MessageArgs。
 
-文化切换后，仍显示的 validation message 必须可刷新。
+文化切换后，仍显示的 validation message 可由 `CreateMessageTextAsync` 刷新；专用 Validation adapter 不属于 Localization 当前 public API。
 
 ### 7. 测试策略
 
 测试必须覆盖：
 
-- ViewModel localizer lookup。
-- strong typed accessor。
+- ViewModel service lookup。
+- generated key constant lookup。
 - ActivationScope 停用释放 subscription。
-- Command text culture refresh。
-- Interaction message refresh。
-- Validation message refresh。
+- `ILocalizedText` / message text culture refresh。
+
+Command、Interaction、Validation 的专用跨模块测试随各自 Feature ID 建设，不能在本页宣称已由 Localization 自动完成。

@@ -11,9 +11,13 @@ public sealed class LocalizedString
         bool isFallback,
         bool isMissing)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        ArgumentNullException.ThrowIfNull(value);
+        ArgumentNullException.ThrowIfNull(culture);
+
         Key = key;
         Value = value;
-        Culture = culture;
+        Culture = CultureInfoSnapshot.Create(culture);
         IsFallback = isFallback;
         IsMissing = isMissing;
     }

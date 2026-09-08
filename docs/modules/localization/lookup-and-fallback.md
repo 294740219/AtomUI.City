@@ -43,6 +43,7 @@
 | AUC-LOCALIZATION-005 | Assembly Language Packages | LanguagePackageProviderTests; LocalizationDeclarationAttributeTests |
 | AUC-LOCALIZATION-006 | Presentation Bridge | LocalizationServiceTests |
 | AUC-LOCALIZATION-007 | Plugin Package Revocation | LocalizationServiceTests |
+| AUC-LOCALIZATION-008 | Generated Localization Manifest | AtomUICityIncrementalGeneratorLocalizationTests; LocalizationManifestBuilderTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -72,14 +73,9 @@ Lookup and fallback 负责把 resource key 解析为当前 culture 下的显示�
 查找输入包含：
 
 - Resource key。
-- Resource type。
-- Current culture。
-- Scope。
-- ModuleId。
-- PluginId。
-- ContributionId。
-- Format args。
-- Fallback policy。
+- 当前 `CultureState` snapshot。
+- 可选 `LocalizationLookupContext`（ModuleId、PluginId、RouteId、WindowId）。
+- message format args。
 
 ### 3. 查找顺序
 
@@ -107,38 +103,31 @@ zh-CN -> zh-Hans -> zh -> invariant
 
 规则：
 
+- 每次 lookup 只使用全局 descriptor 与本次 `LocalizationLookupContext` 可见、且 lease 已激活的 scoped descriptor 计算 fallback chain；其他活动 scope 不得污染本次查找。
 - fallback package 按需加载。
-- fallback 命中必须记录诊断级别信息。
-- critical resource fallback 失败可以导致 culture switch rollback。
+- fallback 全部未命中时记录 `AUCLOC002`；成功命中由 `LocalizedString.IsFallback/Culture` 表达，不额外产生 warning。
+- target package 的 critical resource 在 commit 前校验；缺失时保持旧 culture state 并释放本次未缓存 package。
 - 非 critical resource fallback 失败返回 missing marker。
 - 当前 culture 的所有 scope 均未命中后，才进入 fallback culture chain。
 
 ### 5. Missing Marker
 
-开发模式默认：
+当前 1.0 固定 missing marker：
 
 ```text
 !Settings.Title!
 ```
 
-发布模式默认：
-
-- invariant fallback。
-- key fallback。
-- diagnostics record。
-
-具体策略由 Host 配置。
+在返回 marker 前仍会尝试 invariant fallback，并写入 diagnostics。开发/发布模式可配置 marker 尚无 Feature ID。
 
 ### 6. 格式化
 
-格式化资源必须使用当前 culture。
+格式化资源必须使用实际命中资源的 culture。
 
 规则：
 
-- 参数数量不匹配时返回 raw template 或 missing marker。
-- 格式化异常记录 diagnostics。
-- 日期、数字、货币使用 CurrentCulture。
-- UI 文案资源使用 CurrentUICulture。
+- 参数数量不匹配或任意 `IFormattable`/格式提供器执行异常时返回 raw template。
+- 所有格式化执行异常记录 diagnostics，不得让用户格式化代码逃逸为 lookup 异常。
 - `GetMessageAsync` 使用命中资源的 culture 进行格式化。
 
 ### 7. 资源撤销
@@ -163,7 +152,8 @@ Revoke contribution
 - module fallback。
 - host fallback。
 - culture fallback。
+- 动态 scoped descriptor 声明的 fallback 以及跨 scope fallback 隔离。
 - invariant fallback。
 - missing marker。
-- 格式参数错误。
+- 格式参数和自定义 formatter 异常。
 - 插件撤销后 fallback。

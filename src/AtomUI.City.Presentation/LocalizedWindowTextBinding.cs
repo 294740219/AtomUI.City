@@ -24,9 +24,11 @@ public sealed class LocalizedWindowTextBinding
         ArgumentNullException.ThrowIfNull(target);
 
         var resources = new List<IDisposable>();
+        var context = new LocalizationLookupContext(windowId: descriptor.WindowId);
 
         try
         {
+            resources.Add(_bindingSet.ActivateScope(context));
             if (descriptor.TitleKey is null)
             {
                 await _bindingSet
@@ -43,6 +45,7 @@ public sealed class LocalizedWindowTextBinding
                         descriptor.TitleKey,
                         value => target.Title = value,
                         resources,
+                        context,
                         cancellationToken)
                     .ConfigureAwait(false);
             }

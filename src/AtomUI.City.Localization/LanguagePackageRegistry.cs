@@ -2,11 +2,12 @@ namespace AtomUI.City.Localization;
 
 public sealed class LanguagePackageRegistry
 {
-    private readonly Dictionary<string, LanguagePackageRegistration> _registrations =
-        new(StringComparer.Ordinal);
+    private readonly Dictionary<(string CultureName, string PackageId), LanguagePackageRegistration> _registrations = [];
     private readonly HashSet<string> _revokedOwners =
         new(StringComparer.Ordinal);
     private readonly object _syncRoot = new();
+
+    internal event Action<IReadOnlyList<LanguagePackageDescriptor>>? DescriptorsRevoked;
 
     public IReadOnlyList<LanguagePackageRegistration> Registrations
     {
@@ -37,7 +38,32 @@ public sealed class LanguagePackageRegistry
         string ownerId)
     {
         ArgumentNullException.ThrowIfNull(descriptor);
+        return RegisterRange([descriptor], ownerId);
+    }
+
+    public LocalizationResult RegisterRange(
+        IEnumerable<LanguagePackageDescriptor> descriptors,
+        string ownerId)
+    {
+        ArgumentNullException.ThrowIfNull(descriptors);
         ArgumentException.ThrowIfNullOrWhiteSpace(ownerId);
+
+        var descriptorArray = descriptors.ToArray();
+        if (descriptorArray.Any(descriptor => descriptor is null))
+        {
+            throw new ArgumentException(
+                "Language package descriptors cannot contain null values.",
+                nameof(descriptors));
+        }
+
+        foreach (var descriptor in descriptorArray)
+        {
+            var validationResult = ValidateDescriptor(descriptor);
+            if (!validationResult.Succeeded)
+            {
+                return validationResult;
+            }
+        }
 
         lock (_syncRoot)
         {
@@ -49,17 +75,26 @@ public sealed class LanguagePackageRegistry
                         $"Language package owner '{ownerId}' has been revoked."));
             }
 
-            if (_registrations.ContainsKey(descriptor.PackageId))
+            var pendingKeys = new HashSet<(string CultureName, string PackageId)>();
+            foreach (var descriptor in descriptorArray)
             {
-                return LocalizationResult.Failed(
-                    new LocalizationError(
-                        LocalizationErrorKind.PackageAlreadyRegistered,
-                        $"Language package '{descriptor.PackageId}' is already registered."));
+                var key = CreateKey(descriptor);
+                if (_registrations.ContainsKey(key) || !pendingKeys.Add(key))
+                {
+                    return LocalizationResult.Failed(
+                        new LocalizationError(
+                            LocalizationErrorKind.PackageAlreadyRegistered,
+                            $"Language package '{descriptor.PackageId}' for culture " +
+                            $"'{descriptor.Culture.Name}' is already registered."));
+                }
             }
 
-            _registrations.Add(
-                descriptor.PackageId,
-                new LanguagePackageRegistration(descriptor, ownerId));
+            foreach (var descriptor in descriptorArray)
+            {
+                _registrations.Add(
+                    CreateKey(descriptor),
+                    new LanguagePackageRegistration(descriptor, ownerId));
+            }
 
             return LocalizationResult.Success();
         }
@@ -69,20 +104,128 @@ public sealed class LanguagePackageRegistry
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(ownerId);
 
+        LanguagePackageDescriptor[] revokedDescriptors;
         lock (_syncRoot)
         {
             _revokedOwners.Add(ownerId);
-            var revokedPackageIds = _registrations
+            var revokedKeys = _registrations
                 .Where(pair => string.Equals(pair.Value.OwnerId, ownerId, StringComparison.Ordinal))
                 .Select(pair => pair.Key)
                 .ToArray();
 
-            foreach (var packageId in revokedPackageIds)
-            {
-                _registrations.Remove(packageId);
-            }
+            revokedDescriptors = revokedKeys
+                .Select(key => _registrations[key].Descriptor)
+                .ToArray();
 
-            return revokedPackageIds.Length;
+            foreach (var key in revokedKeys)
+            {
+                _registrations.Remove(key);
+            }
         }
+
+        NotifyDescriptorsRevoked(revokedDescriptors);
+
+        return revokedDescriptors.Length;
+    }
+
+    internal static LanguagePackageRegistry CreateWithHostDescriptors(
+        IEnumerable<LanguagePackageDescriptor> descriptors)
+    {
+        ArgumentNullException.ThrowIfNull(descriptors);
+
+        var registry = new LanguagePackageRegistry();
+        foreach (var descriptor in descriptors)
+        {
+            var result = registry.Register(descriptor, "host");
+            if (!result.Succeeded)
+            {
+                throw new ArgumentException(result.Error!.Message, nameof(descriptors));
+            }
+        }
+
+        return registry;
+    }
+
+    internal IReadOnlyList<LanguagePackageDescriptor> RevokeContribution(string contributionId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(contributionId);
+
+        LanguagePackageDescriptor[] revokedDescriptors;
+        lock (_syncRoot)
+        {
+            var revokedKeys = _registrations
+                .Where(pair => string.Equals(
+                    pair.Value.Descriptor.ContributionId,
+                    contributionId,
+                    StringComparison.Ordinal))
+                .Select(pair => pair.Key)
+                .ToArray();
+
+            revokedDescriptors = revokedKeys
+                .Select(key => _registrations[key].Descriptor)
+                .ToArray();
+
+            foreach (var key in revokedKeys)
+            {
+                _registrations.Remove(key);
+            }
+        }
+
+        NotifyDescriptorsRevoked(revokedDescriptors);
+
+        return Array.AsReadOnly(revokedDescriptors);
+    }
+
+    internal bool Contains(LanguagePackageDescriptor descriptor)
+    {
+        ArgumentNullException.ThrowIfNull(descriptor);
+
+        lock (_syncRoot)
+        {
+            return _registrations.TryGetValue(CreateKey(descriptor), out var registration)
+                && ReferenceEquals(registration.Descriptor, descriptor);
+        }
+    }
+
+    private void NotifyDescriptorsRevoked(IReadOnlyList<LanguagePackageDescriptor> descriptors)
+    {
+        if (descriptors.Count > 0)
+        {
+            DescriptorsRevoked?.Invoke(descriptors);
+        }
+    }
+
+    private static (string CultureName, string PackageId) CreateKey(LanguagePackageDescriptor descriptor)
+    {
+        return (descriptor.Culture.Name, descriptor.PackageId);
+    }
+
+    private static bool RequiresScopeId(ResourceScope scope)
+    {
+        return scope is ResourceScope.Module
+            or ResourceScope.Plugin
+            or ResourceScope.Route
+            or ResourceScope.Window;
+    }
+
+    private static LocalizationResult ValidateDescriptor(LanguagePackageDescriptor descriptor)
+    {
+        if (!Enum.IsDefined(descriptor.ProviderKind))
+        {
+            return LocalizationResult.Failed(
+                new LocalizationError(
+                    LocalizationErrorKind.InvalidDescriptor,
+                    $"Language package '{descriptor.PackageId}' has an unknown provider kind."));
+        }
+
+        if (RequiresScopeId(descriptor.Scope) && string.IsNullOrWhiteSpace(descriptor.ScopeId))
+        {
+            return LocalizationResult.Failed(
+                new LocalizationError(
+                    LocalizationErrorKind.InvalidDescriptor,
+                    $"Language package '{descriptor.PackageId}' in scope '{descriptor.Scope}' requires a scope id."));
+        }
+
+        return LocalizationResult.Success();
     }
 }

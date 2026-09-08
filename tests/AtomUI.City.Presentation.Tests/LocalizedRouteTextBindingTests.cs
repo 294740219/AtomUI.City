@@ -59,6 +59,40 @@ public sealed class LocalizedRouteTextBindingTests
     }
 
     [Fact]
+    public async Task BindAsyncActivatesMatchingRouteLocalizationScope()
+    {
+        var host = Package("Host.zh-CN", "zh-CN", ("Routes.Settings.Title", "Host Settings"));
+        var route = LanguagePackage.Create(
+            new LanguagePackageDescriptor(
+                "Route.settings.zh-CN",
+                CultureInfo.GetCultureInfo("zh-CN"),
+                ResourceScope.Route)
+            {
+                ScopeId = "settings",
+            },
+            new Dictionary<string, string>
+            {
+                ["Routes.Settings.Title"] = "Route Settings",
+            });
+        await using var localization = new LocalizationService(
+            [host.Descriptor, route.Descriptor],
+            [new TestLanguagePackageProvider(host, route)]);
+        var binding = new LocalizedRouteTextBinding(localization, new RecordingDispatcher());
+        var target = new RouteTextTarget();
+
+        await localization.SetCultureAsync("zh-CN");
+        var handle = await binding.BindAsync(Route("settings"), target);
+
+        Assert.Equal("Route Settings", target.Title);
+
+        handle.Dispose();
+        var afterDispose = await localization.GetStringAsync(
+            "Routes.Settings.Title",
+            new LocalizationLookupContext(routeId: "settings"));
+        Assert.Equal("Host Settings", afterDispose.Value);
+    }
+
+    [Fact]
     public async Task ActivationScopeDisposesRouteTextBinding()
     {
         var zh = Package("Host.zh-CN", "zh-CN", ("Routes.Settings.Title", "设置"));

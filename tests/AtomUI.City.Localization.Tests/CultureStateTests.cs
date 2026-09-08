@@ -6,6 +6,25 @@ namespace AtomUI.City.Localization.Tests;
 public sealed class CultureStateTests
 {
     [Fact]
+    public async Task CultureStateIsPublishedThroughCityStateContract()
+    {
+        var zh = Package("Host.zh-CN", "zh-CN");
+        await using var service = new LocalizationService(
+            [zh.Descriptor],
+            [new RecordingLanguagePackageProvider(zh)]);
+        var published = new List<CultureState>();
+        using var subscription = service.CultureState.OnChange(
+            change => published.Add(change.NewValue));
+
+        await service.SetCultureAsync("zh-CN");
+
+        var state = Assert.Single(published);
+        Assert.Same(service.State, state);
+        Assert.Equal("zh-CN", service.CultureState.Value.CurrentCulture.Name);
+        Assert.Equal(1, service.CultureState.Version);
+    }
+
+    [Fact]
     public void LocalizationOptionsDefaultCultureInitializesServiceState()
     {
         var options = new LocalizationOptions
@@ -137,6 +156,78 @@ public sealed class CultureStateTests
     }
 
     [Fact]
+    public async Task SetCultureExpandsMultiNodeFallbackGraph()
+    {
+        var zhDescriptor = new LanguagePackageDescriptor(
+            "Host.zh-CN",
+            CultureInfo.GetCultureInfo("zh-CN"),
+            ResourceScope.Host)
+        {
+            FallbackCulture = CultureInfo.GetCultureInfo("en-US"),
+        };
+        var enDescriptor = new LanguagePackageDescriptor(
+            "Host.en-US",
+            CultureInfo.GetCultureInfo("en-US"),
+            ResourceScope.Host)
+        {
+            FallbackCulture = CultureInfo.GetCultureInfo("fr-FR"),
+        };
+        var frDescriptor = new LanguagePackageDescriptor(
+            "Host.fr-FR",
+            CultureInfo.GetCultureInfo("fr-FR"),
+            ResourceScope.Host);
+        var packages = new[]
+        {
+            LanguagePackage.Create(zhDescriptor, new Dictionary<string, string>()),
+            LanguagePackage.Create(enDescriptor, new Dictionary<string, string>()),
+            LanguagePackage.Create(frDescriptor, new Dictionary<string, string>()),
+        };
+        await using var service = new LocalizationService(
+            [zhDescriptor, enDescriptor, frDescriptor],
+            [new RecordingLanguagePackageProvider(packages)]);
+
+        var result = await service.SetCultureAsync("zh-CN");
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(
+            ["en-US", "fr-FR", "zh-Hans", "zh", ""],
+            service.State.FallbackCultures.Select(culture => culture.Name));
+    }
+
+    [Fact]
+    public async Task SetCultureRejectsMultiNodeFallbackCycle()
+    {
+        var zhDescriptor = new LanguagePackageDescriptor(
+            "Host.zh-CN",
+            CultureInfo.GetCultureInfo("zh-CN"),
+            ResourceScope.Host)
+        {
+            FallbackCulture = CultureInfo.GetCultureInfo("en-US"),
+        };
+        var enDescriptor = new LanguagePackageDescriptor(
+            "Host.en-US",
+            CultureInfo.GetCultureInfo("en-US"),
+            ResourceScope.Host)
+        {
+            FallbackCulture = CultureInfo.GetCultureInfo("zh-CN"),
+        };
+        var packages = new[]
+        {
+            LanguagePackage.Create(zhDescriptor, new Dictionary<string, string>()),
+            LanguagePackage.Create(enDescriptor, new Dictionary<string, string>()),
+        };
+        await using var service = new LocalizationService(
+            [zhDescriptor, enDescriptor],
+            [new RecordingLanguagePackageProvider(packages)]);
+
+        var result = await service.SetCultureAsync("zh-CN");
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(LocalizationErrorKind.InvalidCulture, result.Error?.Kind);
+        Assert.Equal(string.Empty, service.CurrentCulture.Name);
+    }
+
+    [Fact]
     public void CollectionsRejectExternalListMutation()
     {
         var state = new CultureState(
@@ -152,6 +243,53 @@ public sealed class CultureStateTests
         Assert.Throws<NotSupportedException>(() => loadedPackageIds[0] = "Changed");
         Assert.Equal("en-US", state.FallbackCultures[0].Name);
         Assert.Equal("Host.zh-CN", state.LoadedPackageIds[0]);
+    }
+
+    [Fact]
+    public void CultureStateTakesDeepReadonlyCultureSnapshots()
+    {
+        var current = new CultureInfo("en-US");
+        var fallback = new CultureInfo("fr-FR");
+        var originalPattern = current.DateTimeFormat.ShortDatePattern;
+        var state = new CultureState(
+            current,
+            current,
+            [fallback],
+            revision: 0,
+            loadedPackageIds: []);
+
+        current.DateTimeFormat.ShortDatePattern = "yyyy";
+        fallback.DateTimeFormat.ShortDatePattern = "MM";
+
+        Assert.True(state.CurrentCulture.IsReadOnly);
+        Assert.True(state.CurrentUICulture.IsReadOnly);
+        Assert.True(state.FallbackCultures[0].IsReadOnly);
+        Assert.Equal(originalPattern, state.CurrentCulture.DateTimeFormat.ShortDatePattern);
+        Assert.Throws<InvalidOperationException>(
+            () => state.FallbackCultures[0].DateTimeFormat.ShortDatePattern = "dd");
+    }
+
+    [Fact]
+    public void CultureStateRejectsInvalidCollectionInputs()
+    {
+        Assert.Throws<ArgumentNullException>(() => new CultureState(
+            CultureInfo.InvariantCulture,
+            CultureInfo.InvariantCulture,
+            null!,
+            revision: 0,
+            loadedPackageIds: []));
+        Assert.Throws<ArgumentException>(() => new CultureState(
+            CultureInfo.InvariantCulture,
+            CultureInfo.InvariantCulture,
+            [null!],
+            revision: 0,
+            loadedPackageIds: []));
+        Assert.Throws<ArgumentException>(() => new CultureState(
+            CultureInfo.InvariantCulture,
+            CultureInfo.InvariantCulture,
+            [],
+            revision: 0,
+            loadedPackageIds: [" "]));
     }
 
     private static LanguagePackage Package(

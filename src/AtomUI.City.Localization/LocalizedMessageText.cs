@@ -4,21 +4,27 @@ namespace AtomUI.City.Localization;
 
 internal sealed class LocalizedMessageText : ILocalizedText
 {
+    private static readonly AsyncLocal<NotificationExecution?> CurrentNotification = new();
     private readonly LocalizationService _owner;
+    private readonly LocalizationLookupContext _context;
     private readonly IReadOnlyList<object?> _arguments;
     private readonly object _gate = new();
     private LocalizedMessage _current;
+    private Task _refreshTail = Task.CompletedTask;
     private long _revision;
+    private int _activeNotifications;
     private bool _disposed;
 
     private LocalizedMessageText(
         LocalizationService owner,
         IReadOnlyList<object?> arguments,
+        LocalizationLookupContext context,
         LocalizedMessage current,
         long revision)
     {
         _owner = owner;
         _arguments = arguments.ToArray();
+        _context = context;
         _current = current;
         _revision = revision;
     }
@@ -95,32 +101,89 @@ internal sealed class LocalizedMessageText : ILocalizedText
         LocalizationService owner,
         string key,
         IReadOnlyList<object?> arguments,
+        LocalizationLookupContext context,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(owner);
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
         ArgumentNullException.ThrowIfNull(arguments);
+        ArgumentNullException.ThrowIfNull(context);
 
-        var current = await owner.GetMessageAsync(key, arguments, cancellationToken).ConfigureAwait(false);
+        LocalizedMessage current;
+        long revision;
+        do
+        {
+            revision = owner.CultureRevision;
+            current = await owner.GetMessageAsync(key, arguments, context, cancellationToken).ConfigureAwait(false);
+        }
+        while (revision != owner.CultureRevision);
 
-        return new LocalizedMessageText(owner, arguments, current, owner.CultureRevision);
+        return new LocalizedMessageText(owner, arguments, context, current, revision);
     }
 
-    public async ValueTask RefreshAsync(CancellationToken cancellationToken = default)
+    public ValueTask RefreshAsync(CancellationToken cancellationToken = default)
     {
-        if (IsDisposed)
+        if (CurrentNotification.Value is { IsActive: true } notification
+            && ReferenceEquals(notification.Owner, this))
         {
-            return;
+            return ValueTask.CompletedTask;
         }
-
-        string key;
 
         lock (_gate)
         {
+            if (_disposed)
+            {
+                return ValueTask.CompletedTask;
+            }
+
+            var predecessor = _refreshTail;
+            _refreshTail = RunRefreshAfterAsync(predecessor, cancellationToken);
+
+            return new ValueTask(_refreshTail);
+        }
+    }
+
+    private async Task RunRefreshAfterAsync(
+        Task predecessor,
+        CancellationToken cancellationToken)
+    {
+        await Task.Yield();
+
+        try
+        {
+            await predecessor.ConfigureAwait(false);
+        }
+        catch
+        {
+            // A failed refresh does not poison later refresh requests.
+        }
+
+        string key;
+        lock (_gate)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
             key = _current.Key;
         }
 
-        var next = await _owner.GetMessageAsync(key, _arguments, cancellationToken).ConfigureAwait(false);
+        LocalizedMessage next;
+        long nextRevision;
+        do
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            nextRevision = _owner.CultureRevision;
+            next = await _owner.GetMessageAsync(
+                    key,
+                    _arguments,
+                    _context,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        while (nextRevision != _owner.CultureRevision);
+
         LocalizedTextChangedEventArgs args;
 
         lock (_gate)
@@ -130,7 +193,6 @@ internal sealed class LocalizedMessageText : ILocalizedText
                 return;
             }
 
-            var nextRevision = _owner.CultureRevision;
             if (IsSameMessage(_current, next) && _revision == nextRevision)
             {
                 return;
@@ -154,39 +216,71 @@ internal sealed class LocalizedMessageText : ILocalizedText
             }
 
             _disposed = true;
+            if (CurrentNotification.Value is not { IsActive: true } notification
+                || !ReferenceEquals(notification.Owner, this))
+            {
+                while (_activeNotifications > 0)
+                {
+                    Monitor.Wait(_gate);
+                }
+            }
         }
 
         _owner.UnregisterLocalizedText(this);
     }
 
-    private bool IsDisposed
-    {
-        get
-        {
-            lock (_gate)
-            {
-                return _disposed;
-            }
-        }
-    }
-
     private void OnChanged(LocalizedTextChangedEventArgs args)
     {
-        var handlers = Changed;
-        if (handlers is null)
+        EventHandler<LocalizedTextChangedEventArgs>? handlers;
+        lock (_gate)
         {
-            return;
+            if (_disposed)
+            {
+                return;
+            }
+
+            handlers = Changed;
+            if (handlers is null)
+            {
+                return;
+            }
+
+            _activeNotifications++;
         }
 
-        foreach (EventHandler<LocalizedTextChangedEventArgs> handler in handlers.GetInvocationList())
+        var previous = CurrentNotification.Value;
+        var execution = new NotificationExecution(this);
+        CurrentNotification.Value = execution;
+        try
         {
-            try
+            foreach (EventHandler<LocalizedTextChangedEventArgs> handler in handlers.GetInvocationList())
             {
-                handler(this, args);
+                lock (_gate)
+                {
+                    if (_disposed)
+                    {
+                        break;
+                    }
+                }
+
+                try
+                {
+                    handler(this, args);
+                }
+                catch (Exception exception)
+                {
+                    _owner.WriteTextRefreshFailed(Key, exception);
+                }
             }
-            catch (Exception exception)
+        }
+        finally
+        {
+            execution.Deactivate();
+            CurrentNotification.Value = previous;
+            lock (_gate)
             {
-                _owner.WriteTextRefreshFailed(Key, exception);
+                _activeNotifications--;
+                Monitor.PulseAll(_gate);
             }
         }
     }
@@ -211,5 +305,16 @@ internal sealed class LocalizedMessageText : ILocalizedText
         return message.IsFallback
             ? LocalizedString.Fallback(message.Key, message.Value, message.Culture)
             : LocalizedString.Found(message.Key, message.Value, message.Culture);
+    }
+
+    private sealed class NotificationExecution(LocalizedMessageText owner)
+    {
+        private int _active = 1;
+
+        public LocalizedMessageText Owner { get; } = owner;
+
+        public bool IsActive => Volatile.Read(ref _active) != 0;
+
+        public void Deactivate() => Volatile.Write(ref _active, 0);
     }
 }

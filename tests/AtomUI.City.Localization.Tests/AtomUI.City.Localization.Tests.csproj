@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Fixtures/Host.en-US.locpack.json" />
+    <EmbeddedResource Include="Fixtures/Ambiguous/Host.en-US.locpack.json" />
   </ItemGroup>
 
 </Project>

@@ -18,14 +18,19 @@ AtomUI.City.Localization 的架构目标是把模块职责变成可实现、可�
 
 | 概念 | 职责 | 创建者 | 释放/失效规则 |
 | --- | --- | --- | --- |
-| CultureState | 当前 culture 和 fallback 链。 | LocalizationService | Host 持有。 |
-| LanguagePackage | 一个 culture 的资源集合。 | Provider | provider revoke 释放。 |
-| LocalizedText | 可订阅文案。 | LocalizationService | binding dispose 释放。 |
+| CultureState | 当前 culture、递归 fallback 链、revision 和 loaded package 的深只读快照。 | LocalizationService 通过 City.State 创建 | LocalizationService Dispose；消费者只持有 `IReadOnlyState<CultureState>`，不能通过可变 `CultureInfo` 反向修改 snapshot。 |
+| LanguagePackageRegistry | `(culture, packageId)` descriptor 的唯一事实源，支持原子批量注册。 | Host/DI | owner revoke 失效；service 解除事件后释放。 |
+| LanguagePackage | 一个 culture 的字符串资源集合。 | Provider | cache 替换、owner/contribution revoke 或 service Dispose 释放。 |
+| LocalizedText | 捕获 lookup context 的可订阅文案。 | LocalizationService | binding 或 service Dispose；Dispose 返回后不再开始通知。 |
+| LocalizationScopeLease | Module/Plugin/Route/Window 活动资源引用。 | LocalizationService | 最后一个 lease Dispose 后作用域不可见。 |
 
 ## 产品级状态机
 
-- CultureState: Created -> Active -> Changing -> Active
-- LanguagePackage: Discovered -> Loading -> Loaded 或 Failed -> Revoked
+Localization 1.0 不公开状态枚举。源码使用下列隐式生命周期合同：
+
+- `LocalizationService`: Running -> Disposing -> Disposed；Dispose/DisposeAsync 共享一个完成事务。
+- Culture mutation: Queued -> Preparing -> Committed -> PostCommitRefresh -> Completed/Failed；调用方取消只在 Committed 前有效。
+- Package load: Registered -> Loading -> Loaded/Cached，或 Failed/Cancelled/Revoked；只有成功且仍注册的 package 可以进入 cache。
 
 ## 关键运行流程
 
@@ -43,7 +48,8 @@ AtomUI.City.Localization 的架构目标是把模块职责变成可实现、可�
 ## 性能和资源边界
 
 - culture 切换批量刷新。
-- lookup 使用 scope/culture 索引。
+- lookup 使用 active scope、`(culture, packageId)` cache 和稳定 scope priority；fallback 按本次 context 可见 descriptor 计算；并发 waiter 共享 service-owned load。
+- locpack 输入最多 16 MiB，避免不受限内存分配。
 
 ## 运行时对象模型
 

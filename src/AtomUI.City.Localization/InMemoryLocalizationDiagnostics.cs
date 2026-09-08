@@ -18,6 +18,8 @@ public sealed class InMemoryLocalizationDiagnostics : ILocalizationDiagnostics
 
     public void Write(LocalizationDiagnosticRecord record)
     {
+        ArgumentNullException.ThrowIfNull(record);
+
         lock (_syncRoot)
         {
             _records.Add(record);

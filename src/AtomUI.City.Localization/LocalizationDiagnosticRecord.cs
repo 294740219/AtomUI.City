@@ -12,7 +12,13 @@ public sealed record LocalizationDiagnosticRecord(
     long? CultureRevision = null,
     LocalizationErrorKind? ErrorKind = null,
     string? ContributionId = null,
-    int? RevokedPackageCount = null);
+    int? RevokedPackageCount = null,
+    string? ScopeId = null,
+    LanguagePackageProviderKind? ProviderKind = null,
+    string? Location = null,
+    string? OperationId = null,
+    int? Attempt = null,
+    double? ElapsedMilliseconds = null);
 
 public enum LocalizationDiagnosticSeverity
 {

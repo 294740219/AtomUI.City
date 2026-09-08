@@ -17,4 +17,12 @@ public sealed class LocalizationDiagnosticsTests
             LocalizationDiagnosticSeverity.Error));
         Assert.Equal("AUCLOC999", diagnostics.Records[0].Code);
     }
+
+    [Fact]
+    public void WriteRejectsNullDiagnosticRecord()
+    {
+        var diagnostics = new InMemoryLocalizationDiagnostics();
+
+        Assert.Throws<ArgumentNullException>(() => diagnostics.Write(null!));
+    }
 }

@@ -18,6 +18,8 @@ public sealed class LanguagePackageAttribute : Attribute
 
     public ResourceScope Scope { get; set; } = ResourceScope.Module;
 
+    public string? ScopeId { get; set; }
+
     public string? ResourceBaseName { get; set; }
 
     public string? FallbackCulture { get; set; }

@@ -20,6 +20,10 @@ public sealed class LocalizedResourceAttribute : Attribute
 
     public ResourceScope Scope { get; set; } = ResourceScope.Module;
 
+    public string? ScopeId { get; set; }
+
+    public string? Culture { get; set; }
+
     public string? Version { get; set; }
 
     public bool Critical { get; set; }

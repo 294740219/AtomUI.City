@@ -45,6 +45,8 @@
 | AUC-LOCALIZATION-004 | Lookup and Fallback | LocalizationServiceTests |
 | AUC-LOCALIZATION-005 | Assembly Language Packages | LanguagePackageProviderTests; LocalizationDeclarationAttributeTests |
 | AUC-LOCALIZATION-006 | Presentation Bridge | LocalizationServiceTests |
+| AUC-LOCALIZATION-007 | Plugin Package Revocation | LocalizationServiceTests |
+| AUC-LOCALIZATION-008 | Generated Localization Manifest | AtomUICityIncrementalGeneratorLocalizationTests; LocalizationManifestBuilderTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -87,13 +89,13 @@ ILanguagePackageProvider
 | `AssemblyLanguagePackageProvider` | CoreCLR、普通桌面运行时、插件动态加载。 |
 | `FileLanguagePackageProvider` | Native AOT、严格 trimming、独立资源包。 |
 
-两者都输出同一套 `ILanguagePackage` / `ILocalizedResourceStore` contract。
+两者都输出同一套 `LanguagePackage` / `ILanguagePackageProvider` contract。
 
-`LanguagePackageRegistry` 负责把 descriptor 绑定到 owner，拒绝重复 package id，并在 owner revoke 后移除该 owner 的 descriptors 且拒绝同 owner 后续注册。Provider load 取消必须返回 `LanguagePackageLoadResult.Failed(Cancelled)`，不能抛出未声明异常。
+`LanguagePackageRegistry` 负责把 descriptor 绑定到 owner，拒绝重复 `(culture, packageId)`，并在 owner revoke 后移除该 owner 的 descriptors 且拒绝同 owner 后续注册。`RegisterRange` 必须全有或全无，生成 registrar 使用该入口避免部分 manifest 发布。Provider 必须拒绝与自身 `Kind` 不匹配的 descriptor；load 取消必须返回 `LanguagePackageLoadResult.Failed(Cancelled)`，不能抛出未声明异常。
 
 ### 3. Assembly 语言包布局
 
-推荐使用 .NET satellite assembly 风格：
+部署目录可以采用 .NET satellite assembly 风格：
 
 ```text
 locales/
@@ -114,7 +116,7 @@ SalesModule.Localization.zh-CN.dll
 SalesModule.Localization.en-US.dll
 ```
 
-但无论命名如何，descriptor 必须说明：
+当前 provider 不做 satellite probing；调用方必须在 descriptor 中提供精确 assembly path 和 embedded locpack resource name。无论目录和命名如何，descriptor 必须说明：
 
 - Culture。
 - PackageId。
@@ -123,6 +125,7 @@ SalesModule.Localization.en-US.dll
 - ContributionId。
 - Version。
 - Checksum。
+- AssemblyLoadContext：descriptor 记录被发现 assembly 所属 context；collectible plugin 必须在该 context 解析/加载，owner revoke 后方可 unload，禁止回落到 Default ALC。
 
 ### 4. 加载流程
 
@@ -130,12 +133,12 @@ SalesModule.Localization.en-US.dll
 Language package descriptor
 -> resolve package path
 -> load assembly in package load context
--> create resource store
--> expose lookup table / ResourceManager adapter
--> register package lease
+-> open embedded locpack stream
+-> validate and create immutable LanguagePackage
+-> cache by (culture, packageId)
 ```
 
-Host app 语言包可以加载到默认上下文或专用上下文。插件语言包必须跟插件加载上下文和 ContributionLease 绑定。
+Host app 语言包可以加载到默认上下文或专用上下文。插件语言包 descriptor 必须保存插件的 collectible `AssemblyLoadContext`，并通过 owner/contribution 撤销先释放 package；ContributionLease 本身由 PluginSystem 管理。
 
 ### 5. 卸载约束
 
@@ -150,24 +153,21 @@ Host app 语言包可以加载到默认上下文或专用上下文。插件语�
 - AtomUI/Avalonia ResourceDictionary 未移除就卸载插件。
 - generated accessor 类型放进语言包 assembly。
 
-强类型 accessor 应生成在模块或插件主 assembly。语言包 assembly 只提供资源数据。
+生成的 key constants 和 registrar 位于模块或插件主 assembly。语言包 assembly 只提供资源数据。
 
 ### 6. Native AOT Locpack
 
 Native AOT 模式使用 file-based locpack。
 
-可选格式：
-
-- `.locpack` binary。
-- json。
-- embedded generated table。
+当前格式是 schema v1 JSON locpack；binary 和 embedded generated table 尚无 Feature ID。
 
 规则：
 
 - locpack 不依赖动态 assembly loading。
 - locpack descriptor 与 assembly package descriptor 语义一致。
-- Source Generator 生成 locpack manifest。
+- 应用或后续 Build 能力提供 file descriptor 和 locpack 产物；当前 Localization Generator 不生成 locpack 文件。
 - 运行时通过 `FileLanguagePackageProvider` 加载当前 culture 的 locpack。
+- schema v1 locpack 的 UTF-8 JSON 总大小上限为 16 MiB；读取期间观察取消，重复 JSON 根属性必须拒绝。
 
 ### 7. 安全和完整性
 
@@ -187,19 +187,24 @@ Native AOT 模式使用 file-based locpack。
 |---|---|
 | assembly 不存在 | fallback 或 culture switch rollback。 |
 | assembly 加载失败 | fallback 或 rollback。 |
+| schema/version/id/culture/checksum 不匹配 | 返回对应稳定 `LocalizationErrorKind`，不发布 package。 |
+| locpack 超过 16 MiB | 返回 `PackageTooLarge`，不继续分配或发布 package。 |
+| embedded resource suffix 同时匹配多个资源 | 返回 `PackageNotFound`，不得按枚举顺序任取一个资源。 |
 | checksum 不匹配 | 拒绝加载。 |
 | culture 不匹配 | 拒绝加载。 |
-| AOT 下请求 assembly provider | 返回不支持，使用 file provider。 |
-| 卸载后仍有引用 | 标记 UnloadPending，输出诊断。 |
+| Native AOT 发布 | 不注册 assembly provider descriptor，应用显式注册 file locpack descriptor；发布/复制由 Build 能力承接。 |
+| 卸载后仍有引用 | 由 PluginSystem 的 unload/lease 诊断承接。 |
 
 ### 9. 测试策略
 
 测试必须覆盖：
 
 - assembly package 加载。
-- satellite-style package 解析。
+- descriptor 指定 assembly/resource 解析。
 - file locpack 加载。
-- AOT provider fallback。
+- file locpack provider（Native AOT publish smoke 需由 Build/Release Gate 单独立项）。
 - checksum mismatch。
+- locpack size limit、duplicate root property 和 provider kind mismatch。
+- embedded resource exact/unique suffix 解析。
 - plugin package unload。
 - Host 不持有插件 package 引用。

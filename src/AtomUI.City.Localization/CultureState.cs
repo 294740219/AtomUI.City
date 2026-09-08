@@ -11,9 +11,22 @@ public sealed class CultureState
         long revision,
         IReadOnlyList<string> loadedPackageIds)
     {
-        CurrentCulture = currentCulture ?? throw new ArgumentNullException(nameof(currentCulture));
-        CurrentUICulture = currentUICulture ?? throw new ArgumentNullException(nameof(currentUICulture));
-        FallbackCultures = Array.AsReadOnly(fallbackCultures.ToArray());
+        ArgumentNullException.ThrowIfNull(fallbackCultures);
+        ArgumentNullException.ThrowIfNull(loadedPackageIds);
+        if (fallbackCultures.Any(culture => culture is null))
+        {
+            throw new ArgumentException("Fallback cultures cannot contain null values.", nameof(fallbackCultures));
+        }
+
+        if (loadedPackageIds.Any(string.IsNullOrWhiteSpace))
+        {
+            throw new ArgumentException("Loaded package ids cannot contain empty values.", nameof(loadedPackageIds));
+        }
+
+        CurrentCulture = CultureInfoSnapshot.Create(currentCulture);
+        CurrentUICulture = CultureInfoSnapshot.Create(currentUICulture);
+        FallbackCultures = Array.AsReadOnly(
+            fallbackCultures.Select(CultureInfoSnapshot.Create).ToArray());
         Revision = revision;
         LoadedPackageIds = Array.AsReadOnly(loadedPackageIds.ToArray());
     }
