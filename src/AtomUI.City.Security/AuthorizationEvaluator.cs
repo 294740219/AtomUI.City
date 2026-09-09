@@ -1,29 +1,36 @@
 using System.Security.Claims;
+using AtomUI.City.Core.Diagnostics;
 
 namespace AtomUI.City.Security;
 
 public sealed class AuthorizationEvaluator : IAuthorizationEvaluator
 {
-    private const string PermissionClaimType = "permission";
-
     private readonly IPermissionRegistry _permissions;
     private readonly IAuthorizationPolicyProvider? _policyProvider;
+    private readonly IHostDiagnostics? _diagnostics;
 
     public AuthorizationEvaluator(IPermissionRegistry permissions)
+        : this(permissions, policyProvider: null, diagnostics: null)
     {
-        ArgumentNullException.ThrowIfNull(permissions);
-
-        _permissions = permissions;
     }
 
     public AuthorizationEvaluator(
         IPermissionRegistry permissions,
         IAuthorizationPolicyProvider policyProvider)
-        : this(permissions)
+        : this(permissions, policyProvider, diagnostics: null)
     {
-        ArgumentNullException.ThrowIfNull(policyProvider);
+    }
 
+    public AuthorizationEvaluator(
+        IPermissionRegistry permissions,
+        IAuthorizationPolicyProvider? policyProvider,
+        IHostDiagnostics? diagnostics)
+    {
+        ArgumentNullException.ThrowIfNull(permissions);
+
+        _permissions = permissions;
         _policyProvider = policyProvider;
+        _diagnostics = diagnostics;
     }
 
     public ValueTask<AuthorizationResult> EvaluateAsync(
@@ -46,26 +53,28 @@ public sealed class AuthorizationEvaluator : IAuthorizationEvaluator
                     return ValueTask.FromResult(AuthorizationResult.Cancelled());
                 }
 
-                var result = EvaluateRequirement(request.Principal, requirement);
+                var result = EvaluateRequirement(request.PrincipalSnapshot, requirement);
                 if (!result.Succeeded)
                 {
+                    WriteFailureDiagnostic(request, result, requirement);
                     return ValueTask.FromResult(result);
                 }
             }
 
             return ValueTask.FromResult(AuthorizationResult.Allowed());
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             return ValueTask.FromResult(AuthorizationResult.Cancelled());
         }
         catch (Exception exception)
         {
-            return ValueTask.FromResult(
-                AuthorizationResult.Failed(
+            var result = AuthorizationResult.Failed(
                     SecurityFailureKind.EvaluatorFailed,
                     message: exception.Message,
-                    exception: exception));
+                    exception: exception);
+            WriteFailureDiagnostic(request, result, requirement: null);
+            return ValueTask.FromResult(result);
         }
     }
 
@@ -85,10 +94,18 @@ public sealed class AuthorizationEvaluator : IAuthorizationEvaluator
 
         if (_policyProvider is null)
         {
-            return AuthorizationResult.Failed(
+            var result = AuthorizationResult.Failed(
                 SecurityFailureKind.EvaluatorFailed,
                 policyName,
                 "No authorization policy provider is configured.");
+            WriteFailureDiagnostic(
+                policyName,
+                resourceName,
+                contributionId,
+                result,
+                requirement: null,
+                GetPrincipalIdHash(principal));
+            return result;
         }
 
         try
@@ -103,10 +120,18 @@ public sealed class AuthorizationEvaluator : IAuthorizationEvaluator
 
             if (policy is null)
             {
-                return AuthorizationResult.Failed(
+                var result = AuthorizationResult.Failed(
                     SecurityFailureKind.PolicyNotFound,
                     policyName,
                     $"Authorization policy '{policyName}' is not registered.");
+                WriteFailureDiagnostic(
+                    policyName,
+                    resourceName,
+                    contributionId,
+                    result,
+                    requirement: null,
+                    GetPrincipalIdHash(principal));
+                return result;
             }
 
             return await EvaluateAsync(
@@ -114,17 +139,25 @@ public sealed class AuthorizationEvaluator : IAuthorizationEvaluator
                     cancellationToken)
                 .ConfigureAwait(false);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             return AuthorizationResult.Cancelled();
         }
         catch (Exception exception)
         {
-            return AuthorizationResult.Failed(
+            var result = AuthorizationResult.Failed(
                 SecurityFailureKind.EvaluatorFailed,
                 policyName,
                 exception.Message,
                 exception: exception);
+            WriteFailureDiagnostic(
+                policyName,
+                resourceName,
+                contributionId,
+                result,
+                requirement: null,
+                GetPrincipalIdHash(principal));
+            return result;
         }
     }
 
@@ -169,7 +202,7 @@ public sealed class AuthorizationEvaluator : IAuthorizationEvaluator
             return AuthorizationResult.Challenge("Authentication is required.");
         }
 
-        return principal.HasClaim(PermissionClaimType, requirement.Name)
+        return principal.HasClaim(SecurityClaimTypes.Permission, requirement.Name)
             ? AuthorizationResult.Allowed()
             : AuthorizationResult.Forbidden(
                 requirement.Name,
@@ -215,6 +248,57 @@ public sealed class AuthorizationEvaluator : IAuthorizationEvaluator
 
     private static bool IsAuthenticated(ClaimsPrincipal principal)
     {
-        return principal.Identity?.IsAuthenticated == true;
+        return principal.Identities.Any(static identity => identity.IsAuthenticated);
+    }
+
+    private void WriteFailureDiagnostic(
+        AuthorizationRequest request,
+        AuthorizationResult result,
+        AuthorizationRequirement? requirement)
+    {
+        WriteFailureDiagnostic(
+            request.Policy.Name,
+            request.ResourceName,
+            request.ContributionId ?? request.Policy.ContributionId,
+            result,
+            requirement,
+            GetPrincipalIdHash(request.PrincipalSnapshot));
+    }
+
+    private void WriteFailureDiagnostic(
+        string policyName,
+        string? resourceName,
+        string? contributionId,
+        AuthorizationResult result,
+        AuthorizationRequirement? requirement,
+        string? principalIdHash)
+    {
+        SecurityDiagnostics.Write(
+            _diagnostics,
+            result.Status == AuthorizationResultStatus.Failed
+                ? SecurityDiagnosticIds.AuthorizationEvaluationFailed
+                : SecurityDiagnosticIds.AuthorizationDenied,
+            "Authorization evaluation did not allow the request.",
+            result.Status == AuthorizationResultStatus.Failed
+                ? HostDiagnosticSeverity.Error
+                : HostDiagnosticSeverity.Warning,
+            new Dictionary<string, string?>(StringComparer.Ordinal)
+            {
+                ["policyName"] = policyName,
+                ["requirementKind"] = requirement?.Kind.ToString(),
+                ["requirementName"] = result.FailedRequirement ?? requirement?.Name,
+                ["resourceName"] = resourceName,
+                ["contributionId"] = contributionId,
+                ["resultStatus"] = result.Status.ToString(),
+                ["failureKind"] = result.FailureKind.ToString(),
+                ["principalIdHash"] = principalIdHash,
+                ["exceptionType"] = result.Exception?.GetType().FullName,
+            });
+    }
+
+    private static string? GetPrincipalIdHash(ClaimsPrincipal? principal)
+    {
+        return SecurityDiagnostics.RedactIdentifier(
+            principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value);
     }
 }

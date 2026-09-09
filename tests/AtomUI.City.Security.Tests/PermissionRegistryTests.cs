@@ -1,4 +1,5 @@
 using AtomUI.City.Security;
+using AtomUI.City.Core.Diagnostics;
 
 namespace AtomUI.City.Security.Tests;
 
@@ -90,5 +91,56 @@ public sealed class PermissionRegistryTests
 
         var mutable = Assert.IsAssignableFrom<IList<PermissionDescriptor>>(permissions);
         Assert.Throws<NotSupportedException>(() => mutable[0] = new PermissionDescriptor("settings.write"));
+    }
+
+    [Fact]
+    public async Task ConcurrentChangesPublishInRevisionOrder()
+    {
+        var registry = new PermissionRegistry();
+        using var firstEntered = new ManualResetEventSlim();
+        using var releaseFirst = new ManualResetEventSlim();
+        var revisions = new List<long>();
+        var revisionsSync = new object();
+        registry.Changed += (_, args) =>
+        {
+            if (args.Revision == 1)
+            {
+                firstEntered.Set();
+                releaseFirst.Wait(TimeSpan.FromSeconds(5));
+            }
+
+            lock (revisionsSync)
+            {
+                revisions.Add(args.Revision);
+            }
+        };
+
+        var first = Task.Run(() => registry.Add(new PermissionDescriptor("settings.read")));
+        Assert.True(firstEntered.Wait(TimeSpan.FromSeconds(5)));
+        var second = Task.Run(() => registry.Add(new PermissionDescriptor("settings.write")));
+        await second;
+        releaseFirst.Set();
+        await first;
+
+        Assert.Equal([1, 2], revisions);
+    }
+
+    [Fact]
+    public void ObserverFailureDoesNotBreakCommitOrOtherObservers()
+    {
+        var diagnostics = new InMemoryHostDiagnostics();
+        var registry = new PermissionRegistry(diagnostics);
+        var secondObserverCalled = false;
+        registry.Changed += (_, _) => throw new InvalidOperationException("observer failed");
+        registry.Changed += (_, _) => secondObserverCalled = true;
+
+        var added = registry.Add(new PermissionDescriptor("settings.read"));
+
+        Assert.True(added);
+        Assert.True(registry.Contains("settings.read"));
+        Assert.True(secondObserverCalled);
+        Assert.Contains(
+            diagnostics.Records,
+            record => record.Code == SecurityDiagnosticIds.PermissionObserverFailed);
     }
 }

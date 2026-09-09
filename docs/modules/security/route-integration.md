@@ -10,8 +10,8 @@
 - 参数绑定失败必须返回导航失败结果。
 - 插件路由撤销后 route graph 必须重新发布。
 - 授权失败返回明确 result，不能直接操作 UI。
-- 权限声明必须来自 registry 或 plugin capability。
-- 认证状态变更必须通知 command、route 和 data 集成点。
+- 当前权限声明来自 registry；plugin capability 属于未来 PluginSystem 集成。
+- 认证状态通过 `IAuthenticationStateProvider.StateChanged` 发布；当前只有 Command source 直接订阅，Route/Data 在每次操作中读取当前 Security contract，其他联动由应用 bridge 负责。
 
 ## Public Contract
 
@@ -40,11 +40,12 @@
 | Feature ID | 相关能力 | 测试文件 |
 | --- | --- | --- |
 | AUC-SECURITY-001 | Authentication State | AuthenticationStateTests |
-| AUC-SECURITY-002 | Permission Registry | PermissionRegistryTests |
-| AUC-SECURITY-003 | Permission Checker | PermissionCheckerTests |
+| AUC-SECURITY-002 | Current Principal | AuthenticationStateTests |
+| AUC-SECURITY-003 | Permission Registry and Checker | PermissionRegistryTests; PermissionCheckerTests |
 | AUC-SECURITY-004 | Authorization Policy | AuthorizationPolicyTests; AuthorizationEvaluatorTests |
 | AUC-SECURITY-005 | Route Guard | RouteAuthorizationGuardTests |
 | AUC-SECURITY-006 | Command Authorization | CommandAuthorizationSourceTests |
+| AUC-SECURITY-007 | Access Token Provider | SecurityRegistrationTests; AccessTokenCredentialProviderTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -71,36 +72,25 @@ Routing 负责执行导航事务和 Guard 顺序。Security 负责解释 route a
 
 ### 2. Route Auth Metadata
 
-Route 可以声明：
-
-- 需要登录。
-- 需要 permission。
-- 需要 policy。
-- 匿名可访问。
-- 授权失败 fallback route。
-- Challenge 行为。
-
-Route metadata 必须进入 Route descriptor，由 Routing 的 Source Generator 输出。Security 不在运行时扫描路由类型。
+当前 Route 授权 metadata 只有 `routeId -> AuthorizationPolicy` 映射，由 `InMemoryRouteAuthorizationPolicyProvider.Add(routeId, policy)` 显式注册。没有 policy 的 route 视为匿名可访问。每个 route 的 fallback 和 challenge metadata、attribute 及 Source Generator manifest 尚未实现；若未来增加，必须单独登记跨模块 Feature。
 
 ### 3. Guard 流程
 
 ```text
 Route matched
 -> Routing builds Guard context
--> Security route guard reads route auth metadata
+-> Security route guard queries policy by RouteId and reads current principal
 -> AuthorizationEvaluator evaluates
 -> GuardResult returned
--> NavigationTransaction continues / rejects / redirects / challenges
+-> NavigationTransaction continues / rejects / redirects / cancels / fails
 ```
 
-Routing 传给 Security 的上下文：
+Routing 传入 `RouteGuardContext`（route descriptor、参数和 navigation context）；Security 另外通过 `ICurrentPrincipalAccessor` 读取当前 principal，并按 route id 查询 policy。当前合同不从 Route metadata 读取 principal、policy 或 challenge 配置。
+
+参与诊断和授权的上下文包括：
 
 - RouteId。
-- Route metadata。
-- 当前 principal。
 - Route 参数。
-- Contribution 来源。
-- Navigation transaction id。
 - CancellationToken。
 
 Security 不访问 UI 对象，不创建 ViewModel，不修改 NavigationSnapshot。
@@ -110,7 +100,7 @@ Security 不访问 UI 对象，不创建 ViewModel，不修改 NavigationSnapsho
 | Authorization result | Guard result | Routing 行为 |
 |---|---|---|
 | Allowed | Allow | 继续导航。 |
-| Challenge | Redirect 或 Reject with challenge | 进入登录流程或保持当前页面。 |
+| Challenge | 配置 LoginRouteId 时 Redirect，否则 Reject/AuthenticationRequired | Routing 执行重定向或保持当前页面。 |
 | Forbidden | Reject | 拒绝导航，可由 Presentation 展示拒绝访问。 |
 | Denied | Reject | 拒绝导航。 |
 | Failed | Failed | 导航失败，记录诊断。 |
@@ -120,25 +110,16 @@ Redirect 必须由 NavigationTransaction 统一处理，Security Guard 内部不
 
 ### 5. Challenge
 
-Challenge 表示需要认证动作。
-
-可能行为：
-
-- 跳转登录路由。
-- 触发登录 Interaction。
-- 尝试 refresh session。
-- 返回 rejected 并让应用决定。
-
-具体策略由 Host 配置，不由 Routing 或 Presentation 私自决定。
+Challenge 表示需要认证动作。当前 `SecurityRouteGuardOptions` 只支持配置 `LoginRouteId` 和登录导航选项：已配置时返回 Redirect，否则返回带 `AuthenticationRequired` code 的 Reject。Guard 不触发 Interaction、不刷新 session，也不直接导航；更复杂的 challenge orchestration 属于应用或未来 Feature。
 
 ### 6. 插件路由
 
-插件路由授权必须携带 Contribution 信息。
+当前 Security 只支持按 policy `ContributionId` 调用 `RemoveByContribution` 删除 Route policy 并阻止同 contribution 重新注册。下面的 manifest、插件 capability 和私有 requirement 约束属于未来 PluginSystem 集成目标。
 
-规则：
+未来集成规则：
 
 - 插件 route auth metadata 必须来自插件 manifest 或 source generator descriptor。
-- 插件停用后，该插件路由的授权缓存必须失效。
+- 未来如引入授权缓存，插件停用后必须按 contribution revision 失效。
 - 插件不能声明覆盖 Host route 的权限语义。
 - 插件私有 requirement 类型不能泄漏到 Host policy contract。
 
@@ -146,10 +127,10 @@ Challenge 表示需要认证动作。
 
 | 场景 | 默认处理 |
 |---|---|
-| route auth metadata 无效 | Guard failed。 |
+| route 未注册 policy | Allow。 |
 | permission 未声明 | Guard failed。 |
-| policy 不存在 | Guard failed。 |
-| 未登录 | Challenge。 |
+| 已注册 policy 的 requirement 无法满足 | 按 evaluator result 映射。 |
+| 未登录 | Redirect 或 Reject/AuthenticationRequired。 |
 | 权限不足 | Reject / Forbidden。 |
 | evaluator 异常 | Guard failed。 |
 
@@ -158,8 +139,8 @@ Challenge 表示需要认证动作。
 测试必须覆盖：
 
 - 匿名路由放行。
-- 需要登录路由返回 Challenge。
+- 需要登录路由返回 Redirect 或 Reject/AuthenticationRequired。
 - 权限不足返回 Reject。
 - Redirect 策略。
-- 插件路由停用后缓存失效。
+- contribution 撤销后下一次 route policy 查询返回最新结果。
 - Guard cancellation。

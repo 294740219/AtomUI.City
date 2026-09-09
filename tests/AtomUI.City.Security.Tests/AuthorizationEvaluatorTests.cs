@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Claims;
 using AtomUI.City.Security;
+using AtomUI.City.Core.Diagnostics;
 
 namespace AtomUI.City.Security.Tests;
 
@@ -53,7 +54,7 @@ public sealed class AuthorizationEvaluatorTests
         var result = await evaluator.EvaluateAsync(request);
 
         Assert.Equal(AuthorizationResultStatus.Forbidden, result.Status);
-        Assert.Equal(SecurityFailureKind.RequirementFailed, result.FailureKind);
+        Assert.Equal(SecurityFailureKind.Forbidden, result.FailureKind);
         Assert.Equal("settings.write", result.FailedRequirement);
         Assert.Equal("Errors.AuthorizationForbidden", result.MessageKey);
         Assert.Equal(["settings.write"], result.MessageArguments);
@@ -91,6 +92,78 @@ public sealed class AuthorizationEvaluatorTests
         var result = await evaluator.EvaluateAsync(new AuthorizationRequest(principal, policy));
 
         Assert.Equal(AuthorizationResultStatus.Allowed, result.Status);
+    }
+
+    [Fact]
+    public async Task AnyAuthenticatedIdentityAuthenticatesPrincipal()
+    {
+        var principal = new ClaimsPrincipal(
+        [
+            new ClaimsIdentity(),
+            new ClaimsIdentity(authenticationType: "Test"),
+        ]);
+        var evaluator = CreateEvaluator();
+
+        var result = await evaluator.EvaluateAsync(
+            new AuthorizationRequest(principal, AuthorizationPolicy.RequireAuthenticated("SignedIn")));
+
+        Assert.Equal(AuthorizationResultStatus.Allowed, result.Status);
+    }
+
+    [Fact]
+    public async Task RequestPrincipalCannotBeMutatedAfterConstruction()
+    {
+        var identity = new ClaimsIdentity(authenticationType: "Test");
+        var principal = new ClaimsPrincipal(identity);
+        var request = new AuthorizationRequest(
+            principal,
+            AuthorizationPolicy.RequireAuthenticated("SignedIn"));
+        identity.AddClaim(new Claim(SecurityClaimTypes.Permission, "mutated"));
+
+        var result = await CreateEvaluator().EvaluateAsync(request);
+
+        Assert.Equal(AuthorizationResultStatus.Allowed, result.Status);
+        Assert.DoesNotContain(request.Principal.Claims, claim => claim.Value == "mutated");
+    }
+
+    [Fact]
+    public async Task UnexpectedOperationCancelledExceptionIsEvaluatorFailure()
+    {
+        var exception = new OperationCanceledException("provider failed without caller cancellation");
+        var evaluator = CreateEvaluator(
+            policyProvider: new StubAuthorizationPolicyProvider((_, _) => throw exception));
+
+        var result = await evaluator.EvaluatePolicyAsync(
+            CreatePrincipal(permissions: [], claims: [], roles: []),
+            "BrokenPolicy");
+
+        Assert.Equal(AuthorizationResultStatus.Failed, result.Status);
+        Assert.Equal(SecurityFailureKind.EvaluatorFailed, result.FailureKind);
+        Assert.Same(exception, result.Exception);
+    }
+
+    [Fact]
+    public async Task FailedEvaluationWritesRedactedDiagnosticContext()
+    {
+        var diagnostics = new InMemoryHostDiagnostics();
+        var registry = new PermissionRegistry();
+        registry.Add(new PermissionDescriptor("settings.write"));
+        var evaluator = new AuthorizationEvaluator(registry, policyProvider: null, diagnostics);
+        var principal = CreatePrincipal(permissions: [], claims: [], roles: []);
+
+        var result = await evaluator.EvaluateAsync(new AuthorizationRequest(
+            principal,
+            AuthorizationPolicy.RequirePermission("CanWriteSettings", "settings.write"),
+            resourceName: "settings"));
+
+        Assert.Equal(AuthorizationResultStatus.Forbidden, result.Status);
+        var diagnostic = Assert.Single(
+            diagnostics.Records,
+            record => record.Code == SecurityDiagnosticIds.AuthorizationDenied);
+        Assert.Equal("CanWriteSettings", diagnostic.Context["policyName"]);
+        Assert.Equal("settings.write", diagnostic.Context["requirementName"]);
+        Assert.Equal("settings", diagnostic.Context["resourceName"]);
+        Assert.DoesNotContain("42", string.Join('|', diagnostic.Context.Values));
     }
 
     [Fact]
@@ -203,7 +276,7 @@ public sealed class AuthorizationEvaluatorTests
 
         foreach (var permission in permissions)
         {
-            identity.AddClaim(new Claim("permission", permission));
+            identity.AddClaim(new Claim(SecurityClaimTypes.Permission, permission));
         }
 
         foreach (var claim in claims)

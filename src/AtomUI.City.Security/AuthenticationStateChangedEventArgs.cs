@@ -9,6 +9,13 @@ public sealed class AuthenticationStateChangedEventArgs : EventArgs
         ArgumentNullException.ThrowIfNull(previous);
         ArgumentNullException.ThrowIfNull(current);
 
+        if (current.Revision <= previous.Revision)
+        {
+            throw new ArgumentException(
+                "The current authentication snapshot revision must follow the previous revision.",
+                nameof(current));
+        }
+
         Previous = previous;
         Current = current;
     }

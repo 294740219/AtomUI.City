@@ -7,8 +7,8 @@
 ## 设计决策
 
 - 授权失败返回明确 result，不能直接操作 UI。
-- 权限声明必须来自 registry 或 plugin capability。
-- 认证状态变更必须通知 command、route 和 data 集成点。
+- 当前权限声明来自 registry；plugin capability 属于未来 PluginSystem 集成。
+- 认证状态通过 `IAuthenticationStateProvider.StateChanged` 发布；当前只有 Command source 直接订阅，Route/Data 在每次操作中读取当前 Security contract，其他联动由应用 bridge 负责。
 
 ## Public Contract
 
@@ -93,10 +93,10 @@ Policy 是授权规则组合。
 | Permission | 需要指定权限点。 |
 | Claim | 需要指定 claim。 |
 | Role | 需要指定 role claim。 |
-| PluginCapability | 需要 Host 授予插件 capability。 |
-| CustomRequirement | 应用自定义 requirement。 |
+| PluginCapability | 未来 PluginSystem Feature；当前枚举和 evaluator 不支持。 |
+| CustomRequirement | 未来扩展 Feature；当前枚举和 evaluator 不支持。 |
 
-Policy descriptor 必须由显式声明或 Source Generator manifest 提供，运行时默认不扫描程序集。
+当前 Policy descriptor 由 `AuthorizationPolicy` 显式构造并注册到 provider；运行时不扫描程序集。Source Generator manifest 尚未实现且不属于当前 Feature。
 
 ### 4. 授权结果
 
@@ -137,8 +137,11 @@ Route、Command、Data 可以把结果映射成自己的行为，但不能改变
 - 可以直接评估 `AuthorizationRequest`，也可以通过 `IAuthorizationPolicyProvider` 按 policy name 读取策略后评估。
 - 不能访问 UI 对象。
 - 不能阻塞 UI Thread。
-- 可以使用缓存，但缓存必须带认证状态 revision 和 contribution revision。
+- 当前 evaluator 不缓存；未来缓存 Feature 必须带认证状态 revision 和 contribution revision。
 - Policy 异常返回 Failed，并记录诊断。
+- `AuthorizationPolicy` 先捕获 requirement snapshot，再验证集合非空且不含 null，避免可变输入产生 fail-open。
+- `ClaimsPrincipal` 有任一 authenticated identity 即视为已认证。
+- 只有调用方 token 已请求取消时返回 Cancelled；其他来源的 OperationCanceledException 返回 Failed/EvaluatorFailed。
 
 ### 6. Challenge 和 Forbidden
 
@@ -158,23 +161,25 @@ Presentation 可以展示 UI，但不能重新解释授权结果。
 
 ### 7. 缓存策略
 
-授权结果可以缓存，但必须受以下因素影响：
+当前 `AuthorizationEvaluator` 不缓存结果。未来如新增缓存 Feature，cache key/invalidation 必须至少受以下因素影响：
 
 - Principal revision。
-- Permission manifest revision。
-- Policy manifest revision。
+- Permission registry revision。
+- Policy provider revision。
 - Plugin contribution revision。
 - Route / Command / resource identity。
 
 用户切换、登录态变化、插件停用、权限贡献撤销都必须让相关缓存失效。
 
+当前权限 requirement 使用 `SecurityClaimTypes.Permission` claim type。`SecurityFailureKind.ContributionRevoked` 和 `CapabilityDenied` 是为未来 PluginSystem 集成保留的公开枚举值，当前 Security 评估路径不会产生它们。
+
 ### 8. 错误策略
 
 | 场景 | 默认处理 |
 |---|---|
-| Policy 不存在 | Failed，并记录 manifest 诊断。 |
+| Policy 不存在 | Failed/PolicyNotFound，并记录授权诊断。 |
 | Requirement 未注册 | Failed。 |
-| Evaluator 抛异常 | Failed，进入 ErrorPolicy。 |
+| Evaluator 抛异常 | Failed/EvaluatorFailed，并写 Security 诊断；当前不接入 ErrorPolicy。 |
 | 授权取消 | Cancelled。 |
 | 插件 requirement 已撤销 | Failed 或 Forbidden，按场景返回。 |
 
@@ -187,5 +192,5 @@ Presentation 可以展示 UI，但不能重新解释授权结果。
 - claim / role requirement。
 - Challenge 和 Forbidden 区分。
 - evaluator 异常。
-- 缓存随 principal revision 失效。
+- policy 输入先完成 snapshot，再执行构造校验。
 - 插件 contribution 撤销后授权重新计算。

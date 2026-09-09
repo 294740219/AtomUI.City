@@ -7,6 +7,18 @@ public sealed class CommandAuthorizationChangedEventArgs : EventArgs
         long revision,
         string? commandId = null)
     {
+        if (!Enum.IsDefined(reason))
+        {
+            throw new ArgumentOutOfRangeException(nameof(reason), reason, "Change reason must be defined.");
+        }
+
+        ArgumentOutOfRangeException.ThrowIfNegative(revision);
+
+        if (commandId is not null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(commandId);
+        }
+
         Reason = reason;
         Revision = revision;
         CommandId = commandId;

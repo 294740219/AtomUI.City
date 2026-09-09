@@ -56,4 +56,34 @@ public sealed class AuthorizationPolicyProviderTests
         var mutable = Assert.IsAssignableFrom<IList<AuthorizationPolicy>>(policies);
         Assert.Throws<NotSupportedException>(() => mutable[0] = AuthorizationPolicy.RequireAuthenticated("Other"));
     }
+
+    [Fact]
+    public void RevokedContributionCannotRegisterAnotherPolicy()
+    {
+        var provider = new InMemoryAuthorizationPolicyProvider();
+        provider.Add(AuthorizationPolicy.RequirePermission(
+            "PluginPolicy",
+            "plugin.sales.export",
+            contributionId: "SalesPlugin"));
+
+        provider.RemoveByContribution("SalesPlugin");
+        var added = provider.Add(AuthorizationPolicy.RequirePermission(
+            "ReplacementPolicy",
+            "plugin.sales.import",
+            contributionId: "SalesPlugin"));
+
+        Assert.False(added);
+        Assert.False(provider.Contains("ReplacementPolicy"));
+    }
+
+    [Fact]
+    public async Task CancelledLookupThrowsInsteadOfMasqueradingAsMissingPolicy()
+    {
+        var provider = new InMemoryAuthorizationPolicyProvider();
+        using var cancellation = new CancellationTokenSource();
+        await cancellation.CancelAsync();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(async () =>
+            await provider.GetPolicyAsync("SignedIn", cancellation.Token));
+    }
 }

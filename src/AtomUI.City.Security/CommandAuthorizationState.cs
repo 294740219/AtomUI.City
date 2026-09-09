@@ -14,6 +14,21 @@ public sealed class CommandAuthorizationState
         ArgumentException.ThrowIfNullOrWhiteSpace(commandId);
         ArgumentNullException.ThrowIfNull(authorization);
 
+        if (!Enum.IsDefined(unauthorizedBehavior))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(unauthorizedBehavior),
+                unauthorizedBehavior,
+                "Command unauthorized behavior must be defined.");
+        }
+
+        ArgumentOutOfRangeException.ThrowIfNegative(revision);
+
+        if (deniedMessageKey is not null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(deniedMessageKey);
+        }
+
         CommandId = commandId;
         CanExecute = canExecute;
         IsVisible = isVisible;

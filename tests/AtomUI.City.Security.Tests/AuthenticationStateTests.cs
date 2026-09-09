@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using AtomUI.City.Security;
+using AtomUI.City.Core.Diagnostics;
 
 namespace AtomUI.City.Security.Tests;
 
@@ -13,7 +14,7 @@ public sealed class AuthenticationStateTests
         Assert.Equal(AuthenticationState.Unknown, store.Current.State);
         Assert.Equal(0, store.Current.Revision);
         Assert.False(store.Current.Principal.Identity?.IsAuthenticated);
-        Assert.Same(store.Current.Principal, ((ICurrentPrincipalAccessor)store).Principal);
+        Assert.NotSame(store.Current.Principal, ((ICurrentPrincipalAccessor)store).Principal);
     }
 
     [Fact]
@@ -44,16 +45,167 @@ public sealed class AuthenticationStateTests
         var identity = new ClaimsIdentity(
             [
                 new Claim(ClaimTypes.NameIdentifier, "42"),
-                new Claim("permission", "settings.read"),
+                new Claim(SecurityClaimTypes.Permission, "settings.read"),
             ],
             authenticationType: "Test");
         var principal = new ClaimsPrincipal(identity);
 
         var snapshot = store.SetAuthenticated(principal, scheme: "Bearer");
-        identity.AddClaim(new Claim("permission", "admin"));
+        identity.AddClaim(new Claim(SecurityClaimTypes.Permission, "admin"));
 
-        Assert.Equal(["settings.read"], snapshot.Principal.FindAll("permission").Select(claim => claim.Value));
-        Assert.Equal(["settings.read"], store.Current.Principal.FindAll("permission").Select(claim => claim.Value));
+        Assert.Equal(["settings.read"], snapshot.Principal.FindAll(SecurityClaimTypes.Permission).Select(claim => claim.Value));
+        Assert.Equal(["settings.read"], store.Current.Principal.FindAll(SecurityClaimTypes.Permission).Select(claim => claim.Value));
+    }
+
+    [Fact]
+    public void PublishedSnapshotCannotBeMutatedThroughPrincipalGetter()
+    {
+        var store = new AuthenticationStateStore();
+        store.SetAuthenticated(CreatePrincipal("42", "settings.read"), scheme: "Bearer");
+
+        var exposed = store.Current.Principal;
+        ((ClaimsIdentity)exposed.Identity!).AddClaim(new Claim(SecurityClaimTypes.Permission, "settings.write"));
+
+        Assert.DoesNotContain(
+            store.Current.Principal.Claims,
+            claim => claim.Type == SecurityClaimTypes.Permission && claim.Value == "settings.write");
+        Assert.Equal(1, store.Current.Revision);
+    }
+
+    [Fact]
+    public void PublishedPrincipalPreservesAndIsolatesTheActorChain()
+    {
+        var actor = new ClaimsIdentity(
+            [new Claim(ClaimTypes.NameIdentifier, "delegating-user")],
+            authenticationType: "Delegation")
+        {
+            BootstrapContext = "actor-secret",
+        };
+        var identity = new ClaimsIdentity(authenticationType: "Test")
+        {
+            Actor = actor,
+        };
+        var store = new AuthenticationStateStore();
+
+        store.SetAuthenticated(new ClaimsPrincipal(identity));
+        var firstActor = Assert.IsType<ClaimsIdentity>(
+            Assert.IsType<ClaimsIdentity>(store.Current.Principal.Identity).Actor);
+        firstActor.AddClaim(new Claim("actor-mutation", "value"));
+        var secondActor = Assert.IsType<ClaimsIdentity>(
+            Assert.IsType<ClaimsIdentity>(store.Current.Principal.Identity).Actor);
+
+        Assert.Equal("delegating-user", secondActor.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+        Assert.Null(secondActor.BootstrapContext);
+        Assert.False(secondActor.HasClaim("actor-mutation", "value"));
+    }
+
+    [Fact]
+    public void ActorChangePublishesANewAuthenticationRevision()
+    {
+        var store = new AuthenticationStateStore();
+        var first = CreatePrincipalWithActor("delegating-user-1");
+        var second = CreatePrincipalWithActor("delegating-user-2");
+
+        store.SetAuthenticated(first);
+        var snapshot = store.SetAuthenticated(second);
+
+        Assert.Equal(2, snapshot.Revision);
+        var actor = Assert.IsType<ClaimsIdentity>(
+            Assert.IsType<ClaimsIdentity>(snapshot.Principal.Identity).Actor);
+        Assert.Equal("delegating-user-2", actor.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+    }
+
+    [Fact]
+    public void PublishedSnapshotDoesNotRetainBootstrapCredential()
+    {
+        var identity = new ClaimsIdentity(authenticationType: "Test")
+        {
+            BootstrapContext = "raw-access-token",
+        };
+        identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, "42"));
+        var store = new AuthenticationStateStore();
+
+        store.SetAuthenticated(new ClaimsPrincipal(identity), scheme: "Bearer");
+
+        Assert.Null(((ClaimsIdentity)store.Current.Principal.Identity!).BootstrapContext);
+    }
+
+    [Fact]
+    public async Task ConcurrentStateChangesPublishInRevisionOrder()
+    {
+        var store = new AuthenticationStateStore();
+        using var firstEntered = new ManualResetEventSlim();
+        using var releaseFirst = new ManualResetEventSlim();
+        var revisions = new List<long>();
+        var revisionsSync = new object();
+        store.StateChanged += (_, args) =>
+        {
+            if (args.Current.Revision == 1)
+            {
+                firstEntered.Set();
+                releaseFirst.Wait(TimeSpan.FromSeconds(5));
+            }
+
+            lock (revisionsSync)
+            {
+                revisions.Add(args.Current.Revision);
+            }
+        };
+
+        var first = Task.Run(store.SetAnonymous);
+        Assert.True(firstEntered.Wait(TimeSpan.FromSeconds(5)));
+        var second = Task.Run(() => store.SetAuthenticating());
+        await second;
+        releaseFirst.Set();
+        await first;
+
+        Assert.Equal([1, 2], revisions);
+    }
+
+    [Fact]
+    public void ObserverFailureDoesNotBreakStateCommitOrOtherObservers()
+    {
+        var diagnostics = new InMemoryHostDiagnostics();
+        var store = new AuthenticationStateStore(diagnostics);
+        var secondObserverCalled = false;
+        store.StateChanged += (_, _) => throw new InvalidOperationException("observer failed");
+        store.StateChanged += (_, _) => secondObserverCalled = true;
+
+        var snapshot = store.SetAnonymous();
+
+        Assert.Equal(AuthenticationState.Anonymous, snapshot.State);
+        Assert.True(secondObserverCalled);
+        Assert.Contains(
+            diagnostics.Records,
+            record => record.Code == SecurityDiagnosticIds.AuthenticationObserverFailed);
+    }
+
+    [Fact]
+    public void SetAuthenticatedRejectsUnauthenticatedPrincipal()
+    {
+        var store = new AuthenticationStateStore();
+
+        Assert.Throws<ArgumentException>(() =>
+            store.SetAuthenticated(new ClaimsPrincipal(new ClaimsIdentity())));
+    }
+
+    [Fact]
+    public void RefreshingAndExpiredStatesPreserveCurrentTokenHintsAtomically()
+    {
+        var store = new AuthenticationStateStore();
+        var principal = CreatePrincipal("42", "settings.read");
+        var expiresAt = DateTimeOffset.UtcNow.AddMinutes(30);
+        store.SetAuthenticated(principal, scheme: "Bearer", expiresAt);
+
+        var refreshing = store.SetRefreshing(principal);
+        var expired = store.SetExpired(principal);
+
+        Assert.Equal(AuthenticationState.Refreshing, refreshing.State);
+        Assert.Equal("Bearer", refreshing.Scheme);
+        Assert.Equal(expiresAt, refreshing.ExpiresAt);
+        Assert.Equal(AuthenticationState.Expired, expired.State);
+        Assert.Equal("Bearer", expired.Scheme);
+        Assert.Equal(expiresAt, expired.ExpiresAt);
     }
 
     [Fact]
@@ -98,9 +250,7 @@ public sealed class AuthenticationStateTests
             scheme: "Bearer",
             expiresAt: DateTimeOffset.UtcNow.AddMinutes(30));
 
-        var snapshot = store.SetFailed(
-            "provider failed",
-            CreatePrincipal("42", "settings.read"));
+        var snapshot = store.SetFailed("provider failed");
 
         Assert.Equal(AuthenticationState.Failed, snapshot.State);
         Assert.Equal("provider failed", snapshot.FailureMessage);
@@ -115,12 +265,12 @@ public sealed class AuthenticationStateTests
         var first = SecurityPrincipals.Anonymous;
         var second = SecurityPrincipals.Anonymous;
 
-        ((ClaimsIdentity)first.Identity!).AddClaim(new Claim("permission", "mutated"));
+        ((ClaimsIdentity)first.Identity!).AddClaim(new Claim(SecurityClaimTypes.Permission, "mutated"));
 
         Assert.NotSame(first, second);
         Assert.False(first.Identity?.IsAuthenticated);
         Assert.False(second.Identity?.IsAuthenticated);
-        Assert.DoesNotContain(second.Claims, claim => claim.Type == "permission");
+        Assert.DoesNotContain(second.Claims, claim => claim.Type == SecurityClaimTypes.Permission);
     }
 
     [Fact]
@@ -135,7 +285,7 @@ public sealed class AuthenticationStateTests
         Assert.Equal("42", accessor.Principal.FindFirst(ClaimTypes.NameIdentifier)?.Value);
         Assert.Contains(
             accessor.Principal.Claims,
-            claim => claim.Type == "permission" && claim.Value == "settings.read");
+            claim => claim.Type == SecurityClaimTypes.Permission && claim.Value == "settings.read");
     }
 
     [Fact]
@@ -175,10 +325,20 @@ public sealed class AuthenticationStateTests
         var identity = new ClaimsIdentity(
             [
                 new Claim(ClaimTypes.NameIdentifier, subject),
-                new Claim("permission", permission),
+                new Claim(SecurityClaimTypes.Permission, permission),
             ],
             authenticationType: "Test");
 
         return new ClaimsPrincipal(identity);
+    }
+
+    private static ClaimsPrincipal CreatePrincipalWithActor(string actorSubject)
+    {
+        return new ClaimsPrincipal(new ClaimsIdentity(authenticationType: "Test")
+        {
+            Actor = new ClaimsIdentity(
+                [new Claim(ClaimTypes.NameIdentifier, actorSubject)],
+                authenticationType: "Delegation"),
+        });
     }
 }

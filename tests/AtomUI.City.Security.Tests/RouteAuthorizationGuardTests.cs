@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using AtomUI.City.Routing;
 using AtomUI.City.Security;
+using AtomUI.City.Core.Diagnostics;
 
 namespace AtomUI.City.Security.Tests;
 
@@ -113,6 +114,36 @@ public sealed class RouteAuthorizationGuardTests
     }
 
     [Fact]
+    public async Task GuardDoesNotAllowNavigationWhenProviderCancelsBeforeReturning()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var guard = new SecurityRouteGuard(
+            new AuthorizationEvaluator(new PermissionRegistry()),
+            new AuthenticationStateStore(),
+            new CancellingRouteAuthorizationPolicyProvider(cancellation));
+
+        var result = await guard.CanEnterAsync(CreateContext("settings"), cancellation.Token);
+
+        Assert.Equal(RouteGuardResultStatus.Cancel, result.Status);
+    }
+
+    [Fact]
+    public async Task GuardDoesNotAllowNavigationWhenEvaluatorCancelsBeforeReturning()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var policies = new InMemoryRouteAuthorizationPolicyProvider();
+        policies.Add("settings", AuthorizationPolicy.RequireAuthenticated("SignedIn"));
+        var guard = new SecurityRouteGuard(
+            new CancellingAuthorizationEvaluator(cancellation),
+            new AuthenticationStateStore(),
+            policies);
+
+        var result = await guard.CanEnterAsync(CreateContext("settings"), cancellation.Token);
+
+        Assert.Equal(RouteGuardResultStatus.Cancel, result.Status);
+    }
+
+    [Fact]
     public async Task GuardMapsPolicyProviderExceptionToFailedResult()
     {
         var exception = new InvalidOperationException("Policy provider failed.");
@@ -127,6 +158,69 @@ public sealed class RouteAuthorizationGuardTests
         Assert.Equal(RouteGuardResultStatus.Failed, result.Status);
         Assert.Equal(SecurityRouteGuardResultCodes.AuthorizationFailed, result.Code);
         Assert.Same(exception, result.Exception);
+    }
+
+    [Fact]
+    public async Task GuardMapsUnexpectedOperationCancelledExceptionToFailedResult()
+    {
+        var exception = new OperationCanceledException("provider failed without caller cancellation");
+        var guard = new SecurityRouteGuard(
+            new AuthorizationEvaluator(new PermissionRegistry()),
+            new AuthenticationStateStore(),
+            new ThrowingRouteAuthorizationPolicyProvider(exception));
+
+        var result = await guard.CanEnterAsync(CreateContext("settings"), CancellationToken.None);
+
+        Assert.Equal(RouteGuardResultStatus.Failed, result.Status);
+        Assert.Equal(SecurityRouteGuardResultCodes.AuthorizationFailed, result.Code);
+        Assert.Same(exception, result.Exception);
+    }
+
+    [Fact]
+    public void RoutePolicyContributionRevocationRemovesPoliciesAndRejectsReregistration()
+    {
+        var provider = new InMemoryRouteAuthorizationPolicyProvider();
+        provider.Add(
+            "sales",
+            AuthorizationPolicy.RequirePermission(
+                "SalesPolicy",
+                "plugin.sales.read",
+                contributionId: "SalesPlugin"));
+
+        var removed = provider.RemoveByContribution("SalesPlugin");
+        var added = provider.Add(
+            "sales-new",
+            AuthorizationPolicy.RequirePermission(
+                "SalesPolicy2",
+                "plugin.sales.write",
+                contributionId: "SalesPlugin"));
+
+        Assert.Equal(1, removed);
+        Assert.False(added);
+    }
+
+    [Fact]
+    public async Task RouteAuthorizationWritesRoutePolicyAndResultDiagnostic()
+    {
+        var diagnostics = new InMemoryHostDiagnostics();
+        var provider = new InMemoryRouteAuthorizationPolicyProvider();
+        provider.Add("settings", AuthorizationPolicy.RequireAuthenticated("SignedIn"));
+        var guard = new SecurityRouteGuard(
+            new AuthorizationEvaluator(new PermissionRegistry()),
+            new AuthenticationStateStore(),
+            provider,
+            new SecurityRouteGuardOptions(),
+            diagnostics);
+
+        var result = await guard.CanEnterAsync(CreateContext("settings"), CancellationToken.None);
+
+        Assert.Equal(RouteGuardResultStatus.Reject, result.Status);
+        var record = Assert.Single(
+            diagnostics.Records,
+            item => item.Code == SecurityDiagnosticIds.RouteAuthorizationCompleted);
+        Assert.Equal("settings", record.Context["routeId"]);
+        Assert.Equal("SignedIn", record.Context["policyName"]);
+        Assert.Equal("Reject", record.Context["resultStatus"]);
     }
 
     [Fact]
@@ -185,7 +279,7 @@ public sealed class RouteAuthorizationGuardTests
 
         foreach (var permission in permissions)
         {
-            identity.AddClaim(new Claim("permission", permission));
+            identity.AddClaim(new Claim(SecurityClaimTypes.Permission, permission));
         }
 
         return new ClaimsPrincipal(identity);
@@ -207,6 +301,41 @@ public sealed class RouteAuthorizationGuardTests
             CancellationToken cancellationToken = default)
         {
             throw _exception;
+        }
+    }
+
+    private sealed class CancellingRouteAuthorizationPolicyProvider(
+        CancellationTokenSource cancellation) : IRouteAuthorizationPolicyProvider
+    {
+        public ValueTask<AuthorizationPolicy?> GetPolicyAsync(
+            RouteGuardContext context,
+            CancellationToken cancellationToken = default)
+        {
+            cancellation.Cancel();
+            return ValueTask.FromResult<AuthorizationPolicy?>(null);
+        }
+    }
+
+    private sealed class CancellingAuthorizationEvaluator(
+        CancellationTokenSource cancellation) : IAuthorizationEvaluator
+    {
+        public ValueTask<AuthorizationResult> EvaluateAsync(
+            AuthorizationRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            cancellation.Cancel();
+            return ValueTask.FromResult(AuthorizationResult.Allowed());
+        }
+
+        public ValueTask<AuthorizationResult> EvaluatePolicyAsync(
+            ClaimsPrincipal? principal,
+            string policyName,
+            string? resourceName = null,
+            string? contributionId = null,
+            CancellationToken cancellationToken = default)
+        {
+            cancellation.Cancel();
+            return ValueTask.FromResult(AuthorizationResult.Allowed());
         }
     }
 }

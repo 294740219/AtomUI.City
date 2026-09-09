@@ -11,9 +11,12 @@
 
 ## 并发冲突策略
 
-- 权限未注册：授权失败。
-- policy provider 缺失：返回 Failed。
-- token provider 不可用。
+- AuthenticationStateStore、PermissionRegistry 和内存 providers 以实例锁保护共享状态；读者只观察完整 snapshot/descriptor。
+- Authentication、Permission 和 Command 事件在各自 revision 内按提交顺序进入单消费者队列，用户观察者在内部锁外执行。
+- 观察者异常被逐个隔离并记录诊断，不能阻断后续观察者或回滚 mutation。
+- CommandAuthorizationSource 的 authentication、permission 和 descriptor 并发变化由同一 revision 序列归并；Dispose 后拒绝新通知入队。
+- 当前事件 publisher 是逐条 FIFO 单消费者队列，不合批且不设容量上限。观察者必须短时、非阻塞；持续并发 mutation 遇到阻塞观察者会让队列增长，调用方需要把慢 IO/长任务转交到自己的受控执行器。
+- Planned account file mutation 与账号切换分别按账号和 Host 串行化；在 `AUC-SECURITY-008/009` 实现前不宣称已具备。
 
 ## UI 线程规则
 
@@ -26,9 +29,11 @@
 - IO、网络、子进程、编译分析、插件扫描、缓存清理、streaming 和 handler 调用必须可取消。
 - 取消后不得提交后续状态、缓存、事件、UI 或 generated output。
 - 长生命周期后台任务必须绑定 owner；owner 释放时取消。
+- 只有调用方传入的 token 已请求取消时才返回 Cancelled；其他来源的 `OperationCanceledException` 属于 provider/evaluator failure。
 
 ## 死锁规避
 
 - 不在 UI 线程同步等待异步操作。
 - 不在 lock 内调用用户 handler、插件代码、dispatcher、transport 或外部 process。
+- 用户 handler 重入状态 mutation 时只追加下一 revision，由当前 drainer 在本次通知结束后继续处理。
 - 释放顺序从 leaf owner 到 parent owner。

@@ -9,6 +9,9 @@ public sealed class CommandAuthorizationContext
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(commandId);
 
+        ValidateOptional(resourceName, nameof(resourceName));
+        ValidateOptional(contributionId, nameof(contributionId));
+
         CommandId = commandId;
         ResourceName = resourceName;
         ContributionId = contributionId;
@@ -19,4 +22,12 @@ public sealed class CommandAuthorizationContext
     public string? ResourceName { get; }
 
     public string? ContributionId { get; }
+
+    private static void ValidateOptional(string? value, string parameterName)
+    {
+        if (value is not null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(value, parameterName);
+        }
+    }
 }

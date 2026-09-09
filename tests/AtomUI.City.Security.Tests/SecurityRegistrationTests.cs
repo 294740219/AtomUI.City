@@ -1,4 +1,5 @@
 using AtomUI.City.Security;
+using AtomUI.City.Core.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace AtomUI.City.Security.Tests;
@@ -110,5 +111,84 @@ public sealed class SecurityRegistrationTests
         var result = await provider.GetTokenAsync(new AccessTokenRequest("catalog"), cancellation.Token);
 
         Assert.Equal(AccessTokenResultStatus.Cancelled, result.Status);
+    }
+
+    [Fact]
+    public async Task DelegateAccessTokenProviderMapsUnexpectedCancellationExceptionToFailure()
+    {
+        var exception = new OperationCanceledException("provider failed without caller cancellation");
+        var provider = new DelegateAccessTokenProvider((_, _) => throw exception);
+
+        var result = await provider.GetTokenAsync(new AccessTokenRequest("catalog"));
+
+        Assert.Equal(AccessTokenResultStatus.Failed, result.Status);
+        Assert.Same(exception, result.Exception);
+    }
+
+    [Fact]
+    public async Task DelegateAccessTokenProviderRejectsNullResult()
+    {
+        var provider = new DelegateAccessTokenProvider(
+            (_, _) => ValueTask.FromResult<AccessTokenResult>(null!));
+
+        var result = await provider.GetTokenAsync(new AccessTokenRequest("catalog"));
+
+        Assert.Equal(AccessTokenResultStatus.Failed, result.Status);
+        Assert.IsType<InvalidOperationException>(result.Exception);
+    }
+
+    [Fact]
+    public async Task DelegateAccessTokenProviderObservesCancellationAfterDelegate()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var provider = new DelegateAccessTokenProvider((_, _) =>
+        {
+            cancellation.Cancel();
+            return ValueTask.FromResult(AccessTokenResult.Success("access-token", "Bearer"));
+        });
+
+        var result = await provider.GetTokenAsync(
+            new AccessTokenRequest("catalog"),
+            cancellation.Token);
+
+        Assert.Equal(AccessTokenResultStatus.Cancelled, result.Status);
+    }
+
+    [Fact]
+    public async Task AccessTokenDiagnosticDoesNotContainTokenValue()
+    {
+        var diagnostics = new InMemoryHostDiagnostics();
+        var provider = new DelegateAccessTokenProvider(
+            (_, _) => ValueTask.FromResult(AccessTokenResult.Success(
+                "secret-access-token",
+                "Bearer",
+                DateTimeOffset.UtcNow.AddMinutes(5))),
+            diagnostics);
+
+        var result = await provider.GetTokenAsync(new AccessTokenRequest("catalog"));
+
+        Assert.True(result.Succeeded);
+        var record = Assert.Single(
+            diagnostics.Records,
+            item => item.Code == SecurityDiagnosticIds.AccessTokenResolved);
+        var diagnosticText = string.Join('|', record.Context.Values);
+        Assert.DoesNotContain("secret-access-token", diagnosticText, StringComparison.Ordinal);
+        Assert.Equal("Success", record.Context["status"]);
+    }
+
+    [Fact]
+    public void AddSecurityInjectsCoreDiagnosticsIntoSecurityServices()
+    {
+        var diagnostics = new InMemoryHostDiagnostics();
+        var services = new ServiceCollection();
+        services.AddSingleton<IHostDiagnostics>(diagnostics);
+        services.AddSecurity();
+
+        using var serviceProvider = services.BuildServiceProvider();
+        serviceProvider.GetRequiredService<AuthenticationStateStore>().SetAnonymous();
+
+        Assert.Contains(
+            diagnostics.Records,
+            record => record.Code == SecurityDiagnosticIds.AuthenticationStateChanged);
     }
 }

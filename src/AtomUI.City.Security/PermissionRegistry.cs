@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using AtomUI.City.Core.Diagnostics;
 
 namespace AtomUI.City.Security;
 
@@ -7,7 +8,24 @@ public sealed class PermissionRegistry : IPermissionRegistry
     private readonly Dictionary<string, PermissionDescriptor> _permissions = new(StringComparer.Ordinal);
     private readonly HashSet<string> _revokedContributions = new(StringComparer.Ordinal);
     private readonly object _syncRoot = new();
+    private readonly OrderedEventPublisher<PermissionRegistryChangedEventArgs> _eventPublisher;
+    private readonly IHostDiagnostics? _diagnostics;
     private long _revision;
+
+    public PermissionRegistry()
+    {
+        _eventPublisher = new OrderedEventPublisher<PermissionRegistryChangedEventArgs>(
+            diagnostics: null,
+            SecurityDiagnosticIds.PermissionObserverFailed);
+    }
+
+    public PermissionRegistry(IHostDiagnostics diagnostics)
+    {
+        _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+        _eventPublisher = new OrderedEventPublisher<PermissionRegistryChangedEventArgs>(
+            diagnostics,
+            SecurityDiagnosticIds.PermissionObserverFailed);
+    }
 
     public event EventHandler<PermissionRegistryChangedEventArgs>? Changed;
 
@@ -37,6 +55,8 @@ public sealed class PermissionRegistry : IPermissionRegistry
     {
         ArgumentNullException.ThrowIfNull(descriptor);
         long revision;
+        PermissionRegistryChangedEventArgs args;
+        bool shouldDrain;
 
         lock (_syncRoot)
         {
@@ -53,14 +73,18 @@ public sealed class PermissionRegistry : IPermissionRegistry
 
             _permissions.Add(descriptor.Name, descriptor);
             revision = ++_revision;
-        }
-
-        Changed?.Invoke(
-            this,
-            new PermissionRegistryChangedEventArgs(
+            args = new PermissionRegistryChangedEventArgs(
                 revision,
                 descriptor.Name,
-                descriptor.ContributionId));
+                descriptor.ContributionId);
+            shouldDrain = _eventPublisher.Enqueue(Changed, args);
+        }
+
+        WriteChangedDiagnostic("Add", revision, descriptor.Name, descriptor.ContributionId);
+        if (shouldDrain)
+        {
+            _eventPublisher.Drain(this);
+        }
 
         return true;
     }
@@ -70,6 +94,8 @@ public sealed class PermissionRegistry : IPermissionRegistry
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         long revision;
         PermissionDescriptor removed;
+        PermissionRegistryChangedEventArgs args;
+        bool shouldDrain;
 
         lock (_syncRoot)
         {
@@ -80,14 +106,18 @@ public sealed class PermissionRegistry : IPermissionRegistry
 
             removed = descriptor;
             revision = ++_revision;
-        }
-
-        Changed?.Invoke(
-            this,
-            new PermissionRegistryChangedEventArgs(
+            args = new PermissionRegistryChangedEventArgs(
                 revision,
                 removed.Name,
-                removed.ContributionId));
+                removed.ContributionId);
+            shouldDrain = _eventPublisher.Enqueue(Changed, args);
+        }
+
+        WriteChangedDiagnostic("Remove", revision, removed.Name, removed.ContributionId);
+        if (shouldDrain)
+        {
+            _eventPublisher.Drain(this);
+        }
 
         return true;
     }
@@ -97,6 +127,8 @@ public sealed class PermissionRegistry : IPermissionRegistry
         ArgumentException.ThrowIfNullOrWhiteSpace(contributionId);
         long revision;
         int removedCount;
+        PermissionRegistryChangedEventArgs args;
+        bool shouldDrain;
 
         lock (_syncRoot)
         {
@@ -121,14 +153,18 @@ public sealed class PermissionRegistry : IPermissionRegistry
             }
 
             removedCount = names.Length;
-        }
-
-        Changed?.Invoke(
-            this,
-            new PermissionRegistryChangedEventArgs(
+            args = new PermissionRegistryChangedEventArgs(
                 revision,
                 permissionName: null,
-                contributionId));
+                contributionId);
+            shouldDrain = _eventPublisher.Enqueue(Changed, args);
+        }
+
+        WriteChangedDiagnostic("RevokeContribution", revision, permissionName: null, contributionId);
+        if (shouldDrain)
+        {
+            _eventPublisher.Drain(this);
+        }
 
         return removedCount;
     }
@@ -153,5 +189,25 @@ public sealed class PermissionRegistry : IPermissionRegistry
         {
             return _permissions.TryGetValue(name, out descriptor);
         }
+    }
+
+    private void WriteChangedDiagnostic(
+        string operation,
+        long revision,
+        string? permissionName,
+        string? contributionId)
+    {
+        SecurityDiagnostics.Write(
+            _diagnostics,
+            SecurityDiagnosticIds.PermissionRegistryChanged,
+            "Permission registry changed.",
+            HostDiagnosticSeverity.Info,
+            new Dictionary<string, string?>(StringComparer.Ordinal)
+            {
+                ["operation"] = operation,
+                ["permissionName"] = permissionName,
+                ["contributionId"] = contributionId,
+                ["revision"] = revision.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            });
     }
 }

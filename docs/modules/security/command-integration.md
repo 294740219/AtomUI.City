@@ -7,8 +7,8 @@
 ## 设计决策
 
 - 授权失败返回明确 result，不能直接操作 UI。
-- 权限声明必须来自 registry 或 plugin capability。
-- 认证状态变更必须通知 command、route 和 data 集成点。
+- 当前权限声明来自 registry；plugin capability 属于未来 PluginSystem 集成。
+- 认证状态通过 `IAuthenticationStateProvider.StateChanged` 发布；当前只有 Command source 直接订阅，Route/Data 在每次操作中读取当前 Security contract，其他联动由应用 bridge 负责。
 
 ## Public Contract
 
@@ -78,7 +78,7 @@ Command 可以声明：
 - 未授权时 hidden。
 - 未授权提示 key。
 
-Command metadata 可以来自 attribute、builder API 或 Source Generator manifest。
+当前 Command metadata 通过 `InMemoryCommandAuthorizationDescriptorProvider.Add` 显式注册。descriptor 未显式指定 contribution 时继承 policy contribution；二者同时指定但不一致时构造失败，避免撤销后残留直接持有 policy 的 command。attribute、builder API 和 Source Generator manifest 尚未实现，不能作为当前用法。
 
 ### 3. CanExecute 数据流
 
@@ -98,6 +98,8 @@ Command 可执行状态可以同时受以下因素影响：
 - Operation 正在执行状态。
 
 Security 只提供授权维度，不覆盖其他维度。
+
+当前 Security source 只直接订阅认证状态、command descriptor 和 permission registry。Routing 当前状态、ViewModel active、Validation 和 Operation 状态由 MVVM/应用组合；如需让路由变化刷新 command，应用必须提供 adapter。
 
 ### 4. 用户动作
 
@@ -126,6 +128,8 @@ Presentation 不读取权限存储，不解释 Policy，只消费 Command 状态
 
 ### 6. CompositeCommand
 
+本节描述未来 MVVM 集成目标。Security 当前只发布单个 command id 的授权状态，不提供 `CompositeCommand` 类型或组合命令管理器。
+
 组合命令需要过滤当前 active 上下文中的可执行子命令。
 
 规则：
@@ -141,8 +145,8 @@ Presentation 不读取权限存储，不解释 Policy，只消费 Command 状态
 |---|---|
 | 授权未通过 | `CanExecute = false`，执行时返回 authorization failure。 |
 | Policy 或 descriptor provider 抛异常 | `CanExecute = false`，返回 Failed/EvaluatorFailed，记录诊断。 |
-| 插件 command 权限撤销 | Command contribution disabled 或 removed。 |
-| 登录态未知 | 默认不可执行，除非 command 标记匿名可执行。 |
+| contribution command 权限撤销 | `RemoveByContribution` 删除 descriptor、发布全量刷新，并阻止同 contribution 重新注册。 |
+| command 没有 descriptor | Allowed；注册了受保护 descriptor 时按 policy 评估当前登录态。 |
 
 ### 8. 测试策略
 
@@ -151,7 +155,8 @@ Presentation 不读取权限存储，不解释 Policy，只消费 Command 状态
 - 权限变化刷新 `CanExecute`。
 - 登录态变化刷新 `CanExecute`。
 - 执行前二次授权。
-- CompositeCommand 子命令授权变化。
+- 当前 descriptor contribution 批量撤销和重新注册拒绝。
+- CompositeCommand 子命令授权变化在对应 MVVM 集成 Feature 建立后测试。
 - 插件 command 撤销。
-- Dispose 后释放认证、descriptor 和权限 registry 订阅。
+- 构造期订阅失败回滚已完成订阅；Dispose 尝试释放全部订阅并聚合失败，重复 Dispose 幂等。
 - Presentation 不直接参与授权判断。

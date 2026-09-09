@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using AtomUI.City.Core.Diagnostics;
 
 namespace AtomUI.City.Security;
 
@@ -7,10 +8,27 @@ public sealed class AuthenticationStateStore :
     ICurrentPrincipalAccessor
 {
     private readonly object _syncRoot = new();
+    private readonly OrderedEventPublisher<AuthenticationStateChangedEventArgs> _eventPublisher;
+    private readonly IHostDiagnostics? _diagnostics;
     private AuthenticationStateSnapshot _current = new(
         AuthenticationState.Unknown,
         SecurityPrincipals.Anonymous,
         revision: 0);
+
+    public AuthenticationStateStore()
+    {
+        _eventPublisher = new OrderedEventPublisher<AuthenticationStateChangedEventArgs>(
+            diagnostics: null,
+            SecurityDiagnosticIds.AuthenticationObserverFailed);
+    }
+
+    public AuthenticationStateStore(IHostDiagnostics diagnostics)
+    {
+        _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+        _eventPublisher = new OrderedEventPublisher<AuthenticationStateChangedEventArgs>(
+            diagnostics,
+            SecurityDiagnosticIds.AuthenticationObserverFailed);
+    }
 
     public event EventHandler<AuthenticationStateChangedEventArgs>? StateChanged;
 
@@ -43,6 +61,7 @@ public sealed class AuthenticationStateStore :
         DateTimeOffset? expiresAt = null)
     {
         ArgumentNullException.ThrowIfNull(principal);
+        ThrowIfNotAuthenticated(principal);
 
         return SetCore(AuthenticationState.Authenticated, principal, scheme, expiresAt);
     }
@@ -50,15 +69,25 @@ public sealed class AuthenticationStateStore :
     public AuthenticationStateSnapshot SetRefreshing(ClaimsPrincipal principal, string? scheme = null)
     {
         ArgumentNullException.ThrowIfNull(principal);
+        ThrowIfNotAuthenticated(principal);
 
-        return SetCore(AuthenticationState.Refreshing, principal, scheme);
+        return SetCore(
+            AuthenticationState.Refreshing,
+            principal,
+            scheme,
+            preserveCurrentTokenHints: true);
     }
 
     public AuthenticationStateSnapshot SetExpired(ClaimsPrincipal principal, string? scheme = null)
     {
         ArgumentNullException.ThrowIfNull(principal);
+        ThrowIfNotAuthenticated(principal);
 
-        return SetCore(AuthenticationState.Expired, principal, scheme);
+        return SetCore(
+            AuthenticationState.Expired,
+            principal,
+            scheme,
+            preserveCurrentTokenHints: true);
     }
 
     public AuthenticationStateSnapshot SetSignedOut()
@@ -66,7 +95,7 @@ public sealed class AuthenticationStateStore :
         return SetCore(AuthenticationState.SignedOut, SecurityPrincipals.Anonymous);
     }
 
-    public AuthenticationStateSnapshot SetFailed(string failureMessage, ClaimsPrincipal? principal = null)
+    public AuthenticationStateSnapshot SetFailed(string failureMessage)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(failureMessage);
 
@@ -83,30 +112,62 @@ public sealed class AuthenticationStateStore :
         ClaimsPrincipal principal,
         string? scheme = null,
         DateTimeOffset? expiresAt = null,
-        string? failureMessage = null)
+        string? failureMessage = null,
+        bool preserveCurrentTokenHints = false)
     {
+        var principalSnapshot = SecurityPrincipalSnapshot.Clone(principal);
         AuthenticationStateSnapshot previous;
         AuthenticationStateSnapshot current;
+        AuthenticationStateChangedEventArgs args;
+        bool shouldDrain;
 
         lock (_syncRoot)
         {
             previous = _current;
-            if (Matches(previous, state, principal, scheme, expiresAt, failureMessage))
+            if (preserveCurrentTokenHints)
+            {
+                scheme ??= previous.Scheme;
+                expiresAt ??= previous.ExpiresAt;
+            }
+
+            if (Matches(previous, state, principalSnapshot, scheme, expiresAt, failureMessage))
             {
                 return previous;
             }
 
             current = new AuthenticationStateSnapshot(
                 state,
-                principal,
+                principalSnapshot,
                 previous.Revision + 1,
                 scheme,
                 expiresAt,
                 failureMessage);
             _current = current;
+            args = new AuthenticationStateChangedEventArgs(previous, current);
+            shouldDrain = _eventPublisher.Enqueue(StateChanged, args);
         }
 
-        StateChanged?.Invoke(this, new AuthenticationStateChangedEventArgs(previous, current));
+        SecurityDiagnostics.Write(
+            _diagnostics,
+            SecurityDiagnosticIds.AuthenticationStateChanged,
+            "Authentication state changed.",
+            HostDiagnosticSeverity.Info,
+            new Dictionary<string, string?>(StringComparer.Ordinal)
+            {
+                ["previousState"] = previous.State.ToString(),
+                ["currentState"] = current.State.ToString(),
+                ["reason"] = current.State.ToString(),
+                ["revision"] = current.Revision.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["scheme"] = current.Scheme,
+                ["principalKind"] = current.PrincipalSnapshot.Identities.Any(static identity => identity.IsAuthenticated)
+                    ? "Authenticated"
+                    : "Anonymous",
+            });
+
+        if (shouldDrain)
+        {
+            _eventPublisher.Drain(this);
+        }
 
         return current;
     }
@@ -123,7 +184,7 @@ public sealed class AuthenticationStateStore :
             && string.Equals(snapshot.Scheme, scheme, StringComparison.Ordinal)
             && snapshot.ExpiresAt == expiresAt
             && string.Equals(snapshot.FailureMessage, failureMessage, StringComparison.Ordinal)
-            && PrincipalsEqual(snapshot.Principal, principal);
+            && PrincipalsEqual(snapshot.PrincipalSnapshot, principal);
     }
 
     private static bool PrincipalsEqual(ClaimsPrincipal left, ClaimsPrincipal right)
@@ -152,7 +213,16 @@ public sealed class AuthenticationStateStore :
         return string.Equals(left.AuthenticationType, right.AuthenticationType, StringComparison.Ordinal)
             && string.Equals(left.NameClaimType, right.NameClaimType, StringComparison.Ordinal)
             && string.Equals(left.RoleClaimType, right.RoleClaimType, StringComparison.Ordinal)
-            && ClaimsEqual(left.Claims, right.Claims);
+            && string.Equals(left.Label, right.Label, StringComparison.Ordinal)
+            && ClaimsEqual(left.Claims, right.Claims)
+            && ActorIdentitiesEqual(left.Actor, right.Actor);
+    }
+
+    private static bool ActorIdentitiesEqual(ClaimsIdentity? left, ClaimsIdentity? right)
+    {
+        return left is null
+            ? right is null
+            : right is not null && IdentitiesEqual(left, right);
     }
 
     private static bool ClaimsEqual(IEnumerable<Claim> left, IEnumerable<Claim> right)
@@ -188,6 +258,38 @@ public sealed class AuthenticationStateStore :
             && string.Equals(left.Value, right.Value, StringComparison.Ordinal)
             && string.Equals(left.ValueType, right.ValueType, StringComparison.Ordinal)
             && string.Equals(left.Issuer, right.Issuer, StringComparison.Ordinal)
-            && string.Equals(left.OriginalIssuer, right.OriginalIssuer, StringComparison.Ordinal);
+            && string.Equals(left.OriginalIssuer, right.OriginalIssuer, StringComparison.Ordinal)
+            && ClaimPropertiesEqual(left.Properties, right.Properties);
+    }
+
+    private static bool ClaimPropertiesEqual(
+        IDictionary<string, string> left,
+        IDictionary<string, string> right)
+    {
+        if (left.Count != right.Count)
+        {
+            return false;
+        }
+
+        foreach (var pair in left)
+        {
+            if (!right.TryGetValue(pair.Key, out var value)
+                || !string.Equals(pair.Value, value, StringComparison.Ordinal))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static void ThrowIfNotAuthenticated(ClaimsPrincipal principal)
+    {
+        if (!principal.Identities.Any(static identity => identity.IsAuthenticated))
+        {
+            throw new ArgumentException(
+                "Authenticated, refreshing, and expired states require an authenticated principal.",
+                nameof(principal));
+        }
     }
 }

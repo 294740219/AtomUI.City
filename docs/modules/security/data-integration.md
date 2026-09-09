@@ -10,8 +10,8 @@
 - 请求取消后不得写入 State。
 - HTTP、gRPC、SignalR 必须映射到统一 DataResult。
 - 授权失败返回明确 result，不能直接操作 UI。
-- 权限声明必须来自 registry 或 plugin capability。
-- 认证状态变更必须通知 command、route 和 data 集成点。
+- 当前权限声明来自 registry；plugin capability 属于未来 PluginSystem 集成。
+- 认证状态通过 `IAuthenticationStateProvider.StateChanged` 发布；当前只有 Command source 直接订阅，Route/Data 在每次操作中读取当前 Security contract，其他联动由应用 bridge 负责。
 
 ## Public Contract
 
@@ -113,10 +113,10 @@ Data 管线根据结果决定继续请求、challenge、失败或取消。
 
 | 状态 | 说明 | 默认处理 |
 |---|---|---|
-| 401 | 认证无效、过期或需要登录。 | 通知 Security refresh 或 challenge。 |
+| 401 | 认证无效、过期或需要登录。 | Data/应用认证编排器决定 refresh 或 challenge；Security 不自动刷新。 |
 | 403 | 认证有效但权限不足。 | 返回 authorization failure，不自动重试。 |
 
-401 refresh 应有并发合并策略，避免多个请求同时刷新 token。
+具体 token provider 如支持 401 refresh，应声明并发合并策略；Security 当前默认 `UnavailableAccessTokenProvider` 不实现 refresh。
 
 403 不应自动 refresh，除非 Host 显式配置。
 
@@ -137,6 +137,8 @@ UI 表达由 Presentation 或应用决定。
 
 ### 6. 插件 Data client
 
+本节是未来 PluginSystem/Data 集成目标；当前 Security 没有 capability store 或插件 token broker。
+
 插件 Data client 使用认证信息必须声明 metadata。
 
 规则：
@@ -152,8 +154,8 @@ UI 表达由 Presentation 或应用决定。
 |---|---|
 | Token 获取取消 | 请求取消。 |
 | Token 获取失败 | Data auth failure。 |
-| 401 refresh 成功 | 重试一次，具体由 Data resilience 策略控制。 |
-| 401 refresh 失败 | Security 状态进入 Expired 或 SignedOut。 |
+| 应用/provider 的 401 refresh 成功 | 是否重试由 Data resilience 策略控制。 |
+| 应用/provider 的 401 refresh 失败 | 编排器返回稳定失败并决定是否发布 Expired、SignedOut 或 Failed。 |
 | 403 | 返回 Forbidden，不自动重试。 |
 
 ### 8. 测试策略
@@ -163,7 +165,6 @@ UI 表达由 Presentation 或应用决定。
 - 匿名请求不获取 token。
 - 受保护请求注入 token。
 - Token 获取取消。
-- 401 触发 refresh。
-- refresh 并发合并。
-- 403 不自动 refresh。
-- 插件 Data client 无 capability 时被拒绝。
+- 当前 Data bridge 对 Success/Failed/Unavailable/Cancelled 的映射。
+- 401 refresh、并发合并、403 策略由具体 Data/provider Feature 测试。
+- 插件 Data client capability 在对应 PluginSystem Feature 建立后测试。

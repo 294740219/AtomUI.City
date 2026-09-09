@@ -24,35 +24,92 @@ public sealed class PermissionChecker : IPermissionChecker
         _principalAccessor = principalAccessor;
     }
 
-    public ValueTask<AuthorizationResult> CheckAsync(
+    public async ValueTask<AuthorizationResult> CheckAsync(
         ClaimsPrincipal? principal,
         string permissionName,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(permissionName);
 
-        return _authorizationEvaluator.EvaluateAsync(
-            new AuthorizationRequest(
-                principal,
-                AuthorizationPolicy.RequirePermission($"Permission:{permissionName}", permissionName)),
-            cancellationToken);
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return AuthorizationResult.Cancelled();
+        }
+
+        try
+        {
+            var result = await _authorizationEvaluator.EvaluateAsync(
+                    new AuthorizationRequest(
+                        principal,
+                        AuthorizationPolicy.RequirePermission($"Permission:{permissionName}", permissionName)),
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return AuthorizationResult.Cancelled();
+            }
+
+            return result ?? AuthorizationResult.Failed(
+                SecurityFailureKind.EvaluatorFailed,
+                permissionName,
+                "The authorization evaluator returned null.");
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return AuthorizationResult.Cancelled();
+        }
+        catch (Exception exception)
+        {
+            return AuthorizationResult.Failed(
+                SecurityFailureKind.EvaluatorFailed,
+                permissionName,
+                exception.Message,
+                exception: exception);
+        }
     }
 
-    public ValueTask<AuthorizationResult> CheckCurrentAsync(
+    public async ValueTask<AuthorizationResult> CheckCurrentAsync(
         string permissionName,
         CancellationToken cancellationToken = default)
     {
-        if (_principalAccessor is null)
+        ArgumentException.ThrowIfNullOrWhiteSpace(permissionName);
+
+        if (cancellationToken.IsCancellationRequested)
         {
-            return ValueTask.FromResult(
-                AuthorizationResult.Failed(
-                    SecurityFailureKind.EvaluatorFailed,
-                    message: "No current principal accessor is configured."));
+            return AuthorizationResult.Cancelled();
         }
 
-        return CheckAsync(
-            _principalAccessor.Principal,
-            permissionName,
-            cancellationToken);
+        if (_principalAccessor is null)
+        {
+            return AuthorizationResult.Failed(
+                SecurityFailureKind.EvaluatorFailed,
+                permissionName,
+                "No current principal accessor is configured.");
+        }
+
+        try
+        {
+            var principal = _principalAccessor.Principal;
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return AuthorizationResult.Cancelled();
+            }
+
+            return await CheckAsync(principal, permissionName, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return AuthorizationResult.Cancelled();
+        }
+        catch (Exception exception)
+        {
+            return AuthorizationResult.Failed(
+                SecurityFailureKind.EvaluatorFailed,
+                permissionName,
+                exception.Message,
+                exception: exception);
+        }
     }
 }

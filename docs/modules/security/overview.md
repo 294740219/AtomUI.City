@@ -19,11 +19,15 @@
 - 认证状态以 immutable snapshot 发布。
 - 授权评估不操作 UI 或导航。
 - access token 失败返回 AccessTokenResult。
+- 认证 snapshot 必须防御输入与输出 principal mutation，并移除 `BootstrapContext`。
+- Security 诊断不得包含 token、refresh token、完整 principal 或用户 claims。
 
 ## 模块目标
 
 - 集中表达当前用户和认证状态。
 - 统一权限、策略、路由和命令授权。
+- 通过 Core `IHostDiagnostics` 提供稳定诊断码，并隔离事件观察者失败。
+- 规划多账号文件持久化与全局活动账号切换（`AUC-SECURITY-008/009`）。
 
 ## 明确非目标
 
@@ -33,8 +37,8 @@
 ## 使用者画像
 
 - 框架开发者：根据模块合同实现 public API、状态机、失败路径、诊断和测试。
-- 应用开发者：通过 DI、扩展方法、attribute、manifest、CLI 或模板使用模块能力。
-- 插件开发者：通过 Host 共享 contract、manifest 和可撤销贡献接入模块。
+- 应用开发者：当前通过 DI、扩展方法和显式 descriptor/provider 使用模块能力；attribute、manifest、CLI 或模板必须以对应 Feature 状态为准。
+- 插件开发者：当前由 Host 代为注册并按 contribution id 撤销；完整 manifest、capability 和 lease 接入属于未来 PluginSystem Feature。
 - 测试开发者：根据测试矩阵验证成功路径、失败路径、线程、释放和兼容性。
 
 ## 与 Host 的关系
@@ -43,7 +47,7 @@ AtomUI.City.Security 作为 Host 服务或模块贡献接入 Core 生命周期�
 
 ## 与 PluginSystem 的关系
 
-插件可以通过 manifest 或 Host 共享 contract 贡献本模块能力；所有插件来源对象必须绑定 plugin owner 并可撤销。
+当前 Security 只提供 contribution id 撤销/tombstone 基线。插件 manifest、capability grant、ContributionLease 和 owner 编排属于 Future Integration，不能从本文档推断为已有能力。
 
 ## 与 Testing 的关系
 
@@ -68,4 +72,4 @@ AtomUI.City.Security 作为 Host 服务或模块贡献接入 Core 生命周期�
 
 Partially Implemented
 
-该状态表示模块已有实现基线，但还需要按产品级合同补齐实现和测试。单个功能点状态以 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 为准。
+`AUC-SECURITY-001~007` 已有实现与合同测试；`AUC-SECURITY-008/009` 仅完成设计登记，文件 Provider、账号 session manager 和对应测试尚不存在。Security generator、Plugin capability/ContributionLease 和 Testing helper 也不是当前已实现能力。单个功能点状态以 [features.md](features.md) 和 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 为准。

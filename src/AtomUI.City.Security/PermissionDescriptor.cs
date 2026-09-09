@@ -13,6 +13,12 @@ public sealed class PermissionDescriptor
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
+        ValidateOptionalIdentifier(displayNameKey, nameof(displayNameKey));
+        ValidateOptionalIdentifier(descriptionKey, nameof(descriptionKey));
+        ValidateOptionalIdentifier(category, nameof(category));
+        ValidateOptionalIdentifier(contributionId, nameof(contributionId));
+        ValidateOptionalIdentifier(defaultPolicy, nameof(defaultPolicy));
+
         Name = name;
         DisplayNameKey = displayNameKey;
         DescriptionKey = descriptionKey;
@@ -35,4 +41,12 @@ public sealed class PermissionDescriptor
     public string? DefaultPolicy { get; }
 
     public bool IsHostOnly { get; }
+
+    private static void ValidateOptionalIdentifier(string? value, string parameterName)
+    {
+        if (value is not null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(value, parameterName);
+        }
+    }
 }

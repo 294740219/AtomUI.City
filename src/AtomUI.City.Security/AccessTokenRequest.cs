@@ -9,6 +9,9 @@ public sealed class AccessTokenRequest
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(resourceName);
 
+        ValidateOptional(scheme, nameof(scheme));
+        ValidateOptional(operationName, nameof(operationName));
+
         ResourceName = resourceName;
         Scheme = scheme;
         OperationName = operationName;
@@ -19,4 +22,12 @@ public sealed class AccessTokenRequest
     public string? Scheme { get; }
 
     public string? OperationName { get; }
+
+    private static void ValidateOptional(string? value, string parameterName)
+    {
+        if (value is not null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(value, parameterName);
+        }
+    }
 }

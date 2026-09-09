@@ -7,8 +7,8 @@
 ## 设计决策
 
 - 授权失败返回明确 result，不能直接操作 UI。
-- 权限声明必须来自 registry 或 plugin capability。
-- 认证状态变更必须通知 command、route 和 data 集成点。
+- 当前权限声明来自 registry；plugin capability 属于未来 PluginSystem 集成。
+- 认证状态通过 `IAuthenticationStateProvider.StateChanged` 发布；当前只有 Command source 直接订阅，Route/Data 在每次操作中读取当前 Security contract，其他联动由应用 bridge 负责。
 
 ## Public Contract
 
@@ -37,11 +37,12 @@
 | Feature ID | 相关能力 | 测试文件 |
 | --- | --- | --- |
 | AUC-SECURITY-001 | Authentication State | AuthenticationStateTests |
-| AUC-SECURITY-002 | Permission Registry | PermissionRegistryTests |
-| AUC-SECURITY-003 | Permission Checker | PermissionCheckerTests |
+| AUC-SECURITY-002 | Current Principal | AuthenticationStateTests |
+| AUC-SECURITY-003 | Permission Registry and Checker | PermissionRegistryTests; PermissionCheckerTests |
 | AUC-SECURITY-004 | Authorization Policy | AuthorizationPolicyTests; AuthorizationEvaluatorTests |
 | AUC-SECURITY-005 | Route Guard | RouteAuthorizationGuardTests |
 | AUC-SECURITY-006 | Command Authorization | CommandAuthorizationSourceTests |
+| AUC-SECURITY-007 | Access Token Provider | SecurityRegistrationTests; AccessTokenCredentialProviderTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -58,7 +59,7 @@
 
 ## AtomUI.City.Security Detailed Design
 
-适用范围：认证状态、当前主体、权限声明、授权策略、Route Guard、Command 权限联动、Data 认证集成、Plugin capability、AOT/source generator 和测试策略。
+适用范围：认证状态、当前主体、权限声明、授权策略、Route Guard、Command 权限联动、Data 认证集成，以及明确标记为 Future 的 Plugin capability、AOT/source generator 和测试工具方向。
 
 ### 1. 定位
 
@@ -72,7 +73,7 @@ Security 不实现具体身份系统，不提供登录 UI，不内置用户、�
 Authentication state
 -> Principal / claims
 -> Permission / policy evaluation
--> Routing Guard / Command CanExecute / Data auth / Plugin capability
+-> Routing Guard / Command CanExecute / Data auth
 -> Presentation display feedback
 ```
 
@@ -82,7 +83,7 @@ Authentication state
 - Routing 负责导航事务和 Guard 执行，不解释权限语义。
 - Mvvm 提供 Command 状态接入点，不解释权限语义。
 - Data 负责请求管线、重试、缓存和错误模型，通过 Security 获取认证信息。
-- PluginSystem 负责插件发现、加载和卸载，通过 Security 约束插件权限和 capability。
+- PluginSystem 负责插件发现、加载和卸载；当前 Security 只提供 contribution-aware registry/provider，capability 集成属于未来 Feature。
 - Presentation 负责登录、拒绝访问、命令禁用和权限提示等 UI 表达，不做授权决策。
 
 ### 2. 设计原则
@@ -91,7 +92,7 @@ Authentication state
 - Security makes decisions：认证和授权判断只能由 Security 统一执行。
 - UI-independent：Security 不直接引用 AtomUI/Avalonia，不打开窗口，不显示对话框。
 - Observable：认证状态、主体变化和权限变化必须可观察。
-- AOT-first：权限、Policy、Route/Command 授权声明由 Source Generator 生成 manifest。
+- AOT-compatible：当前显式 registry/provider 路径不依赖反射扫描；未来 generator 必须先登记 Feature ID。
 - Plugin-aware：插件可以贡献权限点和授权元数据，但 Host 解释、授权和撤销。
 - Desktop-aware：支持本地会话、Token 缓存引用、离线状态、锁定/解锁、用户切换和应用恢复。
 - Diagnostics-first：授权失败必须能解释是未登录、权限不足、Policy 异常、插件撤销还是认证过期。
@@ -117,17 +118,19 @@ Security 不负责：
 | 类型 | 职责 |
 |---|---|
 | `IAuthenticationStateProvider` | 提供当前认证状态，并发布变化通知。 |
-| `IAuthenticationService` | 登录、登出、刷新、恢复会话的抽象入口。 |
 | `ICurrentPrincipalAccessor` | 读取当前 `ClaimsPrincipal`。 |
 | `IPermissionChecker` | 检查 permission 是否满足。 |
 | `IAuthorizationPolicyProvider` | 提供 policy descriptor。 |
 | `IAuthorizationEvaluator` | 执行 policy 判断。 |
 | `IAccessTokenProvider` | 为 Data 管线提供 token 或 credential。 |
-| `ISecurityStateStore` | 保存当前认证状态快照。 |
-| `ISecurityContributionRegistry` | 管理模块/插件贡献的权限、Policy 和授权元数据。 |
-| `ISecurityDiagnostics` | 输出认证和授权诊断。 |
+| `AuthenticationStateStore` | 保存并有序发布当前认证状态快照；应用认证适配器显式调用其状态变更方法。 |
+| `PermissionRegistry` / in-memory providers | 管理当前 Host 中权限、Policy、Route 和 Command descriptor；通过 contribution id 撤销。 |
+| `SecurityDiagnosticIds` + Core `IHostDiagnostics` | 输出稳定认证和授权诊断；Security 不另造诊断存储。 |
+| `IAccountSessionStore` / `IAccountSessionManager` | 多账号持久化与切换目标合同；属于 Planned 的 `AUC-SECURITY-008/009`，当前源码不存在。 |
 
 命名不加 `City` 前缀。
+
+当前源码没有 `IAuthenticationService`、`ISecurityStateStore`、`ISecurityContributionRegistry` 或 `ISecurityDiagnostics`。登录、登出和 refresh 网络流程由应用/provider 实现；若未来需要统一 orchestration，必须先分配独立 Feature ID，不能把设想类型写成现有合同。
 
 ### 5. 认证状态
 
@@ -148,13 +151,10 @@ Failed
 
 - `ClaimsPrincipal`。
 - Authentication scheme。
-- Access token 引用或获取句柄。
-- Refresh 状态。
+- Refreshing / Expired 状态。
 - 过期时间。
-- 来源 Contribution。
-- 诊断信息。
 
-Security 是认证状态源。State 模块可以同步认证状态，用于 ViewModel 和 UI 订阅，但不能成为认证状态的权威写入方。
+快照不包含 token、refresh token、`BootstrapContext`、诊断对象或 contribution owner。Security 是认证状态源；State 模块可以同步非敏感派生状态供 ViewModel/UI 订阅，但不能成为认证状态权威写入方。
 
 详细规则见：[authentication.md](authentication.md)。
 
@@ -165,10 +165,10 @@ Security 是认证状态源。State 模块可以同步认证状态，用于 View
 | 概念 | 说明 |
 |---|---|
 | Permission | 稳定权限点，例如 `settings.read`、`project.build`。 |
-| Policy | 组合规则，例如需要登录、需要某权限、需要 claim、需要插件 capability。 |
-| Capability | Host 授权插件可使用的框架能力，例如贡献路由、发事件、访问 Data client。 |
+| Policy | 当前组合规则：需要登录、permission、claim 或 role。 |
+| Capability | PluginSystem 的未来 Host 授权概念；Security 当前没有 capability requirement API。 |
 
-Permission 是可声明、可本地化、可诊断的稳定标识。Policy 是运行时决策规则。Capability 是插件和 Host 的安全边界声明。
+Permission 是可声明、可本地化、可诊断的稳定标识。Policy 是运行时决策规则。Capability 目标由未来 PluginSystem 集成 Feature 建模，不能通过当前 `AuthorizationRequirement` 表达。
 
 详细规则见：
 
@@ -182,10 +182,10 @@ Routing 不解释权限，只执行 Security 提供或 Security 驱动的 Guard�
 
 ```text
 Route matched
--> Route auth metadata
+-> routeId policy lookup
 -> Security route guard
 -> AuthorizationEvaluator
--> Allow / Reject / Redirect / Challenge
+-> Allow / Reject / Redirect / Cancel / Failed
 ```
 
 结果语义：
@@ -195,7 +195,7 @@ Route matched
 | Allow | 继续导航。 |
 | Reject | 导航 rejected，保持当前页面。 |
 | Redirect | 交给 NavigationTransaction 统一重定向。 |
-| Challenge | 触发登录或认证恢复流程。 |
+| Challenge authorization result | Guard 配置登录路由时映射 Redirect，否则映射 Reject/AuthenticationRequired。 |
 | Failed | 导航 failed，进入诊断。 |
 
 详细规则见：[route-integration.md](route-integration.md)。
@@ -211,7 +211,7 @@ Command auth metadata
 -> Presentation updates enabled / disabled state
 ```
 
-权限变化、登录态变化、当前路由变化都应触发相关 Command 状态刷新。Presentation 只展示禁用、隐藏或提示，不做权限判断。
+权限 registry、登录态和 command descriptor 变化会触发 Security Command 状态刷新。当前路由、ViewModel active、Validation 和 Operation 等其他维度由 MVVM/应用组合并触发。Presentation 只展示禁用、隐藏或提示，不做权限判断。
 
 详细规则见：[command-integration.md](command-integration.md)。
 
@@ -225,16 +225,16 @@ Data request
 -> attach auth header / credential
 -> send request
 -> 401 / 403 handling
--> Security state refresh or authorization failure
+-> application/provider refresh orchestration or authorization failure
 ```
 
-401 默认表示认证失效或需要刷新。403 默认表示认证有效但权限不足。具体 UI 反馈由 Presentation 或应用决定。
+401 默认表示认证失效或需要刷新，但 Security 不自动执行 refresh；Data/应用认证编排器负责选择 refresh 或 challenge。403 默认表示认证有效但权限不足。具体 UI 反馈由 Presentation 或应用决定。
 
 详细规则见：[data-integration.md](data-integration.md)。
 
-### 10. PluginSystem 集成
+### 10. PluginSystem 集成（Future）
 
-插件可以贡献：
+当前 Security 只实现 permission、policy、route policy 和 command descriptor 的 contribution id 登记、批量撤销及 tombstone。完整插件 owner、capability、manifest 和跨 registry 撤销事务属于未来 PluginSystem 集成。目标上插件可以贡献：
 
 - Permission descriptor。
 - Policy requirement descriptor。
@@ -250,7 +250,7 @@ Data request
 - 把权限结果静态缓存到 Host。
 - 把插件私有类型泄漏到 Host policy contract。
 
-插件停用时必须撤销它贡献的权限、Policy、Route/Command 授权元数据，并触发相关 Guard/Command 重新计算。
+未来 PluginSystem 停用插件时必须编排撤销其权限、Policy、Route/Command 授权元数据，并聚合清理失败。当前各内存 provider 只能独立 `RemoveByContribution`；Command provider 会发布刷新，Route 在下一次查询时生效。
 
 详细规则见：[plugin-integration.md](plugin-integration.md)。
 
@@ -269,36 +269,27 @@ Presentation 不直接读取权限存储，不解释 Policy。
 
 ### 12. AOT 和 Source Generator
 
-Security generator 负责生成：
+当前 Security runtime 使用显式 registry/provider，不扫描程序集，因此现有路径没有反射发现依赖。仓库只有通用 Generator feature 名称，没有 Security permission/policy generator、manifest schema 或对应测试。
 
-- Permission manifest。
-- Policy manifest。
-- Route auth metadata。
-- Command auth metadata。
-- Plugin permission contribution descriptor。
-- 重复权限点诊断。
-- 未声明权限引用诊断。
-- 插件权限泄漏诊断。
-
-运行时默认不扫描程序集找权限声明。
+Security 专属 generator 是未来候选能力，不属于 `AUC-SECURITY-001~009` 的 Completed 范围。施工前必须新增 Feature ID，并一次性定义 permission/policy/route/command manifest、诊断码、generated output 兼容性和 AOT 测试。
 
 ### 13. 错误策略
 
 | 场景 | 默认处理 |
 |---|---|
-| 未登录访问受保护路由 | Challenge 或 Redirect。 |
+| 未登录访问受保护路由 | 配置登录 route 时 Redirect，否则 Reject/AuthenticationRequired。 |
 | 权限不足 | Reject / Forbidden。 |
-| Token 过期 | 尝试 Refresh，失败后 SignedOut。 |
+| Token 过期 | 具体应用/provider 决定 refresh；当前 Security 不自动刷新或登出。 |
 | Policy 抛异常 | Failed，进入 diagnostics。 |
-| 插件权限撤销失败 | 聚合错误，继续撤销其他 contribution。 |
-| Data 401 | 通知 Security 刷新或退出登录。 |
+| 跨 provider 的插件权限撤销失败 | 未来 PluginSystem 编排应聚合错误并继续清理；当前 provider 仅返回 bool/count。 |
+| Data 401 | Data/应用认证编排器决定 refresh、challenge 或退出登录。 |
 | Data 403 | 返回 authorization failure，不自动重试。 |
 
 Security 错误不能静默吞掉，必须进入授权结果或诊断。
 
 ### 14. 测试策略
 
-Testing 包应提供：
+仓库当前没有 Security 专属 Testing helper 包。以下是未来候选能力，施工前必须分配 Feature ID：
 
 - Fake principal。
 - Fake authentication state provider。
@@ -311,11 +302,12 @@ Testing 包应提供：
 
 必须覆盖：
 
-- 匿名、已登录、过期、刷新失败。
-- Route allow / reject / redirect / challenge。
+- 匿名、已登录、过期及状态失败。
+- Route allow / reject / redirect / cancel / failed。
 - Command `CanExecute` 随权限变化刷新。
 - Data 401 / 403 映射。
-- 插件权限贡献和撤销。
-- Source Generator 重复权限诊断。
+- 当前 contribution 注册、批量撤销和 tombstone；完整插件生命周期由未来 PluginSystem Feature 覆盖。
+- 当前显式注册的重复权限、撤销和诊断。
+- Planned 多账号持久化与切换在实现后增加文件、并发和恢复测试。
 
 详细规则见：[diagnostics-and-testing.md](diagnostics-and-testing.md)。

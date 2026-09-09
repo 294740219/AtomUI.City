@@ -1,4 +1,5 @@
 using AtomUI.City.Routing;
+using AtomUI.City.Core.Diagnostics;
 
 namespace AtomUI.City.Security;
 
@@ -8,6 +9,7 @@ public sealed class SecurityRouteGuard : IRouteEnterGuard
     private readonly ICurrentPrincipalAccessor _principalAccessor;
     private readonly IRouteAuthorizationPolicyProvider _policyProvider;
     private readonly SecurityRouteGuardOptions _options;
+    private readonly IHostDiagnostics? _diagnostics;
 
     public SecurityRouteGuard(
         IAuthorizationEvaluator authorizationEvaluator,
@@ -17,7 +19,8 @@ public sealed class SecurityRouteGuard : IRouteEnterGuard
             authorizationEvaluator,
             principalAccessor,
             policyProvider,
-            new SecurityRouteGuardOptions())
+            new SecurityRouteGuardOptions(),
+            diagnostics: null)
     {
     }
 
@@ -26,16 +29,39 @@ public sealed class SecurityRouteGuard : IRouteEnterGuard
         ICurrentPrincipalAccessor principalAccessor,
         IRouteAuthorizationPolicyProvider policyProvider,
         SecurityRouteGuardOptions options)
+        : this(
+            authorizationEvaluator,
+            principalAccessor,
+            policyProvider,
+            options,
+            diagnostics: null)
+    {
+    }
+
+    public SecurityRouteGuard(
+        IAuthorizationEvaluator authorizationEvaluator,
+        ICurrentPrincipalAccessor principalAccessor,
+        IRouteAuthorizationPolicyProvider policyProvider,
+        SecurityRouteGuardOptions options,
+        IHostDiagnostics? diagnostics)
     {
         ArgumentNullException.ThrowIfNull(authorizationEvaluator);
         ArgumentNullException.ThrowIfNull(principalAccessor);
         ArgumentNullException.ThrowIfNull(policyProvider);
         ArgumentNullException.ThrowIfNull(options);
 
+        if (options.LoginRouteId is not null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(options.LoginRouteId);
+        }
+
+        ArgumentNullException.ThrowIfNull(options.LoginNavigationOptions);
+
         _authorizationEvaluator = authorizationEvaluator;
         _principalAccessor = principalAccessor;
         _policyProvider = policyProvider;
         _options = options;
+        _diagnostics = diagnostics;
     }
 
     public async ValueTask<RouteGuardResult> CanEnterAsync(
@@ -46,19 +72,31 @@ public sealed class SecurityRouteGuard : IRouteEnterGuard
 
         if (cancellationToken.IsCancellationRequested)
         {
-            return RouteGuardResult.Cancel("Route authorization was cancelled.");
+            return Complete(
+                context,
+                policy: null,
+                RouteGuardResult.Cancel("Route authorization was cancelled."));
         }
 
         AuthorizationResult authorization;
+        AuthorizationPolicy? policy = null;
 
         try
         {
-            var policy = await _policyProvider.GetPolicyAsync(context, cancellationToken)
+            policy = await _policyProvider.GetPolicyAsync(context, cancellationToken)
                 .ConfigureAwait(false);
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return Complete(
+                    context,
+                    policy,
+                    RouteGuardResult.Cancel("Route authorization was cancelled."));
+            }
 
             if (policy is null)
             {
-                return RouteGuardResult.Allow();
+                return Complete(context, policy, RouteGuardResult.Allow());
             }
 
             authorization = await _authorizationEvaluator.EvaluateAsync(
@@ -68,20 +106,44 @@ public sealed class SecurityRouteGuard : IRouteEnterGuard
                         resourceName: context.Route.RouteId),
                     cancellationToken)
                 .ConfigureAwait(false);
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return Complete(
+                    context,
+                    policy,
+                    RouteGuardResult.Cancel("Route authorization was cancelled."));
+            }
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            return RouteGuardResult.Cancel("Route authorization was cancelled.");
+            return Complete(
+                context,
+                policy,
+                RouteGuardResult.Cancel("Route authorization was cancelled."));
         }
         catch (Exception exception)
         {
-            return RouteGuardResult.Failed(
-                SecurityRouteGuardResultCodes.AuthorizationFailed,
-                exception.Message,
-                exception);
+            return Complete(
+                context,
+                policy,
+                RouteGuardResult.Failed(
+                    SecurityRouteGuardResultCodes.AuthorizationFailed,
+                    exception.Message,
+                    exception));
         }
 
-        return authorization.Status switch
+        if (authorization is null)
+        {
+            return Complete(
+                context,
+                policy,
+                RouteGuardResult.Failed(
+                    SecurityRouteGuardResultCodes.AuthorizationFailed,
+                    "The authorization evaluator returned null."));
+        }
+
+        var result = authorization.Status switch
         {
             AuthorizationResultStatus.Allowed => RouteGuardResult.Allow(),
             AuthorizationResultStatus.Challenge => CreateChallengeResult(authorization),
@@ -97,6 +159,8 @@ public sealed class SecurityRouteGuard : IRouteEnterGuard
                 SecurityRouteGuardResultCodes.AuthorizationFailed,
                 "Route authorization returned an unsupported result."),
         };
+
+        return Complete(context, policy, result);
     }
 
     private RouteGuardResult CreateChallengeResult(AuthorizationResult authorization)
@@ -113,5 +177,33 @@ public sealed class SecurityRouteGuard : IRouteEnterGuard
         return RouteGuardResult.Reject(
             SecurityRouteGuardResultCodes.AuthenticationRequired,
             authorization.Message);
+    }
+
+    private RouteGuardResult Complete(
+        RouteGuardContext context,
+        AuthorizationPolicy? policy,
+        RouteGuardResult result)
+    {
+        SecurityDiagnostics.Write(
+            _diagnostics,
+            result.Status == RouteGuardResultStatus.Failed
+                ? SecurityDiagnosticIds.RouteAuthorizationFailed
+                : SecurityDiagnosticIds.RouteAuthorizationCompleted,
+            "Route authorization completed.",
+            result.Status switch
+            {
+                RouteGuardResultStatus.Failed => HostDiagnosticSeverity.Error,
+                RouteGuardResultStatus.Reject => HostDiagnosticSeverity.Warning,
+                _ => HostDiagnosticSeverity.Info,
+            },
+            new Dictionary<string, string?>(StringComparer.Ordinal)
+            {
+                ["routeId"] = context.Route.RouteId,
+                ["policyName"] = policy?.Name,
+                ["resultStatus"] = result.Status.ToString(),
+                ["resultCode"] = result.Code,
+                ["exceptionType"] = result.Exception?.GetType().FullName,
+            });
+        return result;
     }
 }

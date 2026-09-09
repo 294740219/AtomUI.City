@@ -1,3 +1,5 @@
+using AtomUI.City.Core.Diagnostics;
+
 namespace AtomUI.City.Security;
 
 public sealed class CommandAuthorizationSource : ICommandAuthorizationSource, IDisposable
@@ -7,6 +9,9 @@ public sealed class CommandAuthorizationSource : ICommandAuthorizationSource, ID
     private readonly ICommandAuthorizationDescriptorProvider _descriptorProvider;
     private readonly IAuthenticationStateProvider? _authenticationStateProvider;
     private readonly IPermissionRegistry? _permissionRegistry;
+    private readonly IHostDiagnostics? _diagnostics;
+    private readonly OrderedEventPublisher<CommandAuthorizationChangedEventArgs> _eventPublisher;
+    private readonly object _syncRoot = new();
     private long _revision;
     private bool _disposed;
 
@@ -16,6 +21,23 @@ public sealed class CommandAuthorizationSource : ICommandAuthorizationSource, ID
         ICommandAuthorizationDescriptorProvider descriptorProvider,
         IAuthenticationStateProvider? authenticationStateProvider = null,
         IPermissionRegistry? permissionRegistry = null)
+        : this(
+            authorizationEvaluator,
+            principalAccessor,
+            descriptorProvider,
+            authenticationStateProvider,
+            permissionRegistry,
+            diagnostics: null)
+    {
+    }
+
+    public CommandAuthorizationSource(
+        IAuthorizationEvaluator authorizationEvaluator,
+        ICurrentPrincipalAccessor principalAccessor,
+        ICommandAuthorizationDescriptorProvider descriptorProvider,
+        IAuthenticationStateProvider? authenticationStateProvider,
+        IPermissionRegistry? permissionRegistry,
+        IHostDiagnostics? diagnostics)
     {
         ArgumentNullException.ThrowIfNull(authorizationEvaluator);
         ArgumentNullException.ThrowIfNull(principalAccessor);
@@ -26,17 +48,78 @@ public sealed class CommandAuthorizationSource : ICommandAuthorizationSource, ID
         _descriptorProvider = descriptorProvider;
         _authenticationStateProvider = authenticationStateProvider ?? principalAccessor as IAuthenticationStateProvider;
         _permissionRegistry = permissionRegistry;
+        _diagnostics = diagnostics;
+        _eventPublisher = new OrderedEventPublisher<CommandAuthorizationChangedEventArgs>(
+            diagnostics,
+            SecurityDiagnosticIds.CommandAuthorizationObserverFailed);
 
-        if (_authenticationStateProvider is not null)
+        var authenticationSubscriptionAttempted = false;
+        var descriptorSubscriptionAttempted = false;
+        var permissionSubscriptionAttempted = false;
+
+        try
         {
-            _authenticationStateProvider.StateChanged += OnAuthenticationStateChanged;
+            if (_authenticationStateProvider is not null)
+            {
+                authenticationSubscriptionAttempted = true;
+                _authenticationStateProvider.StateChanged += OnAuthenticationStateChanged;
+            }
+
+            descriptorSubscriptionAttempted = true;
+            _descriptorProvider.DescriptorChanged += OnDescriptorChanged;
+
+            if (_permissionRegistry is not null)
+            {
+                permissionSubscriptionAttempted = true;
+                _permissionRegistry.Changed += OnPermissionRegistryChanged;
+            }
         }
-
-        _descriptorProvider.DescriptorChanged += OnDescriptorChanged;
-
-        if (_permissionRegistry is not null)
+        catch (Exception exception)
         {
-            _permissionRegistry.Changed += OnPermissionRegistryChanged;
+            lock (_syncRoot)
+            {
+                _disposed = true;
+            }
+
+            var rollbackFailures = new List<Exception>();
+            if (permissionSubscriptionAttempted)
+            {
+                CaptureFailure(
+                    () => _permissionRegistry!.Changed -= OnPermissionRegistryChanged,
+                    rollbackFailures);
+            }
+
+            if (descriptorSubscriptionAttempted)
+            {
+                CaptureFailure(
+                    () => _descriptorProvider.DescriptorChanged -= OnDescriptorChanged,
+                    rollbackFailures);
+            }
+
+            if (authenticationSubscriptionAttempted)
+            {
+                CaptureFailure(
+                    () => _authenticationStateProvider!.StateChanged -= OnAuthenticationStateChanged,
+                    rollbackFailures);
+            }
+
+            _eventPublisher.Complete();
+            WriteLifecycleFailure("Subscribe", exception);
+
+            foreach (var rollbackFailure in rollbackFailures)
+            {
+                WriteLifecycleFailure("SubscribeRollback", rollbackFailure);
+            }
+
+            if (rollbackFailures.Count > 0)
+            {
+                rollbackFailures.Insert(0, exception);
+                throw new AggregateException(
+                    "Command authorization source subscription and rollback failed.",
+                    rollbackFailures);
+            }
+
+            throw;
         }
     }
 
@@ -50,7 +133,7 @@ public sealed class CommandAuthorizationSource : ICommandAuthorizationSource, ID
 
         if (cancellationToken.IsCancellationRequested)
         {
-            return CreateCancelledState(context);
+            return Complete(context, descriptor: null, CreateCancelledState(context));
         }
 
         CommandAuthorizationDescriptor? descriptor = null;
@@ -62,41 +145,46 @@ public sealed class CommandAuthorizationSource : ICommandAuthorizationSource, ID
 
             if (cancellationToken.IsCancellationRequested)
             {
-                return CreateCancelledState(context);
+                return Complete(context, descriptor, CreateCancelledState(context));
             }
 
             if (descriptor is null)
             {
-                return new CommandAuthorizationState(
+                return Complete(context, descriptor, new CommandAuthorizationState(
                     context.CommandId,
                     canExecute: true,
                     isVisible: true,
                     CommandUnauthorizedBehavior.Disable,
                     AuthorizationResult.Allowed(),
-                    _revision);
+                    Interlocked.Read(ref _revision)));
             }
 
             var result = await EvaluateDescriptorAsync(context, descriptor, cancellationToken)
                 .ConfigureAwait(false);
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return Complete(context, descriptor, CreateCancelledState(context));
+            }
+
             var canExecute = result.Succeeded;
             var isVisible = result.Succeeded || descriptor.UnauthorizedBehavior != CommandUnauthorizedBehavior.Hide;
 
-            return new CommandAuthorizationState(
+            return Complete(context, descriptor, new CommandAuthorizationState(
                 context.CommandId,
                 canExecute,
                 isVisible,
                 descriptor.UnauthorizedBehavior,
                 result,
-                _revision,
-                descriptor.DeniedMessageKey);
+                Interlocked.Read(ref _revision),
+                descriptor.DeniedMessageKey));
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            return CreateCancelledState(context);
+            return Complete(context, descriptor, CreateCancelledState(context));
         }
         catch (Exception exception)
         {
-            return CreateFailedState(context, descriptor, exception);
+            return Complete(context, descriptor, CreateFailedState(context, descriptor, exception));
         }
     }
 
@@ -108,7 +196,7 @@ public sealed class CommandAuthorizationSource : ICommandAuthorizationSource, ID
 
         if (cancellationToken.IsCancellationRequested)
         {
-            return AuthorizationResult.Cancelled();
+            return Complete(context, descriptor: null, AuthorizationResult.Cancelled());
         }
 
         try
@@ -118,44 +206,75 @@ public sealed class CommandAuthorizationSource : ICommandAuthorizationSource, ID
 
             if (cancellationToken.IsCancellationRequested)
             {
-                return AuthorizationResult.Cancelled();
+                return Complete(context, descriptor, AuthorizationResult.Cancelled());
             }
 
-            return descriptor is null
+            var result = descriptor is null
                 ? AuthorizationResult.Allowed()
                 : await EvaluateDescriptorAsync(context, descriptor, cancellationToken)
                     .ConfigureAwait(false);
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return Complete(context, descriptor, AuthorizationResult.Cancelled());
+            }
+
+            return Complete(context, descriptor, result);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            return AuthorizationResult.Cancelled();
+            return Complete(context, descriptor: null, AuthorizationResult.Cancelled());
         }
         catch (Exception exception)
         {
-            return CreateFailedResult(context, exception);
+            return Complete(context, descriptor: null, CreateFailedResult(context, exception));
         }
     }
 
     public void Dispose()
     {
-        if (_disposed)
+        lock (_syncRoot)
         {
-            return;
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
         }
 
+        var failures = new List<Exception>();
         if (_authenticationStateProvider is not null)
         {
-            _authenticationStateProvider.StateChanged -= OnAuthenticationStateChanged;
+            CaptureFailure(
+                () => _authenticationStateProvider.StateChanged -= OnAuthenticationStateChanged,
+                failures);
         }
 
-        _descriptorProvider.DescriptorChanged -= OnDescriptorChanged;
+        CaptureFailure(
+            () => _descriptorProvider.DescriptorChanged -= OnDescriptorChanged,
+            failures);
 
         if (_permissionRegistry is not null)
         {
-            _permissionRegistry.Changed -= OnPermissionRegistryChanged;
+            CaptureFailure(
+                () => _permissionRegistry.Changed -= OnPermissionRegistryChanged,
+                failures);
         }
 
-        _disposed = true;
+        _eventPublisher.Complete();
+
+        foreach (var failure in failures)
+        {
+            WriteLifecycleFailure("Dispose", failure);
+        }
+
+        if (failures.Count > 0)
+        {
+            throw new AggregateException(
+                "One or more command authorization subscriptions could not be released.",
+                failures);
+        }
     }
 
     private ValueTask<AuthorizationResult> EvaluateDescriptorAsync(
@@ -180,7 +299,7 @@ public sealed class CommandAuthorizationSource : ICommandAuthorizationSource, ID
             isVisible: true,
             CommandUnauthorizedBehavior.Disable,
             AuthorizationResult.Cancelled(),
-            _revision);
+            Interlocked.Read(ref _revision));
     }
 
     private CommandAuthorizationState CreateFailedState(
@@ -195,55 +314,156 @@ public sealed class CommandAuthorizationSource : ICommandAuthorizationSource, ID
             isVisible: unauthorizedBehavior != CommandUnauthorizedBehavior.Hide,
             unauthorizedBehavior,
             CreateFailedResult(context, exception),
-            _revision,
+            Interlocked.Read(ref _revision),
             descriptor?.DeniedMessageKey);
     }
 
-    private static AuthorizationResult CreateFailedResult(
+    private AuthorizationResult CreateFailedResult(
         CommandAuthorizationContext context,
         Exception exception)
     {
-        return AuthorizationResult.Failed(
+        var result = AuthorizationResult.Failed(
             SecurityFailureKind.EvaluatorFailed,
             context.CommandId,
             exception.Message,
             exception: exception);
+        SecurityDiagnostics.Write(
+            _diagnostics,
+            SecurityDiagnosticIds.CommandAuthorizationFailed,
+            "Command authorization failed.",
+            HostDiagnosticSeverity.Error,
+            new Dictionary<string, string?>(StringComparer.Ordinal)
+            {
+                ["commandId"] = context.CommandId,
+                ["resourceName"] = context.ResourceName,
+                ["contributionId"] = context.ContributionId,
+                ["exceptionType"] = exception.GetType().FullName,
+            });
+        return result;
     }
 
     private void OnAuthenticationStateChanged(
         object? sender,
         AuthenticationStateChangedEventArgs args)
     {
-        var revision = Interlocked.Increment(ref _revision);
-        AuthorizationChanged?.Invoke(
-            this,
-            new CommandAuthorizationChangedEventArgs(
-                CommandAuthorizationChangeReason.AuthenticationStateChanged,
-                revision));
+        PublishChanged(CommandAuthorizationChangeReason.AuthenticationStateChanged);
     }
 
     private void OnDescriptorChanged(
         object? sender,
         CommandAuthorizationChangedEventArgs args)
     {
-        var revision = Interlocked.Increment(ref _revision);
-        AuthorizationChanged?.Invoke(
-            this,
-            new CommandAuthorizationChangedEventArgs(
-                CommandAuthorizationChangeReason.DescriptorChanged,
-                revision,
-                args.CommandId));
+        PublishChanged(CommandAuthorizationChangeReason.DescriptorChanged, args.CommandId);
     }
 
     private void OnPermissionRegistryChanged(
         object? sender,
         PermissionRegistryChangedEventArgs args)
     {
-        var revision = Interlocked.Increment(ref _revision);
-        AuthorizationChanged?.Invoke(
-            this,
-            new CommandAuthorizationChangedEventArgs(
-                CommandAuthorizationChangeReason.PermissionChanged,
-                revision));
+        PublishChanged(CommandAuthorizationChangeReason.PermissionChanged);
+    }
+
+    private void PublishChanged(CommandAuthorizationChangeReason reason, string? commandId = null)
+    {
+        bool shouldDrain;
+        long revision;
+
+        lock (_syncRoot)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            revision = Interlocked.Increment(ref _revision);
+            shouldDrain = _eventPublisher.Enqueue(
+                AuthorizationChanged,
+                new CommandAuthorizationChangedEventArgs(reason, revision, commandId));
+        }
+
+        SecurityDiagnostics.Write(
+            _diagnostics,
+            SecurityDiagnosticIds.CommandAuthorizationChanged,
+            "Command authorization state changed.",
+            HostDiagnosticSeverity.Info,
+            new Dictionary<string, string?>(StringComparer.Ordinal)
+            {
+                ["commandId"] = commandId,
+                ["changeReason"] = reason.ToString(),
+                ["revision"] = revision.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            });
+
+        if (shouldDrain)
+        {
+            _eventPublisher.Drain(this);
+        }
+    }
+
+    private CommandAuthorizationState Complete(
+        CommandAuthorizationContext context,
+        CommandAuthorizationDescriptor? descriptor,
+        CommandAuthorizationState state)
+    {
+        WriteEvaluationDiagnostic(context, descriptor, state.Authorization);
+        return state;
+    }
+
+    private AuthorizationResult Complete(
+        CommandAuthorizationContext context,
+        CommandAuthorizationDescriptor? descriptor,
+        AuthorizationResult result)
+    {
+        WriteEvaluationDiagnostic(context, descriptor, result);
+        return result;
+    }
+
+    private void WriteEvaluationDiagnostic(
+        CommandAuthorizationContext context,
+        CommandAuthorizationDescriptor? descriptor,
+        AuthorizationResult result)
+    {
+        SecurityDiagnostics.Write(
+            _diagnostics,
+            SecurityDiagnosticIds.CommandAuthorizationEvaluated,
+            "Command authorization completed.",
+            result.Status == AuthorizationResultStatus.Failed
+                ? HostDiagnosticSeverity.Error
+                : result.Succeeded
+                    ? HostDiagnosticSeverity.Info
+                    : HostDiagnosticSeverity.Warning,
+            new Dictionary<string, string?>(StringComparer.Ordinal)
+            {
+                ["commandId"] = context.CommandId,
+                ["policyName"] = descriptor?.Policy.Name,
+                ["resultStatus"] = result.Status.ToString(),
+                ["failureKind"] = result.FailureKind.ToString(),
+                ["contributionId"] = context.ContributionId ?? descriptor?.ContributionId,
+            });
+    }
+
+    private void WriteLifecycleFailure(string operation, Exception exception)
+    {
+        SecurityDiagnostics.Write(
+            _diagnostics,
+            SecurityDiagnosticIds.CommandAuthorizationFailed,
+            "Command authorization subscription lifecycle failed.",
+            HostDiagnosticSeverity.Error,
+            new Dictionary<string, string?>(StringComparer.Ordinal)
+            {
+                ["operation"] = operation,
+                ["exceptionType"] = exception.GetType().FullName,
+            });
+    }
+
+    private static void CaptureFailure(Action action, ICollection<Exception> failures)
+    {
+        try
+        {
+            action();
+        }
+        catch (Exception exception)
+        {
+            failures.Add(exception);
+        }
     }
 }

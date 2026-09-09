@@ -13,6 +13,8 @@ AtomUI.City.Security 的架构目标是把模块职责变成可实现、可测�
 - 认证状态以 immutable snapshot 发布。
 - 授权评估不操作 UI 或导航。
 - access token 失败返回 AccessTokenResult。
+- 事件观察者不能回滚已提交状态或阻断其他观察者。
+- Token、BootstrapContext 和完整 claims 不得进入 snapshot 或 diagnostics。
 
 ## 核心概念和所有权
 
@@ -21,11 +23,15 @@ AtomUI.City.Security 的架构目标是把模块职责变成可实现、可测�
 | AuthenticationStateSnapshot | principal 和状态快照。 | AuthenticationStateStore | 不可变。 |
 | PermissionRegistry | 权限定义注册表。 | DI | Host/plugin owner 管理。 |
 | AuthorizationEvaluator | 策略评估。 | DI | 无状态。 |
+| CommandAuthorizationSource | 把认证、权限和 descriptor revision 汇总为命令授权状态。 | DI singleton | Dispose 释放上游订阅并停止新通知。 |
+| IHostDiagnostics | 承接 Security 稳定诊断码。 | Core Host | Security 不拥有或完成该实例。 |
+| Account persistence/session contracts | 多账号文件和全局活动账号。 | 规划中的 DI singleton | `AUC-SECURITY-008/009` 实现前不存在运行时对象。 |
 
 ## 产品级状态机
 
-- Authentication: Unknown -> Anonymous 或 Authenticated -> Refreshing -> Authenticated 或 Anonymous
-- Authorization: Created -> Evaluating -> Succeeded 或 Failed
+- Authentication 使用 Unknown、Anonymous、Authenticating、Authenticated、Refreshing、Expired、SignedOut、Failed 状态词汇；当前 Store 校验每个 snapshot 的内容一致性，但不强制业务流程的转换图，认证编排器负责选择下一状态。
+- Authorization result: Allowed / Denied / Forbidden / Challenge / Failed / Cancelled
+- Planned account session: Empty -> Restoring / Switching -> Active 或保持原 session；删除活动账号后进入 SignedOut
 
 ## 关键运行流程
 
@@ -33,17 +39,24 @@ AtomUI.City.Security 的架构目标是把模块职责变成可实现、可测�
 - PermissionRegistry 注册 permission。
 - AuthorizationEvaluator 评估 policy。
 - RouteGuard 映射 result。
+- CommandAuthorizationSource 汇总 revision 并发布有序通知。
+- IAccessTokenProvider 返回稳定 result，诊断中不包含凭据。
 
 ## 失败矩阵
 
 - 权限未注册：授权失败。
 - policy provider 缺失：返回 Failed。
 - token provider 不可用。
+- 事件观察者抛异常：隔离该观察者、继续其他观察者并写诊断。
+- 非调用方取消产生的 OperationCanceledException：按 provider/evaluator failure 处理，不伪装为 Cancelled。
 
 ## 性能和资源边界
 
 - 权限查找使用 registry 索引。
 - AuthorizationEvaluator 不做网络 IO。
+- 认证、权限和命令通知使用有序单消费者 drain；用户观察者在内部锁外执行。
+- CLR 事件观察者必须保持短小且不得阻塞；持续并发写入遇到阻塞观察者时，待发布通知会在内存中排队。
+- 多账号文件 IO、原子替换和切换串行化属于 `AUC-SECURITY-008/009`，当前尚未实现。
 
 ## 运行时对象模型
 
@@ -51,7 +64,7 @@ AtomUI.City.Security 的架构目标是把模块职责变成可实现、可测�
 flowchart LR
     Boundary["Host runtime security service"] --> Module["AtomUI.City.Security"]
     Module --> Contracts["Public Contracts"]
-    Module --> State["State / Manifest / Snapshot"]
+    Module --> State["Authentication / Permission / Authorization Snapshot"]
     Module --> Diagnostics["Diagnostics"]
     Module --> Tests["Product Contract Tests"]
 ```
@@ -64,6 +77,6 @@ flowchart LR
 
 ## AOT 和 Trimming 约束
 
-- 运行时发现能力优先通过 source generator 或 manifest。
-- 产品实现不得把运行时反射扫描作为唯一发现机制。
-- 生成输出和 manifest 必须稳定排序，便于 snapshot test 和增量构建。
+- 当前 Security runtime 不执行程序集反射扫描；权限、policy、route 和 command descriptor 通过显式 API/DI provider 注册。
+- Security 专属 source generator/manifest 尚未分配 Feature ID，也没有源码实现，不属于当前完成能力。
+- 后续如引入 generated manifest，必须先登记 Feature ID，并定义稳定排序、诊断、AOT 和增量构建测试。

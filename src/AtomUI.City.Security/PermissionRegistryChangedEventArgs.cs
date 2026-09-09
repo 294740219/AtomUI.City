@@ -7,6 +7,18 @@ public sealed class PermissionRegistryChangedEventArgs : EventArgs
         string? permissionName = null,
         string? contributionId = null)
     {
+        ArgumentOutOfRangeException.ThrowIfNegative(revision);
+
+        if (permissionName is not null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(permissionName);
+        }
+
+        if (contributionId is not null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(contributionId);
+        }
+
         Revision = revision;
         PermissionName = permissionName;
         ContributionId = contributionId;

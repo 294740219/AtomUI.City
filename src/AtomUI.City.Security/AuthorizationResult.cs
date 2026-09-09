@@ -73,6 +73,24 @@ public sealed class AuthorizationResult
 
         return new AuthorizationResult(
             AuthorizationResultStatus.Forbidden,
+            SecurityFailureKind.Forbidden,
+            failedRequirement,
+            message,
+            messageKey,
+            messageArguments ?? [failedRequirement],
+            exception: null);
+    }
+
+    public static AuthorizationResult Denied(
+        string failedRequirement,
+        string? message = null,
+        string? messageKey = "Errors.AuthorizationDenied",
+        IReadOnlyList<object?>? messageArguments = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(failedRequirement);
+
+        return new AuthorizationResult(
+            AuthorizationResultStatus.Denied,
             SecurityFailureKind.RequirementFailed,
             failedRequirement,
             message,
@@ -89,6 +107,19 @@ public sealed class AuthorizationResult
         IReadOnlyList<object?>? messageArguments = null,
         Exception? exception = null)
     {
+        if (!Enum.IsDefined(failureKind)
+            || failureKind is SecurityFailureKind.None
+                or SecurityFailureKind.AuthenticationRequired
+                or SecurityFailureKind.Forbidden
+                or SecurityFailureKind.RequirementFailed
+                or SecurityFailureKind.Cancelled)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(failureKind),
+                failureKind,
+                "The failure kind must represent a framework failure, not another authorization result status.");
+        }
+
         return new AuthorizationResult(
             AuthorizationResultStatus.Failed,
             failureKind,

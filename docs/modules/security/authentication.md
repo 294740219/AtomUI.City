@@ -7,8 +7,8 @@
 ## 设计决策
 
 - 授权失败返回明确 result，不能直接操作 UI。
-- 权限声明必须来自 registry 或 plugin capability。
-- 认证状态变更必须通知 command、route 和 data 集成点。
+- 当前权限声明必须来自 registry；plugin capability 属于未来 PluginSystem 集成。
+- 认证状态通过 `IAuthenticationStateProvider.StateChanged` 发布；当前只有 Command source 直接订阅，Route/Data 在每次操作中读取当前 Security contract，其他联动由应用 bridge 负责。
 
 ## Public Contract
 
@@ -37,11 +37,14 @@
 | Feature ID | 相关能力 | 测试文件 |
 | --- | --- | --- |
 | AUC-SECURITY-001 | Authentication State | AuthenticationStateTests |
-| AUC-SECURITY-002 | Permission Registry | PermissionRegistryTests |
-| AUC-SECURITY-003 | Permission Checker | PermissionCheckerTests |
+| AUC-SECURITY-002 | Current Principal | AuthenticationStateTests |
+| AUC-SECURITY-003 | Permission Registry and Checker | PermissionRegistryTests; PermissionCheckerTests |
 | AUC-SECURITY-004 | Authorization Policy | AuthorizationPolicyTests; AuthorizationEvaluatorTests |
 | AUC-SECURITY-005 | Route Guard | RouteAuthorizationGuardTests |
 | AUC-SECURITY-006 | Command Authorization | CommandAuthorizationSourceTests |
+| AUC-SECURITY-007 | Access Token Provider | SecurityRegistrationTests; AccessTokenCredentialProviderTests |
+| AUC-SECURITY-008 | Multi-Account File Persistence (Planned) | AccountPersistenceTests; FileCredentialStoreTests |
+| AUC-SECURITY-009 | Active Account Switching and Restore (Planned) | AccountSessionManagerTests; AccountSwitchIntegrationTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -68,7 +71,7 @@ Authentication 子模块负责描述当前应用是否有已认证主体，以�
 
 ### 2. 认证状态机
 
-建议状态：
+认证状态词汇如下。它描述可发布的 snapshot 状态，不是由 `AuthenticationStateStore` 强制执行的转换图；具体认证编排器负责决定允许的转换：
 
 ```text
 Unknown
@@ -96,7 +99,7 @@ Unknown
 
 认证状态变化必须可诊断、可订阅、可测试。
 
-`AuthenticationStateStore` 发布的 `AuthenticationStateSnapshot` 必须克隆传入的 `ClaimsPrincipal`。调用方之后修改原始 identity 或 claims 不得改变已发布 snapshot，也不得改变 `Current` 引用中已发布的 principal。
+`AuthenticationStateStore` 发布的 `AuthenticationStateSnapshot` 必须克隆传入的 `ClaimsPrincipal`，每次读取 `Principal` 也返回防御性副本。调用方修改输入 principal 或读取结果均不得改变已发布 snapshot；标准 identity、claim 和 Actor chain 语义必须保留，但 Actor chain 任意层级的 `ClaimsIdentity.BootstrapContext` 都可能携带凭据，不得被复制到 snapshot。
 
 重复设置等价状态必须幂等：不递增 revision，不重复触发 `StateChanged`。例如已经处于 Anonymous 时再次 `SetAnonymous()` 必须返回当前 snapshot。
 
@@ -113,11 +116,11 @@ Unknown
 - 业务用户信息应由应用或 Data 模块按需加载。
 - 插件不能修改 Host root principal。
 
-`ICurrentPrincipalAccessor` 只提供读取入口。写入必须通过认证状态服务完成；读取到的 principal 是当时 snapshot 的稳定视图，后续状态变化不能反向修改已读取对象。
+`ICurrentPrincipalAccessor` 只提供读取入口。当前写入通过 `AuthenticationStateStore` 完成；读取到的 principal 是当时 snapshot 的独立副本，后续状态变化和调用方 mutation 都不能反向修改彼此。
 
-### 4. 认证服务
+### 4. 认证流程边界
 
-`IAuthenticationService` 负责统一入口：
+当前源码没有 `IAuthenticationService`。应用提供认证协议适配器，并在自己的 orchestration 中组合：
 
 ```text
 SignInAsync
@@ -127,7 +130,7 @@ RestoreAsync
 ChallengeAsync
 ```
 
-规则：
+上述名称是应用流程示意，不是 Security 当前 public API。规则：
 
 - 所有方法接收 `CancellationToken`。
 - 登录流程不能阻塞 UI Thread。
@@ -143,34 +146,63 @@ Data 管线通过 `IAccessTokenProvider` 获取认证信息。
 
 - Token 不能作为普通全局状态随意暴露。
 - Token 获取必须支持取消。
-- Token 快过期时可以触发 refresh。
-- Refresh 期间并发请求应共享同一次 refresh，避免重复刷新。
-- Refresh 失败后状态进入 Expired 或 SignedOut。
+- 具体应用 token provider 可以在 token 快过期时触发 refresh；当前默认 provider 不实现 refresh。
+- 具体 provider 如实现 refresh，必须明确并发请求合并或拒绝策略。
+- 具体认证编排器负责在 refresh 失败后发布 Expired、SignedOut 或 Failed。
 - Provider 失败进入 Failed 时必须清理 principal、scheme 和 expiry，不能保留半认证状态。
-- 具体存储方式由应用或平台实现，Security 只定义抽象。
+- `AUC-SECURITY-008/009` 目标定义凭据存储抽象、账号隔离规则和会话编排；实现后提供应用本地数据目录中的默认文件 Provider，应用可以替换 Provider。
+- 目标文件 Provider 允许 access token 和 refresh token 进入声明的账号凭据文件，以支持跨进程恢复；凭据不得复制到普通配置、State、日志或诊断。
+- Security 不保存用户密码。当前文件 Provider 不承诺抵御同一操作系统用户权限下的恶意进程或本地文件读取，该限制必须在安全模型中明确声明。
 
-### 6. 状态通知
+### 6. 多账号持久化与切换
 
-认证状态变化需要通知：
+本节是 `AUC-SECURITY-008/009` 的 Planned 合同，当前源码尚未实现。完成后，Security 必须支持在磁盘上持久化多个账号，但一个 City Host 进程同一时刻只能发布一个全局活动账号，所有窗口共享该活动主体。
 
-- Route Guard。
-- Command authorization source。
-- Data auth pipeline。
-- Presentation 用户信息展示。
-- State 同步器。
-- Plugin capability checker。
-
-通知必须带版本号或 revision，避免旧状态覆盖新状态。
+稳定账号身份由以下字段组成：
 
 ```text
-Authentication state changed
--> update SecurityStateStore
--> publish scoped notification
--> recompute route / command / data authorization
--> update Presentation display
+AuthenticationScheme + Authority + TenantId + SubjectId
 ```
 
-### 7. Desktop 场景
+其中 `TenantId` 可以为空，其余字段必须在写入边界完成规范化和校验。显示名、头像引用、最后使用时间等非敏感资料不能参与账号唯一性判断。
+
+持久化边界：
+
+- `IAccountSessionStore` 保存账号资料、最后活动账号指针和权限快照；文件位于应用本地数据目录，必须使用带 schema version 的原子替换格式。
+- `ICredentialStore` 在应用本地数据目录中按账号保存 token、refresh token 和凭据过期信息；凭据文件必须有独立路径、schema version 和原子替换语义。
+- 权限快照按账号身份隔离，并包含 permission set、revision、issued-at 和 expires-at；它只服务于离线 UI 和客户端预检查，不替代服务器授权。
+- 删除账号必须同时删除账号资料、活动指针引用、权限快照和账号凭据文件。
+
+账号切换流程：
+
+```text
+Switch requested
+-> load account profile
+-> load credential file
+-> load and validate permission snapshot
+-> cancel or invalidate old account work
+-> atomically publish active session and authentication snapshot
+-> notify Route / Command / Data / State / Presentation
+```
+
+加载、验证、取消或凭据文件读写任一步失败时，原活动账号保持不变。成功切换只能发布一次 session/authentication revision，不允许观察到新 principal 配旧 token 或旧权限的中间状态。删除当前活动账号后进入 Anonymous/SignedOut，不自动选择其他账号。
+
+离线时允许切换到已缓存账号，但会话必须标记为受限模式。受限模式可以驱动本地 UI、菜单和命令预检查；过期 token、未缓存授权以及需要服务器确认的业务操作必须拒绝。重新联网后必须刷新认证和权限，并以服务器结果替换缓存。
+
+操作系统安全保险库不属于当前版本目标。后续版本可以为同一 `ICredentialStore` 合同增加 Windows Credential Manager 或数据保护、macOS Keychain、Linux Secret Service Provider，并提供从文件 Provider 原子迁移后删除旧凭据文件的流程。
+
+### 7. 状态通知
+
+`AuthenticationStateStore` 通过 `StateChanged` 发布带 revision 的有序通知。当前 `CommandAuthorizationSource` 直接订阅该事件；Route Guard 和 Data pipeline 在下一次操作时读取当前 Security contract。Presentation、State 和其他业务联动由应用 bridge 显式订阅，不是 Security 的内建广播目标；未来 Plugin capability checker 另行登记 Feature。
+
+```text
+AuthenticationStateStore changed
+-> publish ordered revision notification
+-> Command authorization source invalidates
+-> application bridges update any additional consumers
+```
+
+### 8. Desktop 场景
 
 桌面应用必须考虑：
 
@@ -183,22 +215,25 @@ Authentication state changed
 
 Security 不决定这些策略的具体 UI，只提供状态、错误和扩展点。
 
-### 8. 错误策略
+### 9. 错误策略
 
 | 场景 | 默认处理 |
 |---|---|
 | 登录取消 | 返回 canceled，不进入 fatal error。 |
 | 登录失败 | 状态进入 Failed，记录诊断。 |
-| Refresh 失败 | 状态进入 Expired 或 SignedOut。 |
+| Refresh 失败 | 由具体 provider/认证编排器返回失败并决定发布 Expired、SignedOut 或 Failed。 |
 | Token 不可用 | Data 管线收到 authentication unavailable。 |
 | 恢复会话失败 | 进入 Anonymous 或 Failed，按 Host 策略决定。 |
+| 凭据文件不可读写 | 返回稳定存储失败，不改变当前活动账号。 |
+| 账号切换加载失败或取消 | 保留原活动账号，不发布部分状态。 |
+| 权限快照过期或损坏 | 拒绝作为有效授权输入；离线会话进入受限或失败状态。 |
 
-### 9. 测试策略
+### 10. 测试策略
 
 测试替身：
 
 - Fake authentication state provider。
-- Fake authentication service。
+- 应用认证适配器 fake（不是当前 Security public 类型）。
 - Fake access token provider。
 - Test principal builder。
 
@@ -207,6 +242,11 @@ Security 不决定这些策略的具体 UI，只提供状态、错误和扩展�
 - 启动恢复为 anonymous。
 - 登录成功后主体变化。
 - 登出清理 token。
-- Refresh 并发合并。
-- Refresh 失败触发状态变化。
-- 状态变化触发 Command 和 Guard 重新计算。
+- snapshot 输入/输出 mutation 隔离、Actor chain 保留与隔离、所有层级 `BootstrapContext` 清除和多 identity 认证判断。
+- 并发状态变更按 revision 通知，观察者异常不破坏提交。
+- 状态变化触发 Command 刷新；Route/Data 在下一次操作中读取最新状态。
+- 具体认证 Provider 在提供 refresh 时必须自行覆盖并发合并和失败状态变化；这不是当前默认 Provider 的既有能力。
+- `AUC-SECURITY-008/009` 实现后覆盖多账号持久化、删除、重启恢复和跨账号隔离。
+- token、refresh token 只出现在声明的凭据文件中，不得进入普通配置、State、日志或诊断。
+- 账号切换成功、失败回滚、取消、并发和单次 revision 发布。
+- 离线受限切换、过期权限快照和重新联网刷新。

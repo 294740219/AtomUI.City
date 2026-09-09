@@ -5,6 +5,7 @@ namespace AtomUI.City.Security;
 public sealed class InMemoryAuthorizationPolicyProvider : IAuthorizationPolicyProvider
 {
     private readonly Dictionary<string, AuthorizationPolicy> _policies = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _revokedContributions = new(StringComparer.Ordinal);
     private readonly object _syncRoot = new();
     private long _revision;
 
@@ -36,6 +37,12 @@ public sealed class InMemoryAuthorizationPolicyProvider : IAuthorizationPolicyPr
 
         lock (_syncRoot)
         {
+            if (!string.IsNullOrWhiteSpace(policy.ContributionId)
+                && _revokedContributions.Contains(policy.ContributionId))
+            {
+                return false;
+            }
+
             if (_policies.ContainsKey(policy.Name))
             {
                 return false;
@@ -71,6 +78,7 @@ public sealed class InMemoryAuthorizationPolicyProvider : IAuthorizationPolicyPr
 
         lock (_syncRoot)
         {
+            _revokedContributions.Add(contributionId);
             var names = _policies
                 .Where(pair => string.Equals(pair.Value.ContributionId, contributionId, StringComparison.Ordinal))
                 .Select(pair => pair.Key)
@@ -118,13 +126,11 @@ public sealed class InMemoryAuthorizationPolicyProvider : IAuthorizationPolicyPr
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
-        if (cancellationToken.IsCancellationRequested)
-        {
-            return ValueTask.FromResult<AuthorizationPolicy?>(null);
-        }
+        cancellationToken.ThrowIfCancellationRequested();
 
         lock (_syncRoot)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             _policies.TryGetValue(name, out var policy);
 
             return ValueTask.FromResult<AuthorizationPolicy?>(policy);

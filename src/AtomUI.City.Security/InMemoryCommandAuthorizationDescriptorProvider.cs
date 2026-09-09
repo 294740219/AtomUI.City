@@ -1,10 +1,29 @@
+using AtomUI.City.Core.Diagnostics;
+
 namespace AtomUI.City.Security;
 
 public sealed class InMemoryCommandAuthorizationDescriptorProvider : ICommandAuthorizationDescriptorProvider
 {
     private readonly Dictionary<string, CommandAuthorizationDescriptor> _descriptors = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _revokedContributions = new(StringComparer.Ordinal);
     private readonly object _syncRoot = new();
+    private readonly OrderedEventPublisher<CommandAuthorizationChangedEventArgs> _eventPublisher;
     private long _revision;
+
+    public InMemoryCommandAuthorizationDescriptorProvider()
+    {
+        _eventPublisher = new OrderedEventPublisher<CommandAuthorizationChangedEventArgs>(
+            diagnostics: null,
+            SecurityDiagnosticIds.CommandAuthorizationObserverFailed);
+    }
+
+    public InMemoryCommandAuthorizationDescriptorProvider(IHostDiagnostics diagnostics)
+    {
+        ArgumentNullException.ThrowIfNull(diagnostics);
+        _eventPublisher = new OrderedEventPublisher<CommandAuthorizationChangedEventArgs>(
+            diagnostics,
+            SecurityDiagnosticIds.CommandAuthorizationObserverFailed);
+    }
 
     public event EventHandler<CommandAuthorizationChangedEventArgs>? DescriptorChanged;
 
@@ -24,9 +43,17 @@ public sealed class InMemoryCommandAuthorizationDescriptorProvider : ICommandAut
         ArgumentNullException.ThrowIfNull(descriptor);
 
         long revision;
+        CommandAuthorizationChangedEventArgs args;
+        bool shouldDrain;
 
         lock (_syncRoot)
         {
+            if (!string.IsNullOrWhiteSpace(descriptor.ContributionId)
+                && _revokedContributions.Contains(descriptor.ContributionId))
+            {
+                return false;
+            }
+
             if (_descriptors.ContainsKey(descriptor.CommandId))
             {
                 return false;
@@ -34,14 +61,17 @@ public sealed class InMemoryCommandAuthorizationDescriptorProvider : ICommandAut
 
             _descriptors.Add(descriptor.CommandId, descriptor);
             revision = ++_revision;
-        }
-
-        DescriptorChanged?.Invoke(
-            this,
-            new CommandAuthorizationChangedEventArgs(
+            args = new CommandAuthorizationChangedEventArgs(
                 CommandAuthorizationChangeReason.DescriptorChanged,
                 revision,
-                descriptor.CommandId));
+                descriptor.CommandId);
+            shouldDrain = _eventPublisher.Enqueue(DescriptorChanged, args);
+        }
+
+        if (shouldDrain)
+        {
+            _eventPublisher.Drain(this);
+        }
 
         return true;
     }
@@ -50,6 +80,8 @@ public sealed class InMemoryCommandAuthorizationDescriptorProvider : ICommandAut
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(commandId);
         long revision;
+        CommandAuthorizationChangedEventArgs args;
+        bool shouldDrain;
 
         lock (_syncRoot)
         {
@@ -59,16 +91,63 @@ public sealed class InMemoryCommandAuthorizationDescriptorProvider : ICommandAut
             }
 
             revision = ++_revision;
-        }
-
-        DescriptorChanged?.Invoke(
-            this,
-            new CommandAuthorizationChangedEventArgs(
+            args = new CommandAuthorizationChangedEventArgs(
                 CommandAuthorizationChangeReason.DescriptorChanged,
                 revision,
-                commandId));
+                commandId);
+            shouldDrain = _eventPublisher.Enqueue(DescriptorChanged, args);
+        }
+
+        if (shouldDrain)
+        {
+            _eventPublisher.Drain(this);
+        }
 
         return true;
+    }
+
+    public int RemoveByContribution(string contributionId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(contributionId);
+        string[] commandIds;
+        long revision;
+        CommandAuthorizationChangedEventArgs args;
+        bool shouldDrain;
+
+        lock (_syncRoot)
+        {
+            _revokedContributions.Add(contributionId);
+            commandIds = _descriptors
+                .Where(pair => string.Equals(
+                    pair.Value.ContributionId,
+                    contributionId,
+                    StringComparison.Ordinal))
+                .Select(static pair => pair.Key)
+                .ToArray();
+
+            foreach (var commandId in commandIds)
+            {
+                _descriptors.Remove(commandId);
+            }
+
+            if (commandIds.Length == 0)
+            {
+                return 0;
+            }
+
+            revision = ++_revision;
+            args = new CommandAuthorizationChangedEventArgs(
+                CommandAuthorizationChangeReason.DescriptorChanged,
+                revision);
+            shouldDrain = _eventPublisher.Enqueue(DescriptorChanged, args);
+        }
+
+        if (shouldDrain)
+        {
+            _eventPublisher.Drain(this);
+        }
+
+        return commandIds.Length;
     }
 
     public ValueTask<CommandAuthorizationDescriptor?> GetDescriptorAsync(
@@ -77,13 +156,11 @@ public sealed class InMemoryCommandAuthorizationDescriptorProvider : ICommandAut
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        if (cancellationToken.IsCancellationRequested)
-        {
-            return ValueTask.FromResult<CommandAuthorizationDescriptor?>(null);
-        }
+        cancellationToken.ThrowIfCancellationRequested();
 
         lock (_syncRoot)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             _descriptors.TryGetValue(context.CommandId, out var descriptor);
 
             return ValueTask.FromResult<CommandAuthorizationDescriptor?>(descriptor);

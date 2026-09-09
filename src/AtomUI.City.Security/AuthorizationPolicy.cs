@@ -10,8 +10,24 @@ public sealed class AuthorizationPolicy
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(requirements);
 
+        var requirementSnapshot = requirements.ToArray();
+        if (requirementSnapshot.Length == 0)
+        {
+            throw new ArgumentException("An authorization policy must contain at least one requirement.", nameof(requirements));
+        }
+
+        if (requirementSnapshot.Any(static requirement => requirement is null))
+        {
+            throw new ArgumentException("Authorization policy requirements cannot contain null values.", nameof(requirements));
+        }
+
+        if (contributionId is not null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(contributionId);
+        }
+
         Name = name;
-        Requirements = Array.AsReadOnly(requirements.ToArray());
+        Requirements = Array.AsReadOnly(requirementSnapshot);
         ContributionId = contributionId;
     }
 

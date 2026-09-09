@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using AtomUI.City.Core.Diagnostics;
 
 namespace AtomUI.City.Security;
 
@@ -34,11 +35,13 @@ public static class SecurityServiceCollectionExtensions
                 serviceProvider.GetRequiredService<ICurrentPrincipalAccessor>(),
                 serviceProvider.GetRequiredService<ICommandAuthorizationDescriptorProvider>(),
                 serviceProvider.GetRequiredService<IAuthenticationStateProvider>(),
-                serviceProvider.GetRequiredService<IPermissionRegistry>()));
+                serviceProvider.GetRequiredService<IPermissionRegistry>(),
+                serviceProvider.GetService<IHostDiagnostics>()));
         services.TryAddSingleton<IAccessTokenProvider, UnavailableAccessTokenProvider>();
         services.TryAddSingleton<InMemoryRouteAuthorizationPolicyProvider>();
         services.TryAddSingleton<IRouteAuthorizationPolicyProvider>(
             serviceProvider => serviceProvider.GetRequiredService<InMemoryRouteAuthorizationPolicyProvider>());
+        services.TryAddSingleton(new SecurityRouteGuardOptions());
         services.TryAddSingleton<SecurityRouteGuard>();
 
         return services;

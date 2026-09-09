@@ -10,8 +10,8 @@
 - 集成测试不能替代单元测试。
 - 释放、取消和诊断必须断言。
 - 授权失败返回明确 result，不能直接操作 UI。
-- 权限声明必须来自 registry 或 plugin capability。
-- 认证状态变更必须通知 command、route 和 data 集成点。
+- 当前权限声明来自 registry；plugin capability 属于未来 PluginSystem 集成。
+- 认证状态通过 `IAuthenticationStateProvider.StateChanged` 发布；当前只有 Command source 直接订阅，Route/Data 在每次操作中读取当前 Security contract，其他联动由应用 bridge 负责。
 
 ## Public Contract
 
@@ -40,11 +40,12 @@
 | Feature ID | 相关能力 | 测试文件 |
 | --- | --- | --- |
 | AUC-SECURITY-001 | Authentication State | AuthenticationStateTests |
-| AUC-SECURITY-002 | Permission Registry | PermissionRegistryTests |
-| AUC-SECURITY-003 | Permission Checker | PermissionCheckerTests |
+| AUC-SECURITY-002 | Current Principal | AuthenticationStateTests |
+| AUC-SECURITY-003 | Permission Registry and Checker | PermissionRegistryTests; PermissionCheckerTests |
 | AUC-SECURITY-004 | Authorization Policy | AuthorizationPolicyTests; AuthorizationEvaluatorTests |
 | AUC-SECURITY-005 | Route Guard | RouteAuthorizationGuardTests |
 | AUC-SECURITY-006 | Command Authorization | CommandAuthorizationSourceTests |
+| AUC-SECURITY-007 | Access Token Provider | SecurityRegistrationTests; AccessTokenCredentialProviderTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -71,7 +72,7 @@ Diagnostics and Testing 子模块负责定义诊断字段、错误分类和测�
 
 ### 2. 诊断字段
 
-认证诊断应包含：
+当前诊断 code、severity 和 required context 以 [diagnostics.md](diagnostics.md) 的逐项表格为唯一合同。以下字段是未来认证 orchestration/持久化 Feature 的候选上下文，不表示当前每条诊断都已包含：
 
 - AuthenticationState。
 - Principal id 或匿名标记。
@@ -82,7 +83,7 @@ Diagnostics and Testing 子模块负责定义诊断字段、错误分类和测�
 - ScopeId。
 - ContributionId。
 
-授权诊断应包含：
+未来授权集成可按实际 Feature 增加：
 
 - Authorization result。
 - Permission name。
@@ -93,13 +94,13 @@ Diagnostics and Testing 子模块负责定义诊断字段、错误分类和测�
 - PluginId。
 - ContributionId。
 - Principal revision。
-- Policy manifest revision。
+- Policy provider/manifest revision（取决于实际 Feature）。
 
 敏感信息不能写入日志，例如 access token、refresh token、密码、完整 credential。
 
 ### 3. 错误分类
 
-建议分类：
+当前公开 `SecurityFailureKind` 分类：
 
 | 分类 | 说明 |
 |---|---|
@@ -113,19 +114,23 @@ Diagnostics and Testing 子模块负责定义诊断字段、错误分类和测�
 | ContributionRevoked | 来源贡献已撤销。 |
 | CapabilityDenied | 插件 capability 被拒绝。 |
 
+其中 `ContributionRevoked` 和 `CapabilityDenied` 是未来 PluginSystem 集成保留值，当前评估路径不产生。
+
 ### 4. ErrorPolicy 集成
+
+当前 Security 不依赖独立 ErrorPolicy 类型。预期失败通过 `AuthorizationResult`、`RouteGuardResult` 或 `AccessTokenResult` 返回，框架异常同时写入 Core `IHostDiagnostics`。下面的统一 ErrorPolicy 接入是未来跨模块目标。
 
 Security 错误处理规则：
 
 - 授权不通过不是 fatal error。
-- Policy/evaluator 异常进入 ErrorPolicy，但返回明确 Failed。
-- 认证 refresh 失败不直接杀死应用。
-- 插件撤销失败聚合错误并继续清理。
+- Policy/evaluator 异常返回明确 Failed 并写入 `IHostDiagnostics`；当前不接入 ErrorPolicy。
+- 具体认证 provider 的 refresh 失败不应直接杀死应用。
+- 跨 provider 的插件撤销聚合属于未来 PluginSystem orchestration；当前 provider 独立返回 bool/count。
 - 敏感信息必须脱敏。
 
 ### 5. Testing 包
 
-Testing 包应提供：
+当前验证位于 `tests/AtomUI.City.Security.Tests`，仓库没有 Security 专属 Testing helper 包。以下 helper 是未来候选能力，必须先分配 Feature ID：
 
 - `TestPrincipalBuilder`。
 - `FakeAuthenticationStateProvider`。
@@ -138,22 +143,21 @@ Testing 包应提供：
 - `DataAuthPipelineTestHost`。
 - `PluginSecurityContributionTestHost`。
 
-命名最终以实现阶段 API 规范为准，但能力必须覆盖这些场景。
+命名和能力范围以未来 Feature 设计为准，不计入 `AUC-SECURITY-001~007` 当前验收。
 
 ### 6. 测试场景
 
-必须覆盖：
+`AUC-SECURITY-001~007` 当前必须覆盖：
 
 - anonymous / authenticated / expired / signed out。
-- 登录成功、登录取消、登录失败。
-- refresh 成功、失败、并发合并。
-- Route allow / reject / redirect / challenge。
+- authentication snapshot 成功变更、幂等、非法输入和观察者失败。
+- Route allow / reject / redirect / cancel / failed。
 - Command `CanExecute` 随权限变化刷新。
-- Data 401 / 403 映射。
-- 插件权限贡献、冲突、撤销。
-- Capability deny。
-- Source Generator 重复权限诊断。
-- 未声明权限引用诊断。
+- AccessTokenResult 到 Data credential 的当前映射。
+- contribution 注册、冲突、撤销和 tombstone。
+- policy snapshot、取消边界、诊断失败隔离和订阅生命周期。
+
+具体登录协议、refresh 并发合并、Data 401/403 transport、Capability deny、Source Generator 重复权限和未声明引用诊断属于对应未来 Feature，不计入当前 Completed 验收。
 
 ### 7. 无 UI 测试
 

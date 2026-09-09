@@ -4,14 +4,16 @@
 
 本专题属于 `AtomUI.City.Security` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `Plugin Integration` 相关实现决策，不重新定义模块边界。
 
+> 状态：Future Integration。当前 Security 没有 PluginSystem 项目引用、Capability/ContributionLease API 或插件 manifest loader。本页除 contribution id 撤销基线外均不是 `AUC-SECURITY-001~009` 的 Completed 能力；正式施工前必须新增 Feature ID。
+
 ## 设计决策
 
 - 插件来源对象必须绑定 plugin owner。
 - 卸载必须撤销 contribution、subscription、view lease、state 和 connection。
 - 跨插件 contract 必须位于 Host 共享程序集。
 - 授权失败返回明确 result，不能直接操作 UI。
-- 权限声明必须来自 registry 或 plugin capability。
-- 认证状态变更必须通知 command、route 和 data 集成点。
+- 当前权限声明来自 registry；plugin capability 尚未实现。
+- 认证状态通过 `IAuthenticationStateProvider.StateChanged` 发布；当前只有 Command source 直接订阅，Route/Data 在每次操作中读取当前 Security contract，其他联动由应用 bridge 负责。
 
 ## Public Contract
 
@@ -40,11 +42,12 @@
 | Feature ID | 相关能力 | 测试文件 |
 | --- | --- | --- |
 | AUC-SECURITY-001 | Authentication State | AuthenticationStateTests |
-| AUC-SECURITY-002 | Permission Registry | PermissionRegistryTests |
-| AUC-SECURITY-003 | Permission Checker | PermissionCheckerTests |
+| AUC-SECURITY-002 | Current Principal | AuthenticationStateTests |
+| AUC-SECURITY-003 | Permission Registry and Checker | PermissionRegistryTests; PermissionCheckerTests |
 | AUC-SECURITY-004 | Authorization Policy | AuthorizationPolicyTests; AuthorizationEvaluatorTests |
 | AUC-SECURITY-005 | Route Guard | RouteAuthorizationGuardTests |
 | AUC-SECURITY-006 | Command Authorization | CommandAuthorizationSourceTests |
+| AUC-SECURITY-007 | Access Token Provider | SecurityRegistrationTests; AccessTokenCredentialProviderTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -80,11 +83,13 @@ Plugin integration 负责约束插件如何参与 Security。
 - Data client auth metadata。
 - Capability request。
 
-所有贡献都必须通过 Contribution Request 和 ContributionLease 进入 Security registry。
+目标态要求所有插件贡献通过 Contribution Request 和 ContributionLease 进入 Security registry。当前只能由 Host composition 调用 registry/provider，并以 contribution id 撤销；这不是安全边界。
 
 ### 3. Capability
 
 Capability 表达 Host 允许插件使用的框架能力。
+
+当前 Security 源码没有 Capability 类型、grant store 或 evaluator requirement，本节仅为后续 PluginSystem 设计输入。
 
 示例：
 

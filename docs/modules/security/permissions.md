@@ -7,8 +7,8 @@
 ## 设计决策
 
 - 授权失败返回明确 result，不能直接操作 UI。
-- 权限声明必须来自 registry 或 plugin capability。
-- 认证状态变更必须通知 command、route 和 data 集成点。
+- 当前权限声明来自 registry；plugin capability 属于未来 PluginSystem 集成。
+- 认证状态通过 `IAuthenticationStateProvider.StateChanged` 发布；当前只有 Command source 直接订阅，Route/Data 在每次操作中读取当前 Security contract，其他联动由应用 bridge 负责。
 
 ## Public Contract
 
@@ -70,7 +70,7 @@ Permission 不是业务角色，不是用户权限表，也不是 UI 菜单项�
 
 ### 2. Permission Descriptor
 
-Permission descriptor 建议包含：
+`PermissionDescriptor` 包含：
 
 | 字段 | 说明 |
 |---|---|
@@ -83,6 +83,10 @@ Permission descriptor 建议包含：
 | IsHostOnly | 是否仅 Host 可授予。 |
 
 权限名必须稳定，不应使用运行时随机值。
+
+`DefaultPolicy` 和 `IsHostOnly` 当前是描述性 metadata；`PermissionRegistry` 与 `PermissionChecker` 不会自动执行这两个字段。需要强制 Host-only 或默认 policy 的应用必须在 composition/policy 层显式实现，并在未来新增框架执行机制时分配 Feature ID。
+
+当前 `PermissionChecker` 使用 `SecurityClaimTypes.Permission` 指定的 claim type（值为 `permission`）判断主体是否持有权限。应用不应复制该字符串常量。
 
 ### 3. 命名规则
 
@@ -104,23 +108,21 @@ plugin.sales.export
 
 ### 4. 权限贡献
 
-模块和插件通过 Contribution 提交权限声明：
+当前 Host/应用通过 `PermissionRegistry.Add` 显式提交权限声明，并可附带 contribution id：
 
 ```text
-Module / Plugin
--> PermissionContribution
--> SecurityContributionRegistry
--> PermissionManifest
+Host / application composition
+-> PermissionDescriptor
+-> PermissionRegistry
 ```
 
 规则：
 
-- 插件不能直接写权限 registry。
-- 插件权限必须有 ContributionLease。
-- 插件停用时撤销对应权限和 policy metadata。
+- 当前 Security 尚未提供 `ContributionLease` 或 capability gate；插件代码不能仅凭本模块获得隔离保证。
+- Host/未来 PluginSystem 停用 contribution 时调用各 registry/provider 的 `RemoveByContribution`。
 - 已撤销权限不能再被 Route、Command 或 Data 使用。
 - 同一 contribution id 撤销后不能继续向 registry 追加新权限。
-- 活动授权缓存必须按 contribution revision 失效。
+- 当前 evaluator 不缓存授权结果；未来新增缓存 Feature 时必须按 contribution revision 失效。
 
 ### 5. 本地化
 
@@ -130,25 +132,19 @@ Localization 负责资源查找和文化切换。Security 只保存 key 和 meta
 
 ### 6. Source Generator
 
-Security generator 负责：
+当前没有 Security permission generator、permission manifest schema 或相关 analyzer 诊断。运行时使用显式 registry 注册，也不扫描程序集。
 
-- 生成 permission manifest。
-- 生成 permission descriptor 注册代码。
-- 诊断重复权限名。
-- 诊断未声明权限引用。
-- 诊断插件覆盖 Host 权限。
-- 诊断权限名不符合规范。
-
-运行时默认不扫描程序集找权限。
+Generator 属于未来候选 Feature；施工前必须先分配 Feature ID，并定义 generated registration、重复/未声明/Host 覆盖诊断及 AOT 测试。通用 `GeneratorFeature.Security` 枚举值本身不代表这些能力已实现。
 
 ### 7. 错误策略
 
 | 场景 | 默认处理 |
 |---|---|
-| 重复权限名 | 构建期诊断。 |
-| 未声明权限引用 | 构建期诊断；动态场景运行时 Failed。 |
-| 插件权限撤销失败 | 聚合错误，继续撤销其他权限。 |
-| 权限本地化缺失 | 使用权限名 fallback，并记录诊断。 |
+| 重复权限名 | 当前运行时 Add 返回 false；未来 generator 可增加构建期诊断。 |
+| 未声明权限引用 | 当前运行时 Failed/PermissionNotFound；未来 generator 可增加构建期诊断。 |
+| 当前 registry 按 contribution 撤销 | 返回删除数量；重复撤销返回 0，并永久拒绝该 contribution 在当前实例中重新注册。 |
+| 跨 registry/provider 的插件撤销失败 | 属于未来 PluginSystem orchestration；必须聚合错误并继续撤销其他贡献。 |
+| 权限本地化缺失 | 由 Localization/应用决定 fallback 和诊断；Security 只保存资源 key。 |
 
 ### 8. 测试策略
 
@@ -156,6 +152,6 @@ Security generator 负责：
 
 - Host 权限注册。
 - 插件权限注册和撤销。
-- 重复权限诊断。
-- 未声明权限引用诊断。
-- contribution revision 变化后缓存失效。
+- 重复权限运行时拒绝。
+- 未声明权限返回 PermissionNotFound。
+- contribution 撤销后 registry 查询和后续授权立即反映最新定义。
