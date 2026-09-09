@@ -83,6 +83,8 @@ atomui city <command>
 
 ### 3. 命令树
 
+下列 `generate` 子树是 `AUC-CLI-007` 的 Planned 目标，当前版本不会执行生成，也不会返回空变更的成功结果。
+
 ```text
 atomui city
   new app

@@ -12,6 +12,7 @@
 | AUC-CLI-004 | Plugin Inspect and Doctor | Completed | CliApplication, PluginManifestReader, PluginDiagnostic | CliInspectDoctorPluginTests |
 | AUC-CLI-005 | AI-Friendly Envelope | Completed | CliEnvelope, CliDiagnostic, CliExecutionEnvironment | CliCommandArchitectureTests |
 | AUC-CLI-006 | Non-Interactive and CI Mode | Completed | CliExecutionEnvironment, CliExitCodes | CliCommandArchitectureTests |
+| AUC-CLI-007 | Generation Commands | Planned | CLI -> Templates generation contract | Pending |
 
 ## Feature 硬门禁
 
@@ -113,3 +114,17 @@ Diagnostics: diagnostic 包含 missing confirmation、required option 和 enviro
 Tests: `CliCommandArchitectureTests`
 Required Assertions: 断言 CI、non-interactive、stdin unavailable、需要确认时失败。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
+
+## AUC-CLI-007 Generation Commands
+
+Feature ID: `AUC-CLI-007`
+Status: Planned
+Goal: 调用 Templates 生成 module、page、plugin、test、configuration 和 localization 产物。
+Public Contract: 尚未进入 1.0 public contract。
+Runtime / Build Behavior: 未实现前，`generate` 按未知命令失败，不得返回空变更的成功 envelope。
+Failure Behavior: 当前返回 `AUCCLI0002`，不写文件。
+Threading / Cancellation: 实现时必须贯穿 CLI cancellation，并复用 Templates 的事务写入合同。
+Diagnostics: Pending；实现后分配专用诊断码。
+Tests: Pending；当前由 `GenerateCommandCannotReportSuccessBeforeFeatureIsImplemented` 锁定不得虚假成功。
+Required Assertions: 真实变更、dry-run、冲突、取消、回滚和生成产物可构建。
+Acceptance Criteria: Templates 对应 Feature 完成后，生成命令具备真实 plan、render、diagnostic 与 smoke test 闭环。

@@ -127,7 +127,6 @@ public static class CliApplication
             "explain" => await ExplainAsync(commandLine, output).ConfigureAwait(false),
             "plan" => await GenericPlanAsync(commandLine, output).ConfigureAwait(false),
             "apply" => await ApplyAsync(commandLine, environment, output).ConfigureAwait(false),
-            "generate" => await GenericPlanAsync(commandLine, output).ConfigureAwait(false),
             _ => await WriteAsync(
                     output,
                     commandLine,
@@ -206,7 +205,8 @@ public static class CliApplication
         }
 
         var rootNamespace = commandLine.GetOptionValue("--namespace") ?? appName;
-        if (rootNamespace.StartsWith("AtomUI.City", StringComparison.Ordinal))
+        if (rootNamespace.Equals("AtomUI.City", StringComparison.Ordinal) ||
+            rootNamespace.StartsWith("AtomUI.City.", StringComparison.Ordinal))
         {
             return await WriteAsync(
                     output,
@@ -233,17 +233,49 @@ public static class CliApplication
         }
 
         var outputPath = commandLine.GetOptionValue("--output") ?? environment.WorkingDirectory;
+        string resolvedOutputPath;
+        try
+        {
+            resolvedOutputPath = Path.GetFullPath(outputPath, environment.WorkingDirectory);
+        }
+        catch (Exception exception) when (exception is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return await WriteAsync(
+                    output,
+                    commandLine,
+                    "atomui city new app",
+                    CliEnvelope.Failed(
+                        "atomui city new app",
+                        CliExitCodes.ArgumentError,
+                        CliDiagnostic.Error("AUCTPL0001", "Output path is invalid.", outputPath)))
+                .ConfigureAwait(false);
+        }
+
         var options = new ApplicationTemplateOptions
         {
             AppName = appName,
             RootNamespace = rootNamespace,
-            OutputPath = Path.GetFullPath(outputPath, environment.WorkingDirectory),
+            OutputPath = resolvedOutputPath,
             TargetFramework = commandLine.GetOptionValue("--target-framework") ?? "net10.0",
             IncludeTests = !commandLine.HasOption("--no-tests"),
             IncludeSample = commandLine.HasOption("--sample"),
             UseAot = commandLine.HasOption("--use-aot"),
             UseDynamicPlugins = commandLine.HasOption("--use-dynamic-plugins"),
         };
+        var optionDiagnostics = options.Validate();
+        if (optionDiagnostics.Count > 0)
+        {
+            return await WriteAsync(
+                    output,
+                    commandLine,
+                    "atomui city new app",
+                    CliEnvelope.Failed(
+                        "atomui city new app",
+                        CliExitCodes.ArgumentError,
+                        optionDiagnostics.Select(ToCliTemplateDiagnostic).ToArray()))
+                .ConfigureAwait(false);
+        }
+
         var renderer = new ApplicationTemplateRenderer();
         var plan = renderer.CreatePlan(options);
         var artifacts = CreateArtifacts(plan);
@@ -297,7 +329,56 @@ public static class CliApplication
                     .ConfigureAwait(false);
             }
 
-            renderer.Render(options, cancellationToken);
+            TemplateRenderResult renderResult;
+            try
+            {
+                renderResult = renderer.Render(options, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                return await WriteAsync(
+                        output,
+                        commandLine,
+                        "atomui city new app",
+                        CliEnvelope.FailedWithData(
+                            "atomui city new app",
+                            CliExitCodes.Failure,
+                            new Dictionary<string, object?>
+                            {
+                                ["plan"] = plan,
+                                ["artifacts"] = artifacts,
+                            },
+                            CliDiagnostic.Error(
+                                "AUCCLI0106",
+                                "New app generation was cancelled.",
+                                appName,
+                                3)))
+                    .ConfigureAwait(false);
+            }
+
+            if (!renderResult.Succeeded)
+            {
+                var diagnostics = renderResult.Diagnostics
+                    .Select(ToCliTemplateDiagnostic)
+                    .ToArray();
+                var exitCode = renderResult.Diagnostics.Any(static diagnostic => diagnostic.Code == "AUCTPL1004")
+                    ? CliExitCodes.ArgumentError
+                    : CliExitCodes.Failure;
+                return await WriteAsync(
+                        output,
+                        commandLine,
+                        "atomui city new app",
+                        CliEnvelope.FailedWithData(
+                            "atomui city new app",
+                            exitCode,
+                            new Dictionary<string, object?>
+                            {
+                                ["plan"] = plan,
+                                ["artifacts"] = artifacts,
+                            },
+                            diagnostics))
+                    .ConfigureAwait(false);
+            }
         }
 
         return await WriteAsync(
@@ -729,6 +810,25 @@ public static class CliApplication
             diagnostic.Code,
             diagnostic.Message,
             diagnostic.Path ?? diagnostic.Field ?? diagnostic.PluginId);
+    }
+
+    private static CliDiagnostic ToCliTemplateDiagnostic(TemplateDiagnostic diagnostic)
+    {
+        var code = diagnostic.Code switch
+        {
+            "AUCTPL0001" when diagnostic.Context.TryGetValue("variable", out var variable) &&
+                Equals(variable, "appName") => "AUCCLI0104",
+            "AUCTPL0002" => "AUCCLI0102",
+            "AUCTPL0301" => "AUCCLI0103",
+            "AUCTPL1004" => "AUCCLI0105",
+            _ => diagnostic.Code,
+        };
+        var target = diagnostic.Context.TryGetValue("path", out var path)
+            ? path?.ToString()
+            : diagnostic.Context.TryGetValue("rawValue", out var rawValue)
+                ? rawValue?.ToString()
+                : null;
+        return CliDiagnostic.Error(code, diagnostic.Message, target);
     }
 
     private static string ResolvePluginPackageRoot(string packageInput, string workingDirectory)

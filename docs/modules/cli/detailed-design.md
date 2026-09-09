@@ -93,12 +93,12 @@ CLI 不定义项目结构，不实现 MSBuild task，不维护模板内容，不
 ```text
 atomui city
   new app
-  generate module
-  generate page
-  generate plugin
-  generate test
-  generate config
-  generate localization
+  generate module        # Planned: AUC-CLI-007
+  generate page          # Planned: AUC-CLI-007
+  generate plugin        # Planned: AUC-CLI-007
+  generate test          # Planned: AUC-CLI-007
+  generate config        # Planned: AUC-CLI-007
+  generate localization  # Planned: AUC-CLI-007
 
   build
   pack

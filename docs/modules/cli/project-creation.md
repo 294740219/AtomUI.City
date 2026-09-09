@@ -79,6 +79,7 @@ atomui city new app <AppName>
 | `AppName` | 应用名。 |
 | `--namespace` | RootNamespace。 |
 | `--target-framework` | 目标框架。 |
+| `--sample` | 在 `Samples/` 下生成不含业务领域概念的最小 ViewModel 示例。 |
 | `--output` | 输出目录。 |
 | `--include-tests` | 是否生成测试项目，默认 true。 |
 | `--use-aot` | 是否启用 AOT 友好默认设置。 |

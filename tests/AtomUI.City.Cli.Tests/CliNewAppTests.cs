@@ -47,7 +47,7 @@ public sealed class CliNewAppTests
         Assert.Equal(0, run.ExitCode);
         Assert.True(File.Exists(Path.Combine(host.WorkingDirectory, "src", "SalesClient", "SalesClient.csproj")));
         Assert.True(File.Exists(Path.Combine(host.WorkingDirectory, "src", "SalesClient", "Program.cs")));
-        Assert.True(File.Exists(Path.Combine(host.WorkingDirectory, "src", "SalesClient", "App.axaml")));
+        Assert.False(File.Exists(Path.Combine(host.WorkingDirectory, "src", "SalesClient", "App.axaml")));
         Assert.True(File.Exists(Path.Combine(host.WorkingDirectory, "tests", "SalesClient.Tests", "FeatureTestMatrix.md")));
         Assert.True(File.Exists(Path.Combine(host.WorkingDirectory, "tests", "SalesClient.Tests", "ApplicationSmokeTests.cs")));
     }
@@ -76,6 +76,30 @@ public sealed class CliNewAppTests
     }
 
     [Fact]
+    public async Task NewAppSampleOptionGeneratesExplicitSampleViewModel()
+    {
+        using var host = new CliTestHost();
+
+        var run = await host.RunAsync(
+            "city",
+            "new",
+            "app",
+            "SalesClient",
+            "--sample",
+            "--output",
+            host.WorkingDirectory,
+            "--json");
+
+        Assert.Equal(0, run.ExitCode);
+        Assert.True(File.Exists(Path.Combine(
+            host.WorkingDirectory,
+            "src",
+            "SalesClient",
+            "Samples",
+            "WelcomeViewModel.cs")));
+    }
+
+    [Fact]
     public async Task NewAppRejectsInvalidAppName()
     {
         using var host = new CliTestHost();
@@ -92,6 +116,49 @@ public sealed class CliNewAppTests
         Assert.Equal(2, run.ExitCode);
         using var json = run.ReadJson();
         Assert.Equal("AUCCLI0104", json.RootElement.GetProperty("diagnostics")[0].GetProperty("code").GetString());
+        Assert.False(Directory.Exists(Path.Combine(host.WorkingDirectory, "src")));
+    }
+
+    [Fact]
+    public async Task NewAppRejectsCSharpKeywordWithoutReportingArtifacts()
+    {
+        using var host = new CliTestHost();
+
+        var run = await host.RunAsync(
+            "city",
+            "new",
+            "app",
+            "class",
+            "--output",
+            host.WorkingDirectory,
+            "--json");
+
+        Assert.Equal(2, run.ExitCode);
+        using var json = run.ReadJson();
+        Assert.False(json.RootElement.GetProperty("success").GetBoolean());
+        Assert.Equal("AUCCLI0104", json.RootElement.GetProperty("diagnostics")[0].GetProperty("code").GetString());
+        Assert.False(Directory.Exists(Path.Combine(host.WorkingDirectory, "src")));
+    }
+
+    [Fact]
+    public async Task NewAppRejectsMalformedTargetFramework()
+    {
+        using var host = new CliTestHost();
+
+        var run = await host.RunAsync(
+            "city",
+            "new",
+            "app",
+            "SalesClient",
+            "--target-framework",
+            "abc",
+            "--output",
+            host.WorkingDirectory,
+            "--json");
+
+        Assert.Equal(2, run.ExitCode);
+        using var json = run.ReadJson();
+        Assert.Equal("AUCTPL0001", json.RootElement.GetProperty("diagnostics")[0].GetProperty("code").GetString());
         Assert.False(Directory.Exists(Path.Combine(host.WorkingDirectory, "src")));
     }
 

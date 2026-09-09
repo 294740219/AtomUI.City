@@ -1,5 +1,7 @@
 # AtomUI.City.Cli Generation 合同
 
+> Status: Planned (`AUC-CLI-007`). 本页描述目标合同；当前 CLI 不执行 `generate`，且不得以空变更返回成功。
+
 ## 适用范围
 
 本专题属于 `AtomUI.City.Cli` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `Generation` 相关实现决策，不重新定义模块边界。
