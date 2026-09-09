@@ -402,6 +402,7 @@ public sealed class EngineeringGateTests
         var msbuildFiles = Directory
             .EnumerateFiles(repositoryRoot, "*.*", SearchOption.AllDirectories)
             .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}output{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}.artifacts{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
             .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}.referenceprojects{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
             .Where(path =>
                 path.EndsWith(".csproj", StringComparison.Ordinal) ||
