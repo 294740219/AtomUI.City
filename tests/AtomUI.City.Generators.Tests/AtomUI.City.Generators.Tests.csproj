@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/AtomUI.City.Core/AtomUI.City.Core.csproj" />
+    <ProjectReference Include="../../src/AtomUI.City.Data/AtomUI.City.Data.csproj" />
     <ProjectReference Include="../../src/AtomUI.City.EventBus/AtomUI.City.EventBus.csproj" />
     <ProjectReference Include="../../src/AtomUI.City.Generators/AtomUI.City.Generators.csproj" />
     <ProjectReference Include="../../src/AtomUI.City.Localization/AtomUI.City.Localization.csproj" />

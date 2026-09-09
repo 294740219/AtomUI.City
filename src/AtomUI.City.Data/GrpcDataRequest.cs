@@ -1,6 +1,6 @@
 namespace AtomUI.City.Data;
 
-public sealed class GrpcDataRequest<TResponse> : DataRequest<TResponse>
+public class GrpcDataRequest<TResponse> : DataRequest<TResponse>
 {
     public GrpcDataRequest(
         string clientId,

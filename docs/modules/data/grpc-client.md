@@ -1,8 +1,8 @@
-# AtomUI.City.Data gRPC CLIent 合同
+# AtomUI.City.Data gRPC Client 合同
 
 ## 适用范围
 
-本专题属于 `AtomUI.City.Data` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `gRPC CLIent` 相关实现决策，不重新定义模块边界。
+本专题属于 `AtomUI.City.Data` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `gRPC Client` 相关实现决策，不重新定义模块边界。
 
 ## 设计决策
 
@@ -19,7 +19,7 @@
 
 ## 运行时边界
 
-- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- `DataConnectionOwnerKind` 只允许 Application、Window、Navigation、Route、Activation、Plugin 或 Manual。
 - 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
 - Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
 - 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
@@ -42,6 +42,7 @@
 | AUC-DATA-004 | SignalR Transport | SignalRDataTransportTests |
 | AUC-DATA-005 | Connection Lifecycle | DataConnectionLifecycleTests |
 | AUC-DATA-006 | Authentication | AccessTokenCredentialProviderTests |
+| AUC-DATA-011 | Native gRPC and Streaming | DataStreamingTests; DataDogfoodTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -64,6 +65,8 @@
 
 gRPC 是 Data 第一批一等 transport。
 
+除显式 invoker unary 兼容 adapter 外，`GrpcChannelConnection` 和 `NativeGrpcClient` 已接入官方 gRPC channel、metadata/deadline、credential 及 server/client/bidi streaming。
+
 gRPC client 负责强类型 RPC、低延迟服务调用和 streaming。Data 统一管理 gRPC 调用的生命周期、认证、deadline、错误映射和诊断。
 
 ### 2. 调用类型
@@ -83,9 +86,9 @@ gRPC call 必须支持 deadline 和 cancellation。
 
 规则：
 
-- operation timeout 映射到 gRPC deadline。
-- parent scope cancellation token 传入 call options。
-- deadline exceeded 映射为 `Timeout` 或 `DeadlineExceeded`。
+- `GrpcCallOptions.DeadlineUtc` 显式传入 gRPC deadline；request pipeline 总 timeout 则通过 cancellation 映射为 Data `Timeout`。
+- 调用方把自己的 operation/parent scope cancellation token 传入 native call。
+- gRPC `DeadlineExceeded` 稳定映射为 `DeadlineExceeded`；Data pipeline 自身总超时映射为 `Timeout`。
 - 用户取消映射为 `Cancelled`。
 - 插件停用取消插件 gRPC call。
 
@@ -95,9 +98,9 @@ gRPC call 必须支持 deadline 和 cancellation。
 
 规则：
 
-- credential 来自 Security。
+- credential 由调用方显式提供；应用通常通过 Security/Data credential adapter 获取。
 - metadata 不能记录敏感值。
-- token refresh 后是否重试由 Data resilience 策略决定。
+- 认证失败不会在 native stream 内自动 refresh/retry；调用方获取新 credential 后重建 call/stream。
 - streaming call 中 token 过期通常需要结束并重新建立 stream，不能假设原 stream 自动续期。
 
 ### 5. Channel Lifecycle
@@ -107,7 +110,7 @@ gRPC channel 可以跨多个 call。
 规则：
 
 - channel owner 必须明确。
-- channel fault 进入 connection diagnostics。
+- channel state 由 `GrpcChannelConnection.State` 表达；manager 记录 start/stop failure diagnostics。
 - Plugin owner 停止时关闭插件 channel。
 - Host 不长期持有插件私有 channel callback。
 
@@ -116,10 +119,10 @@ gRPC channel 可以跨多个 call。
 | gRPC status | 数值 | DataError |
 |---|---:|---|
 | OK | 0 | 仅用于成功结果。 |
-| Cancelled | 1 | Cancelled / StreamCancelled。 |
+| Cancelled | 1 | unary adapter 映射为 Cancelled；native streaming 取消映射为 StreamCancelled。 |
 | Unknown | 2 | Unknown。 |
 | InvalidArgument | 3 | ValidationFailed。 |
-| DeadlineExceeded | 4 | DeadlineExceeded / Timeout。 |
+| DeadlineExceeded | 4 | DeadlineExceeded。 |
 | NotFound | 5 | NotFound。 |
 | AlreadyExists | 6 | Conflict。 |
 | PermissionDenied | 7 | AuthorizationForbidden。 |
@@ -131,21 +134,21 @@ gRPC channel 可以跨多个 call。
 | Internal | 13 | ServerError。 |
 | Unavailable | 14 | ServiceUnavailable。 |
 | DataLoss | 15 | ServerError。 |
-| Unauthenticated | 16 | AuthenticationRequired / AuthenticationExpired。 |
+| Unauthenticated | 16 | AuthenticationRequired。 |
 
 ### 7. Streaming
 
 gRPC streaming 必须遵守：
 
-- SubscriptionScope。
+- `DataStreamOptions.ParentScope` 可选绑定 lifecycle cancellation；未绑定时调用方显式 Dispose。
 - Backpressure policy。
-- Stream completion diagnostics。
-- Cancellation diagnostics。
+- Stream completion/failure diagnostics。
 - No direct UI update from stream callback。
+- client/duplex writer 串行；并发 dispose 等待当前 write，随后仅释放底层 call 一次。
 
 ### 8. 测试策略
 
-测试必须覆盖：
+当前测试覆盖委托式 unary 成功、取消、timeout、完整 status mapping，以及原生 gRPC 的以下行为：
 
 - unary success。
 - deadline exceeded。

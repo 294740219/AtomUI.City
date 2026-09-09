@@ -7,8 +7,9 @@ public sealed class SignalRDataRequest<TResponse> : DataRequest<TResponse>
         string operationName,
         string hubName,
         string methodName,
-        Func<SignalRInvocationContext, CancellationToken, ValueTask<TResponse>> invoker)
-        : base(clientId, operationName, DataTransportKind.SignalR)
+        Func<SignalRInvocationContext, CancellationToken, ValueTask<TResponse>> invoker,
+        DataAccessMode accessMode = DataAccessMode.Query)
+        : base(clientId, operationName, DataTransportKind.SignalR, accessMode)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(hubName);
         ArgumentException.ThrowIfNullOrWhiteSpace(methodName);

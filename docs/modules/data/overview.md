@@ -1,7 +1,7 @@
 # AtomUI.City.Data
 
 文档等级：Level 3
-成熟度：Partially Implemented
+成熟度：Verified
 执行边界：Host runtime data pipeline
 程序集：`AtomUI.City.Data`
 源码：`src/AtomUI.City.Data`
@@ -9,7 +9,7 @@
 
 ## 模块定位
 
-桌面客户端统一数据访问层，第一批支持 HttpClient、gRPC 和 SignalR。
+桌面客户端统一数据访问层。提供 HttpClient transport、委托兼容 adapter、官方 gRPC unary/streaming、SignalR realtime、并发/resilience/cache consistency、generated descriptor、插件贡献和大载荷传输。
 
 ## 产品级硬性约束
 
@@ -62,12 +62,12 @@ AtomUI.City.Data 作为 Host 服务或模块贡献接入 Core 生命周期，必
 | [threading.md](threading.md) | 线程边界、UI dispatcher、后台任务、并发冲突和死锁规避。 |
 | [diagnostics.md](diagnostics.md) | 现有诊断码、产品级目标诊断、上下文字段和测试断言。 |
 | [testing.md](testing.md) | 具体测试矩阵、必须断言的行为、测试类型和缺口处理。 |
-| [compatibility.md](compatibility.md) | public API、配置、manifest、snapshot、generated output、CLI envelope 和包布局兼容。 |
+| [compatibility.md](compatibility.md) | public API、options、diagnostics、generated manifest/output、descriptor 和 plugin contract 兼容。 |
 | [integration.md](integration.md) | 跨模块依赖方向、生命周期、线程和失败行为。 |
 | [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) | Feature 到现有基线、缺口、必补测试和实现工作的追踪。 |
 
 ## 当前成熟度状态
 
-Partially Implemented
+Verified
 
-该状态表示模块已有实现基线，但还需要按产品级合同补齐实现和测试。单个功能点状态以 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 为准。
+当前为 `20/20`：全部 1.0 Feature 均已有公开合同与测试证据；真实 HTTP/gRPC/SignalR headless fixture 和 generated catalog NativeAOT fixture 已通过。单个功能点状态以 [features.md](features.md) 和 [全局 1.0 进度](../../superpowers/plans/2026-06-11-development-tracking-plan.md) 为准。

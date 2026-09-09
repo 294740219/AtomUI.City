@@ -19,7 +19,7 @@
 
 ## 运行时边界
 
-- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- `DataConnectionOwnerKind` 只允许 Application、Window、Navigation、Route、Activation、Plugin 或 Manual。
 - 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
 - Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
 - 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
@@ -42,6 +42,8 @@
 | AUC-DATA-004 | SignalR Transport | SignalRDataTransportTests |
 | AUC-DATA-005 | Connection Lifecycle | DataConnectionLifecycleTests |
 | AUC-DATA-006 | Authentication | AccessTokenCredentialProviderTests |
+| AUC-DATA-007 | Request Cache Baseline | DataRequestCacheTests |
+| AUC-DATA-015 | Cache Consistency and Invalidation | DataCacheConsistencyTests; DataPluginLifecycleTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -63,6 +65,8 @@
 ### 1. 定位
 
 Data 必须区分查询、写入和订阅。
+
+`DataConsistencyOptions` 已实现 mutation success invalidation 与 optimistic apply/confirm/rollback；订阅来源通过 `IDataCacheInvalidator` 提交相同的显式失效合同。
 
 查询可以缓存和重试。写入需要一致性和幂等性约束。订阅是长期数据流，需要投影和失效策略。
 
@@ -133,13 +137,13 @@ Subscription 推送可以用于维护本地状态投影。
 | 场景 | 默认处理 |
 |---|---|
 | mutation conflict | Conflict。 |
-| optimistic rollback failed | 记录 ErrorPolicy，保留诊断。 |
+| optimistic rollback failed | 记录 `AUCDATA032` 诊断；不覆盖 transport result。 |
 | invalidation failed | 记录诊断，不吞掉 mutation result。 |
 | subscription gap | 标记 stale，按策略重新同步。 |
 
 ### 8. 测试策略
 
-测试必须覆盖：
+AUC-DATA-015 完成时必须覆盖：
 
 - query cache。
 - mutation 不自动 retry。

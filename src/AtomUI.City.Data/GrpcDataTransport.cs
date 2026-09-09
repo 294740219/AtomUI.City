@@ -20,11 +20,35 @@ public sealed class GrpcDataTransport : IRequestResponseTransport
                     "gRPC transport requires a gRPC data request."));
         }
 
+        var validation = DataTransportRequestValidator.Validate(request, context, Kind);
+        if (validation is not null)
+        {
+            return validation;
+        }
+
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return DataResult<TResponse>.Cancelled();
+        }
+
         try
         {
             var callResult = await grpcRequest
                 .Invoker(new GrpcRequestContext(context), cancellationToken)
                 .ConfigureAwait(false);
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return DataResult<TResponse>.Cancelled();
+            }
+
+            if (callResult is null)
+            {
+                return DataResult<TResponse>.Failed(
+                    new DataError(
+                        DataErrorKind.TransportError,
+                        "gRPC invoker returned a null result."));
+            }
 
             if (callResult.Succeeded)
             {
@@ -37,6 +61,18 @@ public sealed class GrpcDataTransport : IRequestResponseTransport
                 ? DataResult<TResponse>.Cancelled(error.Message)
                 : DataResult<TResponse>.Failed(error);
         }
+        catch (Exception) when (cancellationToken.IsCancellationRequested)
+        {
+            return DataResult<TResponse>.Cancelled();
+        }
+        catch (TaskCanceledException exception)
+        {
+            return DataResult<TResponse>.Failed(
+                new DataError(
+                    DataErrorKind.Timeout,
+                    DataErrorMessage.FromException(exception, "gRPC call timed out."),
+                    Exception: exception));
+        }
         catch (OperationCanceledException)
         {
             return DataResult<TResponse>.Cancelled();
@@ -46,7 +82,7 @@ public sealed class GrpcDataTransport : IRequestResponseTransport
             return DataResult<TResponse>.Failed(
                 new DataError(
                     DataErrorKind.TransportError,
-                    exception.Message,
+                    DataErrorMessage.FromException(exception, "gRPC transport failed."),
                     Exception: exception));
         }
     }

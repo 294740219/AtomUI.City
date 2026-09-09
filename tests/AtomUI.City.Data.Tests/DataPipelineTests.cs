@@ -120,6 +120,7 @@ public sealed class DataPipelineTests
         Assert.Equal("get-items", record.OperationName);
         Assert.Equal(DataTransportKind.Http, record.TransportKind);
         Assert.Equal(0, record.Attempt);
+        Assert.Equal(DataDiagnosticSeverity.Trace, record.Severity);
         Assert.NotEqual(Guid.Empty, record.OperationId);
     }
 
@@ -172,6 +173,7 @@ public sealed class DataPipelineTests
         Assert.Equal("get-items", record.OperationName);
         Assert.Equal(DataTransportKind.Http, record.TransportKind);
         Assert.Equal(0, record.Attempt);
+        Assert.Equal(DataDiagnosticSeverity.Trace, record.Severity);
         Assert.NotEqual(Guid.Empty, record.OperationId);
     }
 
@@ -283,6 +285,49 @@ public sealed class DataPipelineTests
         Assert.Equal(DataResultStatus.Failed, result.Status);
         Assert.Equal(DataErrorKind.Timeout, result.Error?.Kind);
         Assert.Equal(0, transport.Attempts);
+    }
+
+    [Fact]
+    public async Task PipelineSuppressesCacheHitWhenParentScopeStopsDuringRead()
+    {
+        var parent = LifecycleScope.CreateRoot(LifecycleScopeKind.Route, "route:/cached-items");
+        var readStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var cache = new CallbackRequestCache(async _ =>
+        {
+            readStarted.TrySetResult();
+            await release.Task;
+            return "stale-cache";
+        });
+        var transport = new RecordingTransport(_ => DataResult<string>.Success("should-not-run"));
+        var pipeline = new DataRequestPipeline(transport, cache: cache);
+        var request = new DataRequest<string>("catalog", "cached-items", DataTransportKind.Http)
+        {
+            ParentScope = parent,
+            Cache = DataCacheOptions.Enabled("cached-items:v1"),
+        };
+
+        var resultTask = pipeline.SendAsync(request).AsTask();
+        await readStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        await parent.StopAsync();
+        release.TrySetResult();
+        var result = await resultTask;
+
+        Assert.Equal(DataResultStatus.StaleSuppressed, result.Status);
+        Assert.Equal(0, transport.Attempts);
+    }
+
+    [Fact]
+    public async Task PipelineIgnoresDiagnosticsSinkFailure()
+    {
+        var transport = new RecordingTransport(_ => DataResult<string>.Success("completed"));
+        var pipeline = new DataRequestPipeline(transport, diagnostics: new ThrowingDiagnostics());
+
+        var result = await pipeline.SendAsync(
+            new DataRequest<string>("catalog", "diagnostic-failure", DataTransportKind.Http));
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("completed", result.Value);
     }
 
     [Fact]
@@ -449,6 +494,26 @@ public sealed class DataPipelineTests
     }
 
     [Fact]
+    public async Task PipelineMapsNullCredentialResultToUnavailable()
+    {
+        var transport = new RecordingTransport(_ => DataResult<string>.Success("should-not-run"));
+        var pipeline = new DataRequestPipeline(transport, credentialProvider: new NullCredentialProvider());
+        var request = new DataRequest<string>(
+            "catalog",
+            "secure-items",
+            DataTransportKind.Http)
+        {
+            Authentication = DataAuthenticationOptions.Bearer(),
+        };
+
+        var result = await pipeline.SendAsync(request);
+
+        Assert.Equal(DataResultStatus.Failed, result.Status);
+        Assert.Equal(DataErrorKind.CredentialUnavailable, result.Error?.Kind);
+        Assert.Equal(0, transport.Attempts);
+    }
+
+    [Fact]
     public async Task PipelineMapsCredentialCancellationCausedByOperationTimeout()
     {
         var credentials = new DelayingCredentialProvider(async cancellationToken =>
@@ -532,6 +597,35 @@ public sealed class DataPipelineTests
         var result = await resultTask;
 
         Assert.Equal(DataResultStatus.Cancelled, result.Status);
+        Assert.Equal(0, transport.Attempts);
+    }
+
+    [Fact]
+    public async Task PipelineSuppressesCredentialCancellationWhenParentScopeStops()
+    {
+        var parent = LifecycleScope.CreateRoot(LifecycleScopeKind.Route, "route:/secure-items");
+        var credentials = new DelayingCredentialProvider(async cancellationToken =>
+        {
+            await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+
+            return DataCredentialResult.Success(DataCredential.Bearer("access-token"));
+        });
+        var transport = new RecordingTransport(_ => DataResult<string>.Success("should-not-run"));
+        var pipeline = new DataRequestPipeline(transport, credentialProvider: credentials);
+        var request = new DataRequest<string>(
+            "catalog",
+            "secure-items",
+            DataTransportKind.Http)
+        {
+            Authentication = DataAuthenticationOptions.Bearer(),
+            ParentScope = parent,
+        };
+
+        var resultTask = pipeline.SendAsync(request).AsTask();
+        await parent.StopAsync();
+        var result = await resultTask;
+
+        Assert.Equal(DataResultStatus.StaleSuppressed, result.Status);
         Assert.Equal(0, transport.Attempts);
     }
 
@@ -653,6 +747,26 @@ public sealed class DataPipelineTests
     }
 
     [Fact]
+    public async Task PipelineMapsBlankTransportExceptionMessageToStableFallback()
+    {
+        var exception = new InvalidOperationException(string.Empty);
+        var transport = new RecordingTransport(
+            new Func<DataRequestContext, DataResult<string>>(_ => throw exception));
+        var pipeline = new DataRequestPipeline(transport);
+        var request = new DataRequest<string>(
+            "catalog",
+            "get-items",
+            DataTransportKind.Http);
+
+        var result = await pipeline.SendAsync(request);
+
+        Assert.Equal(DataResultStatus.Failed, result.Status);
+        Assert.Equal(DataErrorKind.TransportError, result.Error?.Kind);
+        Assert.Equal("Data transport failed.", result.Error?.Message);
+        Assert.Same(exception, result.Error?.Exception);
+    }
+
+    [Fact]
     public async Task PipelineDoesNotRetryMutationWithoutIdempotency()
     {
         var transport = new RecordingTransport(_ =>
@@ -671,6 +785,35 @@ public sealed class DataPipelineTests
 
         Assert.False(result.Succeeded);
         Assert.Equal(1, transport.Attempts);
+    }
+
+    [Fact]
+    public async Task PipelineDoesNotRetryOrCachePartialResult()
+    {
+        var diagnostics = new InMemoryDataDiagnostics();
+        var cache = new RecordingRequestCache();
+        var error = new DataError(DataErrorKind.ServiceUnavailable, "Some records are unavailable.");
+        var transport = new RecordingTransport(_ => DataResult<string>.Partial("available", error));
+        var pipeline = new DataRequestPipeline(transport, diagnostics: diagnostics, cache: cache);
+        var request = new DataRequest<string>(
+            "catalog",
+            "get-items",
+            DataTransportKind.Http)
+        {
+            Cache = DataCacheOptions.Enabled("items:v1"),
+            Resilience = new DataResilienceOptions { MaxRetryAttempts = 3 },
+        };
+
+        var result = await pipeline.SendAsync(request);
+
+        Assert.Equal(DataResultStatus.Partial, result.Status);
+        Assert.Equal("available", result.Value);
+        Assert.Equal(1, transport.Attempts);
+        Assert.Equal(0, cache.Writes);
+        var record = Assert.Single(
+            diagnostics.Records,
+            record => record.Code == DataDiagnosticIds.RequestFailed);
+        Assert.Equal(DataDiagnosticSeverity.Warning, record.Severity);
     }
 
     [Fact]
@@ -714,6 +857,62 @@ public sealed class DataPipelineTests
         var result = await resultTask;
 
         Assert.Equal(DataResultStatus.Cancelled, result.Status);
+    }
+
+    [Fact]
+    public async Task PipelineDoesNotCacheTransportResultAfterCancellation()
+    {
+        var release = new TaskCompletionSource();
+        var cache = new RecordingRequestCache();
+        var transport = new RecordingTransport(async _ =>
+        {
+            await release.Task;
+
+            return DataResult<string>.Success("late");
+        });
+        var pipeline = new DataRequestPipeline(transport, cache: cache);
+        var request = new DataRequest<string>(
+            "catalog",
+            "get-items",
+            DataTransportKind.Http)
+        {
+            Cache = DataCacheOptions.Enabled("items:v1"),
+        };
+        using var cancellation = new CancellationTokenSource();
+
+        var resultTask = pipeline.SendAsync(request, cancellation.Token).AsTask();
+        await cancellation.CancelAsync();
+        release.SetResult();
+        var result = await resultTask;
+
+        Assert.Equal(DataResultStatus.Cancelled, result.Status);
+        Assert.Equal(0, cache.Writes);
+    }
+
+    [Fact]
+    public async Task PipelineRollsBackCacheWhenCancelledDuringCacheWrite()
+    {
+        var cache = new BlockingWriteRequestCache();
+        var transport = new RecordingTransport(_ => DataResult<string>.Success("late"));
+        var pipeline = new DataRequestPipeline(transport, cache: cache);
+        var request = new DataRequest<string>(
+            "catalog",
+            "get-items",
+            DataTransportKind.Http)
+        {
+            Cache = DataCacheOptions.Enabled("items:v1"),
+        };
+        using var cancellation = new CancellationTokenSource();
+
+        var resultTask = pipeline.SendAsync(request, cancellation.Token).AsTask();
+        await cache.WriteStarted.Task;
+        await cancellation.CancelAsync();
+        cache.ReleaseWrite.SetResult();
+        var result = await resultTask;
+
+        Assert.Equal(DataResultStatus.Cancelled, result.Status);
+        Assert.False(cache.HasValue);
+        Assert.Equal(1, cache.Invalidations);
     }
 
     [Fact]
@@ -881,6 +1080,64 @@ public sealed class DataPipelineTests
     }
 
     [Fact]
+    public async Task PipelineSuppressesTransportCancellationWhenParentScopeStops()
+    {
+        var parent = LifecycleScope.CreateRoot(LifecycleScopeKind.Route, "route:/items");
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var transport = new RecordingTransport(async context =>
+        {
+            entered.TrySetResult();
+            await Task.Delay(Timeout.InfiniteTimeSpan, context.CancellationToken);
+            return DataResult<string>.Success("unreachable");
+        });
+        var pipeline = new DataRequestPipeline(transport);
+        var request = new DataRequest<string>(
+            "catalog",
+            "get-items",
+            DataTransportKind.Http)
+        {
+            ParentScope = parent,
+        };
+
+        var resultTask = pipeline.SendAsync(request).AsTask();
+        await entered.Task;
+        await parent.StopAsync();
+        var result = await resultTask;
+
+        Assert.Equal(DataResultStatus.StaleSuppressed, result.Status);
+    }
+
+    [Fact]
+    public async Task PipelineSuppressesTransportFailureWhenParentScopeStops()
+    {
+        var parent = LifecycleScope.CreateRoot(LifecycleScopeKind.Route, "route:/items");
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var transport = new RecordingTransport(async _ =>
+        {
+            entered.TrySetResult();
+            await release.Task;
+            throw new InvalidOperationException("late transport failure");
+        });
+        var pipeline = new DataRequestPipeline(transport);
+        var request = new DataRequest<string>(
+            "catalog",
+            "get-items",
+            DataTransportKind.Http)
+        {
+            ParentScope = parent,
+        };
+
+        var resultTask = pipeline.SendAsync(request).AsTask();
+        await entered.Task;
+        await parent.StopAsync();
+        release.TrySetResult();
+        var result = await resultTask;
+
+        Assert.Equal(DataResultStatus.StaleSuppressed, result.Status);
+    }
+
+    [Fact]
     public async Task PipelineWritesStaleSuppressedDiagnosticWhenParentScopeStopsDuringRequest()
     {
         var parent = LifecycleScope.CreateRoot(LifecycleScopeKind.Route, "route:/items");
@@ -949,6 +1206,27 @@ public sealed class DataPipelineTests
         Assert.Equal(0, transport.Attempts);
     }
 
+    [Fact]
+    public async Task PipelineSuppressesRequestWhenParentScopeIsAlreadyDisposed()
+    {
+        var parent = LifecycleScope.CreateRoot(LifecycleScopeKind.Route, "route:/disposed");
+        await parent.DisposeAsync();
+        var transport = new RecordingTransport(_ => DataResult<string>.Success("should-not-run"));
+        var pipeline = new DataRequestPipeline(transport);
+        var request = new DataRequest<string>(
+            "catalog",
+            "get-items",
+            DataTransportKind.Http)
+        {
+            ParentScope = parent,
+        };
+
+        var result = await pipeline.SendAsync(request);
+
+        Assert.Equal(DataResultStatus.StaleSuppressed, result.Status);
+        Assert.Equal(0, transport.Attempts);
+    }
+
     private sealed class RecordingTransport : IRequestResponseTransport
     {
         private readonly Func<DataRequestContext, ValueTask<DataResult<string>>> _handler;
@@ -997,6 +1275,16 @@ public sealed class DataPipelineTests
         }
     }
 
+    private sealed class ThrowingDiagnostics : IDataDiagnostics
+    {
+        public IReadOnlyList<DataDiagnosticRecord> Records => [];
+
+        public void Write(DataDiagnosticRecord record)
+        {
+            throw new InvalidOperationException("diagnostics unavailable");
+        }
+    }
+
     private sealed class RecordingCredentialProvider : IDataCredentialProvider
     {
         private readonly DataCredentialResult _result;
@@ -1032,6 +1320,16 @@ public sealed class DataPipelineTests
             CancellationToken cancellationToken = default)
         {
             throw _exception;
+        }
+    }
+
+    private sealed class NullCredentialProvider : IDataCredentialProvider
+    {
+        public ValueTask<DataCredentialResult> GetCredentialAsync(
+            DataAuthenticationContext context,
+            CancellationToken cancellationToken = default)
+        {
+            return ValueTask.FromResult<DataCredentialResult>(null!);
         }
     }
 
@@ -1210,6 +1508,45 @@ public sealed class DataPipelineTests
         {
             _entries.Remove(key);
 
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class BlockingWriteRequestCache : IDataRequestCache
+    {
+        public TaskCompletionSource WriteStarted { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource ReleaseWrite { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public bool HasValue { get; private set; }
+
+        public int Invalidations { get; private set; }
+
+        public ValueTask<DataCacheLookup<TResponse>> TryGetAsync<TResponse>(
+            DataCacheKey key,
+            CancellationToken cancellationToken = default)
+        {
+            return ValueTask.FromResult(DataCacheLookup<TResponse>.Miss());
+        }
+
+        public async ValueTask SetAsync<TResponse>(
+            DataCacheKey key,
+            TResponse? value,
+            CancellationToken cancellationToken = default)
+        {
+            WriteStarted.TrySetResult();
+            await ReleaseWrite.Task;
+            HasValue = true;
+        }
+
+        public ValueTask InvalidateAsync(
+            DataCacheKey key,
+            CancellationToken cancellationToken = default)
+        {
+            Invalidations++;
+            HasValue = false;
             return ValueTask.CompletedTask;
         }
     }

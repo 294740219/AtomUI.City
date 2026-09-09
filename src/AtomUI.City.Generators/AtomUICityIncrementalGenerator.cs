@@ -1,6 +1,7 @@
 using System.Text;
 using AtomUI.City.Generators.Common;
 using AtomUI.City.Generators.DependencyInjection;
+using AtomUI.City.Generators.Data;
 using AtomUI.City.Generators.Diagnostics;
 using AtomUI.City.Generators.EventBus;
 using AtomUI.City.Generators.Localization;
@@ -40,6 +41,66 @@ public sealed class AtomUICityIncrementalGenerator : IIncrementalGenerator
         InitializeRouting(context);
         InitializePresentation(context);
         InitializeLocalization(context);
+        InitializeData(context);
+    }
+
+    private static void InitializeData(IncrementalGeneratorInitializationContext context)
+    {
+        var candidates = context.SyntaxProvider
+            .CreateSyntaxProvider(
+                static (node, _) => node is TypeDeclarationSyntax declaration && declaration.AttributeLists.Count > 0,
+                static (syntaxContext, _) => syntaxContext.SemanticModel.GetDeclaredSymbol(syntaxContext.Node) is INamedTypeSymbol symbol
+                    ? DataClientMetadataReader.TryRead(symbol)
+                    : null)
+            .Where(static candidate => candidate is not null)
+            .Collect();
+
+        context.RegisterSourceOutput(
+            context.CompilationProvider.Combine(candidates),
+            static (sourceContext, value) =>
+            {
+                var clients = value.Right.Where(static candidate => candidate is not null).Select(static candidate => candidate!).ToArray();
+                if (clients.Length == 0)
+                {
+                    return;
+                }
+
+                var invalid = clients.Where(static client => client.Issues.Count > 0).ToArray();
+                foreach (var client in invalid)
+                {
+                    foreach (var issue in client.Issues)
+                    {
+                        sourceContext.ReportDiagnostic(GeneratorDiagnostics.CreateRoslynDiagnostic(
+                            GeneratorFeature.Data,
+                            new GeneratorDiagnostic(GeneratorDiagnostics.InvalidManifestInput, issue, client.TypeName),
+                            client.Location));
+                    }
+                }
+
+                var duplicateIds = clients.GroupBy(static client => client.ClientId, StringComparer.Ordinal)
+                    .Where(static group => group.Count() > 1)
+                    .ToArray();
+                foreach (var duplicate in duplicateIds)
+                {
+                    sourceContext.ReportDiagnostic(GeneratorDiagnostics.CreateRoslynDiagnostic(
+                        GeneratorFeature.Data,
+                        new GeneratorDiagnostic(
+                            GeneratorDiagnostics.InvalidManifestInput,
+                            $"Data client id '{duplicate.Key}' is declared more than once.",
+                            duplicate.Key),
+                        duplicate.First().Location));
+                }
+
+                if (invalid.Length > 0 || duplicateIds.Length > 0)
+                {
+                    return;
+                }
+
+                var assemblyName = string.IsNullOrWhiteSpace(value.Left.AssemblyName) ? "Assembly" : value.Left.AssemblyName!;
+                sourceContext.AddSource(
+                    GeneratedCodeNames.CreateHintName(GeneratorFeature.Data, assemblyName, "Clients"),
+                    SourceText.From(DataClientRegistrarSourceBuilder.Build(assemblyName, clients), Encoding.UTF8));
+            });
     }
 
     private static void InitializeLocalization(IncrementalGeneratorInitializationContext context)

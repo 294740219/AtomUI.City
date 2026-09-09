@@ -38,7 +38,13 @@ public sealed class AccessTokenCredentialProvider : IDataCredentialProvider
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            return DataCredentialResult.Unavailable(exception.Message);
+            return DataCredentialResult.Unavailable(
+                DataErrorMessage.FromException(exception, "Access token provider failed."));
+        }
+
+        if (token is null)
+        {
+            return DataCredentialResult.Unavailable("Access token provider returned a null result.");
         }
 
         return token.Status switch

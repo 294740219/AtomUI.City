@@ -22,7 +22,7 @@
 
 ## 运行时边界
 
-- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- `DataConnectionOwnerKind` 只允许 Application、Window、Navigation、Route、Activation、Plugin 或 Manual。
 - 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
 - Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
 - 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
@@ -84,7 +84,7 @@ HTTP、gRPC、SignalR 回调都不能假设发生在 UI Thread。Data 必须遵�
 
 ### 3. Operation 语义
 
-每个请求必须有：
+Data 1.0 的每个请求均具有 `OperationId`、linked `CancellationToken`、timeout、diagnostics 和 `ConcurrencyPolicy`；`ParentScope` 是可选项。`DataRequestContext` 是请求的逻辑 operation transaction；提供 `ParentScope` 时，它同时受该 City lifecycle scope 取消约束：
 
 - OperationId。
 - ParentScope。
@@ -96,7 +96,7 @@ HTTP、gRPC、SignalR 回调都不能假设发生在 UI Thread。Data 必须遵�
 
 ```text
 Data request starts
--> OperationScope running
+-> DataRequestContext active
 -> transport executes asynchronously
 -> result returns
 -> validate scope and concurrency state
@@ -126,7 +126,7 @@ Data request starts
 
 ### 5. DispatchPolicy
 
-Data pipeline 默认在后台或 transport async context 中运行。
+Data pipeline 不执行隐式 `Task.Run` 或 UI dispatch；同步前段在调用线程执行，异步 continuation 不捕获 UI context。
 
 结果投递：
 
@@ -139,11 +139,11 @@ Data pipeline 默认在后台或 transport async context 中运行。
 
 ### 6. Streaming 回调
 
-Streaming item 和 SignalR message 必须先进入 Data subscription dispatcher。
+gRPC server/duplex item 进入有界 `DataStream` pump；SignalR message 进入 `DataSubscription` dispatcher。
 
 ```text
 Transport callback
--> Data subscription dispatcher
+-> DataStream pump / DataSubscription dispatcher
 -> backpressure policy
 -> mapper
 -> State / EventBus / ViewModel boundary
@@ -157,15 +157,15 @@ Transport callback
 |---|---|
 | UI dispatcher 不存在 | Data 仍可运行，结果不直接投递 UI。 |
 | Scope 已取消 | 抑制结果。 |
-| callback 抛异常 | 进入 Data diagnostics 和 ErrorPolicy。 |
+| callback 抛异常 | 进入 Data diagnostics；subscription 按 `DataSubscriptionErrorPolicy` 继续或停止。 |
 | 取消 | 返回 Cancelled，不作为失败。 |
-| sync-over-async 检测 | Analyzer 诊断或运行时警告。 |
+| sync-over-async | Data API 只提供 async contract；调用方不得使用 `.Result` / `.Wait()`。 |
 
 ### 8. 测试策略
 
-测试必须覆盖：
+当前测试同时覆盖取消、timeout、parent scope late result suppression、无 UI 执行、streaming/realtime 和六种并发策略：
 
-- 请求在后台完成。
+- 无 UI dispatcher 时请求仍可完成。
 - Scope 取消后结果不提交。
 - `CancelPrevious` 旧请求晚返回。
 - SignalR handler 在后台线程回调。

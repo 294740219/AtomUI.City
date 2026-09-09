@@ -84,6 +84,10 @@ public sealed class DataResultTests
     public void DataErrorRejectsBlankMessage()
     {
         Assert.Throws<ArgumentException>(() => new DataError(DataErrorKind.Unknown, " "));
+        Assert.Throws<ArgumentException>(() =>
+            new DataError(DataErrorKind.Unknown, "Unknown error.", TransportStatus: " "));
+        Assert.Throws<ArgumentException>(() =>
+            new DataError(DataErrorKind.Unknown, "Unknown error.", MessageKey: " "));
     }
 
     [Fact]
@@ -139,5 +143,56 @@ public sealed class DataResultTests
         Assert.Equal(DataResultStatus.StaleSuppressed, result.Status);
         Assert.Null(result.Value);
         Assert.Equal(DataErrorKind.Cancelled, result.Error?.Kind);
+    }
+
+    [Fact]
+    public void PartialResultPreservesValueAndErrorAcrossCompatibleCast()
+    {
+        var error = new DataError(DataErrorKind.StreamProtocolError, "Some records were unavailable.");
+        var result = DataResult<string>.Partial("available", error);
+
+        var cast = result.Cast<object>();
+
+        Assert.Equal(DataResultStatus.Partial, cast.Status);
+        Assert.False(cast.Succeeded);
+        Assert.Equal("available", cast.Value);
+        Assert.Same(error, cast.Error);
+    }
+
+    [Fact]
+    public void SuccessCastPreservesNullableNullValue()
+    {
+        var result = DataResult<string?>.Success(null);
+
+        var cast = result.Cast<object?>();
+
+        Assert.Equal(DataResultStatus.Success, cast.Status);
+        Assert.True(cast.Succeeded);
+        Assert.Null(cast.Value);
+        Assert.Null(cast.Error);
+    }
+
+    [Fact]
+    public void PartialCastPreservesNullableNullValueAndError()
+    {
+        var error = new DataError(DataErrorKind.StreamProtocolError, "Partial response.");
+        var result = DataResult<string?>.Partial(null, error);
+
+        var cast = result.Cast<object?>();
+
+        Assert.Equal(DataResultStatus.Partial, cast.Status);
+        Assert.Null(cast.Value);
+        Assert.Same(error, cast.Error);
+    }
+
+    [Fact]
+    public void ErrorMappersRejectSuccessfulAndUnknownStatuses()
+    {
+        Assert.Throws<ArgumentException>(() => DataErrorMapper.FromHttpStatusCode(HttpStatusCode.OK));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            DataErrorMapper.FromHttpStatusCode((HttpStatusCode)0));
+        Assert.Throws<ArgumentException>(() => DataErrorMapper.FromGrpcStatus(GrpcStatusCode.OK));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            DataErrorMapper.FromGrpcStatus((GrpcStatusCode)999));
     }
 }

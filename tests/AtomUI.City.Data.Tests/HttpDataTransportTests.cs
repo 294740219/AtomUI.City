@@ -32,6 +32,37 @@ public sealed class HttpDataTransportTests
     }
 
     [Fact]
+    public async Task HttpTransportPassesCancellationTokenToResponseMapper()
+    {
+        var handler = new RecordingHttpMessageHandler(_ =>
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("payload"),
+            });
+        var transport = new HttpDataTransport(new RecordingHttpClientFactory("api", handler));
+        using var cancellation = new CancellationTokenSource();
+        CancellationToken observedToken = default;
+        var request = new HttpDataRequest<string>(
+            "catalog",
+            "get-items",
+            "api",
+            _ => new HttpRequestMessage(HttpMethod.Get, "https://server/items"),
+            async (response, cancellationToken) =>
+            {
+                observedToken = cancellationToken;
+                return await response.Content.ReadAsStringAsync(cancellationToken);
+            });
+
+        var result = await transport.SendAsync(
+            request,
+            DataRequestContext.Create(request, cancellation.Token),
+            cancellation.Token);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(cancellation.Token, observedToken);
+    }
+
+    [Fact]
     public async Task HttpTransportAttachesBearerCredential()
     {
         var handler = new RecordingHttpMessageHandler(_ =>
@@ -173,6 +204,109 @@ public sealed class HttpDataTransportTests
         Assert.False(result.Succeeded);
         Assert.Equal(DataErrorKind.TransportError, result.Error?.Kind);
         Assert.Same(sendException, result.Error?.Exception);
+    }
+
+    [Fact]
+    public async Task HttpTransportDoesNotInvokeRequestFactoryWhenAlreadyCancelled()
+    {
+        var factoryInvoked = false;
+        var handler = new RecordingHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK));
+        var transport = new HttpDataTransport(new RecordingHttpClientFactory("api", handler));
+        var request = new HttpDataRequest<string>(
+            "catalog",
+            "get-items",
+            "api",
+            _ =>
+            {
+                factoryInvoked = true;
+                return new HttpRequestMessage(HttpMethod.Get, "https://server/items");
+            },
+            _ => ValueTask.FromResult("unused"));
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        var result = await transport.SendAsync(
+            request,
+            DataRequestContext.Create(request, cancellation.Token),
+            cancellation.Token);
+
+        Assert.Equal(DataResultStatus.Cancelled, result.Status);
+        Assert.False(factoryInvoked);
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
+    public async Task HttpTransportRejectsContextFromAnotherRequest()
+    {
+        var handler = new RecordingHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK));
+        var transport = new HttpDataTransport(new RecordingHttpClientFactory("api", handler));
+        var request = new HttpDataRequest<string>(
+            "catalog",
+            "get-items",
+            "api",
+            _ => new HttpRequestMessage(HttpMethod.Get, "https://server/items"),
+            _ => ValueTask.FromResult("unused"));
+        var otherRequest = new HttpDataRequest<string>(
+            "catalog",
+            "get-items",
+            "api",
+            _ => new HttpRequestMessage(HttpMethod.Get, "https://server/items"),
+            _ => ValueTask.FromResult("unused"));
+
+        var result = await transport.SendAsync(
+            request,
+            DataRequestContext.Create(otherRequest, CancellationToken.None));
+
+        Assert.Equal(DataResultStatus.Failed, result.Status);
+        Assert.Equal(DataErrorKind.PolicyRejected, result.Error?.Kind);
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
+    public async Task HttpTransportMapsNullRequestMessageToTransportError()
+    {
+        var handler = new RecordingHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK));
+        var transport = new HttpDataTransport(new RecordingHttpClientFactory("api", handler));
+        var request = new HttpDataRequest<string>(
+            "catalog",
+            "get-items",
+            "api",
+            _ => null!,
+            _ => ValueTask.FromResult("unused"));
+
+        var result = await transport.SendAsync(
+            request,
+            DataRequestContext.Create(request, CancellationToken.None));
+
+        Assert.Equal(DataResultStatus.Failed, result.Status);
+        Assert.Equal(DataErrorKind.TransportError, result.Error?.Kind);
+        Assert.Contains("null request message", result.Error?.Message, StringComparison.Ordinal);
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
+    public async Task HttpTransportCancellationWinsWhenMapperIgnoresCancellation()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var handler = new RecordingHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK));
+        var transport = new HttpDataTransport(new RecordingHttpClientFactory("api", handler));
+        var request = new HttpDataRequest<string>(
+            "catalog",
+            "get-items",
+            "api",
+            _ => new HttpRequestMessage(HttpMethod.Get, "https://server/items"),
+            _ =>
+            {
+                cancellation.Cancel();
+                return ValueTask.FromResult("late");
+            });
+
+        var result = await transport.SendAsync(
+            request,
+            DataRequestContext.Create(request, cancellation.Token),
+            cancellation.Token);
+
+        Assert.Equal(DataResultStatus.Cancelled, result.Status);
     }
 
     private sealed class RecordingHttpClientFactory : IHttpClientFactory

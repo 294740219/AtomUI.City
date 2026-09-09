@@ -19,7 +19,7 @@
 
 ## 运行时边界
 
-- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- `DataConnectionOwnerKind` 只允许 Application、Window、Navigation、Route、Activation、Plugin 或 Manual。
 - 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
 - Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
 - 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
@@ -42,6 +42,8 @@
 | AUC-DATA-004 | SignalR Transport | SignalRDataTransportTests |
 | AUC-DATA-005 | Connection Lifecycle | DataConnectionLifecycleTests |
 | AUC-DATA-006 | Authentication | AccessTokenCredentialProviderTests |
+| AUC-DATA-010 | Host Lifecycle Integration | DataHostIntegrationTests |
+| AUC-DATA-011..020 | Completed 1.0 capabilities | 详见 features.md 与 testing.md |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -66,7 +68,7 @@
 
 Data 不提供 DDD Repository 作为默认范式，不定义领域模型，不替代业务应用自己的 Application Service、Repository 或 Query Service。它只保证所有数据访问都能进入统一生命周期、统一错误处理、统一认证注入和统一诊断链路。
 
-第一版必须把 HTTP、gRPC、SignalR 都作为一等访问方式支持：
+Data 1.0 把 HTTP、gRPC、SignalR 都作为一等访问方式支持；HTTP、官方 gRPC 四种 call shape、官方 SignalR connection 与委托兼容 transport 均已落地：
 
 | 访问方式 | 主要用途 |
 |---|---|
@@ -79,7 +81,7 @@ Data 不提供 DDD Repository 作为默认范式，不定义领域模型，不�
 ```text
 ViewModel / Command / Resolver
 -> Data client
--> OperationScope
+-> DataRequestContext / optional ParentScope
 -> Data request pipeline
 -> Security credential
 -> Transport
@@ -93,10 +95,10 @@ ViewModel / Command / Resolver
 - .NET-first：优先基于 `HttpClientFactory`、Options、DI、`CancellationToken`、typed client、handler pipeline。
 - Multi-transport：HTTP、gRPC、SignalR 都是一等 transport，不把 Data 设计成 HTTP wrapper。
 - Pipeline-first：所有请求必须进入 Data pipeline，不能让 ViewModel 直接散落使用裸 transport。
-- Lifecycle-aware：每次请求、stream、connection 必须绑定 `OperationScope`、`SubscriptionScope` 或显式 lifecycle owner。
+- Lifecycle-aware：每次请求由 `DataRequestContext` 承载独立逻辑 operation transaction，并可绑定 `ParentScope`；standalone stream 可选绑定 `ParentScope`，SignalR subscription 随 connection owner 撤销，长连接必须声明显式 owner。
 - Security-integrated：认证凭据只通过 Security 获取，Data 不直接管理登录态。
 - State-separated：Data 不隐式写全局 State；请求完成后由调用方或显式 adapter 更新 State。
-- AOT-first：client descriptor、operation metadata、auth metadata、cache metadata 由 Source Generator 生成。
+- AOT-first：Source Generator 只生成稳定的 client/operation metadata registrar；运行时不扫描程序集，也不生成业务 client 实现。
 - Plugin-aware：插件 Data client 必须可撤销，运行中请求可取消，不能持有 Host 私有凭据。
 - Thread-safe：transport callback 不直接访问 UI，不捕获 UI `SynchronizationContext`。
 - Testable：请求管线、transport、认证、缓存、重试、长连接和竞态都必须可替换测试。
@@ -120,27 +122,26 @@ Data 不负责：
 | 类型 | 职责 |
 |---|---|
 | `IDataClient` | 数据客户端统一标识。 |
-| `IDataClientFactory` | 创建 typed client、generated client 或 adapter client。 |
+| `IDataClientFactory` | 按 contract type 获取已注册 typed client。 |
 | `IDataRequestPipeline` | 执行请求管线。 |
-| `IDataRequest` | 请求 descriptor。 |
-| `IDataResponse` | 原始响应 descriptor。 |
+| `DataRequest<T>` / `DataRequestContext` | 调用方请求 descriptor 与单次 operation context。 |
 | `DataResult<T>` | 标准请求结果，不返回裸异常。 |
 | `DataError` | 标准错误模型。 |
-| `IDataTransport` | 传输抽象根接口。 |
 | `IRequestResponseTransport` | 请求/响应传输，例如 HTTP、gRPC unary。 |
-| `IStreamingTransport` | streaming 传输，例如 gRPC streaming。 |
+| `NativeGrpcClient` / `IDataStream<T>` | typed gRPC streaming 调用与 owned response stream。 |
 | `IRealtimeConnectionTransport` | 实时连接传输，例如 SignalR。 |
 | `IDataConnection` | 长连接实例抽象。 |
 | `IDataSubscription` | streaming 或 SignalR 订阅句柄。 |
-| `IDataConnectionManager` | 管理长连接生命周期、重连和关闭。 |
+| `DataConnectionManager` | 管理长连接注册、启动、逆序停止和撤销。 |
 | `IDataRequestHandler` | 管线处理器。 |
-| `IDataErrorMapper` | 把 transport error 转换成 DataError。 |
-| `IDataCache` | 请求缓存和结果缓存抽象。 |
-| `IResiliencePolicyProvider` | timeout、retry、circuit breaker 等策略。 |
-| `IDataSerializer` | 请求/响应序列化。 |
+| `DataErrorMapper` | 把 HTTP/gRPC transport status 转换成 DataError。 |
+| `IDataRequestCache` / `IDataCacheInvalidator` | 请求结果缓存、TTL 和显式失效。 |
+| `IDataResiliencePolicyProvider` | timeout、retry、circuit breaker、rate limit 和 fallback 策略解析。 |
 | `IDataDiagnostics` | 请求诊断、耗时、错误、correlation id。 |
 
 命名不加 `City` 前缀。
+
+协议序列化由 `HttpDataRequest` mapper、protobuf marshaller 和 SignalR client 各自负责，不存在 Data 级 `IDataSerializer`。`NativeGrpcClient` 和 `SignalRRealtimeConnection` 是原生协议入口，委托式 transport 继续作为兼容 adapter。精确边界、失败语义与释放规则见 [api-contracts.md](api-contracts.md)。
 
 ### 5. 访问模式
 
@@ -168,20 +169,18 @@ Data client
 推荐管线：
 
 ```text
-Create request context
--> Attach OperationScope
--> Validate request metadata
--> Check plugin capability
+Runtime gate / concurrency admission
+-> Resolve resilience policy
+-> Validate ParentScope and contribution capability
 -> Resolve authentication credential
--> Build transport request
 -> Cache lookup
--> Execute resilience policy
--> Send transport request
--> Map transport response
--> Map error
+-> Circuit/rate admission
+-> Apply optimistic update
+-> Ordered handlers and transport
+-> Retry / fallback / consistency finalization
 -> Cache write
--> Return DataResult
--> Emit diagnostics
+-> Final stale/cancellation check
+-> Return DataResult and emit diagnostics
 ```
 
 详细规则见：[request-pipeline.md](request-pipeline.md)。
@@ -231,7 +230,7 @@ Plugin
 Manual
 ```
 
-长连接不能默认挂 `ApplicationScope`。连接 owner 必须由 client metadata、Host 配置或调用方显式声明。
+长连接不采用隐式 application lifetime；`DataConnectionOwner` 必须由 Host 配置或调用方显式声明，并由对应 lifecycle hook 调用 manager stop。
 
 详细规则见：
 
@@ -255,14 +254,16 @@ Data request
 
 | 状态 | 默认语义 | 默认处理 |
 |---|---|---|
-| 401 | 认证失效或需要登录 | 通知 Security refresh / challenge。 |
+| 401 | 认证失效或需要登录 | 映射认证错误；本次 operation 不在 Data 内刷新重试。 |
 | 403 | 已认证但权限不足 | 返回 forbidden，不自动重试。 |
+
+Security 可以在 `IAccessTokenProvider` 返回凭据前执行自己的 single-flight refresh；Data 不读取 token store，也不直接触发 refresh。
 
 详细规则见：[security-integration.md](security-integration.md)。
 
 ### 11. 缓存和一致性
 
-HTTP 和 gRPC unary 可以缓存。Streaming 和 SignalR 默认不缓存原始消息，只允许显式状态投影、latest snapshot 或有界 buffer。
+进入 request pipeline 的 query 可以显式启用结果缓存。Streaming 和 SignalR 不进入该缓存；latest snapshot 或状态投影由应用 adapter/State 明确实现。
 
 缓存必须按主体、权限、插件贡献和 client version 隔离。
 
@@ -303,37 +304,26 @@ Unknown
 
 ### 13. AOT 和 Source Generator
 
-Data generator 负责生成：
+Data generator 根据 `[DataClient]` 和 `[DataOperation]` 生成：
 
-- `HttpClientDescriptor`。
-- `GrpcClientDescriptor`。
-- `SignalRHubDescriptor`。
-- Operation metadata。
-- Auth metadata。
-- Timeout / retry metadata。
-- Cache metadata。
-- Streaming metadata。
-- Connection lifetime metadata。
-- Plugin contribution metadata。
-- Serializer metadata。
+- assembly-level `GeneratedDataClientManifestAttribute`。
+- 实现 `IDataClientDescriptorRegistrar` 的确定性 registrar。
+- `DataClientDescriptor` 的 client id、client type、transport kind 和 version。
+- `DataOperationDescriptor` 的 operation name、request/response type、access/concurrency、timeout、retry、cache 和 authentication metadata。
+- Data client interface 继承得到的 attributed operation。
 
-运行时默认不扫描程序集发现 Data client。
+生成器不生成业务 client/proxy、协议 serializer、endpoint、stream/connection 配置或插件注册代码。应用必须显式调用 `RegisterGenerated<TRegistrar>`；该批注册失败时整体回滚，运行时不扫描程序集发现 Data client。
 
 ### 14. 测试策略
 
-Testing 包应提供：
+`AtomUI.City.Testing` 当前提供四个通用替身：
 
-- Fake data client。
-- Fake HTTP transport。
-- Fake gRPC transport。
-- Fake SignalR transport。
-- Test request pipeline。
-- Fake access token provider。
-- Fake cache。
-- Fake resilience policy。
-- Data diagnostics recorder。
-- Plugin data client test host。
-- Deterministic scheduler。
+- `ScriptedDataTransport`。
+- `ScriptedDataCredentialProvider`。
+- `RecordingDataRequestHandler`。
+- `FakeDataConnection`。
+
+cache、resilience、官方协议和 Host/plugin 生命周期使用模块测试内的定向 fake 与真实 headless fixture 验证，不宣称为 Testing 包公开 API。
 
 必须覆盖竞态、取消、重试、缓存、401/403、streaming backpressure、SignalR reconnect、插件卸载和无 UI 调度环境。
 

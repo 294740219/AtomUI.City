@@ -19,7 +19,7 @@
 
 ## 运行时边界
 
-- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- `DataConnectionOwnerKind` 只允许 Application、Window、Navigation、Route、Activation、Plugin 或 Manual。
 - 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
 - Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
 - 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
@@ -42,6 +42,7 @@
 | AUC-DATA-004 | SignalR Transport | SignalRDataTransportTests |
 | AUC-DATA-005 | Connection Lifecycle | DataConnectionLifecycleTests |
 | AUC-DATA-006 | Authentication | AccessTokenCredentialProviderTests |
+| AUC-DATA-019 | Pipeline Extensibility and Capability | DataRequestHandlerTests; DataPluginLifecycleTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -58,65 +59,65 @@
 
 ## AtomUI.City.Data Request Pipeline 设计
 
-适用范围：请求上下文、管线阶段、handler、OperationScope、认证注入、缓存、resilience、响应映射和诊断。
+适用范围：请求上下文、管线阶段、handler、可选 ParentScope、认证注入、缓存、resilience、响应映射和诊断。
 
 ### 1. 定位
 
 Request pipeline 是 Data 的核心执行链路。
 
-所有 request/response 类型访问必须进入 pipeline。Streaming 和 realtime connection 也应复用 pipeline 中的认证、诊断、capability、resilience 和错误映射阶段。
+pipeline 已完成 credential、capability、cache、ordered handler、transport、resilience、consistency 和 diagnostics 链；capability gate 内建于 pipeline，本体直接构造时同样生效。
+
+通用 `DataRequest<T>` request/response 访问进入 pipeline。`NativeGrpcClient` 和 `SignalRRealtimeConnection` 是独立原生入口，显式接收 credential/cancellation/options，并不暗中经过 request pipeline。
 
 ### 2. Pipeline 阶段
 
-推荐阶段：
+Data 1.0 固定管线阶段如下；request context、parent scope token、credential、cache、resilience、capability、handler、transport、result 和 diagnostics 均已进入默认实现：
 
 ```text
-Create request context
--> Attach OperationScope
--> Validate request metadata
--> Check plugin capability
--> Resolve authentication credential
--> Build transport request
+Runtime gate / operation scheduler
+-> Resolve resilience policy
+-> Create DataRequestContext and link optional ParentScope
+-> Check capability/contribution
+-> Resolve credential
 -> Cache lookup
--> Execute resilience policy
--> Send transport request
--> Map transport response
--> Map error
--> Cache write
--> Return DataResult
--> Emit diagnostics
+-> Circuit/rate admission
+-> Optimistic apply
+-> Ordered handlers and transport
+-> Retry or fallback
+-> Optimistic confirm/rollback and invalidation
+-> Cache write and final stale/cancellation check
+-> Return DataResult and emit diagnostics
 ```
 
 第一版用固定阶段，避免复杂动态排序。
 
 ### 3. Request Context
 
-Request context 应包含：
+`DataRequestContext` 包含：
 
 - OperationId。
 - DataClientId。
 - Operation name。
-- Parent scope。
 - CancellationToken。
 - Transport kind。
-- Auth metadata。
-- Cache metadata。
-- Resilience metadata。
-- Plugin contribution。
-- Correlation id。
-- Diagnostics context。
+- Access mode。
+- Attempt。
+- operation-local credential。
+- operation-local `Items`。
+
+Auth/cache/resilience/concurrency/origin 与 `ParentScope` 保存在 `DataRequest<T>`，不会复制进 context。
 
 Request context 不能包含 UI 控件实例。
 
-### 4. OperationScope
+### 4. Operation 生命周期
 
-每次请求都是 Operation。
+每次请求都是逻辑 Operation。实现创建独立 `DataRequestContext` 和 linked cancellation source；Core `LifecycleScope` 仅作为可选 parent owner，不为短暂请求额外创建一棵 scope 子树。
 
 规则：
 
-- 调用方没有提供 OperationScope 时，Data 创建一个。
+- 调用方可提供 `ParentScope`；pipeline 为每次请求创建并释放 linked cancellation source。
 - 请求取消应联动 parent scope cancellation token。
-- OperationScope 停止后禁止提交结果。
+- ParentScope 停止后返回 `StaleSuppressed`，禁止 cache/optimistic commit。
 - Operation 完成、失败、取消都要记录诊断。
 
 ### 5. Handler
@@ -129,13 +130,14 @@ Request context 不能包含 UI 控件实例。
 - Handler 不访问 UI。
 - Handler 必须尊重 cancellation token。
 - Handler 异常进入 DataError mapping。
+- 每个 handler 在一次 attempt 内最多调用 continuation 一次。
+- handler source 或 capability authorizer 异常在 transport 前映射为 `PolicyRejected` 并记录诊断。
 - 插件 handler 必须绑定插件 contribution。
 
 ### 6. 结果提交
 
 结果提交前必须检查：
 
-- OperationScope 是否仍 running。
 - Parent ActivationScope / RouteScope 是否仍有效。
 - Plugin contribution 是否仍 active。
 - 当前 operation 是否被并发策略允许提交。
@@ -154,7 +156,7 @@ Request context 不能包含 UI 控件实例。
 
 ### 8. 测试策略
 
-测试必须覆盖：
+当前测试覆盖 fixed pipeline、credential/cache short-circuit、retry、transport mapping、timeout/cancel、stale suppression、handler/capability/metadata 和 Host-stopping gate：
 
 - handler 顺序。
 - credential 注入。
@@ -162,4 +164,4 @@ Request context 不能包含 UI 控件实例。
 - retry 包裹 transport。
 - transport error mapping。
 - stale result suppression。
-- OperationScope 取消。
+- ParentScope 取消与 Host runtime stop/drain。

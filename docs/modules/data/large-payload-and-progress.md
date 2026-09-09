@@ -19,7 +19,7 @@
 
 ## 运行时边界
 
-- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- `DataConnectionOwnerKind` 只允许 Application、Window、Navigation、Route、Activation、Plugin 或 Manual。
 - 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
 - Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
 - 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
@@ -42,6 +42,7 @@
 | AUC-DATA-004 | SignalR Transport | SignalRDataTransportTests |
 | AUC-DATA-005 | Connection Lifecycle | DataConnectionLifecycleTests |
 | AUC-DATA-006 | Authentication | AccessTokenCredentialProviderTests |
+| AUC-DATA-018 | Large Payload and Progress | DataLargePayloadTests; DataDogfoodTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -59,6 +60,8 @@
 ## AtomUI.City.Data Large Payload and Progress 设计
 
 适用范围：上传、下载、大载荷、进度、range、临时文件、节流、取消和内存约束。
+
+本页描述已完成的 AUC-DATA-018 合同。`DataLargePayloadClient` 提供固定缓冲区流式 IO、节流进度、range/resume、临时文件所有权及取消清理。
 
 ### 1. 定位
 
@@ -95,7 +98,7 @@ Data operation 可以声明：
 
 - 大文件默认流式处理。
 - 不默认把完整 payload 放入内存。
-- 临时文件必须绑定 OperationScope。
+- 临时下载在 operation cancellation/failure 时删除部分文件；成功返回 `DataTemporaryFile` lease，未 Commit 时由调用方 Dispose 删除。
 - Operation 取消时清理临时文件。
 - 插件上传下载不能把 Host stream 长期保存。
 
@@ -122,7 +125,7 @@ Transport progress
 
 ### 7. 测试策略
 
-测试必须覆盖：
+AUC-DATA-018 完成时必须覆盖：
 
 - upload progress。
 - download progress。

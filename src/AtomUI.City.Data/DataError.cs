@@ -10,6 +10,8 @@ public sealed record DataError(
 {
     private DataErrorKind _kind = ValidateKind(Kind);
     private string _message = ValidateMessage(Message);
+    private string? _transportStatus = ValidateOptionalText(TransportStatus, nameof(TransportStatus));
+    private string? _messageKey = ValidateOptionalText(MessageKey, nameof(MessageKey));
     private readonly IReadOnlyList<object?>? _messageArguments =
         MessageArguments is null ? null : Array.AsReadOnly(MessageArguments.ToArray());
 
@@ -23,6 +25,18 @@ public sealed record DataError(
     {
         get => _message;
         init => _message = ValidateMessage(value);
+    }
+
+    public string? TransportStatus
+    {
+        get => _transportStatus;
+        init => _transportStatus = ValidateOptionalText(value, nameof(TransportStatus));
+    }
+
+    public string? MessageKey
+    {
+        get => _messageKey;
+        init => _messageKey = ValidateOptionalText(value, nameof(MessageKey));
     }
 
     public IReadOnlyList<object?>? MessageArguments
@@ -46,5 +60,15 @@ public sealed record DataError(
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
 
         return message;
+    }
+
+    private static string? ValidateOptionalText(string? value, string parameterName)
+    {
+        if (value is not null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(value, parameterName);
+        }
+
+        return value;
     }
 }

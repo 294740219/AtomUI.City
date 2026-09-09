@@ -17,6 +17,10 @@ public sealed record DataCacheKey(
 
     public string OperationName { get; init; } = Require(OperationName, nameof(OperationName));
 
+    public DataTransportKind TransportKind { get; init; } = Validate(TransportKind, nameof(TransportKind));
+
+    public DataAccessMode AccessMode { get; init; } = Validate(AccessMode, nameof(AccessMode));
+
     public string RequestFingerprint { get; init; } = Require(RequestFingerprint, nameof(RequestFingerprint));
 
     public string AuthenticationScheme { get; init; } = Require(AuthenticationScheme, nameof(AuthenticationScheme));
@@ -39,6 +43,10 @@ public sealed record DataCacheKey(
         ArgumentNullException.ThrowIfNull(request);
         ArgumentException.ThrowIfNullOrWhiteSpace(authenticationScheme);
 
+        var pluginContributionId = request.Origin.Kind == DataRequestOriginKind.Plugin
+            ? request.Origin.ContributionId
+            : request.Cache.PluginContributionId;
+
         return new DataCacheKey(
             request.ClientId,
             request.OperationName,
@@ -48,7 +56,7 @@ public sealed record DataCacheKey(
             authenticationScheme,
             request.Cache.PrincipalRevision,
             request.Cache.PermissionRevision,
-            request.Cache.PluginContributionId,
+            pluginContributionId,
             request.Cache.ClientVersion,
             request.Cache.PolicyVersion);
     }
@@ -68,5 +76,13 @@ public sealed record DataCacheKey(
         }
 
         return value;
+    }
+
+    private static TEnum Validate<TEnum>(TEnum value, string parameterName)
+        where TEnum : struct, Enum
+    {
+        return Enum.IsDefined(value)
+            ? value
+            : throw new ArgumentOutOfRangeException(parameterName, value, "Data cache key enum value is not supported.");
     }
 }

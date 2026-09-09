@@ -19,7 +19,7 @@
 
 ## 运行时边界
 
-- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- `DataConnectionOwnerKind` 只允许 Application、Window、Navigation、Route、Activation、Plugin 或 Manual。
 - 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
 - Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
 - 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
@@ -58,7 +58,9 @@
 
 ## AtomUI.City.Data State Integration 设计
 
-适用范围：Data 与 State 的显式更新、状态投影、OperationScope、UI 线程和错误边界。
+适用范围：Data 与 State 的显式更新、状态投影、ParentScope/cancellation、UI 线程和错误边界。
+
+本页是跨模块集成合同，不代表 Data 直接依赖或自动写入 State。调用方必须在检查 `DataResult` 后显式使用 State writer；需要统一提交时可通过 ordered `IDataRequestHandler` 实现应用级 adapter。
 
 ### 1. 定位
 
@@ -70,7 +72,7 @@ Data 不隐式写全局 State。请求完成后是否写 State 必须由 ViewMod
 
 ```text
 Command / Data request
--> OperationScope
+-> DataRequestContext + optional ParentScope
 -> DataResult<T>
 -> explicit decision
 -> State writer
@@ -95,11 +97,11 @@ Command / Data request
 
 ### 4. Late Result
 
-OperationScope 取消后不应继续提交状态更新。
+ParentScope 取消或 operation 返回 `Cancelled`/`StaleSuppressed` 后不应继续提交状态更新。
 
 规则：
 
-- 提交 State 前检查 OperationScope。
+- 提交 State 前检查 `DataResult.Status`；绑定 ParentScope 时 pipeline 已将 late result 映射为 `StaleSuppressed`。
 - `LatestWins` 旧结果不能提交 State。
 - Plugin contribution revoked 后不能提交 Host state。
 
@@ -109,7 +111,7 @@ Streaming / SignalR 消息可以显式投影到 State。
 
 规则：
 
-- 投影 mapper 绑定 SubscriptionScope。
+- SignalR mapper 随 `IDataSubscription` 撤销；standalone stream mapper 随 stream Dispose/ParentScope cancellation 结束。
 - mapper 不能访问 UI。
 - mapper 错误进入 diagnostics。
 - backpressure drop 必须可诊断。
@@ -125,7 +127,7 @@ Streaming / SignalR 消息可以显式投影到 State。
 
 ### 7. 测试策略
 
-测试必须覆盖：
+对应跨模块集成能力落地时必须覆盖：
 
 - DataResult 显式写入 State。
 - cancelled operation 不写 State。

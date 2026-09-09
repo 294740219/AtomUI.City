@@ -9,8 +9,8 @@ AtomUI.City.Data 作为 Host 服务或模块贡献接入 Core 生命周期，必
 ## 模块特有状态机
 
 - Request: Created -> Authenticating -> CacheLookup -> Sending -> Mapping -> Completed 或 Failed 或 Cancelled
-- Connection: Created -> Opening -> Open -> Closing -> Closed 或 Faulted
-- Stream: Subscribed -> Active -> Completing -> Completed 或 Cancelled 或 Faulted
+- Connection: Created -> Connecting -> Connected -> Reconnecting / Disconnecting -> Stopped 或 Faulted
+- Stream（AUC-DATA-011/012，Completed）: Subscribed -> Active -> Completing -> Completed 或 Cancelled 或 Faulted
 
 ## 生命周期流程
 
@@ -22,9 +22,9 @@ AtomUI.City.Data 作为 Host 服务或模块贡献接入 Core 生命周期，必
 
 ## Host Shutdown / 执行结束行为
 
-- Host 停止时阻止新操作进入。
+- 使用 `DataModule` 时，Host 停止先关闭请求 runtime gate，再阻止新连接注册并停止已有连接。
 - 取消未完成后台任务。
-- 从 leaf owner 到 root owner 释放资源。
+- connection manager 按全局注册逆序停止连接；插件 lease 在自身边界内先停连接，再等待请求 drain 并撤销 descriptor/client/cache。
 - 释放失败记录诊断并继续释放其他资源。
 
 ## 插件动态变更行为
@@ -35,9 +35,9 @@ AtomUI.City.Data 作为 Host 服务或模块贡献接入 Core 生命周期，必
 
 ## 异常中断行为
 
-- credential provider 不可用：返回 Unauthorized，不调用 transport。
-- transport timeout：返回 Timeout，诊断包含 endpoint 和 operationId。
-- connection owner dispose：取消未完成请求并关闭 connection。
+- credential provider 缺失、失败或 unavailable：返回 `CredentialUnavailable`；明确 required 时返回 `AuthenticationRequired`；两者都不调用 transport。
+- transport timeout：返回 Timeout，诊断包含 operationId；协议 endpoint 不属于 generated descriptor。
+- `StopOwnerAsync` 关闭该 owner 的 connection；普通请求只有在绑定 `ParentScope`、plugin contribution 或 Host runtime gate 时才随对应边界取消。
 - 请求取消：返回 Cancelled，不写缓存和状态。
 
 ## 生命周期测试要求

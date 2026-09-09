@@ -2,7 +2,7 @@ namespace AtomUI.City.Data;
 
 public sealed class DataClientRegistry : IDataClientFactory
 {
-    private readonly Dictionary<Type, IDataClient> _clients = [];
+    private readonly Dictionary<Type, ClientRegistration> _clients = [];
     private readonly IDataDiagnostics? _diagnostics;
     private readonly object _syncRoot = new();
 
@@ -14,24 +14,41 @@ public sealed class DataClientRegistry : IDataClientFactory
     public void Register<TClient>(TClient client)
         where TClient : class, IDataClient
     {
-        ArgumentNullException.ThrowIfNull(client);
+        _ = RegisterCore(client);
+    }
 
+    public IDisposable RegisterOwned<TClient>(TClient client)
+        where TClient : class, IDataClient
+    {
+        return RegisterCore(client);
+    }
+
+    private IDisposable RegisterCore<TClient>(TClient client)
+        where TClient : class, IDataClient
+    {
+        ArgumentNullException.ThrowIfNull(client);
+        var clientId = client.ClientId;
+        ArgumentException.ThrowIfNullOrWhiteSpace(clientId);
+
+        var token = new object();
         lock (_syncRoot)
         {
-            _clients[typeof(TClient)] = client;
+            _clients[typeof(TClient)] = new ClientRegistration(client, clientId, token);
         }
 
-        _diagnostics?.Write(new DataDiagnosticRecord(
+        DataDiagnosticWriter.TryWrite(_diagnostics, new DataDiagnosticRecord(
             DataDiagnosticIds.ClientRegistered,
             $"Data client '{typeof(TClient).FullName}' registered.",
             DataDiagnosticSeverity.Info,
-            ClientId: client.ClientId));
+            ClientId: clientId));
+
+        return new ClientLease(this, typeof(TClient), token, clientId);
     }
 
     public bool Unregister<TClient>()
         where TClient : class, IDataClient
     {
-        IDataClient? removedClient = null;
+        ClientRegistration? removedClient = null;
         lock (_syncRoot)
         {
             if (_clients.Remove(typeof(TClient), out var client))
@@ -42,7 +59,7 @@ public sealed class DataClientRegistry : IDataClientFactory
 
         if (removedClient is null)
         {
-            _diagnostics?.Write(new DataDiagnosticRecord(
+            DataDiagnosticWriter.TryWrite(_diagnostics, new DataDiagnosticRecord(
                 DataDiagnosticIds.ClientUnregistrationMissing,
                 $"Data client '{typeof(TClient).FullName}' could not be unregistered because it is not registered.",
                 DataDiagnosticSeverity.Warning));
@@ -50,7 +67,7 @@ public sealed class DataClientRegistry : IDataClientFactory
             return false;
         }
 
-        _diagnostics?.Write(new DataDiagnosticRecord(
+        DataDiagnosticWriter.TryWrite(_diagnostics, new DataDiagnosticRecord(
             DataDiagnosticIds.ClientUnregistered,
             $"Data client '{typeof(TClient).FullName}' unregistered.",
             DataDiagnosticSeverity.Info,
@@ -66,16 +83,58 @@ public sealed class DataClientRegistry : IDataClientFactory
         {
             if (_clients.TryGetValue(typeof(TClient), out var client))
             {
-                return (TClient)client;
+                return (TClient)client.Client;
             }
         }
 
         var clientTypeName = typeof(TClient).FullName;
-        _diagnostics?.Write(new DataDiagnosticRecord(
+        DataDiagnosticWriter.TryWrite(_diagnostics, new DataDiagnosticRecord(
             DataDiagnosticIds.ClientMissing,
             $"Data client '{clientTypeName}' is not registered.",
             DataDiagnosticSeverity.Warning));
 
         throw new KeyNotFoundException($"Data client '{clientTypeName}' is not registered.");
+    }
+
+    private void RevokeOwned(Type clientType, object token, string clientId)
+    {
+        var removed = false;
+        lock (_syncRoot)
+        {
+            if (_clients.TryGetValue(clientType, out var registration)
+                && ReferenceEquals(registration.Token, token))
+            {
+                _clients.Remove(clientType);
+                removed = true;
+            }
+        }
+
+        if (removed)
+        {
+            DataDiagnosticWriter.TryWrite(_diagnostics, new DataDiagnosticRecord(
+                DataDiagnosticIds.ClientUnregistered,
+                $"Data client '{clientType.FullName}' unregistered by its owner.",
+                DataDiagnosticSeverity.Info,
+                ClientId: clientId));
+        }
+    }
+
+    private sealed record ClientRegistration(IDataClient Client, string ClientId, object Token);
+
+    private sealed class ClientLease(
+        DataClientRegistry registry,
+        Type clientType,
+        object token,
+        string clientId) : IDisposable
+    {
+        private int _disposed;
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) == 0)
+            {
+                registry.RevokeOwned(clientType, token, clientId);
+            }
+        }
     }
 }

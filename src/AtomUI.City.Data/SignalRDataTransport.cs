@@ -20,6 +20,17 @@ public sealed class SignalRDataTransport : IRequestResponseTransport
                     "SignalR transport requires a SignalR data request."));
         }
 
+        var validation = DataTransportRequestValidator.Validate(request, context, Kind);
+        if (validation is not null)
+        {
+            return validation;
+        }
+
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return DataResult<TResponse>.Cancelled();
+        }
+
         try
         {
             var response = await signalRRequest
@@ -31,14 +42,23 @@ public sealed class SignalRDataTransport : IRequestResponseTransport
                     cancellationToken)
                 .ConfigureAwait(false);
 
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return DataResult<TResponse>.Cancelled();
+            }
+
             return DataResult<TResponse>.Success(response);
+        }
+        catch (Exception) when (cancellationToken.IsCancellationRequested)
+        {
+            return DataResult<TResponse>.Cancelled();
         }
         catch (SignalRConnectionClosedException exception)
         {
             return DataResult<TResponse>.Failed(
                 new DataError(
                     DataErrorKind.ConnectionClosed,
-                    exception.Message,
+                    DataErrorMessage.FromException(exception, "SignalR connection closed."),
                     Exception: exception));
         }
         catch (SignalRReconnectFailedException exception)
@@ -46,15 +66,15 @@ public sealed class SignalRDataTransport : IRequestResponseTransport
             return DataResult<TResponse>.Failed(
                 new DataError(
                     DataErrorKind.ReconnectFailed,
-                    exception.Message,
+                    DataErrorMessage.FromException(exception, "SignalR reconnect failed."),
                     Exception: exception));
         }
-        catch (TaskCanceledException exception) when (!cancellationToken.IsCancellationRequested)
+        catch (TaskCanceledException exception)
         {
             return DataResult<TResponse>.Failed(
                 new DataError(
                     DataErrorKind.Timeout,
-                    exception.Message,
+                    DataErrorMessage.FromException(exception, "SignalR invocation timed out."),
                     Exception: exception));
         }
         catch (OperationCanceledException)
@@ -66,7 +86,7 @@ public sealed class SignalRDataTransport : IRequestResponseTransport
             return DataResult<TResponse>.Failed(
                 new DataError(
                     DataErrorKind.TransportError,
-                    exception.Message,
+                    DataErrorMessage.FromException(exception, "SignalR transport failed."),
                     Exception: exception));
         }
     }

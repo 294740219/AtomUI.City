@@ -22,7 +22,7 @@
 
 ## 运行时边界
 
-- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- `DataConnectionOwnerKind` 只允许 Application、Window、Navigation、Route、Activation、Plugin 或 Manual。
 - 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
 - Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
 - 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
@@ -61,7 +61,9 @@
 
 ## AtomUI.City.Data Security Integration 设计
 
-适用范围：Security credential、AccessTokenProvider、401/403、single-flight refresh、用户切换、长连接认证和插件凭据边界。
+适用范围：Security credential、AccessTokenProvider、401/403 状态映射、用户切换、长连接认证和插件凭据边界。
+
+Data 已完成请求前 credential 获取、匿名跳过、状态映射、异常隔离、长连接 principal switch 及插件 capability/revoke。refresh 的触发、并发合并和认证状态发布由具体 Security provider 或应用认证编排器负责；Data 在每次 operation 或连接重建时重新取 credential，但不会因 transport 返回 401 而自动刷新并重放当前 operation。
 
 ### 1. 定位
 
@@ -89,33 +91,34 @@ Data request
 - token provider 非取消异常必须映射为 `Unavailable` credential result，不能泄漏异常到 transport。
 - 插件不能直接读取 Host token。
 
-### 3. Single-flight Refresh
+### 3. Refresh 边界
 
-401 或 unauthenticated 可能触发 refresh。
+Data 只在进入 transport 前调用一次 `IAccessTokenProvider`。具体 provider 可以在这次调用内部刷新 token，并自行实现 single-flight；这不是 Data pipeline 的能力。
 
 ```text
-401 / unauthenticated
--> single-flight refresh
--> pending requests wait
--> refresh success retry
--> refresh failed fail all waiting operations
+Data operation
+-> IAccessTokenProvider.GetTokenAsync
+-> provider optionally refreshes under its own contract
+-> Data attaches returned credential
+-> transport executes once
+-> transport 401 maps to AuthenticationRequired
 ```
 
 规则：
 
-- 同一 principal revision 下并发 refresh 合并。
-- refresh 成功后按 resilience 策略重试。
-- refresh 失败后 waiting operations 返回 AuthenticationExpired 或 AuthenticationRequired。
-- 用户取消不触发 refresh。
+- refresh 是否发生、是否合并并发调用由具体 provider 明确。
+- provider 返回 `Expired` 或 `Required` 时，Data 在 transport 前分别返回 `AuthenticationExpired` 或 `AuthenticationRequired`。
+- transport 返回 401 时，Data 返回 `AuthenticationRequired`，不在同一 operation 中刷新或重试。
+- 应用完成 refresh 后，后续 operation 会重新向 provider 获取 credential。
 
 ### 4. 401 / 403
 
 | 状态 | 语义 | 默认处理 |
 |---|---|---|
-| 401 / Unauthenticated | 认证失效、过期或需要登录。 | refresh / challenge。 |
+| 401 / Unauthenticated | transport 拒绝当前凭据，认证失效或需要登录。 | AuthenticationRequired；由应用认证编排器决定后续 refresh 或 challenge。 |
 | 403 / PermissionDenied | 已认证但权限不足。 | AuthorizationForbidden，不自动重试。 |
 
-403 默认不 refresh，除非 Host 显式配置。
+Data 对 401 和 403 都不自动 refresh。具体 provider 或应用可以在 Data operation 之外执行认证恢复。
 
 ### 5. 长连接认证
 
@@ -125,7 +128,7 @@ gRPC streaming 和 SignalR connection 需要特殊处理。
 
 - token 过期后可能需要结束并重建 stream / connection。
 - 用户切换账号时旧连接必须关闭。
-- refresh 期间是否暂停发送由 connection policy 决定。
+- provider refresh 期间是否暂停业务发送由应用连接策略决定，Data 不自动协调。
 - reconnect 后是否重新订阅由 subscription policy 决定。
 
 ### 6. 插件凭据边界
@@ -143,20 +146,22 @@ gRPC streaming 和 SignalR connection 需要特殊处理。
 
 | 场景 | 默认处理 |
 |---|---|
-| credential unavailable | AuthenticationRequired。 |
-| refresh failed | AuthenticationExpired 或 AuthenticationRequired。 |
+| credential provider 缺失、失败或 unavailable | CredentialUnavailable。 |
+| credential provider 明确返回 required | AuthenticationRequired。 |
+| credential provider 返回 expired / required | AuthenticationExpired / AuthenticationRequired。 |
+| transport 返回 401 | AuthenticationRequired，不自动重放当前 operation。 |
 | 403 | AuthorizationForbidden。 |
 | 用户切换 | 取消旧用户相关 operations 和 connections。 |
 | 插件 credential callback 撤销 | PluginUnavailable。 |
 
 ### 8. 测试策略
 
-测试必须覆盖：
+当前测试覆盖 credential 注入、匿名跳过、状态映射、provider failure、plugin capability 和 principal switch；认证集成还必须遵守：
 
 - credential 注入。
 - 匿名请求不取 token。
-- 401 single-flight refresh。
-- refresh 失败唤醒等待请求。
-- 403 不 refresh。
+- provider 的 expired / required 状态在 transport 前稳定映射。
+- transport 401 映射为 AuthenticationRequired，且 Data 不自动 refresh 或重放。
+- transport 403 映射为 AuthorizationForbidden，且 Data 不自动 refresh。
 - 用户切换关闭连接。
 - 插件不能读取 Host token。

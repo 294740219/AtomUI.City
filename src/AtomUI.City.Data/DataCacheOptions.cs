@@ -11,7 +11,8 @@ public sealed class DataCacheOptions
         string permissionRevision,
         string? pluginContributionId,
         string clientVersion,
-        string policyVersion)
+        string policyVersion,
+        TimeSpan? timeToLive)
     {
         IsEnabled = isEnabled;
         RequestFingerprint = requestFingerprint;
@@ -20,6 +21,7 @@ public sealed class DataCacheOptions
         PluginContributionId = pluginContributionId;
         ClientVersion = clientVersion;
         PolicyVersion = policyVersion;
+        TimeToLive = timeToLive;
     }
 
     public static DataCacheOptions Disabled { get; } = new(
@@ -29,7 +31,8 @@ public sealed class DataCacheOptions
         permissionRevision: DefaultRevision,
         pluginContributionId: null,
         clientVersion: DefaultRevision,
-        policyVersion: DefaultRevision);
+        policyVersion: DefaultRevision,
+        timeToLive: null);
 
     public bool IsEnabled { get; }
 
@@ -45,19 +48,31 @@ public sealed class DataCacheOptions
 
     public string PolicyVersion { get; }
 
+    public TimeSpan? TimeToLive { get; }
+
     public static DataCacheOptions Enabled(
         string requestFingerprint,
         string principalRevision = "anonymous",
         string permissionRevision = DefaultRevision,
         string? pluginContributionId = null,
         string clientVersion = DefaultRevision,
-        string policyVersion = DefaultRevision)
+        string policyVersion = DefaultRevision,
+        TimeSpan? timeToLive = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(requestFingerprint);
         ArgumentException.ThrowIfNullOrWhiteSpace(principalRevision);
         ArgumentException.ThrowIfNullOrWhiteSpace(permissionRevision);
+        if (pluginContributionId is not null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(pluginContributionId);
+        }
+
         ArgumentException.ThrowIfNullOrWhiteSpace(clientVersion);
         ArgumentException.ThrowIfNullOrWhiteSpace(policyVersion);
+        if (timeToLive is { } duration && duration <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(timeToLive), timeToLive, "Cache time-to-live must be greater than zero.");
+        }
 
         return new DataCacheOptions(
             isEnabled: true,
@@ -66,6 +81,7 @@ public sealed class DataCacheOptions
             permissionRevision,
             pluginContributionId,
             clientVersion,
-            policyVersion);
+            policyVersion,
+            timeToLive);
     }
 }

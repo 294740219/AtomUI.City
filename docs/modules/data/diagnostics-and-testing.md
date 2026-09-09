@@ -22,7 +22,7 @@
 
 ## 运行时边界
 
-- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- `DataConnectionOwnerKind` 只允许 Application、Window、Navigation、Route、Activation、Plugin 或 Manual。
 - 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
 - Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
 - 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
@@ -45,6 +45,7 @@
 | AUC-DATA-004 | SignalR Transport | SignalRDataTransportTests |
 | AUC-DATA-005 | Connection Lifecycle | DataConnectionLifecycleTests |
 | AUC-DATA-006 | Authentication | AccessTokenCredentialProviderTests |
+| AUC-DATA-020 | Testing Infrastructure and Dogfood | DataTestDoublesTests; DataDogfoodTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -71,59 +72,40 @@ Data 必须可诊断、可测试。
 
 ### 2. 诊断字段
 
-必须记录：
+`DataDiagnosticRecord` 的稳定 1.0 portable envelope 直接提供：
 
-- OperationId。
-- OperationScopeId。
+- OperationId / correlation identity。
 - DataClientId。
 - Operation name。
 - Transport kind。
-- Request correlation id。
-- RouteId。
-- ActivationScopeId。
-- PluginId。
-- ContributionId。
-- Auth result。
-- Cache hit/miss。
 - Retry attempt。
-- Timeout / deadline。
-- Backpressure action。
-- Connection state。
-- Transport status。
 - DataError kind。
-- Dispatch target。
-- Duration。
+
+cache、resilience、backpressure、connection、handler、contribution 和 transfer 状态通过稳定诊断码表达。RouteId、ActivationScopeId、PluginId 等上层领域上下文不得硬编码进 Data 基础 record；adapter 通过 operation/client/contribution identity 与对应模块诊断关联。
 
 敏感信息不能写入日志：token、password、完整 credential、完整 authorization header。
 
 ### 3. 测试替身
 
-Testing 包应提供：
+Data 1.0 的通用 test doubles 由 `AtomUI.City.Testing` 提供；协议级行为由 Data headless fixture 验证：
 
-- Fake data client。
-- Fake HTTP transport。
-- Fake gRPC transport。
-- Fake SignalR transport。
-- Test request pipeline。
-- Fake access token provider。
-- Fake cache。
-- Fake resilience policy。
-- Data diagnostics recorder。
-- Test connection manager。
-- Test stream producer。
-- Plugin data client test host。
-- Deterministic scheduler。
+- `ScriptedDataTransport`：脚本化 request/response transport。
+- `ScriptedDataCredentialProvider`：脚本化 credential 结果。
+- `RecordingDataRequestHandler`：记录 handler 调用并可委托后续链路。
+- `FakeDataConnection`：可控制 start/stop 的连接替身。
+
+cache、resilience、stream producer、plugin host 和 protocol server 是测试项目内部 fixture，不属于 `AtomUI.City.Testing` 的公开承诺。`InMemoryDataDiagnostics` 是 Data 正式 API，其默认容量为 4096，满后淘汰最早记录并累计 `DroppedCount`。
 
 ### 4. 竞态测试
 
-必须覆盖：
+并发、streaming、plugin 和 dogfood 测试必须覆盖：
 
 - 请求完成时 Scope 已取消，结果不提交。
 - `CancelPrevious` 旧请求返回晚于新请求。
 - `LatestWins` 只提交最新结果。
 - SignalR handler 在后台线程回调。
 - gRPC stream 慢消费者触发 backpressure。
-- token refresh 并发合并。
+- credential provider 并发调用不绕过 Data capability/runtime gate；token refresh 合并由提供该能力的具体 provider 自行测试证明。
 - 插件卸载时仍有请求、连接、订阅。
 - cache 按 principal 隔离。
 - mutation retry 被禁止。
@@ -131,7 +113,7 @@ Testing 包应提供：
 
 ### 5. Transport 测试
 
-必须覆盖：
+transport 单元测试与真实 headless fixture共同覆盖：
 
 - HTTP 200 / 401 / 403 / 404 / 409 / 5xx。
 - gRPC status mapping。
@@ -148,16 +130,16 @@ Data 测试不得依赖真实 AtomUI/Avalonia UI。
 规则：
 
 - 不要求 UI dispatcher 存在。
-- 使用 deterministic scheduler。
-- 手动推进 stream 和 connection state。
-- 明确断言 dispatch target。
+- 使用受控 transport、credential、connection 和 `TaskCompletionSource` 驱动竞态。
+- 真实 HTTP/gRPC/SignalR 协议由无 UI headless fixture 验证。
+- Data 不提供 UI dispatcher，也不声明 UI dispatch target。
 
 ### 7. 插件卸载测试
 
-必须覆盖：
+插件生命周期测试必须覆盖：
 
 - 插件请求取消。
-- 插件 stream 取消。
+- 插件在途 request 取消并 drain。
 - 插件 SignalR connection stop。
 - 插件 callbacks 清理。
 - 插件 cache revoke。

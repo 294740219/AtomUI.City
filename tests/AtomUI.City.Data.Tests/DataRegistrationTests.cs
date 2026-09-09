@@ -6,6 +6,22 @@ namespace AtomUI.City.Data.Tests;
 public sealed class DataRegistrationTests
 {
     [Fact]
+    public async Task CustomCacheWithoutBulkInvalidationGetsSafeNoOpInvalidator()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IDataRequestCache, MinimalCache>();
+        services.AddData();
+        await using var provider = services.BuildServiceProvider();
+
+        var invalidator = provider.GetRequiredService<IDataCacheInvalidator>();
+        var result = await invalidator.InvalidateAsync(DataCacheInvalidation.All());
+        var diagnostics = provider.GetRequiredService<IDataDiagnostics>();
+
+        Assert.Equal(0, result.RemovedEntryCount);
+        Assert.Contains(diagnostics.Records, record => record.Code == DataDiagnosticIds.CacheInvalidationUnsupported);
+    }
+
+    [Fact]
     public void AddDataRegistersCoreServices()
     {
         var services = new ServiceCollection();
@@ -37,6 +53,8 @@ public sealed class DataRegistrationTests
         var transports = serviceProvider.GetServices<IRequestResponseTransport>().ToArray();
         var clientRegistry = serviceProvider.GetRequiredService<DataClientRegistry>();
         var clientFactory = serviceProvider.GetRequiredService<IDataClientFactory>();
+        var contributionRegistry = serviceProvider.GetRequiredService<DataContributionRegistry>();
+        var capabilityAuthorizer = serviceProvider.GetRequiredService<IDataCapabilityAuthorizer>();
 
         Assert.IsType<InMemoryDataDiagnostics>(diagnostics);
         Assert.Contains(transports, transport => transport is HttpDataTransport);
@@ -46,6 +64,7 @@ public sealed class DataRegistrationTests
             [DataTransportKind.Http, DataTransportKind.Grpc, DataTransportKind.SignalR],
             transports.Select(transport => transport.Kind).OrderBy(kind => kind).ToArray());
         Assert.Same(clientRegistry, clientFactory);
+        Assert.Same(contributionRegistry, capabilityAuthorizer);
     }
 
     [Fact]
@@ -128,6 +147,22 @@ public sealed class DataRegistrationTests
         Assert.Equal(DataErrorKind.CredentialUnavailable, result.Error?.Kind);
     }
 
+    [Fact]
+    public async Task PipelineCapturesTransportKindOnceDuringRegistration()
+    {
+        var transport = new ChangingKindTransport();
+        var pipeline = new DataRequestPipeline(transport);
+
+        var result = await pipeline.SendAsync(new DataRequest<string>(
+            "registration",
+            "stable-kind",
+            DataTransportKind.Http));
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("stable", result.Value);
+        Assert.Equal(1, transport.KindReads);
+    }
+
     private sealed class TestTransport : IRequestResponseTransport
     {
         private readonly string _response;
@@ -152,5 +187,43 @@ public sealed class DataRegistrationTests
                         DataErrorKind.SerializationError,
                         $"Test response cannot be cast to '{typeof(TResponse).FullName}'.")));
         }
+    }
+
+    private sealed class ChangingKindTransport : IRequestResponseTransport
+    {
+        public int KindReads { get; private set; }
+
+        public DataTransportKind Kind => ++KindReads == 1
+            ? DataTransportKind.Http
+            : DataTransportKind.Grpc;
+
+        public ValueTask<DataResult<TResponse>> SendAsync<TResponse>(
+            DataRequest<TResponse> request,
+            DataRequestContext context,
+            CancellationToken cancellationToken = default)
+        {
+            return "stable" is TResponse response
+                ? ValueTask.FromResult(DataResult<TResponse>.Success(response))
+                : throw new InvalidOperationException("Unexpected response type.");
+        }
+    }
+
+    private sealed class MinimalCache : IDataRequestCache
+    {
+        public ValueTask<DataCacheLookup<TResponse>> TryGetAsync<TResponse>(
+            DataCacheKey key,
+            CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult(DataCacheLookup<TResponse>.Miss());
+
+        public ValueTask SetAsync<TResponse>(
+            DataCacheKey key,
+            TResponse? value,
+            CancellationToken cancellationToken = default) =>
+            ValueTask.CompletedTask;
+
+        public ValueTask InvalidateAsync(
+            DataCacheKey key,
+            CancellationToken cancellationToken = default) =>
+            ValueTask.CompletedTask;
     }
 }

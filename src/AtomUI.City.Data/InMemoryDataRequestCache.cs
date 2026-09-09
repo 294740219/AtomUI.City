@@ -2,14 +2,23 @@ using System.Collections.Concurrent;
 
 namespace AtomUI.City.Data;
 
-public sealed class InMemoryDataRequestCache : IDataRequestCache
+public sealed class InMemoryDataRequestCache :
+    IDataExpiringRequestCache,
+    IDataCacheInvalidator,
+    IDataCacheMutationGuard
 {
     private readonly ConcurrentDictionary<DataCacheKey, CacheEntry> _entries = new();
+    private readonly object _mutationSyncRoot = new();
     private readonly IDataDiagnostics? _diagnostics;
+    private readonly TimeProvider _timeProvider;
+    private long _mutationEpoch;
 
-    public InMemoryDataRequestCache(IDataDiagnostics? diagnostics = null)
+    public InMemoryDataRequestCache(
+        IDataDiagnostics? diagnostics = null,
+        TimeProvider? timeProvider = null)
     {
         _diagnostics = diagnostics;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     public ValueTask<DataCacheLookup<TResponse>> TryGetAsync<TResponse>(
@@ -19,12 +28,32 @@ public sealed class InMemoryDataRequestCache : IDataRequestCache
         ArgumentNullException.ThrowIfNull(key);
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (_entries.TryGetValue(key, out var entry) && entry.ResponseType == typeof(TResponse))
+        var now = _timeProvider.GetUtcNow();
+        var expiredRemoved = false;
+        DataCacheLookup<TResponse> result;
+        lock (_mutationSyncRoot)
         {
-            return ValueTask.FromResult(DataCacheLookup<TResponse>.Hit((TResponse?)entry.Value));
+            if (_entries.TryGetValue(key, out var entry)
+                && entry.ExpiresAt is { } expiresAt
+                && expiresAt <= now)
+            {
+                expiredRemoved = _entries.TryRemove(new KeyValuePair<DataCacheKey, CacheEntry>(key, entry));
+                Interlocked.Increment(ref _mutationEpoch);
+            }
+
+            result = !expiredRemoved
+                     && _entries.TryGetValue(key, out entry)
+                     && entry.ResponseType == typeof(TResponse)
+                ? DataCacheLookup<TResponse>.Hit((TResponse?)entry.Value)
+                : DataCacheLookup<TResponse>.Miss();
         }
 
-        return ValueTask.FromResult(DataCacheLookup<TResponse>.Miss());
+        if (expiredRemoved)
+        {
+            WriteInvalidationDiagnostic(key, DataCacheInvalidationReason.Expired, 1);
+        }
+
+        return ValueTask.FromResult(result);
     }
 
     public ValueTask SetAsync<TResponse>(
@@ -35,9 +64,56 @@ public sealed class InMemoryDataRequestCache : IDataRequestCache
         ArgumentNullException.ThrowIfNull(key);
         cancellationToken.ThrowIfCancellationRequested();
 
-        _entries[key] = new CacheEntry(typeof(TResponse), value);
+        return SetAsync(key, value, DataCacheEntryOptions.NoExpiration, cancellationToken);
+    }
+
+    public ValueTask SetAsync<TResponse>(
+        DataCacheKey key,
+        TResponse? value,
+        DataCacheEntryOptions options,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        ArgumentNullException.ThrowIfNull(options);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var expiresAt = options.TimeToLive is { } ttl
+            ? _timeProvider.GetUtcNow().Add(ttl)
+            : (DateTimeOffset?)null;
+        lock (_mutationSyncRoot)
+        {
+            _entries[key] = new CacheEntry(typeof(TResponse), value, expiresAt);
+        }
 
         return ValueTask.CompletedTask;
+    }
+
+    long IDataCacheMutationGuard.CaptureMutationEpoch() => Volatile.Read(ref _mutationEpoch);
+
+    ValueTask<bool> IDataCacheMutationGuard.TrySetIfUnchangedAsync<TResponse>(
+        DataCacheKey key,
+        TResponse? value,
+        DataCacheEntryOptions options,
+        long expectedEpoch,
+        CancellationToken cancellationToken)
+        where TResponse : default
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        ArgumentNullException.ThrowIfNull(options);
+        cancellationToken.ThrowIfCancellationRequested();
+        var expiresAt = options.TimeToLive is { } ttl
+            ? _timeProvider.GetUtcNow().Add(ttl)
+            : (DateTimeOffset?)null;
+        lock (_mutationSyncRoot)
+        {
+            if (_mutationEpoch != expectedEpoch)
+            {
+                return ValueTask.FromResult(false);
+            }
+
+            _entries[key] = new CacheEntry(typeof(TResponse), value, expiresAt);
+            return ValueTask.FromResult(true);
+        }
     }
 
     public ValueTask InvalidateAsync(
@@ -47,17 +123,62 @@ public sealed class InMemoryDataRequestCache : IDataRequestCache
         ArgumentNullException.ThrowIfNull(key);
         cancellationToken.ThrowIfCancellationRequested();
 
-        _entries.TryRemove(key, out _);
-        _diagnostics?.Write(new DataDiagnosticRecord(
-            DataDiagnosticIds.CacheInvalidated,
-            $"Data operation '{key.OperationName}' cache entry invalidated.",
-            DataDiagnosticSeverity.Info,
-            ClientId: key.ClientId,
-            OperationName: key.OperationName,
-            TransportKind: key.TransportKind));
+        int removed;
+        lock (_mutationSyncRoot)
+        {
+            Interlocked.Increment(ref _mutationEpoch);
+            removed = _entries.TryRemove(key, out _) ? 1 : 0;
+        }
+
+        WriteInvalidationDiagnostic(key, DataCacheInvalidationReason.Manual, removed);
 
         return ValueTask.CompletedTask;
     }
 
-    private sealed record CacheEntry(Type ResponseType, object? Value);
+    public ValueTask<DataCacheInvalidationResult> InvalidateAsync(
+        DataCacheInvalidation invalidation,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(invalidation);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        int removed;
+        DataCacheKey? sample;
+        lock (_mutationSyncRoot)
+        {
+            Interlocked.Increment(ref _mutationEpoch);
+            removed = 0;
+            sample = null;
+            foreach (var entry in _entries)
+            {
+                if (!invalidation.Matches(entry.Key)
+                    || !_entries.TryRemove(new KeyValuePair<DataCacheKey, CacheEntry>(entry.Key, entry.Value)))
+                {
+                    continue;
+                }
+
+                sample ??= entry.Key;
+                removed++;
+            }
+        }
+
+        WriteInvalidationDiagnostic(sample, invalidation.Reason, removed);
+        return ValueTask.FromResult(new DataCacheInvalidationResult(removed));
+    }
+
+    private void WriteInvalidationDiagnostic(
+        DataCacheKey? key,
+        DataCacheInvalidationReason reason,
+        int removed)
+    {
+        DataDiagnosticWriter.TryWrite(_diagnostics, new DataDiagnosticRecord(
+            DataDiagnosticIds.CacheInvalidated,
+            $"Data cache invalidation '{reason}' removed {removed} entr{(removed == 1 ? "y" : "ies")}.",
+            DataDiagnosticSeverity.Info,
+            ClientId: key?.ClientId,
+            OperationName: key?.OperationName,
+            TransportKind: key?.TransportKind));
+    }
+
+    private sealed record CacheEntry(Type ResponseType, object? Value, DateTimeOffset? ExpiresAt);
 }

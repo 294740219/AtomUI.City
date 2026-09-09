@@ -19,7 +19,7 @@
 
 ## 运行时边界
 
-- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- `DataConnectionOwnerKind` 只允许 Application、Window、Navigation、Route、Activation、Plugin 或 Manual。
 - 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
 - Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
 - 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
@@ -42,6 +42,8 @@
 | AUC-DATA-004 | SignalR Transport | SignalRDataTransportTests |
 | AUC-DATA-005 | Connection Lifecycle | DataConnectionLifecycleTests |
 | AUC-DATA-006 | Authentication | AccessTokenCredentialProviderTests |
+| AUC-DATA-011 | Native gRPC and Streaming | DataStreamingTests; DataDogfoodTests |
+| AUC-DATA-012 | SignalR Realtime Connection | DataDogfoodTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -60,6 +62,8 @@
 
 适用范围：gRPC streaming、SignalR server push、subscription、backpressure、状态投影和 EventBus 边界。
 
+本页描述已完成的 AUC-DATA-011/012 合同。源码同时保留委托式 unary/invocation adapter，并提供官方 gRPC/SignalR client、stream/subscription dispatcher、有界 backpressure、重连与 owner 生命周期。
+
 ### 1. 定位
 
 Streaming 和 realtime 是 Data 的一等访问模式。
@@ -76,7 +80,7 @@ Streaming 和 realtime 是 Data 的一等访问模式。
 
 规则：
 
-- server stream item 必须经过 Data subscription dispatcher。
+- server stream item 必须经过有界 `DataStream` pump；SignalR server message 经过 `DataSubscription` dispatcher。
 - client stream 写入必须响应 cancellation。
 - bidi stream 必须同时管理读取和写入取消。
 - deadline / cancellation 必须进入 call options。
@@ -91,7 +95,7 @@ Streaming 和 realtime 是 Data 的一等访问模式。
 - Server event subscription。
 - Reconnect policy。
 - Connection state observable。
-- Token refresh / reconnect。
+- Principal switch / reconnect；token refresh 由 Security credential provider 在重建连接前负责。
 
 SignalR 不替代 EventBus：
 
@@ -118,17 +122,11 @@ Streaming 和 realtime 必须声明 backpressure policy。
 
 默认不允许无限缓冲。
 
-### 5. SubscriptionScope
+### 5. 生命周期绑定
 
-每个 streaming subscription 或 SignalR server handler 都必须绑定 Scope。
-
-Scope 停止时：
-
-- 停止接收新消息。
-- 取消 stream。
-- 释放 handler。
-- 清理 buffer。
-- 停止结果投递。
+- standalone `DataStream` 的 `ParentScope` 是可选项；设置后 Scope cancellation 会结束 pump，未设置时调用方必须 `DisposeAsync`。
+- SignalR subscription 没有独立 `SubscriptionScope` 类型；它由 `SignalRRealtimeConnection` 持有，并在 connection stop、principal switch 或 dispose 时撤销。
+- `DataConnectionOwner` 是 manager 的逻辑所有权标签，不会自动订阅某个 Core Scope；应用必须在对应 Scope stop hook 中调用 `StopOwnerAsync`，插件贡献则由 `DataContributionLease` 自动撤销。
 
 ### 6. 状态投影
 
@@ -136,10 +134,10 @@ Streaming 和 SignalR 默认不缓存原始消息。
 
 允许：
 
-- latest snapshot。
 - bounded buffer。
 - 显式 State projection。
 - 显式 EventBus publish。
+- 应用 adapter 自行维护的 latest snapshot。
 
 禁止：
 
@@ -151,19 +149,20 @@ Streaming 和 SignalR 默认不缓存原始消息。
 
 | 场景 | 默认处理 |
 |---|---|
-| stream cancel | StreamCancelled，不作为失败。 |
-| stream completed | StreamCompleted。 |
+| 本地 stream cancel/dispose | 正常终止 pump，不发布 failed item。 |
+| 远端 RPC cancelled | 映射 `StreamCancelled` terminal error。 |
+| stream completed | 正常完成，不创建 DataError 或 failed DataResult；旧 `DataErrorKind.StreamCompleted` 已废弃。 |
 | backpressure drop | 记录 drop diagnostics。 |
 | handler 抛异常 | 记录错误，按 subscription error policy 处理。 |
 | reconnect failed | ReconnectFailed。 |
 
 ### 8. 测试策略
 
-测试必须覆盖：
+AUC-DATA-011/012 完成时必须覆盖：
 
 - server streaming 正常完成。
 - stream cancellation。
 - SignalR server push。
 - backpressure DropOldest。
 - LatestOnly 只投递最新状态。
-- subscription scope 停止后不再投递。
+- parent scope 取消 stream；connection stop 后撤销 subscription 并拒绝新 subscription。

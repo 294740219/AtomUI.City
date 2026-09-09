@@ -19,7 +19,7 @@
 
 ## 运行时边界
 
-- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- `DataConnectionOwnerKind` 只允许 Application、Window、Navigation、Route、Activation、Plugin 或 Manual。
 - 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
 - Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
 - 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
@@ -42,6 +42,8 @@
 | AUC-DATA-004 | SignalR Transport | SignalRDataTransportTests |
 | AUC-DATA-005 | Connection Lifecycle | DataConnectionLifecycleTests |
 | AUC-DATA-006 | Authentication | AccessTokenCredentialProviderTests |
+| AUC-DATA-007 | Request Cache Baseline | DataRequestCacheTests; DataCacheConsistencyTests; DataPipelineTests |
+| AUC-DATA-015 | Cache Consistency and Invalidation | DataCacheConsistencyTests; DataPluginLifecycleTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -58,11 +60,13 @@
 
 ## AtomUI.City.Data Caching 设计
 
-适用范围：request cache、response cache、snapshot cache、principal 隔离、插件缓存撤销和缓存诊断。
+适用范围：request result cache、principal 隔离、插件缓存撤销和缓存诊断。
 
 ### 1. 定位
 
 Data cache 用于减少重复请求和提升响应速度。
+
+线程安全内存缓存已支持 canonical identity、TTL、精确 key 与 operation/principal/permission/plugin/client-version/policy-version 等多来源批量失效。默认 pipeline/cache 通过 mutation epoch 防止失效前开始的在途 query 在失效后重新写入陈旧缓存。
 
 Cache 不是 State。Cache 是数据访问层优化；State 是应用状态表达。Data 不应把所有响应自动写入全局 State。
 
@@ -70,10 +74,9 @@ Cache 不是 State。Cache 是数据访问层优化；State 是应用状态表�
 
 | 类型 | 说明 |
 |---|---|
-| Request cache | 同一请求 key 的短期结果缓存。 |
-| Response cache | HTTP response 或 transport response cache。 |
-| Snapshot cache | streaming / realtime 的 latest snapshot。 |
-| Entity cache | 可选高风险能力，第一版只定义扩展点。 |
+| Request result cache | pipeline query 的 typed result 缓存，可配置 TTL。 |
+| Streaming / realtime snapshot | 不属于 Data 1.0 cache；由应用 adapter 或 State 显式维护。 |
+| Entity cache | 不属于 Data 1.0 contract。 |
 
 ### 3. 缓存 key
 
@@ -92,17 +95,13 @@ Cache 不是 State。Cache 是数据访问层优化；State 是应用状态表�
 用户 A 的缓存不能被用户 B 读到。
 `DataCacheKey` 的 required string components 必须拒绝 `null`、空字符串和空白字符串，`PluginContributionId` 可以为 `null` 但不能是空白字符串。
 
+插件来源请求的 `PluginContributionId` 由 pipeline 从签发的 active origin 自动写入 cache key；调用方显式声明不同 contribution id 时必须在 cache lookup 前返回 `PolicyRejected`。
+
 ### 4. Streaming 和 SignalR
 
 Streaming 和 SignalR 默认不缓存原始消息。
 
-允许：
-
-- latest snapshot。
-- bounded buffer。
-- explicit state projection。
-
-不允许无限消息缓存。
+`DataStream`/`DataSubscription` 只提供有界 buffer 和 backpressure，不接入 `IDataRequestCache`。latest snapshot 与 state projection 由应用显式实现；Data 不提供无限消息缓存。
 
 ### 5. 失效
 
@@ -113,12 +112,14 @@ Streaming 和 SignalR 默认不缓存原始消息。
 - Permission / capability revision change。
 - Plugin contribution revoked。
 - Client version changed。
+- Policy version changed。
+- Operation/client targeted invalidation。
 - Manual invalidation。
 - TTL expired。
 
 ### 6. 插件缓存
 
-插件 client 缓存必须带 PluginId 和 ContributionId。
+插件 client 缓存必须带全局唯一的 ContributionId；pipeline 从 Host 签发的 origin 自动绑定该值。
 
 插件停用时：
 
@@ -127,7 +128,6 @@ Stop new plugin data operations
 -> cancel running operations
 -> revoke client descriptors
 -> invalidate plugin cache entries
--> dispose cache handles
 ```
 
 ### 7. 错误策略
@@ -136,12 +136,12 @@ Stop new plugin data operations
 |---|---|
 | cache read failed | 记录诊断，继续请求 transport。 |
 | cache write failed | 返回请求结果，记录诊断。 |
-| cache key 缺少 principal | 拒绝缓存。 |
+| cache key principal/revision 为空白 | 构造时拒绝；省略 principal 时显式使用 `anonymous` 默认值。 |
 | 插件缓存撤销失败 | 聚合错误，继续撤销其他资源。 |
 
 ### 8. 测试策略
 
-测试必须覆盖：
+当前测试覆盖精确 key、value equality、principal isolation、hit/miss、TTL 和多来源批量失效：
 
 - cache hit / miss。
 - principal 隔离。
@@ -149,4 +149,5 @@ Stop new plugin data operations
 - permission revision 失效。
 - mutation 后失效。
 - plugin cache revoke。
-- streaming snapshot cache。
+- 精确 key 失效的真实删除计数与 null key 拒绝。
+- 在途 query 跨越 invalidation 时跳过 stale cache write。

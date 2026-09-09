@@ -21,15 +21,15 @@ AtomUI.City.Data 的架构目标是把模块职责变成可实现、可测试、
 | --- | --- | --- | --- |
 | DataRequest<TResponse> | 统一请求模型。 | 调用方 | 单次请求有效。 |
 | DataRequestContext | operationId、transport、client、attempt、cancellation。 | Pipeline | 单次请求有效。 |
-| IDataRequestPipeline | 认证、缓存、传输、重试和错误映射。 | DI | Host stop 释放。 |
+| IDataRequestPipeline | 认证、缓存、传输、重试和错误映射。 | DI | 默认 pipeline 随 DI provider；`DataModule` shutdown 先关闭 runtime gate，再停止连接。 |
 | IRequestResponseTransport | HTTP/gRPC/SignalR 传输。 | DI 或 client registry | 随 DI 或 owner。 |
-| DataConnectionManager | 长连接注册、启动、停止。 | DI | Host/plugin owner stop 释放。 |
+| DataConnectionManager | 长连接注册、启动、停止。 | DI | `DataModule` 在 Host shutdown 调用 StopAll；普通 owner 显式 StopOwner/revoke，Plugin owner 由 contribution lease 自动撤销。 |
 
 ## 产品级状态机
 
 - Request: Created -> Authenticating -> CacheLookup -> Sending -> Mapping -> Completed 或 Failed 或 Cancelled
-- Connection: Created -> Opening -> Open -> Closing -> Closed 或 Faulted
-- Stream: Subscribed -> Active -> Completing -> Completed 或 Cancelled 或 Faulted
+- Connection: Created -> Connecting -> Connected -> Reconnecting / Disconnecting -> Stopped 或 Faulted
+- Stream（AUC-DATA-011/012，Completed）: Subscribed -> Active -> Completing -> Completed 或 Cancelled 或 Faulted
 
 ## 关键运行流程
 
@@ -41,9 +41,9 @@ AtomUI.City.Data 的架构目标是把模块职责变成可实现、可测试、
 
 ## 失败矩阵
 
-- credential provider 不可用：返回 Unauthorized，不调用 transport。
-- transport timeout：返回 Timeout，诊断包含 endpoint 和 operationId。
-- connection owner dispose：取消未完成请求并关闭 connection。
+- credential provider 缺失、失败或 unavailable：返回 CredentialUnavailable；明确 required 时返回 AuthenticationRequired；两者都不调用 transport。
+- transport timeout：返回 Timeout，诊断包含 operationId；descriptor endpoint 由 AUC-DATA-016/019 补齐。
+- connection owner stop：关闭该 owner 的 connection；请求取消另由 ParentScope、plugin contribution 或 Host runtime gate 传播。
 - 请求取消：返回 Cancelled，不写缓存和状态。
 
 ## 性能和资源边界
@@ -57,7 +57,7 @@ AtomUI.City.Data 的架构目标是把模块职责变成可实现、可测试、
 flowchart LR
     Boundary["Host runtime data pipeline"] --> Module["AtomUI.City.Data"]
     Module --> Contracts["Public Contracts"]
-    Module --> State["State / Manifest / Snapshot"]
+    Module -. explicit application adapter .-> State["State projection"]
     Module --> Diagnostics["Diagnostics"]
     Module --> Tests["Product Contract Tests"]
 ```

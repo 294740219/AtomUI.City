@@ -19,7 +19,7 @@
 
 ## 运行时边界
 
-- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- `DataConnectionOwnerKind` 只允许 Application、Window、Navigation、Route、Activation、Plugin 或 Manual。
 - 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
 - Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
 - 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
@@ -42,6 +42,8 @@
 | AUC-DATA-004 | SignalR Transport | SignalRDataTransportTests |
 | AUC-DATA-005 | Connection Lifecycle | DataConnectionLifecycleTests |
 | AUC-DATA-006 | Authentication | AccessTokenCredentialProviderTests |
+| AUC-DATA-011 | Native gRPC and Streaming | DataStreamingTests; DataDogfoodTests |
+| AUC-DATA-012 | SignalR Realtime Connection | DataDogfoodTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -64,7 +66,7 @@
 
 Transport 是 Data 与外部数据源交互的传输层抽象。
 
-Data 第一版必须支持：
+Data 1.0 目标必须支持；当前完成度以 [features.md](features.md) 为准：
 
 - HTTP request / response。
 - gRPC unary 和 streaming。
@@ -77,8 +79,10 @@ Transport 只负责传输，不负责业务状态，不解释权限，不直接�
 | 类型 | 说明 | 代表实现 |
 |---|---|---|
 | `IRequestResponseTransport` | 单次请求/响应。 | HTTP、gRPC unary、SignalR hub invoke。 |
-| `IStreamingTransport` | 有开始和结束的 stream。 | gRPC server/client/bidi streaming。 |
+| `NativeGrpcClient` + `IDataStream<T>` | 有开始和结束的 typed stream。 | gRPC server/client/bidi streaming。 |
 | `IRealtimeConnectionTransport` | 长连接和实时推送。 | SignalR HubConnection。 |
+
+`IRequestResponseTransport` 承载 HTTP 和委托兼容 adapter；`NativeGrpcClient`/`IDataStream<T>` 与 `IRealtimeConnectionTransport` 分别承载原生 gRPC streaming 和 SignalR realtime public contract。
 
 Transport 分类影响生命周期、取消、错误映射、缓存和测试策略。
 
@@ -88,8 +92,10 @@ Request / Response transport 输出 `DataResult<T>`。
 
 规则：
 
-- 每次调用绑定 OperationScope。
+- 每次调用创建独立 `DataRequestContext` 逻辑 operation transaction，并联动可选 `ParentScope` token。
 - 必须接收 `CancellationToken`。
+- 直接调用 transport 时，`DataRequestContext` 必须由同一个 request 创建；不匹配时返回 `PolicyRejected`，防止跨 operation 误用 credential/metadata。
+- 已取消 token 不得进入 request factory、response mapper 或 transport invoker；外部调用返回后必须再次观察取消。
 - 必须支持 timeout。
 - 可以使用 retry、cache 和 error mapping。
 - 结果提交前必须检查 parent scope。
@@ -100,11 +106,11 @@ Streaming transport 输出 stream handle 或 async stream abstraction。
 
 规则：
 
-- stream 必须有 owner scope。
+- standalone `DataStream` 可通过 `DataStreamOptions.ParentScope` 绑定取消；gRPC stream 的底层 channel 必须声明 connection owner。
 - stream 必须支持取消。
 - stream item 回调不能直接访问 UI。
 - stream 必须有 backpressure policy。
-- stream 完成、取消和失败都要进入诊断。
+- stream 正常完成和失败进入诊断；本地 cancellation/dispose 正常结束 pump，不伪造 failed item。
 
 ### 5. Realtime Connection
 
@@ -120,19 +126,12 @@ Realtime connection transport 输出 `IDataConnection`。
 
 ### 6. Transport Metadata
 
-Transport descriptor 应包含：
+传输 metadata 分层承载：
 
-- Transport kind。
-- Client id。
-- Operation id。
-- Auth scheme。
-- Timeout / deadline。
-- Retry policy。
-- Cache policy。
-- Streaming metadata。
-- Connection lifetime。
-- Plugin contribution。
-- Serializer。
+- `DataRequest<T>`：transport/client/operation/access、auth、cache、resilience、concurrency、consistency、origin 和可选 `ParentScope`。
+- `DataRequestContext`：每次调用的 operation id、attempt、cancellation 和已解析 credential。
+- `HttpDataRequest`、`NativeGrpcDataRequest`、`SignalRDataRequest`：各协议的 factory/invoker 与映射逻辑。
+- generated `DataClientDescriptor` / `DataOperationDescriptor`：静态 client/operation metadata，不包含 endpoint、runtime operation id、serializer 或 connection 实例。
 
 ### 7. 错误映射
 
@@ -146,13 +145,11 @@ Transport 层错误必须映射成 DataError。
 
 ### 8. 测试策略
 
-Testing 包应提供：
+Data 1.0 的公开替身由 `AtomUI.City.Testing` 提供：
 
-- Fake request/response transport。
-- Fake streaming transport。
-- Fake realtime connection transport。
-- Controlled connection state。
-- Controlled stream producer。
-- Transport error injection。
+- `ScriptedDataTransport`。
+- `ScriptedDataCredentialProvider`。
+- `RecordingDataRequestHandler`。
+- `FakeDataConnection`。
 
-测试必须覆盖三类 transport 的成功、失败、取消、超时和 lifecycle stop。
+测试项目内部的受控 stream/server fixture 不构成公开 API。当前测试覆盖 request/response transport 的成功、失败、取消、超时、context 边界以及 streaming/realtime lifecycle；真实协议链路由 Data headless fixture 覆盖。

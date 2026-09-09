@@ -22,7 +22,7 @@
 
 ## 运行时边界
 
-- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- `DataConnectionOwnerKind` 只允许 Application、Window、Navigation、Route、Activation、Plugin 或 Manual。
 - 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
 - Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
 - 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
@@ -45,6 +45,7 @@
 | AUC-DATA-004 | SignalR Transport | SignalRDataTransportTests |
 | AUC-DATA-005 | Connection Lifecycle | DataConnectionLifecycleTests |
 | AUC-DATA-006 | Authentication | AccessTokenCredentialProviderTests |
+| AUC-DATA-013 | Operation Concurrency Policies | DataConcurrencyTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -66,6 +67,8 @@
 ### 1. 定位
 
 Data operation 必须明确并发行为。
+
+`DataRequestPipeline` 通过 `IDataOperationScheduler` 执行以下六种策略；Queue/KeyedSerial 使用有界显式 FIFO，取消与结果抑制具有确定性。
 
 桌面应用中搜索、保存、自动刷新、导航预取、SignalR 重连和插件请求经常并发发生。如果没有统一策略，就会出现旧结果覆盖新结果、重复保存、重复刷新和不可诊断的竞态。
 
@@ -93,6 +96,7 @@ Data operation 必须明确并发行为。
 - 只有最新 sequence 的结果允许提交。
 - 旧请求完成后结果被抑制。
 - 旧请求可以选择不取消，但不能写状态。
+- scheduler 释放会取消仍在运行的请求；并发释放与完成不得访问已经释放的 cancellation source。
 
 ### 4. CancelPrevious
 
@@ -100,9 +104,10 @@ Data operation 必须明确并发行为。
 
 规则：
 
-- 新请求到来时取消旧 OperationScope。
+- 新请求到来时取消旧 operation 的 linked cancellation token。
 - 旧请求返回 Cancelled。
 - 如果 transport 无法立即取消，返回后也必须 suppress result。
+- scheduler 释放会取消仍在运行的请求；并发替换、完成与释放共享同一个幂等 cancellation transaction。
 
 ### 5. Queue
 
@@ -137,7 +142,7 @@ Data operation 必须明确并发行为。
 
 ### 8. 测试策略
 
-测试必须覆盖：
+AUC-DATA-013 完成时必须覆盖：
 
 - 并发请求允许。
 - DisallowConcurrent 拒绝。

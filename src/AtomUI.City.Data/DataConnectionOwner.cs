@@ -4,6 +4,11 @@ public readonly record struct DataConnectionOwner
 {
     public DataConnectionOwner(DataConnectionOwnerKind kind, string id)
     {
+        if (!Enum.IsDefined(kind))
+        {
+            throw new ArgumentOutOfRangeException(nameof(kind), kind, "Data connection owner kind is not supported.");
+        }
+
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
 
         Kind = kind;

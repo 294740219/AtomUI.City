@@ -6,6 +6,18 @@ namespace AtomUI.City.Data.Tests;
 public sealed class AccessTokenCredentialProviderTests
 {
     [Fact]
+    public void CredentialStringRepresentationDoesNotExposeSecret()
+    {
+        var credential = DataCredential.Bearer("top-secret-token");
+
+        var text = credential.ToString();
+
+        Assert.Contains("Bearer", text, StringComparison.Ordinal);
+        Assert.Contains("[REDACTED]", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("top-secret-token", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task AnonymousAuthenticationReturnsNoneWithoutRequestingToken()
     {
         var requests = 0;
@@ -122,6 +134,23 @@ public sealed class AccessTokenCredentialProviderTests
 
         Assert.Equal(DataCredentialResultStatus.Unavailable, result.Status);
         Assert.Equal("token store failed", result.Message);
+    }
+
+    [Fact]
+    public async Task NullAccessTokenResultMapsToUnavailableCredential()
+    {
+        var provider = new AccessTokenCredentialProvider(
+            new DelegateAccessTokenProvider((_, _) =>
+                ValueTask.FromResult<AccessTokenResult>(null!)));
+
+        var result = await provider.GetCredentialAsync(
+            new DataAuthenticationContext(
+                "catalog",
+                "secure-items",
+                DataAuthenticationOptions.Bearer()));
+
+        Assert.Equal(DataCredentialResultStatus.Unavailable, result.Status);
+        Assert.Contains("null", result.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     private static AccessTokenResult CreateTokenResult(AccessTokenResultStatus status)

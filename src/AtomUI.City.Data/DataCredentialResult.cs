@@ -9,7 +9,7 @@ public sealed class DataCredentialResult
     {
         Status = status;
         Credential = credential;
-        Message = message;
+        Message = ValidateOptionalMessage(message);
     }
 
     public DataCredentialResultStatus Status { get; }
@@ -50,6 +50,16 @@ public sealed class DataCredentialResult
     public static DataCredentialResult Cancelled(string? message = null)
     {
         return new DataCredentialResult(DataCredentialResultStatus.Cancelled, credential: null, message);
+    }
+
+    private static string? ValidateOptionalMessage(string? message)
+    {
+        if (message is not null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(message);
+        }
+
+        return message;
     }
 }
 

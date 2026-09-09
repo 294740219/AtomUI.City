@@ -32,17 +32,34 @@
 | `AUCDATA018` | ClientUnregistrationMissing | `src/AtomUI.City.Data/Diagnostics.cs` |
 | `AUCDATA019` | RequestStaleSuppressed | `src/AtomUI.City.Data/Diagnostics.cs` |
 | `AUCDATA020` | RequestCancelled | `src/AtomUI.City.Data/Diagnostics.cs` |
+| `AUCDATA021` | CircuitOpened | `src/AtomUI.City.Data/Diagnostics.cs` |
+| `AUCDATA022` | CircuitRejected | `src/AtomUI.City.Data/Diagnostics.cs` |
+| `AUCDATA023` | RateLimitRejected | `src/AtomUI.City.Data/Diagnostics.cs` |
+| `AUCDATA024` | FallbackApplied | `src/AtomUI.City.Data/Diagnostics.cs` |
+| `AUCDATA025` | FallbackFailed | `src/AtomUI.City.Data/Diagnostics.cs` |
+| `AUCDATA026` | BackpressureDropped | `src/AtomUI.City.Data/Diagnostics.cs` |
+| `AUCDATA027` | StreamCompleted | `src/AtomUI.City.Data/Diagnostics.cs` |
+| `AUCDATA028` | StreamFailed | `src/AtomUI.City.Data/Diagnostics.cs` |
+| `AUCDATA029` | ContributionRegistered | `src/AtomUI.City.Data/Diagnostics.cs` |
+| `AUCDATA030` | ContributionRevoked | `src/AtomUI.City.Data/Diagnostics.cs` |
+| `AUCDATA031` | ContributionRejected | `src/AtomUI.City.Data/Diagnostics.cs` |
+| `AUCDATA032` | HandlerFailed | `src/AtomUI.City.Data/Diagnostics.cs` |
+| `AUCDATA033` | TransferProgressFailed | `src/AtomUI.City.Data/Diagnostics.cs` |
+| `AUCDATA034` | TransferCompleted | `src/AtomUI.City.Data/Diagnostics.cs` |
+| `AUCDATA035` | CacheInvalidationUnsupported | `src/AtomUI.City.Data/Diagnostics.cs` |
 
 ## 产品级必须诊断的失败
 
-- credential provider 不可用：返回 Unauthorized，不调用 transport。
-- transport timeout：返回 Timeout，诊断包含 endpoint 和 operationId。
-- connection owner dispose：取消未完成请求并关闭 connection。
+- credential provider 缺失、失败或返回 unavailable：返回 `CredentialUnavailable`，不调用 transport；明确要求登录时返回 `AuthenticationRequired`。
+- transport timeout：返回 `Timeout` 并记录 `operationId`；generated descriptor 提供静态 client/operation metadata，不包含 endpoint。
+- connection owner dispose：关闭该 owner 的 connection；request/stream cancellation 由 parent scope 或 contribution lease 传播。
 - 请求取消：返回 Cancelled，不写缓存和状态。
 
 ## 上下文字段
 
-推荐字段：`operationId`、`scopeId`、`module`、`pluginId`、`routeId`、`stateKey`、`eventType`、`handlerType`、`assembly`、`path`、`featureId`、`threadId`、`attempt`、`transportKind`。
+`DataDiagnosticRecord` 的稳定字段是 `Code`、`Message`、`Severity`、`OperationId`、`ClientId`、`OperationName`、`TransportKind`、`Attempt` 和 `ErrorKind`。上层模块通过这些 identity 与自己的 route/plugin/state 诊断关联，不向 Data record 增加领域字段。
+
+默认 `InMemoryDataDiagnostics` 容量为 4096；满载后按 FIFO 淘汰最早记录，并通过 `DroppedCount` 暴露淘汰总数。诊断 sink 异常必须被框架隔离。
 
 ## 诊断缺口处理
 

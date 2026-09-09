@@ -19,7 +19,7 @@
 
 ## 运行时边界
 
-- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- `DataConnectionOwnerKind` 只允许 Application、Window、Navigation、Route、Activation、Plugin 或 Manual。
 - 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
 - Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
 - 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
@@ -60,6 +60,8 @@
 
 适用范围：Resolver 调用 Data、导航取消、ResolveResult 映射、预取、缓存和诊断。
 
+本页是跨模块集成目标，不代表 Data 直接依赖 Routing。调用方通过 `ParentScope` 联动 route scope 取消并抑制 late result；resolver 负责使用 generated descriptor 构造业务请求并显式提交结果。
+
 ### 1. 定位
 
 Routing Resolver 可以调用 Data client，为页面进入准备首屏必需数据。
@@ -98,7 +100,7 @@ Resolver 可以使用 Data cache。
 
 规则：
 
-- Resolver cache 必须绑定 RouteScope、NavigationScope 或 Data cache。
+- Resolver 生命周期数据由 Routing scope 管理；Data query cache 使用显式 revision/key，并在 route leave 需要失效时调用 `IDataCacheInvalidator`。
 - 不使用无边界静态缓存。
 - Journal 恢复时只能复用可序列化快照。
 - Principal change 必须让受保护数据缓存失效。
@@ -108,7 +110,7 @@ Resolver 可以使用 Data cache。
 导航取消时：
 
 - Resolver cancellation token 取消。
-- Data OperationScope 取消。
+- Data request 的 token/ParentScope 联动取消。
 - transport 请求取消。
 - 返回 ResolveResult Cancelled。
 - 不提交 State。
@@ -124,7 +126,7 @@ Resolver 可以使用 Data cache。
 
 ### 7. 测试策略
 
-测试必须覆盖：
+对应跨模块集成能力落地时必须覆盖：
 
 - Resolver Data success。
 - Data NotFound 映射。

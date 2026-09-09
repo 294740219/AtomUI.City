@@ -29,6 +29,21 @@ public sealed class GrpcCallResult<T>
 
     public static GrpcCallResult<T> Failed(GrpcStatusCode statusCode, string? detail = null)
     {
+        if (!Enum.IsDefined(statusCode))
+        {
+            throw new ArgumentOutOfRangeException(nameof(statusCode), statusCode, "gRPC status code is not supported.");
+        }
+
+        if (statusCode == GrpcStatusCode.OK)
+        {
+            throw new ArgumentException("A failed gRPC result cannot use the OK status code.", nameof(statusCode));
+        }
+
+        if (detail is not null && string.IsNullOrWhiteSpace(detail))
+        {
+            throw new ArgumentException("gRPC failure detail cannot be empty when provided.", nameof(detail));
+        }
+
         return new GrpcCallResult<T>(succeeded: false, value: default, statusCode, detail);
     }
 }

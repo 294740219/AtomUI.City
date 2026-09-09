@@ -22,7 +22,7 @@
 
 ## 运行时边界
 
-- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- `DataConnectionOwnerKind` 只允许 Application、Window、Navigation、Route、Activation、Plugin 或 Manual。
 - 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
 - Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
 - 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
@@ -45,6 +45,7 @@
 | AUC-DATA-004 | SignalR Transport | SignalRDataTransportTests |
 | AUC-DATA-005 | Connection Lifecycle | DataConnectionLifecycleTests |
 | AUC-DATA-006 | Authentication | AccessTokenCredentialProviderTests |
+| AUC-DATA-017 | Plugin Data Contributions | DataPluginLifecycleTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -62,6 +63,8 @@
 ## AtomUI.City.Data Plugin Integration 设计
 
 适用范围：插件 Data client、capability、请求取消、连接停止、缓存撤销、contract 隔离和卸载诊断。
+
+本页描述已完成的 AUC-DATA-017/019 合同。Data 不依赖 PluginSystem 具体实现；Host 通过 `DataContributionRegistry` 签发 contribution lease/origin，统一执行 capability gate、请求取消、连接关闭、注册撤销和缓存清理。
 
 ### 1. 定位
 
@@ -104,6 +107,7 @@ Plugin integration 负责约束插件如何贡献和使用 Data client。
 Stop new plugin data operations
 -> cancel running operations
 -> stop streams and realtime connections
+-> wait admitted handlers to exit
 -> revoke client descriptors
 -> invalidate plugin cache
 -> clear callbacks
@@ -140,16 +144,17 @@ Stop new plugin data operations
 |---|---|
 | capability denied | contribution rejected。 |
 | plugin client conflict | contribution rejected。 |
-| plugin unload with active connection | cancel and stop；失败进入 UnloadPending。 |
+| plugin revoke with active connection | cancel and stop；继续其他清理，最后聚合失败。 |
 | plugin cache revoke failed | 聚合错误，继续清理。 |
 
 ### 8. 测试策略
 
-测试必须覆盖：
+AUC-DATA-017/019 的测试覆盖：
 
 - 插件 HTTP/gRPC/SignalR client 注册。
 - capability denied。
 - 插件停用取消请求。
+- cancellation-ignoring operation 的撤销等待与 handler 自撤销重入。
 - 插件停用关闭 SignalR connection。
 - 插件 cache revoke。
 - Host 不持有插件私有类型。

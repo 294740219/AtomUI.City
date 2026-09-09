@@ -12,8 +12,11 @@
 | Provider Module | Consumer Module | Contract | Direction | Lifecycle | Threading | Failure Behavior | Tests |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Core / Hosting | AtomUI.City.Data | AtomUI.City.Data 作为 Host 服务或模块贡献接入 Core 生命周期，必须在 Host start/stop/dispose 中遵守本模块状态机。 | Core -> Module 或执行边界 -> Module | 见 lifecycle.md | 见 threading.md | 启动/执行失败必须有 Result、异常或诊断。 | tests/AtomUI.City.Data.Tests |
+| Security | AtomUI.City.Data | `IAccessTokenProvider` 向 Data credential adapter 提供脱敏凭据结果。 | Data -> Security | 每次 operation；SignalR principal switch 重建连接 | 全异步，不捕获 UI context | required/expired/unavailable 映射为稳定 DataErrorKind，不调用 transport。 | AccessTokenCredentialProviderTests; DataDogfoodTests |
+| AtomUI.City.Data | State | DataResult 或实时消息只允许由调用方/显式 adapter 投影到 State；Data 基础包不依赖 State。 | Application adapter -> Data + State | operation/subscription owner | State dispatcher 由调用方选择 | Data 失败不产生隐式 State mutation。 | AUC-DATA-012/020 Completed |
+| Routing | AtomUI.City.Data | Route/Navigation `LifecycleScope` 可作为 request ParentScope；connection 使用对应 kind/id 的 Data owner label，Data 基础包不依赖 Routing。 | Routing adapter -> Data public owner/scope contract | route leave 时取消 request 或显式 StopOwner | 不直接访问 UI | late result stale-suppressed；批量 cache invalidation 由显式 invalidator 执行。 | DataPipelineTests; AUC-DATA-015 Completed |
 | PluginSystem | AtomUI.City.Data | 插件可以通过 manifest 或 Host 共享 contract 贡献本模块能力；所有插件来源对象必须绑定 plugin owner 并可撤销。 | Plugin owner/manifest -> Module | load/enable/disable/unload 或 package/template/generator 边界 | 插件后台任务必须可取消 | 贡献撤销失败必须隔离。 | tests/AtomUI.City.Data.Tests |
-| Testing | AtomUI.City.Data | Feature ID 和产品合同测试。 | Testing -> Module | 构造 -> 执行 -> 断言 -> 释放 | fake dispatcher / deterministic scheduler / snapshot | 测试失败阻止完成状态。 | tests/AtomUI.City.Data.Tests |
+| Testing | AtomUI.City.Data | scripted transport/credential、recording handler、fake connection 和产品合同测试。 | Testing -> Module | 构造 -> 执行 -> 断言 -> 释放 | TaskCompletionSource/本地协议服务器确定性驱动 | 测试失败阻止完成状态。 | tests/AtomUI.City.Data.Tests; tests/AtomUI.City.Testing.Tests |
 
 ## 集成硬约束
 

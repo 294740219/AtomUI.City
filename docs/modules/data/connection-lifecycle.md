@@ -19,7 +19,7 @@
 
 ## 运行时边界
 
-- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- `DataConnectionOwnerKind` 只允许 Application、Window、Navigation、Route、Activation、Plugin 或 Manual。
 - 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
 - Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
 - 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
@@ -42,6 +42,9 @@
 | AUC-DATA-004 | SignalR Transport | SignalRDataTransportTests |
 | AUC-DATA-005 | Connection Lifecycle | DataConnectionLifecycleTests |
 | AUC-DATA-006 | Authentication | AccessTokenCredentialProviderTests |
+| AUC-DATA-010 | Host Lifecycle Integration | DataHostIntegrationTests |
+| AUC-DATA-011 | Native gRPC and Streaming | DataStreamingTests; DataDogfoodTests |
+| AUC-DATA-012 | SignalR Realtime Connection | DataDogfoodTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -82,11 +85,11 @@ Manual
 
 规则：
 
-- 长连接不能默认挂 `ApplicationScope`。
+- owner 是逻辑标签，不会自动绑定或创建 Core `LifecycleScope`。
 - SignalR connection 必须声明 owner。
 - gRPC channel 可以由 client factory 管理，但使用方必须声明关闭策略。
 - Plugin owner 停止时必须关闭插件连接。
-- Manual owner 需要调用方显式 dispose，并进入诊断。
+- Manual owner 需要调用方持有并 dispose manager 返回的 registration；Host shutdown 仍会回收尚未撤销的 registration。
 - 已经处于 `Stopped` 的连接再次 stop 必须幂等，不能重复释放底层资源或重复调用连接 callback。
 
 ### 3. HTTP
@@ -95,7 +98,7 @@ HTTP 使用 `HttpClientFactory` 管理底层 handler lifetime。
 
 规则：
 
-- 业务请求仍然是 OperationScope。
+- 业务请求仍然是独立 `DataRequestContext` operation，并可选绑定 `ParentScope`。
 - Data 不手工长期持有裸 `HttpClientHandler`。
 - named/typed client 配置通过 descriptor 或 DI 完成。
 
@@ -106,8 +109,8 @@ gRPC channel 生命周期可以长于单次 call。
 规则：
 
 - channel owner 必须明确。
-- unary call 绑定 OperationScope。
-- streaming call 绑定 OperationScope + SubscriptionScope。
+- unary call 绑定调用方 cancellation/deadline；通过 pipeline 时由 request operation 管理。
+- streaming call 使用 call cancellation；`DataStreamOptions.ParentScope` 可选绑定 Core lifecycle cancellation。
 - deadline 和 cancellation 必须传入 call options。
 - channel fault 进入 connection diagnostics。
 
@@ -125,20 +128,21 @@ SignalR connection 是显式长连接。
 
 ### 6. 关闭顺序
 
-连接 owner 停止时：
+Data 1.0 的 manager/transport 关闭流程如下；manager 负责注册与逆序 stop，具体 connection 实现负责其 subscription 和底层资源：
 
 ```text
 Stop accepting new operations
--> stop subscriptions
--> cancel streams
--> stop realtime connection
--> dispose connection resources
--> clear callbacks
+-> snapshot connections in reverse registration order
+-> invoke each connection StopAsync outside manager locks
+-> SignalR connection rejects/revokes subscriptions and stops transport
+-> remove successfully terminated registrations
 -> emit diagnostics
 ```
 
 插件连接必须保证没有 callback 持有插件私有类型。
 如果 owner stop 被重复调用，已经停止的连接必须跳过后续 stop 流程。
+同一个 connection id 只能注册一次；manager 返回的 `DataConnectionRegistration` 是可异步撤销句柄。
+同一连接的外部并发 start/stop 必须共享已发布的事务 Task，用户 callback 在锁外执行；创建共享事务的首个调用者 token 驱动底层 start/stop，后续调用者 token 只取消自己的等待，不能替换已经发布的事务 token。同一异步调用链重入必须快速失败，不能等待自身事务。一项 stop 失败必须继续关闭同批次其他连接，最后保留单异常或聚合多异常；registration revoke 失败后允许再次调用重试。
 
 ### 7. 错误策略
 
@@ -146,15 +150,15 @@ Stop accepting new operations
 |---|---|
 | owner 已停止还创建连接 | 拒绝并记录诊断。 |
 | reconnect 失败 | ReconnectFailed。 |
-| stop 超时 | 进入 ErrorPolicy。 |
-| 插件连接未释放 | 插件 UnloadPending。 |
+| stop 被调用方取消 | 停止后续连接；传播取消，保留尚未终止的 registration 以便重试。 |
+| 插件连接停止失败 | 继续其他清理，最终由 contribution revoke 聚合异常。 |
 
 ### 8. 测试策略
 
-测试必须覆盖：
+当前测试覆盖 owner stop、并发事务、重入、逆序关闭、失败回滚/隔离、registration revoke、gRPC channel 和 SignalR reconnect/principal switch：
 
 - Route owner 停止关闭连接。
 - Plugin owner 停止关闭连接。
 - SignalR reconnect failed。
 - gRPC stream owner 取消。
-- Manual owner 泄漏诊断。
+- Manual owner registration revoke 与 Host shutdown 回收。

@@ -10,6 +10,7 @@ public static class GeneratorFeatureNames
     public const string EventBus = nameof(EventBus);
     public const string Localization = nameof(Localization);
     public const string PluginSystem = nameof(PluginSystem);
+    public const string Data = nameof(Data);
 
     public static string GetName(GeneratorFeature feature)
     {
@@ -31,6 +32,8 @@ public static class GeneratorFeatureNames
                 return Localization;
             case GeneratorFeature.PluginSystem:
                 return PluginSystem;
+            case GeneratorFeature.Data:
+                return Data;
             default:
                 throw new ArgumentOutOfRangeException(nameof(feature), feature, "Unknown generator feature.");
         }

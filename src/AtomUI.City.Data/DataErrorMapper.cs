@@ -6,6 +6,20 @@ public static class DataErrorMapper
 {
     public static DataError FromHttpStatusCode(HttpStatusCode statusCode)
     {
+        var numericStatusCode = (int)statusCode;
+        if (numericStatusCode is < 100 or > 599)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(statusCode),
+                statusCode,
+                "HTTP status code must be between 100 and 599.");
+        }
+
+        if (numericStatusCode is >= 200 and <= 299)
+        {
+            throw new ArgumentException("A successful HTTP status code cannot be mapped as an error.", nameof(statusCode));
+        }
+
         var kind = statusCode switch
         {
             HttpStatusCode.BadRequest => DataErrorKind.BadRequest,
@@ -31,6 +45,21 @@ public static class DataErrorMapper
 
     public static DataError FromGrpcStatus(GrpcStatusCode statusCode, string? detail = null)
     {
+        if (!Enum.IsDefined(statusCode))
+        {
+            throw new ArgumentOutOfRangeException(nameof(statusCode), statusCode, "gRPC status code is not supported.");
+        }
+
+        if (statusCode == GrpcStatusCode.OK)
+        {
+            throw new ArgumentException("A successful gRPC status cannot be mapped as an error.", nameof(statusCode));
+        }
+
+        if (detail is not null && string.IsNullOrWhiteSpace(detail))
+        {
+            throw new ArgumentException("gRPC failure detail cannot be empty when provided.", nameof(detail));
+        }
+
         var kind = statusCode switch
         {
             GrpcStatusCode.Cancelled => DataErrorKind.Cancelled,

@@ -1,8 +1,8 @@
-# AtomUI.City.Data HTTP CLIent 合同
+# AtomUI.City.Data HTTP Client 合同
 
 ## 适用范围
 
-本专题属于 `AtomUI.City.Data` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `HTTP CLIent` 相关实现决策，不重新定义模块边界。
+本专题属于 `AtomUI.City.Data` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `HTTP Client` 相关实现决策，不重新定义模块边界。
 
 ## 设计决策
 
@@ -19,7 +19,7 @@
 
 ## 运行时边界
 
-- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- `DataConnectionOwnerKind` 只允许 Application、Window、Navigation、Route、Activation、Plugin 或 Manual。
 - 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
 - Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
 - 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
@@ -66,6 +66,8 @@ HTTP 是 Data 第一批一等 transport。
 
 HTTP client 负责 REST、Web API、文件上传下载和普通 request/response 数据访问。HTTP 能力必须进入 Data pipeline，而不是让 ViewModel 直接使用裸 `HttpClient`。
 
+当前实现包含 `IHttpClientFactory` named client、request factory、credential header、取消感知 response mapper、status/error mapping、pipeline circuit policy 和大载荷进度。具体 Security provider 可以在 `IAccessTokenProvider.GetTokenAsync` 内实现 token refresh/single-flight；Data 不持有 token 生命周期，也不因 HTTP 401 自动刷新和重放请求。
+
 ### 2. HttpClientFactory
 
 HTTP transport 基于 `IHttpClientFactory`。
@@ -103,12 +105,12 @@ HTTP 认证通过 Security credential 注入。
 - Authorization header 由 Data/Security 管线注入。
 - Token 不写日志。
 - 匿名请求不强制取 token。
-- 401 交给 Security refresh / challenge。
+- 401 映射为 AuthenticationRequired，由应用认证编排器决定后续 refresh 或 challenge；Data 不自动重放当前请求。
 - 403 返回 authorization forbidden。
 
 ### 5. 上传下载
 
-HTTP 必须支持大载荷场景：
+Data 1.0 的 HTTP 大载荷由 `DataLargePayloadClient` 实现：
 
 - Upload progress。
 - Download progress。
@@ -124,7 +126,7 @@ HTTP 必须支持大载荷场景：
 | HTTP | DataError |
 |---|---|
 | 400 | BadRequest。 |
-| 401 | AuthenticationRequired / AuthenticationExpired。 |
+| 401 | AuthenticationRequired。凭据刷新失败可由 credential provider 独立返回 AuthenticationExpired。 |
 | 403 | AuthorizationForbidden。 |
 | 404 | NotFound。 |
 | 409 | Conflict。 |
@@ -144,11 +146,11 @@ HTTP request/response 可以使用 Data cache。
 
 ### 8. 测试策略
 
-测试必须覆盖：
+当前测试覆盖 named client、auth header、status mapping、取消、mapper failure、resilience 和大载荷传输：
 
 - typed client。
 - auth header 注入。
-- 401 refresh。
+- 401 映射且不自动 refresh / replay。
 - 403 forbidden。
 - HTTP status 映射。
 - upload/download cancellation。

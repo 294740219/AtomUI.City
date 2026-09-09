@@ -19,7 +19,7 @@
 
 ## 运行时边界
 
-- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- `DataConnectionOwnerKind` 只允许 Application、Window、Navigation、Route、Activation、Plugin 或 Manual。
 - 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
 - Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
 - 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
@@ -42,6 +42,7 @@
 | AUC-DATA-004 | SignalR Transport | SignalRDataTransportTests |
 | AUC-DATA-005 | Connection Lifecycle | DataConnectionLifecycleTests |
 | AUC-DATA-006 | Authentication | AccessTokenCredentialProviderTests |
+| AUC-DATA-014 | Advanced Resilience Policies | DataResilienceTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -64,11 +65,13 @@
 
 Resilience 负责提高 Data operation 对网络抖动、服务暂时不可用和超时的容错能力。
 
+当前已完成总 timeout、retry delay、circuit breaker、fallback、fixed-window rate limit 和 operation/client/global 策略作用域。
+
 Data 可以使用 Polly 作为策略实现，但 Data API 不应把 Polly 类型扩散到 ViewModel、Routing 或 State。
 
 ### 2. 策略类型
 
-第一版支持：
+Data 1.0 已支持以下策略；半开 circuit probe 使用 admission transaction，提前取消不会永久占用探针：
 
 - Timeout。
 - Retry。
@@ -76,7 +79,7 @@ Data 可以使用 Polly 作为策略实现，但 Data API 不应把 Polly 类型
 - Fallback。
 - Rate limit。
 
-策略由 operation descriptor、client metadata 或 Host 配置提供。
+运行时策略由 `DataRequest.Resilience` 提供，并可经 `IDataResiliencePolicyProvider` 按 policy name 解析。generated descriptor 保存静态 metadata，但不会自动构造业务 request。
 
 ### 3. Timeout / Deadline
 
@@ -85,7 +88,7 @@ Data 可以使用 Polly 作为策略实现，但 Data API 不应把 Polly 类型
 - HTTP timeout 映射为 Data timeout。
 - gRPC timeout 映射为 deadline。
 - SignalR hub invoke timeout 映射为 operation timeout。
-- Streaming 和 SignalR connection 不能只有总 timeout，还需要 idle timeout 或 keepalive 诊断。
+- 1.0 的总 timeout 作用于 request/hub invoke；stream/connection 通过 call deadline、cancellation、reconnect 和 owner stop 管理。idle timeout/keepalive 不是 Data 1.0 内建策略。
 
 ### 4. Retry
 
@@ -96,7 +99,7 @@ Data 可以使用 Polly 作为策略实现，但 Data API 不应把 Polly 类型
 - 取消不 retry。
 - Transport exception 必须先映射为 `TransportError`，再按 retry policy 判断是否重试。
 - 403 不 retry。
-- 401 refresh 成功后最多按策略重试一次。
+- 401/403 不由 Data 自动 retry；Security 可以在返回 credential 前完成 refresh，下一次 operation 再获取新凭据。
 - streaming item handler 不按普通 request retry。
 
 Mutation 只有声明幂等或提供 idempotency key 时才允许自动 retry。
@@ -109,6 +112,8 @@ Circuit breaker 绑定 client 或 operation。
 
 - breaker 状态进入 diagnostics。
 - breaker open 时返回 PolicyRejected 或 ServiceUnavailable。
+- credential failure 不消耗 rate-limit permit；cache hit 在 circuit admission 前返回。
+- circuit/rate admission 拒绝也可以进入显式 fallback，但不会调用 transport。
 - 插件 client 的 breaker 随插件 contribution 撤销。
 
 ### 6. Fallback
@@ -138,12 +143,14 @@ Fallback 必须显式声明。
 
 ### 8. 测试策略
 
-测试必须覆盖：
+当前测试覆盖 query/mutation retry、timeout、retry diagnostics、circuit breaker、半开探针取消恢复、fallback、rate limit 和 policy scope：
 
 - query retry。
 - mutation 默认不 retry。
 - idempotent mutation retry。
 - timeout。
 - circuit open。
+- circuit open cache hit 与显式 fallback。
+- credential failure 不消耗 rate-limit permit。
 - fallback cache。
 - retry attempts diagnostics。

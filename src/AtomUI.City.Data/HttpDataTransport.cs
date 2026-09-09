@@ -29,15 +29,44 @@ public sealed class HttpDataTransport : IRequestResponseTransport
                     "HTTP transport requires an HTTP data request."));
         }
 
+        var validation = DataTransportRequestValidator.Validate(request, context, Kind);
+        if (validation is not null)
+        {
+            return validation;
+        }
+
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return DataResult<TResponse>.Cancelled();
+        }
+
         try
         {
             var client = _httpClientFactory.CreateClient(httpRequest.ClientName);
             using var message = httpRequest.RequestFactory(context);
+            if (message is null)
+            {
+                return DataResult<TResponse>.Failed(
+                    new DataError(
+                        DataErrorKind.TransportError,
+                        "HTTP request factory returned a null request message."));
+            }
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return DataResult<TResponse>.Cancelled();
+            }
+
             AttachCredential(message, context.Credential);
 
             using var response = await client
                 .SendAsync(message, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
                 .ConfigureAwait(false);
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return DataResult<TResponse>.Cancelled();
+            }
 
             if (!response.IsSuccessStatusCode)
             {
@@ -47,25 +76,40 @@ public sealed class HttpDataTransport : IRequestResponseTransport
             TResponse mappedResponse;
             try
             {
-                mappedResponse = await httpRequest.ResponseMapper(response).ConfigureAwait(false);
+                mappedResponse = await httpRequest
+                    .ResponseMapperWithCancellation(response, cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    return DataResult<TResponse>.Cancelled();
+                }
+            }
+            catch (Exception) when (cancellationToken.IsCancellationRequested)
+            {
+                return DataResult<TResponse>.Cancelled();
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
                 return DataResult<TResponse>.Failed(
                     new DataError(
                         DataErrorKind.SerializationError,
-                        exception.Message,
+                        DataErrorMessage.FromException(exception, "HTTP response mapping failed."),
                         Exception: exception));
             }
 
             return DataResult<TResponse>.Success(mappedResponse);
         }
-        catch (TaskCanceledException exception) when (!cancellationToken.IsCancellationRequested)
+        catch (Exception) when (cancellationToken.IsCancellationRequested)
+        {
+            return DataResult<TResponse>.Cancelled();
+        }
+        catch (TaskCanceledException exception)
         {
             return DataResult<TResponse>.Failed(
                 new DataError(
                     DataErrorKind.Timeout,
-                    exception.Message,
+                    DataErrorMessage.FromException(exception, "HTTP request timed out."),
                     Exception: exception));
         }
         catch (OperationCanceledException)
@@ -77,7 +121,7 @@ public sealed class HttpDataTransport : IRequestResponseTransport
             return DataResult<TResponse>.Failed(
                 new DataError(
                     DataErrorKind.TransportError,
-                    exception.Message,
+                    DataErrorMessage.FromException(exception, "HTTP transport failed."),
                     Exception: exception));
         }
     }

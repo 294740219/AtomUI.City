@@ -106,10 +106,37 @@ public sealed class DataClientContractTests
         Assert.Contains(nameof(IInventoryClient), record.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void UnregisterUsesCapturedClientIdInsteadOfReenteringClientCode()
+    {
+        var diagnostics = new InMemoryDataDiagnostics();
+        var registry = new DataClientRegistry(diagnostics);
+        var client = new OneShotClientIdClient();
+        registry.Register<IInventoryClient>(client);
+
+        var removed = registry.Unregister<IInventoryClient>();
+
+        Assert.True(removed);
+        Assert.Equal(1, client.ClientIdReads);
+        var record = Assert.Single(
+            diagnostics.Records,
+            record => record.Code == DataDiagnosticIds.ClientUnregistered);
+        Assert.Equal("inventory", record.ClientId);
+    }
+
     private interface IInventoryClient : IDataClient;
 
     private sealed class InventoryClient : IInventoryClient
     {
         public string ClientId => "inventory";
+    }
+
+    private sealed class OneShotClientIdClient : IInventoryClient
+    {
+        public int ClientIdReads { get; private set; }
+
+        public string ClientId => ++ClientIdReads == 1
+            ? "inventory"
+            : throw new InvalidOperationException("ClientId must be captured during registration.");
     }
 }

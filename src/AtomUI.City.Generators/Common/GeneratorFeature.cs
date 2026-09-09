@@ -10,4 +10,5 @@ public enum GeneratorFeature
     EventBus,
     Localization,
     PluginSystem,
+    Data,
 }

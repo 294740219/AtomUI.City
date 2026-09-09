@@ -1,8 +1,8 @@
-# AtomUI.City.Data CLIent Proxy 合同
+# AtomUI.City.Data Client Proxy 合同
 
 ## 适用范围
 
-本专题属于 `AtomUI.City.Data` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `CLIent Proxy` 相关实现决策，不重新定义模块边界。
+本专题属于 `AtomUI.City.Data` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `Client Proxy` 相关实现决策，不重新定义模块边界。
 
 ## 设计决策
 
@@ -19,7 +19,7 @@
 
 ## 运行时边界
 
-- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- `DataConnectionOwnerKind` 只允许 Application、Window、Navigation、Route、Activation、Plugin 或 Manual。
 - 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
 - Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
 - 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
@@ -42,6 +42,8 @@
 | AUC-DATA-004 | SignalR Transport | SignalRDataTransportTests |
 | AUC-DATA-005 | Connection Lifecycle | DataConnectionLifecycleTests |
 | AUC-DATA-006 | Authentication | AccessTokenCredentialProviderTests |
+| AUC-DATA-016 | Client Descriptors and Generation | AtomUICityIncrementalGeneratorDataTests; Data AOT fixture |
+| AUC-DATA-017 | Plugin Data Contributions | DataPluginLifecycleTests |
 
 本专题涉及的每个新增行为必须补充测试矩阵。涉及线程、插件、source generator、build、UI dispatcher、连接或状态的行为必须增加对应专项测试。
 
@@ -64,14 +66,17 @@
 
 Client proxy 负责给应用提供可注入、可测试、可诊断的数据客户端入口。
 
-Data Core 不强制应用使用某一种代理框架。第一版支持 typed client 和 generated client；Refit、RPC、本地服务等通过 adapter 包接入。
+Data Core 不强制应用使用某一种代理框架。Data 1.0 目标支持 typed client 和 generated client；Refit、RPC、本地服务等通过 adapter 包接入。
+
+1.0 已完成 `IDataClient`、`IDataClientFactory`、运行时 `DataClientRegistry`、generated descriptor catalog 和插件可撤销贡献。可选 adapter package 不属于 Data Core 1.0。
+`DataClientRegistry` 按 contract type 注册且线程安全；同一 type 后注册者替换前注册者，`Unregister<TClient>` 只移除该 type 当前值。它不是插件贡献所有权或安全边界。
 
 ### 2. Client 类型
 
 | 类型 | 说明 |
 |---|---|
 | Typed client | 推荐默认方式，符合 .NET DI 和测试习惯。 |
-| Generated client | Source Generator 生成 descriptor 和调用代码。 |
+| Generated descriptor | Source Generator 生成 descriptor registrar；业务 client 实现继续由应用 typed client 或可选 adapter 提供。 |
 | Adapter client | Refit、RPC、本地服务、插件服务等适配。 |
 
 Data client 不应直接暴露裸 transport 给 ViewModel。
@@ -130,7 +135,7 @@ Refit 可以作为 `AtomUI.City.Data.Refit` 可选适配包。
 
 ### 7. 测试策略
 
-测试必须覆盖：
+当前测试覆盖运行时 typed client 注册、替换、获取和移除，以及 generated descriptor 和插件撤销：
 
 - typed client 创建。
 - generated descriptor 注册。

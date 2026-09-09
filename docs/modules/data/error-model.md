@@ -19,7 +19,7 @@
 
 ## 运行时边界
 
-- Owner 必须明确：Host、Module、Plugin、Route、Operation、Connection、View 或 Test scope。
+- `DataConnectionOwnerKind` 只允许 Application、Window、Navigation、Route、Activation、Plugin 或 Manual。
 - 释放必须幂等；释放后 mutating API 必须失败或返回声明的 Result。
 - Cancellation 必须在进入外部调用、用户 handler、插件代码、IO、dispatcher work 前后观察。
 - 插件来源对象必须可撤销，不能泄漏到 Host 根单例。
@@ -84,6 +84,8 @@ StaleSuppressed
 
 `StaleSuppressed` 表示请求完成时 parent scope、operation sequence 或 plugin contribution 已失效，结果未提交。
 
+`Partial` 同时携带仍可使用的 value 与说明缺失部分的 `DataError`；`Succeeded` 为 false。它是终态，不进入自动重试，也不写入请求缓存；调用方可显式发起刷新。
+
 ### 3. DataError
 
 建议错误类型：
@@ -109,7 +111,6 @@ ConnectionFailed
 ConnectionClosed
 ReconnectFailed
 StreamCancelled
-StreamCompleted
 StreamProtocolError
 DeadlineExceeded
 Unavailable
@@ -119,18 +120,19 @@ Unknown
 ```
 
 `DataErrorKind` 必须是已定义值；`DataError.Message` 必须是非空白字符串。`MessageKey` 和 `MessageArguments` 只承载本地化元数据，不改变错误分类。
+`DataErrorKind.StreamCompleted` 仅为兼容保留且已废弃；正常 stream completion 不是错误，不得创建 failed `DataResult`。
 
 ### 4. Transport 映射
 
 | 来源 | 映射 |
 |---|---|
-| HTTP 401 | AuthenticationRequired / AuthenticationExpired。 |
+| HTTP 401 | AuthenticationRequired。 |
 | HTTP 403 | AuthorizationForbidden。 |
 | HTTP 422 | ValidationFailed。 |
 | HTTP 504 | Timeout。 |
-| gRPC Unauthenticated | AuthenticationRequired / AuthenticationExpired。 |
+| gRPC Unauthenticated | AuthenticationRequired。 |
 | gRPC PermissionDenied | AuthorizationForbidden。 |
-| gRPC DeadlineExceeded | DeadlineExceeded / Timeout。 |
+| gRPC DeadlineExceeded | DeadlineExceeded。Data pipeline 自身总超时映射为 Timeout。 |
 | gRPC InvalidArgument / OutOfRange | ValidationFailed。 |
 | gRPC ResourceExhausted | PolicyRejected。 |
 | gRPC FailedPrecondition / Aborted | Conflict。 |
@@ -138,7 +140,8 @@ Unknown
 | gRPC Unimplemented / Internal / DataLoss | ServerError。 |
 | SignalR reconnect failed | ReconnectFailed。 |
 | SignalR closed | ConnectionClosed。 |
-| Scope cancellation | Cancelled。 |
+| 调用方 cancellation | Cancelled。 |
+| ParentScope 停止 | StaleSuppressed result；其 ErrorKind 为 Cancelled。 |
 
 ### 5. 取消语义
 
@@ -170,7 +173,7 @@ DataError 不直接决定 UI 展示。
 
 ### 7. 测试策略
 
-测试必须覆盖：
+当前测试覆盖 result invariant、HTTP/gRPC/SignalR adapter 与原生 client mapping、cancellation、stale suppression、serialization、plugin 和 streaming 错误：
 
 - HTTP status 映射。
 - gRPC status 映射。

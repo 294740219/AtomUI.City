@@ -108,4 +108,84 @@ public sealed class SignalRDataTransportTests
         Assert.Equal(expectedError, result.Error?.Kind);
         Assert.Same(exception, result.Error?.Exception);
     }
+
+    [Fact]
+    public async Task SignalRTransportDoesNotInvokeDelegateWhenAlreadyCancelled()
+    {
+        var invoked = false;
+        var transport = new SignalRDataTransport();
+        var request = new SignalRDataRequest<string>(
+            "notifications",
+            "publish",
+            "NotificationsHub",
+            "Publish",
+            (_, _) =>
+            {
+                invoked = true;
+                return ValueTask.FromResult("unused");
+            });
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        var result = await transport.SendAsync(
+            request,
+            DataRequestContext.Create(request, cancellation.Token),
+            cancellation.Token);
+
+        Assert.Equal(DataResultStatus.Cancelled, result.Status);
+        Assert.False(invoked);
+    }
+
+    [Fact]
+    public async Task SignalRTransportRejectsContextFromAnotherRequest()
+    {
+        var invoked = false;
+        var transport = new SignalRDataTransport();
+        var request = new SignalRDataRequest<string>(
+            "notifications",
+            "publish",
+            "NotificationsHub",
+            "Publish",
+            (_, _) =>
+            {
+                invoked = true;
+                return ValueTask.FromResult("unused");
+            });
+        var otherRequest = new DataRequest<string>(
+            "accounts",
+            "get-profile",
+            DataTransportKind.SignalR);
+
+        var result = await transport.SendAsync(
+            request,
+            DataRequestContext.Create(otherRequest, CancellationToken.None));
+
+        Assert.Equal(DataResultStatus.Failed, result.Status);
+        Assert.Equal(DataErrorKind.PolicyRejected, result.Error?.Kind);
+        Assert.False(invoked);
+    }
+
+    [Fact]
+    public async Task SignalRTransportCancellationWinsWhenInvokerIgnoresCancellation()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var transport = new SignalRDataTransport();
+        var request = new SignalRDataRequest<string>(
+            "notifications",
+            "publish",
+            "NotificationsHub",
+            "Publish",
+            (_, _) =>
+            {
+                cancellation.Cancel();
+                return ValueTask.FromResult("late");
+            });
+
+        var result = await transport.SendAsync(
+            request,
+            DataRequestContext.Create(request, cancellation.Token),
+            cancellation.Token);
+
+        Assert.Equal(DataResultStatus.Cancelled, result.Status);
+    }
 }

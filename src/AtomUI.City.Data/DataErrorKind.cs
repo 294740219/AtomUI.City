@@ -22,6 +22,7 @@ public enum DataErrorKind
     ConnectionClosed,
     ReconnectFailed,
     StreamCancelled,
+    [Obsolete("Normal stream completion is not a data error and must not produce a failed DataResult.")]
     StreamCompleted,
     StreamProtocolError,
     DeadlineExceeded,

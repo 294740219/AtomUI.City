@@ -32,6 +32,13 @@ public sealed class DataResult<T>
         return new DataResult<T>(DataResultStatus.Failed, value: default, error);
     }
 
+    public static DataResult<T> Partial(T value, DataError error)
+    {
+        ArgumentNullException.ThrowIfNull(error);
+
+        return new DataResult<T>(DataResultStatus.Partial, value, error);
+    }
+
     public static DataResult<T> Cancelled(string? message = null)
     {
         return new DataResult<T>(
@@ -52,12 +59,22 @@ public sealed class DataResult<T>
     {
         if (Succeeded)
         {
-            return Value is TResponse response
-                ? DataResult<TResponse>.Success(response)
+            return TryCastValue(Value, out TResponse? response)
+                ? DataResult<TResponse>.Success(response!)
                 : DataResult<TResponse>.Failed(
                     new DataError(
                         DataErrorKind.SerializationError,
                         $"Data result value cannot be cast to '{typeof(TResponse).FullName}'."));
+        }
+
+        if (Status == DataResultStatus.Partial)
+        {
+            return TryCastValue(Value, out TResponse? response)
+                ? DataResult<TResponse>.Partial(response!, Error!)
+                : DataResult<TResponse>.Failed(
+                    new DataError(
+                        DataErrorKind.SerializationError,
+                        $"Partial data result value cannot be cast to '{typeof(TResponse).FullName}'."));
         }
 
         return Status switch
@@ -66,5 +83,23 @@ public sealed class DataResult<T>
             DataResultStatus.StaleSuppressed => DataResult<TResponse>.StaleSuppressed(Error?.Message),
             _ => DataResult<TResponse>.Failed(Error ?? new DataError(DataErrorKind.Unknown, "Data operation failed.")),
         };
+    }
+
+    private static bool TryCastValue<TResponse>(T? value, out TResponse? response)
+    {
+        if (value is TResponse typedValue)
+        {
+            response = typedValue;
+            return true;
+        }
+
+        if (value is null && default(TResponse) is null)
+        {
+            response = default;
+            return true;
+        }
+
+        response = default;
+        return false;
     }
 }

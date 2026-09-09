@@ -113,6 +113,26 @@ public sealed class GrpcDataTransportTests
     }
 
     [Fact]
+    public async Task GrpcTransportDistinguishesInternalTimeoutFromCallerCancellation()
+    {
+        var timeout = new TaskCanceledException(string.Empty);
+        var transport = new GrpcDataTransport();
+        var request = new GrpcDataRequest<string>(
+            "catalog",
+            "get-items",
+            (_, _) => throw timeout);
+
+        var result = await transport.SendAsync(
+            request,
+            DataRequestContext.Create(request, CancellationToken.None));
+
+        Assert.Equal(DataResultStatus.Failed, result.Status);
+        Assert.Equal(DataErrorKind.Timeout, result.Error?.Kind);
+        Assert.Equal("gRPC call timed out.", result.Error?.Message);
+        Assert.Same(timeout, result.Error?.Exception);
+    }
+
+    [Fact]
     public async Task GrpcTransportMapsCancelledStatusToCancelledResult()
     {
         var transport = new GrpcDataTransport();
@@ -146,5 +166,97 @@ public sealed class GrpcDataTransportTests
         Assert.False(result.Succeeded);
         Assert.Equal(DataErrorKind.TransportError, result.Error?.Kind);
         Assert.Same(callException, result.Error?.Exception);
+    }
+
+    [Fact]
+    public async Task GrpcTransportDoesNotInvokeDelegateWhenAlreadyCancelled()
+    {
+        var invoked = false;
+        var transport = new GrpcDataTransport();
+        var request = new GrpcDataRequest<string>(
+            "catalog",
+            "get-items",
+            (_, _) =>
+            {
+                invoked = true;
+                return ValueTask.FromResult(GrpcCallResult<string>.Success("unused"));
+            });
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        var result = await transport.SendAsync(
+            request,
+            DataRequestContext.Create(request, cancellation.Token),
+            cancellation.Token);
+
+        Assert.Equal(DataResultStatus.Cancelled, result.Status);
+        Assert.False(invoked);
+    }
+
+    [Fact]
+    public async Task GrpcTransportRejectsContextFromAnotherRequest()
+    {
+        var invoked = false;
+        var transport = new GrpcDataTransport();
+        var request = new GrpcDataRequest<string>(
+            "catalog",
+            "get-items",
+            (_, _) =>
+            {
+                invoked = true;
+                return ValueTask.FromResult(GrpcCallResult<string>.Success("unused"));
+            });
+        var otherRequest = new DataRequest<string>(
+            "accounts",
+            "get-profile",
+            DataTransportKind.Grpc);
+
+        var result = await transport.SendAsync(
+            request,
+            DataRequestContext.Create(otherRequest, CancellationToken.None));
+
+        Assert.Equal(DataResultStatus.Failed, result.Status);
+        Assert.Equal(DataErrorKind.PolicyRejected, result.Error?.Kind);
+        Assert.False(invoked);
+    }
+
+    [Fact]
+    public async Task GrpcTransportMapsNullInvokerResultToTransportError()
+    {
+        var transport = new GrpcDataTransport();
+        var request = new GrpcDataRequest<string>(
+            "catalog",
+            "get-items",
+            (_, _) => ValueTask.FromResult<GrpcCallResult<string>>(null!));
+
+        var result = await transport.SendAsync(
+            request,
+            DataRequestContext.Create(request, CancellationToken.None));
+
+        Assert.Equal(DataResultStatus.Failed, result.Status);
+        Assert.Equal(DataErrorKind.TransportError, result.Error?.Kind);
+        Assert.Contains("null result", result.Error?.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GrpcTransportCancellationWinsWhenInvokerIgnoresCancellation()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var transport = new GrpcDataTransport();
+        var request = new GrpcDataRequest<string>(
+            "catalog",
+            "get-items",
+            (_, _) =>
+            {
+                cancellation.Cancel();
+                return ValueTask.FromResult(GrpcCallResult<string>.Success("late"));
+            });
+
+        var result = await transport.SendAsync(
+            request,
+            DataRequestContext.Create(request, cancellation.Token),
+            cancellation.Token);
+
+        Assert.Equal(DataResultStatus.Cancelled, result.Status);
     }
 }
