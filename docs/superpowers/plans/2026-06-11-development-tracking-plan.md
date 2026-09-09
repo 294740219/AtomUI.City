@@ -4,11 +4,11 @@
 
 ## 当前结论
 
-- 1.0 发布状态：可发布。
-- 全局进度：119/119。
-- 模块 Feature 合同：110/110。
+- 1.0 发布状态：暂不可发布，Security 多账号能力、CLI Generation 和 Templates 的 5 项规划能力尚待实现。
+- 全局进度：135/143。
+- 模块 Feature 合同：126/134。
 - 最终发布门禁：9/9。
-- 最近校准日期：2026-06-15。
+- 最近校准日期：2026-09-09。
 
 ## 统计规则
 
@@ -43,11 +43,11 @@
 | State | 8 | 0 | 8 | 已完成 |
 | EventBus | 6 | 0 | 6 | 已完成 |
 | PluginSystem | 8 | 0 | 8 | 已完成 |
-| Data | 9 | 0 | 9 | 已完成 |
+| Data | 20 | 0 | 20 | 已完成 |
 | Localization | 8 | 0 | 8 | 已完成 |
-| Security | 7 | 0 | 7 | 已完成 |
-| CLI | 6 | 0 | 6 | 已完成 |
-| Templates | 5 | 0 | 5 | 已完成 |
+| Security | 7 | 2 | 9 | 进行中 |
+| CLI | 6 | 1 | 7 | 进行中 |
+| Templates | 5 | 5 | 10 | 进行中 |
 | Release Gates | 9 | 0 | 9 | 已完成 |
 
 ## Core
@@ -164,13 +164,24 @@
 
 - [x] AUC-DATA-001 Request Pipeline。验收重点：执行顺序、取消不写缓存、retry diagnostics。
 - [x] AUC-DATA-002 HTTP Transport。验收重点：status -> DataErrorKind 映射。
-- [x] AUC-DATA-003 gRPC Transport。验收重点：GrpcStatusCode 映射。
-- [x] AUC-DATA-004 SignalR Transport。验收重点：invocation context。
+- [x] AUC-DATA-003 gRPC Unary Adapter。验收重点：显式 invoker 与 GrpcStatusCode 映射，不代表原生 streaming。
+- [x] AUC-DATA-004 SignalR Invocation Adapter。验收重点：显式 invoker context，不代表原生 HubConnection/realtime。
 - [x] AUC-DATA-005 Connection Lifecycle。验收重点：状态转换、owner 释放。
 - [x] AUC-DATA-006 Authentication。验收重点：credential before transport。
-- [x] AUC-DATA-007 Caching。验收重点：key 组成和 hit/miss。
+- [x] AUC-DATA-007 Request Cache Baseline。验收重点：canonical identity、TTL、精确与多维批量撤销。
 - [x] AUC-DATA-008 Error Model。验收重点：result 不混用 success/error。
 - [x] AUC-DATA-009 DI Registration。验收重点：默认服务。
+- [x] AUC-DATA-010 Host Lifecycle Integration。验收重点：Host shutdown、并发幂等、启动回滚、关闭失败继续清理和注册撤销。
+- [x] AUC-DATA-011 Native gRPC and Streaming。验收重点：官方 client、四种 call、metadata/deadline、owner、backpressure。
+- [x] AUC-DATA-012 SignalR Realtime Connection。验收重点：官方 HubConnection、push/subscription/reconnect/token switch/owner shutdown。
+- [x] AUC-DATA-013 Operation Concurrency Policies。验收重点：六种并发策略和确定性竞态。
+- [x] AUC-DATA-014 Advanced Resilience Policies。验收重点：circuit breaker、fallback、rate limit、作用域和诊断。
+- [x] AUC-DATA-015 Cache Consistency and Invalidation。验收重点：canonical identity、TTL 和多来源批量失效。
+- [x] AUC-DATA-016 Client Descriptors and Generation。验收重点：typed/generated descriptor、AOT catalog、零运行时扫描。
+- [x] AUC-DATA-017 Plugin Data Contributions。验收重点：拒绝、撤销、取消、缓存清理和可卸载。
+- [x] AUC-DATA-018 Large Payload and Progress。验收重点：流式 IO、进度、range/resume、取消和内存上限。
+- [x] AUC-DATA-019 Pipeline Extensibility and Capability。验收重点：handler、metadata validation、capability 和异常映射。
+- [x] AUC-DATA-020 Testing Infrastructure and Dogfood。验收重点：Testing doubles、真实本地三传输 headless 和压力门禁。
 
 ## Localization
 
@@ -185,13 +196,15 @@
 
 ## Security
 
-- [x] AUC-SECURITY-001 Authentication State Store。验收重点：snapshot 不可变、状态切换、订阅通知、重复设置和 logout。
-- [x] AUC-SECURITY-002 Current Principal Access。验收重点：authenticated、anonymous、claims 读取和并发 snapshot。
-- [x] AUC-SECURITY-003 Permission Registry and Checker。验收重点：注册、重复、未注册、插件撤销和 checker result。
-- [x] AUC-SECURITY-004 Authorization Policy Evaluation。验收重点：成功、拒绝、失败、取消、多 requirement 和 provider 异常。
-- [x] AUC-SECURITY-005 Route Authorization Guard。验收重点：allow、deny、redirect login、取消和 Routing 无 Security 反向依赖。
-- [x] AUC-SECURITY-006 Command Authorization。验收重点：状态变化、禁用/隐藏策略、订阅释放和权限撤销。
-- [x] AUC-SECURITY-007 Access Token Provider。验收重点：成功、失败、不可用、取消、DI 默认 provider 和 Data 集成前置条件。
+- [x] AUC-SECURITY-001 Authentication State Store。验收重点：snapshot/Actor chain 输入输出不可变、所有层级 BootstrapContext 清除、token hint 原子继承、状态切换、有序 revision、观察者异常隔离、重复设置和 logout。
+- [x] AUC-SECURITY-002 Current Principal Access。验收重点：authenticated、anonymous、多 identity、claims 稳定读取和 mutation 隔离。
+- [x] AUC-SECURITY-003 Permission Registry and Checker。验收重点：注册、重复、未注册、contribution 撤销/tombstone、并发有序通知、观察者隔离和 checker result。
+- [x] AUC-SECURITY-004 Authorization Policy Evaluation。验收重点：成功、Denied/Forbidden、可变 requirement 输入先快照再校验、非法 Failed kind、取消语义、多 requirement、provider 异常和诊断。
+- [x] AUC-SECURITY-005 Route Authorization Guard。验收重点：allow、deny、redirect login、contribution 撤销、异常取消、诊断和 Routing 无 Security 反向依赖。
+- [x] AUC-SECURITY-006 Command Authorization。验收重点：状态变化、有序 revision、禁用/隐藏、contribution 继承/冲突、失败构造隔离、订阅回滚/释放聚合、contribution 撤销、观察者隔离和诊断。
+- [x] AUC-SECURITY-007 Access Token Provider。验收重点：成功、null/异常失败、不可用、调用前后取消、诊断脱敏、DI 默认 provider 和 Data 集成前置条件。
+- [ ] AUC-SECURITY-008 Multi-Account File Persistence。验收重点：多账号文件持久化、账号隔离、路径约束、原子写入、重启恢复、删除无残留，以及凭据不进入普通配置、State、日志或诊断。
+- [ ] AUC-SECURITY-009 Active Account Switching and Restore。验收重点：全局单活动账号、启动恢复、原子切换、失败/取消回滚、单次 revision/通知和离线受限模式。
 
 ## CLI
 
@@ -201,6 +214,7 @@
 - [x] AUC-CLI-004 Plugin Inspect and Doctor。验收重点：合法插件、manifest 缺失、版本非法、layout 错误和 JSON diagnostics。
 - [x] AUC-CLI-005 AI-Friendly Envelope。验收重点：schema、纯 JSON、artifact 列表、suggested commands、retryable 语义。
 - [x] AUC-CLI-006 Non-Interactive and CI Mode。验收重点：CI、non-interactive、stdin unavailable、需要确认时失败。
+- [ ] AUC-CLI-007 Generation Commands。验收重点：真实生成、dry-run、冲突、取消、回滚和产物可构建。
 
 ## Templates
 
@@ -209,6 +223,11 @@
 - [x] AUC-TEMPLATES-003 Template Variables。验收重点：变量默认值、非法值、命名空间生成和错误消息。
 - [x] AUC-TEMPLATES-004 Plugin Template。验收重点：单 assembly、NuGet metadata、manifest、msbuild 属性和测试项目。
 - [x] AUC-TEMPLATES-005 Test Template。验收重点：测试项目 build/test、TestLayer、Testing 引用边界和命名规则。
+- [ ] AUC-TEMPLATES-006 Module Template。验收重点：模块类型、依赖声明、服务注册、manifest/source generator 输入和 build test。
+- [ ] AUC-TEMPLATES-007 Page Template。验收重点：View/ViewModel、route declaration、Presentation 绑定和激活测试。
+- [ ] AUC-TEMPLATES-008 Localization Template。验收重点：culture package、fallback、generated manifest 和 Localization 测试。
+- [ ] AUC-TEMPLATES-009 Configuration Template。验收重点：Options binding、validation、reload policy 和配置测试。
+- [ ] AUC-TEMPLATES-010 Avalonia Desktop Application Template。验收重点：Avalonia Application、desktop lifetime、主窗口、Presentation bootstrap 和 headless/platform smoke。
 
 ## Release Gates
 
