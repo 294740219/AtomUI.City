@@ -9,7 +9,7 @@
     <Description>Project templates for AtomUI.City applications.</Description>
     <Version>$(AtomUICityTemplatesVersion)</Version>
     <IncludeContentInPack>true</IncludeContentInPack>
-    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <IncludeBuildOutput>true</IncludeBuildOutput>
     <IncludeSymbols>false</IncludeSymbols>
     <ContentTargetFolders>content</ContentTargetFolders>
     <NoDefaultExcludes>true</NoDefaultExcludes>

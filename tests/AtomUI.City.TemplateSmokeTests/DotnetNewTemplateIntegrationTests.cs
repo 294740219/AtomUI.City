@@ -1,0 +1,228 @@
+using System.Diagnostics;
+using System.IO.Compression;
+
+namespace AtomUI.City.TemplateSmokeTests;
+
+public sealed class DotnetNewTemplateIntegrationTests
+{
+    [Fact]
+    public async Task PackedTemplatesInstallAndInstantiateWithoutTokenCorruption()
+    {
+        using var workspace = new IntegrationWorkspace();
+        var repositoryRoot = FindRepositoryRoot();
+        var configuration = new DirectoryInfo(AppContext.BaseDirectory).Parent?.Parent?.Name ?? "Debug";
+        var templateProject = Path.Combine(
+            repositoryRoot.FullName,
+            "src",
+            "AtomUI.City.Templates",
+            "AtomUI.City.Templates.csproj");
+
+        await RunDotnetAsync(
+            repositoryRoot.FullName,
+            workspace.DotnetHome,
+            "pack",
+            templateProject,
+            "--configuration",
+            configuration,
+            "--no-build",
+            "--no-restore",
+            "--output",
+            workspace.PackageRoot);
+
+        var packagePath = Assert.Single(Directory.EnumerateFiles(
+            workspace.PackageRoot,
+            "AtomUI.City.Templates.*.nupkg",
+            SearchOption.TopDirectoryOnly));
+        using (var package = ZipFile.OpenRead(packagePath))
+        {
+            Assert.Contains(
+                package.Entries,
+                entry => entry.FullName.Equals(
+                    $"lib/net10.0/AtomUI.City.Templates.dll",
+                    StringComparison.Ordinal));
+        }
+
+        await RunDotnetAsync(
+            repositoryRoot.FullName,
+            workspace.DotnetHome,
+            "new",
+            "install",
+            packagePath,
+            "--debug:custom-hive",
+            workspace.HiveRoot);
+        await RunDotnetAsync(
+            repositoryRoot.FullName,
+            workspace.DotnetHome,
+            "new",
+            "atomui-city-app",
+            "--name",
+            "SalesDesk",
+            "--output",
+            workspace.ApplicationRoot,
+            "--TargetFramework",
+            "net10.0",
+            "--IncludeSample",
+            "true",
+            "--debug:custom-hive",
+            workspace.HiveRoot);
+        await RunDotnetAsync(
+            repositoryRoot.FullName,
+            workspace.DotnetHome,
+            "new",
+            "atomui-city-app",
+            "--name",
+            "MinimalDesk",
+            "--output",
+            workspace.MinimalApplicationRoot,
+            "--debug:custom-hive",
+            workspace.HiveRoot);
+        await RunDotnetAsync(
+            repositoryRoot.FullName,
+            workspace.DotnetHome,
+            "new",
+            "atomui-city-plugin",
+            "--name",
+            "EnginePlugin",
+            "--output",
+            workspace.PluginRoot,
+            "--PluginId",
+            "com.company.engine",
+            "--TargetFramework",
+            "net10.0",
+            "--debug:custom-hive",
+            workspace.HiveRoot);
+
+        Assert.True(File.Exists(Path.Combine(workspace.ApplicationRoot, "SalesDesk.slnx")));
+        Assert.False(File.Exists(Path.Combine(workspace.ApplicationRoot, "src", "SalesDesk", "App.axaml")));
+        Assert.True(File.Exists(Path.Combine(
+            workspace.ApplicationRoot,
+            "src",
+            "SalesDesk",
+            "Samples",
+            "WelcomeViewModel.cs")));
+        Assert.False(Directory.Exists(Path.Combine(
+            workspace.MinimalApplicationRoot,
+            "src",
+            "MinimalDesk",
+            "Samples")));
+
+        var pluginProjectPath = Path.Combine(
+            workspace.PluginRoot,
+            "src",
+            "EnginePlugin",
+            "EnginePlugin.csproj");
+        var manifestPath = Path.Combine(
+            workspace.PluginRoot,
+            "src",
+            "EnginePlugin",
+            "atomui-city",
+            "plugin.json");
+        var pluginProject = File.ReadAllText(pluginProjectPath);
+        var manifest = File.ReadAllText(manifestPath);
+
+        Assert.Contains("<AtomUICityPlugin>true</AtomUICityPlugin>", pluginProject, StringComparison.Ordinal);
+        Assert.Contains("<AtomUICityPluginId>com.company.engine</AtomUICityPluginId>", pluginProject, StringComparison.Ordinal);
+        Assert.DoesNotContain("<EnginePlugin", pluginProject, StringComparison.Ordinal);
+        Assert.Contains("\"pluginId\": \"com.company.engine\"", manifest, StringComparison.Ordinal);
+        Assert.Contains("\"type\": \"EnginePlugin.EnginePluginModule\"", manifest, StringComparison.Ordinal);
+        Assert.DoesNotContain("__PLUGIN_ID__", manifest, StringComparison.Ordinal);
+        Assert.DoesNotContain("__TARGET_FRAMEWORK__", manifest, StringComparison.Ordinal);
+    }
+
+    private static async Task RunDotnetAsync(
+        string workingDirectory,
+        string dotnetHome,
+        params string[] arguments)
+    {
+        var startInfo = new ProcessStartInfo("dotnet")
+        {
+            WorkingDirectory = workingDirectory,
+            RedirectStandardError = true,
+            RedirectStandardOutput = true,
+        };
+        startInfo.Environment["DOTNET_CLI_HOME"] = dotnetHome;
+        startInfo.Environment["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1";
+        startInfo.Environment["DOTNET_NOLOGO"] = "1";
+        startInfo.Environment["DOTNET_CLI_USE_MSBUILD_SERVER"] = "0";
+        startInfo.Environment["MSBUILDDISABLENODEREUSE"] = "1";
+
+        foreach (var argument in arguments)
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+
+        using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Could not start dotnet.");
+        var stdoutTask = process.StandardOutput.ReadToEndAsync();
+        var stderrTask = process.StandardError.ReadToEndAsync();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        try
+        {
+            await process.WaitForExitAsync(timeout.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            process.Kill(entireProcessTree: true);
+            throw new TimeoutException($"dotnet {string.Join(' ', arguments)} timed out.");
+        }
+
+        var stdout = await stdoutTask;
+        var stderr = await stderrTask;
+        Assert.True(
+            process.ExitCode == 0,
+            $"dotnet {string.Join(' ', arguments)} failed.\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}");
+    }
+
+    private static DirectoryInfo FindRepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "AtomUICity.slnx")))
+            {
+                return directory;
+            }
+
+            directory = directory.Parent;
+        }
+
+        throw new DirectoryNotFoundException("Could not locate repository root from test output directory.");
+    }
+
+    private sealed class IntegrationWorkspace : IDisposable
+    {
+        public IntegrationWorkspace()
+        {
+            Root = Path.Combine(Path.GetTempPath(), "AtomUICityDotnetNewTests", Guid.NewGuid().ToString("N"));
+            PackageRoot = Path.Combine(Root, "packages");
+            HiveRoot = Path.Combine(Root, "hive");
+            DotnetHome = Path.Combine(Root, "dotnet-home");
+            ApplicationRoot = Path.Combine(Root, "app");
+            MinimalApplicationRoot = Path.Combine(Root, "minimal-app");
+            PluginRoot = Path.Combine(Root, "plugin");
+            Directory.CreateDirectory(PackageRoot);
+            Directory.CreateDirectory(DotnetHome);
+        }
+
+        public string Root { get; }
+
+        public string PackageRoot { get; }
+
+        public string HiveRoot { get; }
+
+        public string DotnetHome { get; }
+
+        public string ApplicationRoot { get; }
+
+        public string MinimalApplicationRoot { get; }
+
+        public string PluginRoot { get; }
+
+        public void Dispose()
+        {
+            if (Directory.Exists(Root))
+            {
+                Directory.Delete(Root, recursive: true);
+            }
+        }
+    }
+}

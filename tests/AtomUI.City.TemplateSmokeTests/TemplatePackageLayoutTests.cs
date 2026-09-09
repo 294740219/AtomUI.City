@@ -22,6 +22,7 @@ public sealed class TemplatePackageLayoutTests
 
         Assert.Contains(plan.Changes, change => change.Path == "SalesClient.slnx");
         Assert.Contains(plan.Changes, change => change.Path == "Directory.Build.props");
+        Assert.Contains(plan.Changes, change => change.Path == "Directory.Packages.props");
         Assert.Contains(plan.Changes, change => change.Path == "docs/SalesClient.md");
         Assert.Contains(plan.Changes, change => change.Path == "src/SalesClient/SalesClient.csproj");
         Assert.Contains(plan.Changes, change => change.Path == "tests/SalesClient.Tests/SalesClient.Tests.csproj");
@@ -49,6 +50,15 @@ public sealed class TemplatePackageLayoutTests
         Assert.Throws<ArgumentException>(() => TemplateChange.Create("../outside.txt"));
     }
 
+    [Theory]
+    [InlineData("src/CON/file.txt")]
+    [InlineData("src/name./file.txt")]
+    [InlineData("src/invalid?/file.txt")]
+    public void TemplateChangeCreateRejectsNonPortablePaths(string path)
+    {
+        Assert.Throws<ArgumentException>(() => TemplateChange.Create(path));
+    }
+
     [Fact]
     public void TemplatePlanValidateReportsDuplicateNormalizedPath()
     {
@@ -66,6 +76,21 @@ public sealed class TemplatePackageLayoutTests
         Assert.Equal("AUCTPL1002", diagnostic.Code);
         Assert.Equal("src/SalesClient/Program.cs", diagnostic.Context["normalizedPath"]);
         Assert.Equal(@"src\SalesClient\.\Program.cs", diagnostic.Context["path"]);
+    }
+
+    [Fact]
+    public void TemplatePlanValidateTreatsCaseVariantsAsPortableDuplicates()
+    {
+        var plan = new TemplatePlan(
+            "new-app-SalesClient",
+            "atomui city new app",
+            new Dictionary<string, object?>(),
+            [
+                TemplateChange.Create("src/SalesClient/Program.cs"),
+                TemplateChange.Create("SRC/salesclient/program.cs"),
+            ]);
+
+        Assert.Equal("AUCTPL1002", Assert.Single(plan.Validate()).Code);
     }
 
     [Fact]
@@ -143,18 +168,21 @@ public sealed class TemplatePackageLayoutTests
     {
         var root = GetTemplateRoot("atomui-city-plugin");
 
-        Assert.True(File.Exists(Path.Combine(root, "src", "AtomUICityPlugin", "AtomUICityPlugin.csproj")));
-        Assert.True(File.Exists(Path.Combine(root, "src", "AtomUICityPlugin", "AtomUICityPluginModule.cs")));
-        Assert.True(File.Exists(Path.Combine(root, "src", "AtomUICityPlugin", "atomui-city", "plugin.json")));
-        Assert.True(File.Exists(Path.Combine(root, "tests", "AtomUICityPlugin.Tests", "AtomUICityPlugin.Tests.csproj")));
-        Assert.True(File.Exists(Path.Combine(root, "tests", "AtomUICityPlugin.Tests", "PluginPackageTests.cs")));
-        Assert.True(File.Exists(Path.Combine(root, "tests", "AtomUICityPlugin.Tests", "FeatureTestMatrix.md")));
+        Assert.True(File.Exists(Path.Combine(root, "TemplatePlugin.slnx")));
+        Assert.True(File.Exists(Path.Combine(root, "Directory.Build.props")));
+        Assert.True(File.Exists(Path.Combine(root, "Directory.Packages.props")));
+        Assert.True(File.Exists(Path.Combine(root, "src", "TemplatePlugin", "TemplatePlugin.csproj")));
+        Assert.True(File.Exists(Path.Combine(root, "src", "TemplatePlugin", "TemplatePluginModule.cs")));
+        Assert.True(File.Exists(Path.Combine(root, "src", "TemplatePlugin", "atomui-city", "plugin.json")));
+        Assert.True(File.Exists(Path.Combine(root, "tests", "TemplatePlugin.Tests", "TemplatePlugin.Tests.csproj")));
+        Assert.True(File.Exists(Path.Combine(root, "tests", "TemplatePlugin.Tests", "PluginPackageTests.cs")));
+        Assert.True(File.Exists(Path.Combine(root, "tests", "TemplatePlugin.Tests", "FeatureTestMatrix.md")));
     }
 
     [Fact]
     public void PluginTemplateProjectDefinesSingleAssemblyNuGetAndMsBuildMetadata()
     {
-        var projectPath = Path.Combine(GetTemplateRoot("atomui-city-plugin"), "src", "AtomUICityPlugin", "AtomUICityPlugin.csproj");
+        var projectPath = Path.Combine(GetTemplateRoot("atomui-city-plugin"), "src", "TemplatePlugin", "TemplatePlugin.csproj");
         var project = XDocument.Load(projectPath);
         var properties = project
             .Descendants("PropertyGroup")
@@ -167,9 +195,10 @@ public sealed class TemplatePackageLayoutTests
             .Cast<string>()
             .ToHashSet(StringComparer.Ordinal);
 
-        Assert.Equal("AtomUICityPlugin", properties["PackageId"]);
+        Assert.Equal("TemplatePlugin", properties["PackageId"]);
+        Assert.Equal("README.md", properties["PackageReadmeFile"]);
         Assert.Equal("true", properties["AtomUICityPlugin"]);
-        Assert.Equal("PluginId", properties["AtomUICityPluginId"]);
+        Assert.Equal("__PLUGIN_ID__", properties["AtomUICityPluginId"]);
         Assert.Equal("1.0.0", properties["AtomUICityPluginVersion"]);
         Assert.Equal("Plugin.DisplayName", properties["AtomUICityPluginDisplayNameKey"]);
         Assert.Equal("Plugin.Description", properties["AtomUICityPluginDescriptionKey"]);
@@ -179,29 +208,39 @@ public sealed class TemplatePackageLayoutTests
         Assert.Contains("AtomUI.City.Build", packageReferences);
         Assert.Contains("AtomUI.City.Core", packageReferences);
         Assert.Contains("AtomUI.City.PluginSystem", packageReferences);
+
+        var packageItems = project.Descendants("None").ToArray();
+        var packageReadme = Assert.Single(packageItems, item => item.Attribute("Include")?.Value == "../../README.md");
+        Assert.Equal("../../README.md", packageReadme.Attribute("Include")?.Value);
+        Assert.Equal("true", packageReadme.Attribute("Pack")?.Value);
+        Assert.Equal(string.Empty, packageReadme.Attribute("PackagePath")?.Value);
+
+        var packageManifest = Assert.Single(packageItems, item => item.Attribute("Include")?.Value == "atomui-city/plugin.json");
+        Assert.Equal("true", packageManifest.Attribute("Pack")?.Value);
+        Assert.Equal("atomui-city/", packageManifest.Attribute("PackagePath")?.Value);
     }
 
     [Fact]
     public void PluginTemplateManifestMatchesSingleAssemblyContract()
     {
-        var manifestPath = Path.Combine(GetTemplateRoot("atomui-city-plugin"), "src", "AtomUICityPlugin", "atomui-city", "plugin.json");
+        var manifestPath = Path.Combine(GetTemplateRoot("atomui-city-plugin"), "src", "TemplatePlugin", "atomui-city", "plugin.json");
         using var manifest = JsonDocument.Parse(File.ReadAllText(manifestPath));
         var root = manifest.RootElement;
 
         Assert.Equal("1.0", root.GetProperty("schemaVersion").GetString());
-        Assert.Equal("PluginId", root.GetProperty("pluginId").GetString());
-        Assert.Equal("AtomUICityPlugin", root.GetProperty("packageId").GetString());
-        Assert.Equal("AtomUICityPlugin.dll", root.GetProperty("mainAssembly").GetString());
-        Assert.Equal("net10.0", root.GetProperty("targetFramework").GetString());
+        Assert.Equal("__PLUGIN_ID__", root.GetProperty("pluginId").GetString());
+        Assert.Equal("TemplatePlugin", root.GetProperty("packageId").GetString());
+        Assert.Equal("TemplatePlugin.dll", root.GetProperty("mainAssembly").GetString());
+        Assert.Equal("__TARGET_FRAMEWORK__", root.GetProperty("targetFramework").GetString());
         Assert.Equal("1.0", root.GetProperty("pluginApiVersion").GetString());
-        Assert.Equal("AtomUICityPluginModule", root.GetProperty("modules")[0].GetProperty("name").GetString());
-        Assert.Equal("AtomUICityPlugin.AtomUICityPluginModule", root.GetProperty("modules")[0].GetProperty("type").GetString());
+        Assert.Equal("TemplatePluginModule", root.GetProperty("modules")[0].GetProperty("name").GetString());
+        Assert.Equal("TemplatePlugin.TemplatePluginModule", root.GetProperty("modules")[0].GetProperty("type").GetString());
     }
 
     [Fact]
     public void PluginTemplateTestProjectReferencesPluginAndTestingPackage()
     {
-        var testProjectPath = Path.Combine(GetTemplateRoot("atomui-city-plugin"), "tests", "AtomUICityPlugin.Tests", "AtomUICityPlugin.Tests.csproj");
+        var testProjectPath = Path.Combine(GetTemplateRoot("atomui-city-plugin"), "tests", "TemplatePlugin.Tests", "TemplatePlugin.Tests.csproj");
         var project = XDocument.Load(testProjectPath);
         var packageReferences = project
             .Descendants("PackageReference")
@@ -211,10 +250,14 @@ public sealed class TemplatePackageLayoutTests
             .ToHashSet(StringComparer.Ordinal);
         var projectReference = Assert.Single(project.Descendants("ProjectReference"));
 
-        Assert.Equal("../../src/AtomUICityPlugin/AtomUICityPlugin.csproj", projectReference.Attribute("Include")?.Value);
-        Assert.Contains("AtomUI.City.Testing", packageReferences);
+        Assert.Equal("../../src/TemplatePlugin/TemplatePlugin.csproj", projectReference.Attribute("Include")?.Value);
+        Assert.DoesNotContain("AtomUI.City.Testing", packageReferences);
         Assert.Contains("Microsoft.NET.Test.Sdk", packageReferences);
         Assert.Contains("xunit", packageReferences);
+
+        var testSource = File.ReadAllText(Path.Combine(Path.GetDirectoryName(testProjectPath)!, "PluginPackageTests.cs"));
+        Assert.DoesNotContain("AtomUI.City.Testing", testSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("[TestLayer(", testSource, StringComparison.Ordinal);
     }
 
     private static string GetTemplateRoot(string templateName)

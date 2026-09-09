@@ -65,6 +65,8 @@
 
 ### 2. 核心变量
 
+当前 public renderer/CLI 已实现 `AppName`、`RootNamespace`、`TargetFramework`、`UseAot`、`UseDynamicPlugins`、`IncludeTests` 和 `IncludeSample`。NuGet application template 暴露 name、`TargetFramework`、`IncludeSample`；NuGet plugin template 暴露 name、`PluginId`、`TargetFramework`。`ModuleName`、`PageName`、`RoutePath` 和独立 `PackageId` 属于 Planned Feature，不能视为现有 API。
+
 | 变量 | 说明 |
 |---|---|
 | `AppName` | 应用名。 |
@@ -85,7 +87,7 @@
 规则：
 
 - 用户代码使用 `RootNamespace`。
-- 用户项目不使用 `AtomUI.City.*` 命名空间。
+- 用户项目不得使用精确的 `AtomUI.City` 或 `AtomUI.City.*` 命名空间；`AtomUI.Cityscape` 等不同标识符不属于保留空间。
 - 生成测试项目使用 `<RootNamespace>.Tests`。
 - 插件项目使用用户指定或派生的命名空间。
 - 框架扩展方法来自 `AtomUI.City.*` 包。
@@ -121,7 +123,8 @@
 - `RoutePath` 符合路由语法。
 - `PluginId` 符合反向域名建议格式。
 - `PackageId` 符合 NuGet 包名要求。
-- `RootNamespace` 不以 `AtomUI.City` 开头。
+- `RootNamespace` 不得等于 `AtomUI.City` 或以 `AtomUI.City.` 开头。
+- `TargetFramework` 必须采用 `net<major>.<minor>`，可带一个合法平台后缀，不接受任意文本或路径。
 - `UseAot=true` 时不默认启用动态插件。
 - 变量诊断必须包含 `variable`、`rawValue` 和 `rule`。
 - 校验失败时 `ApplicationTemplateRenderer.Render` 不写任何文件。
@@ -135,3 +138,5 @@
 | RoutePath | Unit | 路由语法校验。 |
 | PluginId | Unit | 格式校验。 |
 | AOT 变量 | Unit | AOT 与动态插件冲突诊断。 |
+| Sample 开关 | Unit/TemplateSmoke | false 不生成 sample，true 生成明确位于 `Samples/` 的非业务示例。 |
+| 双入口 | TemplateSmoke | renderer/CLI 与 NuGet template 的共同变量保持相同默认语义；真实实例化后不得残留 token。 |

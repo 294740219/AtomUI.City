@@ -4,6 +4,8 @@
 
 本专题属于 `AtomUI.City.Templates` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `Plugin Template` 相关实现决策，不重新定义模块边界。
 
+Feature：`AUC-TEMPLATES-004`。状态：Completed。模板包必须通过真实 `dotnet new install` 和实例化测试，项目名替换不得修改 `AtomUICityPlugin*` MSBuild 属性名。
+
 ## 设计决策
 
 - 插件来源对象必须绑定 plugin owner。
@@ -73,16 +75,15 @@
 ### 2. 默认结构
 
 ```text
+<PluginName>.slnx
+Directory.Build.props
 src/<PluginName>/
   <PluginName>.csproj
   <PluginName>Module.cs
   atomui-city/plugin.json
-  Resources/
-  Localization/
 tests/<PluginName>.Tests/
   FeatureTestMatrix.md
   PluginPackageTests.cs
-  PluginLifecycleTests.cs
 ```
 
 ### 3. 项目属性
@@ -111,32 +112,18 @@ tests/<PluginName>.Tests/
 规则：
 
 - 不生成单独的公共 `PluginModule` 基类。
-- 插件模块依赖通过模块依赖声明表达。
-- 插件模块贡献必须生成 lease。
-- 插件模块服务进入插件 ServiceScope。
+- 默认 module 继承 Core `ModuleBase`；依赖和 contribution 由开发者按 PluginSystem 合同显式添加。
 
 ### 5. 资源和本地化
 
-默认结构：
-
-```text
-Localization/
-  en-US/
-  zh-CN/
-Resources/
-  assets/
-```
-
-规则：
-
-- 本地化资源必须可懒加载。
-- 语言包可生成 assembly 或 `.locpack`。
-- 插件卸载时资源必须可撤销。
+当前模板不生成资源和本地化目录。插件资源模板属于 `AUC-TEMPLATES-008` 落地后的扩展，不得视为 AUC-TEMPLATES-004 的现有输出。
 
 ### 6. 打包
 
 插件模板必须生成符合 Build 插件打包规则的项目：
 
+- plugin csproj 必须声明 `PackageReadmeFile`，并将根目录 `README.md` 打入包根。
+- plugin csproj 必须显式将 `atomui-city/plugin.json` 打入包内同名目录，不能依赖空的 Build target 隐式完成。
 - `atomui-city/plugin.json` 在模板中提供可读初始 manifest，并由 Build 生成流程继续验证或覆盖。
 - contribution manifests 由 source generator 和 Build task 生成。
 - package 输出到 `output/packages/plugins`。
@@ -144,14 +131,7 @@ Resources/
 
 ### 7. 测试
 
-插件模板默认生成：
-
-- package layout test。
-- plugin manifest test。
-- plugin lifecycle test。
-- contribution lease revoke test。
-- operation cancellation test。
-- unload assertion test。
+生成工作区默认提供 module contract test。模板仓库自身通过 `TemplatePackageLayoutTests` 检查 manifest/MSBuild/package layout，并通过 `DotnetNewTemplateIntegrationTests` 检查真实安装、实例化和 token 隔离。插件 load/unload、lease、operation cancellation 属于 PluginSystem 的测试责任，不由空插件骨架伪造通过。
 
 ### 8. 测试矩阵
 
@@ -159,6 +139,5 @@ Resources/
 |---|---|---|
 | PluginId | Unit/Build | 生成、格式、manifest 字段。 |
 | 包布局 | Build | 单主程序集、plugin.json、资源。 |
-| 模块贡献 | Unit | contribution request、lease。 |
-| 插件生命周期 | Plugin test | load、activate、deactivate、unload。 |
-| 卸载 | Plugin test | operation、subscription、lease、ALC。 |
+| 模块合同 | Unit | 生成 module 继承 `ModuleBase`。 |
+| 模板引擎 | TemplateSmoke | 项目名、PluginId、TFM 分别替换，框架 MSBuild 属性名不变。 |

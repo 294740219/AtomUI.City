@@ -18,6 +18,9 @@
 | `AUCTPL1001` | InvalidTemplatePath | `src/AtomUI.City.Templates/TemplatePlan.cs` |
 | `AUCTPL1002` | DuplicateTemplatePath | `src/AtomUI.City.Templates/TemplatePlan.cs` |
 | `AUCTPL1003` | UnsupportedTemplateChangeType | `src/AtomUI.City.Templates/TemplatePlan.cs` |
+| `AUCTPL1004` | TemplateOutputConflict | `src/AtomUI.City.Templates/ApplicationTemplateRenderer.cs` |
+| `AUCTPL1005` | TemplateOutputFailure | `src/AtomUI.City.Templates/ApplicationTemplateRenderer.cs` |
+| `AUCTPL1006` | TemplateRollbackFailure | `src/AtomUI.City.Templates/ApplicationTemplateRenderer.cs` |
 
 ## 产品级必须诊断的失败
 
@@ -27,7 +30,7 @@
 
 ## 上下文字段
 
-推荐字段：`operationId`、`scopeId`、`module`、`pluginId`、`routeId`、`stateKey`、`eventType`、`handlerType`、`assembly`、`path`、`firstPath`、`normalizedPath`、`type`、`variable`、`rawValue`、`rule`、`featureId`、`threadId`、`attempt`、`transportKind`。
+模板执行诊断必须优先携带 `templateId`、`operationId`、`targetPath` 和 `path`；变量诊断携带 `variable`、`rawValue`、`rule`；plan 诊断携带 `firstPath`、`normalizedPath` 和 `type`；IO/rollback 诊断携带 `errorType`。
 
 ## 诊断缺口处理
 

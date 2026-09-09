@@ -4,6 +4,8 @@
 
 本专题属于 `AtomUI.City.Templates` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `Test Template` 相关实现决策，不重新定义模块边界。
 
+Feature：`AUC-TEMPLATES-005`。状态：Completed。当前随应用和插件工作区生成测试项目，不提供独立 `dotnet new` short name。
+
 ## 设计决策
 
 - 每个 Feature ID 至少有 Unit 或 Contract 测试。

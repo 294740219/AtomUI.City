@@ -1,3 +1,5 @@
+using System.Text;
+
 namespace AtomUI.City.Templates;
 
 public sealed class ApplicationTemplateRenderer
@@ -6,11 +8,32 @@ public sealed class ApplicationTemplateRenderer
     private const string MicrosoftNetTestSdkVersion = "17.14.1";
     private const string XUnitVersion = "2.9.3";
     private const string XUnitRunnerVisualStudioVersion = "3.1.4";
+    private static readonly object RenderGatesSyncRoot = new();
+    private static readonly Dictionary<string, RenderGate> RenderGates = new(GetPathComparer());
 
     public TemplatePlan CreatePlan(ApplicationTemplateOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
+        var diagnostics = options.Validate();
+        if (diagnostics.Count > 0)
+        {
+            throw new ArgumentException(
+                $"Template options are invalid: {string.Join(", ", diagnostics.Select(static diagnostic => diagnostic.Code))}.",
+                nameof(options));
+        }
+
+        var files = CreateFiles(options);
+        return CreatePlan(options, files);
+    }
+
+    private static TemplatePlan CreatePlan(
+        ApplicationTemplateOptions options,
+        IReadOnlyList<TemplateFile> files)
+    {
         var rootNamespace = options.EffectiveRootNamespace;
+        var testTargets = options.IncludeTests
+            ? new[] { $"tests/{options.AppName}.Tests/{options.AppName}.Tests.csproj" }
+            : [];
 
         return new TemplatePlan(
             operationId: $"new-app-{options.AppName}",
@@ -25,7 +48,12 @@ public sealed class ApplicationTemplateRenderer
                 ["useDynamicPlugins"] = options.UseDynamicPlugins,
                 ["includeSample"] = options.IncludeSample,
             },
-            changes: GetChanges(options).ToArray());
+            changes: files.Select(static file => file.Change).ToArray(),
+            buildTargets: [$"src/{options.AppName}/{options.AppName}.csproj"],
+            testTargets: testTargets,
+            docsRequired: [$"docs/{options.AppName}.md"],
+            risks: options.UseDynamicPlugins ? ["dynamic-plugin-runtime"] : [],
+            rollback: files.Select(static file => file.Change.Path).Reverse().ToArray());
     }
 
     public TemplateRenderResult Render(ApplicationTemplateOptions options)
@@ -44,71 +72,331 @@ public sealed class ApplicationTemplateRenderer
             return TemplateRenderResult.Failed([.. optionDiagnostics]);
         }
 
-        var plan = CreatePlan(options);
+        var files = CreateFiles(options);
+        var plan = CreatePlan(options, files);
         var planDiagnostics = plan.Validate();
         if (planDiagnostics.Count > 0)
         {
-            return TemplateRenderResult.Failed([.. planDiagnostics]);
+            return TemplateRenderResult.Failed(plan, [.. planDiagnostics]);
         }
 
-        WriteFile(options, $"{options.AppName}.slnx", CreateSolution(options), cancellationToken);
-        WriteFile(options, "Directory.Build.props", CreateDirectoryBuildProps(), cancellationToken);
-        WriteFile(options, $"docs/{options.AppName}.md", CreateDocsEntry(options), cancellationToken);
-        WriteFile(options, $"src/{options.AppName}/{options.AppName}.csproj", CreateApplicationProject(options), cancellationToken);
-        WriteFile(options, $"src/{options.AppName}/Program.cs", CreateProgram(options), cancellationToken);
-        WriteFile(options, $"src/{options.AppName}/App.axaml", CreateAppXaml(options), cancellationToken);
-        WriteFile(options, $"src/{options.AppName}/App.axaml.cs", CreateAppCodeBehind(options), cancellationToken);
-        WriteFile(options, $"src/{options.AppName}/Modules/.gitkeep", string.Empty, cancellationToken);
-        WriteFile(options, $"src/{options.AppName}/Routes/.gitkeep", string.Empty, cancellationToken);
-        WriteFile(options, $"src/{options.AppName}/Resources/.gitkeep", string.Empty, cancellationToken);
-        WriteFile(options, $"src/{options.AppName}/Configuration/.gitkeep", string.Empty, cancellationToken);
-        WriteFile(options, $"src/{options.AppName}/Localization/.gitkeep", string.Empty, cancellationToken);
-
-        if (options.IncludeTests)
+        var rootPath = Path.GetFullPath(options.OutputPath);
+        var gate = AcquireRenderGate(rootPath);
+        try
         {
-            WriteFile(options, $"tests/{options.AppName}.Tests/{options.AppName}.Tests.csproj", CreateTestProject(options), cancellationToken);
-            WriteFile(options, $"tests/{options.AppName}.Tests/FeatureTestMatrix.md", CreateFeatureTestMatrix(options), cancellationToken);
-            WriteFile(options, $"tests/{options.AppName}.Tests/ApplicationSmokeTests.cs", CreateApplicationSmokeTests(options), cancellationToken);
-        }
+            lock (gate.SyncRoot)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
 
-        return TemplateRenderResult.Success(plan);
+                foreach (var file in files)
+                {
+                    string destination;
+                    try
+                    {
+                        destination = ResolvePath(rootPath, file.Change.Path);
+                        ValidateExistingAncestors(rootPath, destination);
+                    }
+                    catch (Exception exception) when (
+                        exception is IOException or UnauthorizedAccessException or NotSupportedException)
+                    {
+                        return TemplateRenderResult.Failed(
+                            plan,
+                            CreateOutputDiagnostic(
+                                "AUCTPL1005",
+                                $"Template output preflight failed: {exception.GetType().Name}.",
+                                options,
+                                file.Change.Path,
+                                rootPath,
+                                exception));
+                    }
+
+                    if (File.Exists(destination) || Directory.Exists(destination))
+                    {
+                        return TemplateRenderResult.Failed(
+                            plan,
+                            CreateOutputDiagnostic(
+                                "AUCTPL1004",
+                                "Template output already exists.",
+                                options,
+                                file.Change.Path,
+                                destination));
+                    }
+                }
+
+                var createdFiles = new List<string>();
+                var createdDirectories = new List<string>();
+                string? currentRelativePath = null;
+                try
+                {
+                    foreach (var file in files)
+                    {
+                        currentRelativePath = file.Change.Path;
+                        cancellationToken.ThrowIfCancellationRequested();
+                        var destination = ResolvePath(rootPath, file.Change.Path);
+                        EnsureDirectory(rootPath, Path.GetDirectoryName(destination)!, createdDirectories);
+                        WriteNewFile(destination, file.Content, createdFiles);
+                        cancellationToken.ThrowIfCancellationRequested();
+                    }
+
+                    return TemplateRenderResult.Success(
+                        plan,
+                        files.Select(static file => file.Change.Path).ToArray());
+                }
+                catch (OperationCanceledException)
+                {
+                    Rollback(createdFiles, createdDirectories);
+                    throw;
+                }
+                catch (Exception exception) when (
+                    exception is IOException or UnauthorizedAccessException or NotSupportedException)
+                {
+                    var rollbackFailures = Rollback(createdFiles, createdDirectories);
+                    var diagnostics = new List<TemplateDiagnostic>
+                    {
+                        CreateOutputDiagnostic(
+                            "AUCTPL1005",
+                            $"Template output failed: {exception.GetType().Name}.",
+                            options,
+                            currentRelativePath,
+                            rootPath,
+                            exception),
+                    };
+                    diagnostics.AddRange(rollbackFailures);
+                    return TemplateRenderResult.Failed(plan, [.. diagnostics]);
+                }
+            }
+        }
+        finally
+        {
+            ReleaseRenderGate(rootPath, gate);
+        }
     }
 
-    private static IEnumerable<TemplateChange> GetChanges(ApplicationTemplateOptions options)
+    private static IReadOnlyList<TemplateFile> CreateFiles(ApplicationTemplateOptions options)
     {
-        yield return TemplateChange.Create($"{options.AppName}.slnx");
-        yield return TemplateChange.Create("Directory.Build.props");
-        yield return TemplateChange.Create($"docs/{options.AppName}.md");
-        yield return TemplateChange.Create($"src/{options.AppName}/{options.AppName}.csproj");
-        yield return TemplateChange.Create($"src/{options.AppName}/Program.cs");
-        yield return TemplateChange.Create($"src/{options.AppName}/App.axaml");
-        yield return TemplateChange.Create($"src/{options.AppName}/App.axaml.cs");
-        yield return TemplateChange.Create($"src/{options.AppName}/Modules/.gitkeep");
-        yield return TemplateChange.Create($"src/{options.AppName}/Routes/.gitkeep");
-        yield return TemplateChange.Create($"src/{options.AppName}/Resources/.gitkeep");
-        yield return TemplateChange.Create($"src/{options.AppName}/Configuration/.gitkeep");
-        yield return TemplateChange.Create($"src/{options.AppName}/Localization/.gitkeep");
+        var files = new List<TemplateFile>
+        {
+            CreateFile($"{options.AppName}.slnx", CreateSolution(options)),
+            CreateFile("Directory.Build.props", CreateDirectoryBuildProps()),
+            CreateFile("Directory.Packages.props", CreateDirectoryPackagesProps()),
+            CreateFile($"docs/{options.AppName}.md", CreateDocsEntry(options)),
+            CreateFile($"src/{options.AppName}/{options.AppName}.csproj", CreateApplicationProject(options)),
+            CreateFile($"src/{options.AppName}/Program.cs", CreateProgram(options)),
+            CreateFile($"src/{options.AppName}/Modules/.gitkeep", string.Empty),
+            CreateFile($"src/{options.AppName}/Routes/.gitkeep", string.Empty),
+            CreateFile($"src/{options.AppName}/Resources/.gitkeep", string.Empty),
+            CreateFile($"src/{options.AppName}/Configuration/.gitkeep", string.Empty),
+            CreateFile($"src/{options.AppName}/Localization/.gitkeep", string.Empty),
+        };
 
         if (options.IncludeTests)
         {
-            yield return TemplateChange.Create($"tests/{options.AppName}.Tests/{options.AppName}.Tests.csproj");
-            yield return TemplateChange.Create($"tests/{options.AppName}.Tests/FeatureTestMatrix.md");
-            yield return TemplateChange.Create($"tests/{options.AppName}.Tests/ApplicationSmokeTests.cs");
+            files.Add(CreateFile(
+                $"tests/{options.AppName}.Tests/{options.AppName}.Tests.csproj",
+                CreateTestProject(options)));
+            files.Add(CreateFile(
+                $"tests/{options.AppName}.Tests/FeatureTestMatrix.md",
+                CreateFeatureTestMatrix(options)));
+            files.Add(CreateFile(
+                $"tests/{options.AppName}.Tests/ApplicationSmokeTests.cs",
+                CreateApplicationSmokeTests(options)));
+        }
+
+        if (options.IncludeSample)
+        {
+            files.Add(CreateFile(
+                $"src/{options.AppName}/Samples/WelcomeViewModel.cs",
+                CreateWelcomeViewModel(options)));
+        }
+
+        return files.AsReadOnly();
+    }
+
+    private static TemplateFile CreateFile(string path, string content)
+    {
+        return new TemplateFile(TemplateChange.Create(path), content);
+    }
+
+    private static string ResolvePath(string rootPath, string relativePath)
+    {
+        var path = Path.GetFullPath(Path.Combine([rootPath, .. relativePath.Split('/')]));
+        var rootPrefix = Path.TrimEndingDirectorySeparator(rootPath) + Path.DirectorySeparatorChar;
+        if (!path.StartsWith(rootPrefix, GetPathComparison()))
+        {
+            throw new IOException("Template output escaped its target root.");
+        }
+
+        return path;
+    }
+
+    private static void EnsureDirectory(
+        string rootPath,
+        string directory,
+        List<string> createdDirectories)
+    {
+        var missing = new Stack<string>();
+        for (var current = directory;
+             !Directory.Exists(current);
+             current = Path.GetDirectoryName(current) ?? throw new IOException("Template directory has no parent."))
+        {
+            if (File.Exists(current))
+            {
+                throw new IOException("A file blocks a template output directory.");
+            }
+
+            missing.Push(current);
+            if (string.Equals(current, rootPath, GetPathComparison()))
+            {
+                break;
+            }
+        }
+
+        while (missing.TryPop(out var path))
+        {
+            Directory.CreateDirectory(path);
+            createdDirectories.Add(path);
         }
     }
 
-    private static void WriteFile(
+    private static void ValidateExistingAncestors(string rootPath, string destination)
+    {
+        for (var current = Path.GetDirectoryName(destination);
+             current is not null && !string.Equals(current, rootPath, GetPathComparison());
+             current = Path.GetDirectoryName(current))
+        {
+            if (File.Exists(current))
+            {
+                throw new IOException("A file blocks a template output directory.");
+            }
+
+            if (!Directory.Exists(current))
+            {
+                continue;
+            }
+
+            var directory = new DirectoryInfo(current);
+            if (directory.LinkTarget is not null ||
+                directory.Attributes.HasFlag(FileAttributes.ReparsePoint))
+            {
+                throw new IOException("Template output cannot traverse a symbolic link or reparse point.");
+            }
+        }
+    }
+
+    private static void WriteNewFile(string path, string content, List<string> createdFiles)
+    {
+        using var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+        createdFiles.Add(path);
+        using var writer = new StreamWriter(stream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        writer.Write(content);
+    }
+
+    private static IReadOnlyList<TemplateDiagnostic> Rollback(
+        IReadOnlyList<string> createdFiles,
+        IReadOnlyList<string> createdDirectories)
+    {
+        var diagnostics = new List<TemplateDiagnostic>();
+        foreach (var path in createdFiles.Reverse())
+        {
+            try
+            {
+                File.Delete(path);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                diagnostics.Add(CreateRollbackDiagnostic(path, exception));
+            }
+        }
+
+        foreach (var path in createdDirectories.Reverse())
+        {
+            try
+            {
+                if (Directory.Exists(path) && !Directory.EnumerateFileSystemEntries(path).Any())
+                {
+                    Directory.Delete(path);
+                }
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                diagnostics.Add(CreateRollbackDiagnostic(path, exception));
+            }
+        }
+
+        return diagnostics;
+    }
+
+    private static TemplateDiagnostic CreateRollbackDiagnostic(string path, Exception exception)
+    {
+        return new TemplateDiagnostic(
+            "AUCTPL1006",
+            $"Template rollback failed: {exception.GetType().Name}.",
+            new Dictionary<string, object?>
+            {
+                ["templateId"] = "atomui-city-app",
+                ["path"] = path,
+                ["errorType"] = exception.GetType().FullName,
+            });
+    }
+
+    private static TemplateDiagnostic CreateOutputDiagnostic(
+        string code,
+        string message,
         ApplicationTemplateOptions options,
-        string relativePath,
-        string content,
-        CancellationToken cancellationToken)
+        string? relativePath,
+        string targetPath,
+        Exception? exception = null)
     {
-        cancellationToken.ThrowIfCancellationRequested();
+        return new TemplateDiagnostic(
+            code,
+            message,
+            new Dictionary<string, object?>
+            {
+                ["templateId"] = "atomui-city-app",
+                ["targetPath"] = targetPath,
+                ["path"] = relativePath,
+                ["operationId"] = $"new-app-{options.AppName}",
+                ["errorType"] = exception?.GetType().FullName,
+            });
+    }
 
-        var path = Path.Combine([options.OutputPath, .. relativePath.Split('/')]);
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        cancellationToken.ThrowIfCancellationRequested();
-        File.WriteAllText(path, content);
+    private static StringComparer GetPathComparer()
+    {
+        return OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+    }
+
+    private static RenderGate AcquireRenderGate(string rootPath)
+    {
+        lock (RenderGatesSyncRoot)
+        {
+            if (!RenderGates.TryGetValue(rootPath, out var gate))
+            {
+                gate = new RenderGate();
+                RenderGates.Add(rootPath, gate);
+            }
+
+            gate.ReferenceCount++;
+            return gate;
+        }
+    }
+
+    private static void ReleaseRenderGate(string rootPath, RenderGate gate)
+    {
+        lock (RenderGatesSyncRoot)
+        {
+            gate.ReferenceCount--;
+            if (gate.ReferenceCount == 0 &&
+                RenderGates.TryGetValue(rootPath, out var registered) &&
+                ReferenceEquals(registered, gate))
+            {
+                RenderGates.Remove(rootPath);
+            }
+        }
+    }
+
+    private static StringComparison GetPathComparison()
+    {
+        return OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
     }
 
     private static string CreateSolution(ApplicationTemplateOptions options)
@@ -141,6 +429,19 @@ public sealed class ApplicationTemplateRenderer
                 <ImplicitUsings>enable</ImplicitUsings>
                 <LangVersion>latest</LangVersion>
                 <WarningsAsErrors>Nullable</WarningsAsErrors>
+              </PropertyGroup>
+
+            </Project>
+            """;
+    }
+
+    private static string CreateDirectoryPackagesProps()
+    {
+        return """
+            <Project>
+
+              <PropertyGroup>
+                <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
               </PropertyGroup>
 
             </Project>
@@ -185,7 +486,7 @@ public sealed class ApplicationTemplateRenderer
             <Project Sdk="Microsoft.NET.Sdk">
 
               <PropertyGroup>
-                <OutputType>WinExe</OutputType>
+                <OutputType>Exe</OutputType>
                 <TargetFramework>{{options.TargetFramework}}</TargetFramework>
                 <RootNamespace>{{rootNamespace}}</RootNamespace>
                 <ImplicitUsings>enable</ImplicitUsings>
@@ -199,7 +500,6 @@ public sealed class ApplicationTemplateRenderer
                 <PackageReference Include="AtomUI.City.Core" Version="{{AtomUICityPackageVersion}}" />
                 <PackageReference Include="AtomUI.City.Mvvm" Version="{{AtomUICityPackageVersion}}" />
                 <PackageReference Include="AtomUI.City.Routing" Version="{{AtomUICityPackageVersion}}" />
-                <PackageReference Include="AtomUI.City.Presentation" Version="{{AtomUICityPackageVersion}}" />
                 <PackageReference Include="AtomUI.City.Localization" Version="{{AtomUICityPackageVersion}}" />
             {{dynamicPlugins}}
               </ItemGroup>
@@ -267,7 +567,6 @@ public sealed class ApplicationTemplateRenderer
               </PropertyGroup>
 
               <ItemGroup>
-                <PackageReference Include="AtomUI.City.Testing" Version="{{AtomUICityPackageVersion}}" />
                 <PackageReference Include="Microsoft.NET.Test.Sdk" Version="{{MicrosoftNetTestSdkVersion}}" />
                 <PackageReference Include="xunit" Version="{{XUnitVersion}}" />
                 <PackageReference Include="xunit.runner.visualstudio" Version="{{XUnitRunnerVisualStudioVersion}}" PrivateAssets="all" />
@@ -282,35 +581,6 @@ public sealed class ApplicationTemplateRenderer
               </ItemGroup>
 
             </Project>
-            """;
-    }
-
-    private static string CreateAppXaml(ApplicationTemplateOptions options)
-    {
-        var rootNamespace = options.EffectiveRootNamespace;
-
-        return $$"""
-            <Application
-                x:Class="{{rootNamespace}}.App"
-                xmlns="https://github.com/avaloniaui"
-                xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-            </Application>
-            """;
-    }
-
-    private static string CreateAppCodeBehind(ApplicationTemplateOptions options)
-    {
-        var rootNamespace = options.EffectiveRootNamespace;
-
-        return $$"""
-            namespace {{rootNamespace}};
-
-            public sealed partial class App
-            {
-                public void Initialize()
-                {
-                }
-            }
             """;
     }
 
@@ -330,19 +600,61 @@ public sealed class ApplicationTemplateRenderer
         var rootNamespace = options.EffectiveRootNamespace;
 
         return $$"""
-            using AtomUI.City.Testing;
+            using AtomUI.City.Core.Hosting;
+            using AtomUI.City.Core.Lifecycle;
 
             namespace {{rootNamespace}}.Tests;
 
             public sealed class ApplicationSmokeTests
             {
-                [TestLayer(TestLayerNames.TemplateSmoke)]
                 [Fact]
-                public void ApplicationTemplateContainsSmokeTest()
+                public async Task ApplicationHostStartsAndStops()
                 {
-                    Assert.True(true);
+                    var builder = ApplicationHost.CreateBuilder();
+                    builder.ConfigureHost(hostOptions =>
+                    {
+                        hostOptions.ApplicationId = "{{rootNamespace}}.Tests";
+                        hostOptions.ApplicationName = "{{options.AppName}} Tests";
+                    });
+
+                    await using var host = builder.Build();
+                    await host.StartAsync();
+                    Assert.Equal(LifecycleScopeState.Running, host.HostScope.State);
+
+                    await host.StopAsync();
+                    Assert.Equal(LifecycleScopeState.Stopped, host.HostScope.State);
                 }
             }
             """;
+    }
+
+    private static string CreateWelcomeViewModel(ApplicationTemplateOptions options)
+    {
+        var rootNamespace = options.EffectiveRootNamespace;
+        return $$"""
+            using AtomUI.City.Mvvm;
+
+            namespace {{rootNamespace}}.Samples;
+
+            public sealed class WelcomeViewModel : ViewModelBase
+            {
+                private string _message = "AtomUI.City";
+
+                public string Message
+                {
+                    get => _message;
+                    set => SetProperty(ref _message, value);
+                }
+            }
+            """;
+    }
+
+    private sealed record TemplateFile(TemplateChange Change, string Content);
+
+    private sealed class RenderGate
+    {
+        public object SyncRoot { get; } = new();
+
+        public int ReferenceCount { get; set; }
     }
 }

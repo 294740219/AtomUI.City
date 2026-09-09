@@ -21,7 +21,9 @@ Templates 生成 Host 应用骨架，但不参与 Host 运行时。
 
 ## Host Shutdown / 执行结束行为
 
-- render 失败必须返回已计划或已写入变更。
+- render 成功返回完整 plan 和 AppliedPaths；验证或写入失败返回 plan（若已建立）与 diagnostics，AppliedPaths 为空。
+- render 取消在回滚本次已创建文件后抛 `OperationCanceledException`，不返回伪成功结果。
+- 同目标并发调用等待同一个 keyed gate；前一调用完成后，后一调用重新预检并确定成功或冲突。
 - dry-run 不写文件。
 - 文件冲突默认失败。
 

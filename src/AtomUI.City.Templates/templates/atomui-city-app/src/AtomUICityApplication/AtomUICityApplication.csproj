@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>__TARGET_FRAMEWORK__</TargetFramework>
+    <RootNamespace>AtomUICityApplication</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AtomUICityManifestGeneration>true</AtomUICityManifestGeneration>
+    <AtomUICityAotFriendly>false</AtomUICityAotFriendly>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AtomUI.City.Build" Version="1.0.0" PrivateAssets="all" />
+    <PackageReference Include="AtomUI.City.Core" Version="1.0.0" />
+    <PackageReference Include="AtomUI.City.Mvvm" Version="1.0.0" />
+    <PackageReference Include="AtomUI.City.Routing" Version="1.0.0" />
+    <PackageReference Include="AtomUI.City.Localization" Version="1.0.0" />
+  </ItemGroup>
+
+</Project>

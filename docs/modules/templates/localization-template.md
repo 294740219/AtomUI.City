@@ -4,6 +4,8 @@
 
 本专题属于 `AtomUI.City.Templates` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `Localization Template` 相关实现决策，不重新定义模块边界。
 
+Feature：`AUC-TEMPLATES-008`。状态：Planned。当前只有设计，不存在可调用模板或自动化验收。
+
 ## 设计决策
 
 - 语言包按当前 culture 懒加载。

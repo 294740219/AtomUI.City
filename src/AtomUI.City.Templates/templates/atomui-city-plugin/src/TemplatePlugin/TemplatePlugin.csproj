@@ -1,16 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <RootNamespace>AtomUICityPlugin</RootNamespace>
+    <TargetFramework>__TARGET_FRAMEWORK__</TargetFramework>
+    <RootNamespace>TemplatePlugin</RootNamespace>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <PackageId>AtomUICityPlugin</PackageId>
+    <PackageId>TemplatePlugin</PackageId>
     <Version>1.0.0</Version>
     <Authors>Company</Authors>
     <Description>AtomUI.City plugin.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <AtomUICityPlugin>true</AtomUICityPlugin>
-    <AtomUICityPluginId>PluginId</AtomUICityPluginId>
+    <AtomUICityPluginId>__PLUGIN_ID__</AtomUICityPluginId>
     <AtomUICityPluginVersion>1.0.0</AtomUICityPluginVersion>
     <AtomUICityPluginPublisher>Company</AtomUICityPluginPublisher>
     <AtomUICityPluginDisplayNameKey>Plugin.DisplayName</AtomUICityPluginDisplayNameKey>
@@ -28,6 +29,11 @@
     <PackageReference Include="AtomUI.City.Build" Version="1.0.0" PrivateAssets="all" />
     <PackageReference Include="AtomUI.City.Core" Version="1.0.0" />
     <PackageReference Include="AtomUI.City.PluginSystem" Version="1.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="../../README.md" Pack="true" PackagePath="" />
+    <None Include="atomui-city/plugin.json" Pack="true" PackagePath="atomui-city/" />
   </ItemGroup>
 
 </Project>

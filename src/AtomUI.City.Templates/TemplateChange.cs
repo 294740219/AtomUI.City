@@ -54,6 +54,16 @@ public sealed record TemplateChange(string Type, string Path)
                 return false;
             }
 
+            if (segment.Any(static character =>
+                    char.IsControl(character) || character is '<' or '>' or ':' or '"' or '|' or '?' or '*') ||
+                segment.EndsWith(' ') ||
+                segment.EndsWith('.') ||
+                IsReservedWindowsName(segment))
+            {
+                error = "Template path contains a non-portable segment.";
+                return false;
+            }
+
             segments.Add(segment);
         }
 
@@ -70,5 +80,22 @@ public sealed record TemplateChange(string Type, string Path)
     private static bool IsWindowsRootedPath(string path)
     {
         return path.Length >= 2 && char.IsLetter(path[0]) && path[1] == ':';
+    }
+
+    private static bool IsReservedWindowsName(string segment)
+    {
+        var stem = segment.Split('.')[0];
+        if (stem.Equals("CON", StringComparison.OrdinalIgnoreCase) ||
+            stem.Equals("PRN", StringComparison.OrdinalIgnoreCase) ||
+            stem.Equals("AUX", StringComparison.OrdinalIgnoreCase) ||
+            stem.Equals("NUL", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return stem.Length == 4 &&
+            (stem.StartsWith("COM", StringComparison.OrdinalIgnoreCase) ||
+                stem.StartsWith("LPT", StringComparison.OrdinalIgnoreCase)) &&
+            stem[3] is >= '1' and <= '9';
     }
 }

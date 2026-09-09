@@ -1,13 +1,13 @@
 {
   "schemaVersion": "1.0",
-  "pluginId": "PluginId",
-  "packageId": "AtomUICityPlugin",
+  "pluginId": "__PLUGIN_ID__",
+  "packageId": "TemplatePlugin",
   "version": "1.0.0",
   "displayNameKey": "Plugin.DisplayName",
   "descriptionKey": "Plugin.Description",
   "publisher": "Company",
-  "mainAssembly": "AtomUICityPlugin.dll",
-  "targetFramework": "net10.0",
+  "mainAssembly": "TemplatePlugin.dll",
+  "targetFramework": "__TARGET_FRAMEWORK__",
   "pluginApiVersion": "1.0",
   "minHostVersion": "1.0.0",
   "unloadable": true,
@@ -19,8 +19,8 @@
   },
   "modules": [
     {
-      "name": "AtomUICityPluginModule",
-      "type": "AtomUICityPlugin.AtomUICityPluginModule"
+      "name": "TemplatePluginModule",
+      "type": "TemplatePlugin.TemplatePluginModule"
     }
   ]
 }

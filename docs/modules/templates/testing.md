@@ -21,11 +21,16 @@
 
 | Feature ID | Test Type | Test File | Required Assertions | Failure Paths | Status |
 | --- | --- | --- | --- | --- | --- |
-| AUC-TEMPLATES-001 | TemplateSmoke | ApplicationTemplateBuildSmokeTests | 断言生成、restore/build/test、命名空间、包引用、solution、Directory.Build、docs entry、无绝对路径。 | 缺少 solution、Directory.Build、docs entry 或生成项目无法 restore/build/test 必须失败。 | Completed |
-| AUC-TEMPLATES-002 | TemplateSmoke | TemplatePackageLayoutTests | 断言 required files、路径规范化、重复文件、路径逃逸和 package id。 | 路径逃逸返回 `AUCTPL1001` 或参数异常；重复 normalized path 返回 `AUCTPL1002`；非法 change type 返回 `AUCTPL1003`。 | Completed |
+| AUC-TEMPLATES-001 | TemplateSmoke | ApplicationTemplateBuildSmokeTests | 断言生成、restore/build/test、Host start/stop、命名空间、包引用、solution、Directory.Build、Directory.Packages、docs entry、无绝对路径、冲突、回滚和并发。 | 缺少工作区文件、父级 CPM 污染、生成项目无法 restore/build/test、已有文件被覆盖、失败残留半成品或同目录并发混写必须失败。 | Completed |
+| AUC-TEMPLATES-002 | TemplateSmoke | TemplatePackageLayoutTests, DotnetNewTemplateIntegrationTests | 断言 required files、路径规范化、非可移植路径、大小写重复、路径逃逸、package id、runtime assembly 和真实模板包安装。 | 路径逃逸返回 `AUCTPL1001` 或参数异常；重复 normalized path 返回 `AUCTPL1002`；非法 change type 返回 `AUCTPL1003`。 | Completed |
 | AUC-TEMPLATES-003 | TemplateSmoke | ApplicationTemplateBuildSmokeTests | 断言变量默认值、非法值、命名空间生成和错误消息。 | 非法 identifier、保留字、空值、路径片段非法返回 `AUCTPL0001`；框架命名空间返回 `AUCTPL0002`；AOT/dynamic plugin 冲突返回 `AUCTPL0301`。 | Completed |
-| AUC-TEMPLATES-004 | TemplateSmoke | TemplatePackageLayoutTests | 断言单 assembly、NuGet metadata、manifest、msbuild 属性和测试项目。 | 缺少 plugin project、manifest、module、MSBuild 属性、NuGet metadata 或测试项目必须失败。 | Completed |
+| AUC-TEMPLATES-004 | TemplateSmoke | TemplatePackageLayoutTests, DotnetNewTemplateIntegrationTests | 断言单 assembly、NuGet metadata、manifest、MSBuild 属性、测试项目、项目重命名和 PluginId/TFM 替换。 | 缺少 plugin project、manifest、module、MSBuild 属性、NuGet metadata、测试项目，或 sourceName 污染框架属性名必须失败。 | Completed |
 | AUC-TEMPLATES-005 | TemplateSmoke | ApplicationTemplateBuildSmokeTests | 断言测试项目 build/test、TestLayer、Testing 引用边界和命名规则。 | 测试项目名非法、生产项目误引用 Testing、缺失 TestLayer 失败。 | Completed |
+| AUC-TEMPLATES-006 | TemplateSmoke/Build | Pending | 模块声明、依赖图、注册和 manifest 输入。 | 未实现。 | Planned |
+| AUC-TEMPLATES-007 | TemplateSmoke/Platform | Pending | View/ViewModel、route、Presentation binding。 | 未实现。 | Planned |
+| AUC-TEMPLATES-008 | TemplateSmoke/Generator | Pending | culture package、fallback、manifest。 | 未实现。 | Planned |
+| AUC-TEMPLATES-009 | TemplateSmoke | Pending | Options binding、validation、reload policy。 | 未实现。 | Planned |
+| AUC-TEMPLATES-010 | TemplateSmoke/Platform | Pending | Avalonia Application、desktop lifetime、主窗口、Presentation bootstrap。 | 未实现。 | Planned |
 
 ## 缺口处理
 

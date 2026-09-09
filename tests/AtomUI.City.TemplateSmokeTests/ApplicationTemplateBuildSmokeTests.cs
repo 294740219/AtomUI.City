@@ -110,12 +110,13 @@ public sealed class ApplicationTemplateBuildSmokeTests
 
         Assert.Equal("Company.SalesClient.Tests", rootNamespace);
         Assert.DoesNotContain("AtomUI.City.Testing", appPackageReferences);
-        Assert.Contains("AtomUI.City.Testing", testPackageReferences);
+        Assert.DoesNotContain("AtomUI.City.Testing", testPackageReferences);
         Assert.Contains("../../src/SalesClient/SalesClient.csproj", projectReferences);
 
         var smokeTest = File.ReadAllText(testSourcePath);
-        Assert.Contains("using AtomUI.City.Testing;", smokeTest, StringComparison.Ordinal);
-        Assert.Contains("[TestLayer(TestLayerNames.TemplateSmoke)]", smokeTest, StringComparison.Ordinal);
+        Assert.DoesNotContain("using AtomUI.City.Testing;", smokeTest, StringComparison.Ordinal);
+        Assert.DoesNotContain("[TestLayer(", smokeTest, StringComparison.Ordinal);
+        Assert.Contains("host.HostScope.State", smokeTest, StringComparison.Ordinal);
         Assert.Contains("namespace Company.SalesClient.Tests;", smokeTest, StringComparison.Ordinal);
     }
 
@@ -136,10 +137,12 @@ public sealed class ApplicationTemplateBuildSmokeTests
 
         var solutionPath = Path.Combine(workspace.Root, "SalesClient.slnx");
         var directoryBuildPropsPath = Path.Combine(workspace.Root, "Directory.Build.props");
+        var directoryPackagesPropsPath = Path.Combine(workspace.Root, "Directory.Packages.props");
         var docsEntryPath = Path.Combine(workspace.Root, "docs", "SalesClient.md");
 
         Assert.True(File.Exists(solutionPath), $"Expected generated solution at {solutionPath}.");
         Assert.True(File.Exists(directoryBuildPropsPath), $"Expected Directory.Build.props at {directoryBuildPropsPath}.");
+        Assert.True(File.Exists(directoryPackagesPropsPath), $"Expected Directory.Packages.props at {directoryPackagesPropsPath}.");
         Assert.True(File.Exists(docsEntryPath), $"Expected docs entry at {docsEntryPath}.");
 
         var solution = File.ReadAllText(solutionPath);
@@ -149,6 +152,10 @@ public sealed class ApplicationTemplateBuildSmokeTests
         var directoryBuildProps = File.ReadAllText(directoryBuildPropsPath);
         Assert.Contains("<Nullable>enable</Nullable>", directoryBuildProps, StringComparison.Ordinal);
         Assert.Contains("<LangVersion>latest</LangVersion>", directoryBuildProps, StringComparison.Ordinal);
+        Assert.Contains(
+            "<ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>",
+            File.ReadAllText(directoryPackagesPropsPath),
+            StringComparison.Ordinal);
 
         var docsEntry = File.ReadAllText(docsEntryPath);
         Assert.Contains("Company.SalesClient", docsEntry, StringComparison.Ordinal);
@@ -196,7 +203,17 @@ public sealed class ApplicationTemplateBuildSmokeTests
         Assert.True(File.Exists(solutionPath), $"Expected generated solution at {solutionPath}.");
 
         var repositoryRoot = FindRepositoryRoot();
-        var packageSource = Path.Combine(repositoryRoot.FullName, "output", "NuGet", "Debug");
+        var configuration = Environment.GetEnvironmentVariable("CONFIGURATION");
+        if (string.IsNullOrWhiteSpace(configuration))
+        {
+            configuration = new DirectoryInfo(AppContext.BaseDirectory).Parent?.Parent?.Name ?? "Debug";
+        }
+
+        var packageSource = Environment.GetEnvironmentVariable("ATOMUI_CITY_PACKAGE_SOURCE");
+        if (string.IsNullOrWhiteSpace(packageSource))
+        {
+            packageSource = Path.Combine(repositoryRoot.FullName, "output", "NuGet", configuration);
+        }
         Assert.True(Directory.Exists(packageSource), $"Expected local package source at {packageSource}.");
         var corePackagePath = Path.Combine(packageSource, "AtomUI.City.Core.1.0.0.nupkg");
         Assert.True(File.Exists(corePackagePath), $"Expected Core package at {corePackagePath}.");
@@ -365,6 +382,173 @@ public sealed class ApplicationTemplateBuildSmokeTests
             cancellation.Token));
         Assert.False(Directory.Exists(Path.Combine(workspace.Root, "src", "SalesClient")));
         Assert.False(Directory.Exists(Path.Combine(workspace.Root, "tests", "SalesClient.Tests")));
+    }
+
+    [Fact]
+    public void ApplicationTemplatePlanAndAppliedPathsUseTheSameFileSet()
+    {
+        using var workspace = new TemplateSmokeWorkspace();
+        var renderer = new ApplicationTemplateRenderer();
+        var options = new ApplicationTemplateOptions
+        {
+            AppName = "SalesClient",
+            RootNamespace = "Company.SalesClient",
+            OutputPath = workspace.Root,
+            IncludeTests = true,
+            IncludeSample = true,
+        };
+
+        var plan = renderer.CreatePlan(options);
+        var result = renderer.Render(options);
+
+        Assert.True(result.Succeeded);
+        Assert.NotNull(result.Plan);
+        Assert.Equal(plan.Changes.Select(change => change.Path), result.AppliedPaths);
+        Assert.Equal(plan.Changes.Select(change => change.Path), result.Plan.Changes.Select(change => change.Path));
+        Assert.Equal(["src/SalesClient/SalesClient.csproj"], plan.BuildTargets);
+        Assert.Equal(["tests/SalesClient.Tests/SalesClient.Tests.csproj"], plan.TestTargets);
+        Assert.Equal(["docs/SalesClient.md"], plan.DocsRequired);
+        Assert.Contains("src/SalesClient/Samples/WelcomeViewModel.cs", result.AppliedPaths);
+    }
+
+    [Fact]
+    public void ApplicationTemplateRenderDoesNotOverwriteExistingFile()
+    {
+        using var workspace = new TemplateSmokeWorkspace();
+        var existingPath = Path.Combine(workspace.Root, "SalesClient.slnx");
+        File.WriteAllText(existingPath, "existing");
+        var renderer = new ApplicationTemplateRenderer();
+
+        var result = renderer.Render(CreateOptions(workspace.Root));
+
+        Assert.False(result.Succeeded);
+        Assert.Empty(result.AppliedPaths);
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal("AUCTPL1004", diagnostic.Code);
+        Assert.Equal("SalesClient.slnx", diagnostic.Context["path"]);
+        Assert.Equal("existing", File.ReadAllText(existingPath));
+        Assert.False(Directory.Exists(Path.Combine(workspace.Root, "src")));
+    }
+
+    [Fact]
+    public void ApplicationTemplateRenderRollsBackFilesWhenParentPathIsBlocked()
+    {
+        using var workspace = new TemplateSmokeWorkspace();
+        File.WriteAllText(Path.Combine(workspace.Root, "src"), "blocked");
+        var renderer = new ApplicationTemplateRenderer();
+
+        var result = renderer.Render(CreateOptions(workspace.Root));
+
+        Assert.False(result.Succeeded);
+        Assert.Empty(result.AppliedPaths);
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal("AUCTPL1005", diagnostic.Code);
+        Assert.Equal("src/SalesClient/SalesClient.csproj", diagnostic.Context["path"]);
+        Assert.False(File.Exists(Path.Combine(workspace.Root, "SalesClient.slnx")));
+        Assert.False(File.Exists(Path.Combine(workspace.Root, "Directory.Build.props")));
+        Assert.False(Directory.Exists(Path.Combine(workspace.Root, "docs")));
+        Assert.Equal("blocked", File.ReadAllText(Path.Combine(workspace.Root, "src")));
+    }
+
+    [Fact]
+    public async Task ConcurrentRendersToSameTargetProduceOneCompleteResult()
+    {
+        using var workspace = new TemplateSmokeWorkspace();
+        var renderer = new ApplicationTemplateRenderer();
+        var options = CreateOptions(workspace.Root);
+
+        var results = await Task.WhenAll(
+            Task.Run(() => renderer.Render(options)),
+            Task.Run(() => renderer.Render(options)));
+
+        var success = Assert.Single(results, result => result.Succeeded);
+        var conflict = Assert.Single(results, result => !result.Succeeded);
+        Assert.Equal(success.Plan!.Changes.Count, success.AppliedPaths.Count);
+        Assert.Equal("AUCTPL1004", Assert.Single(conflict.Diagnostics).Code);
+        Assert.All(success.AppliedPaths, path => Assert.True(File.Exists(Path.Combine(workspace.Root, path.Replace('/', Path.DirectorySeparatorChar)))));
+    }
+
+    [Theory]
+    [InlineData("class")]
+    [InlineData("9Client")]
+    [InlineData("Sales-Client")]
+    public void ApplicationTemplateRejectsInvalidCSharpIdentifiers(string appName)
+    {
+        using var workspace = new TemplateSmokeWorkspace();
+        var renderer = new ApplicationTemplateRenderer();
+        var options = CreateOptions(workspace.Root, appName);
+
+        var result = renderer.Render(options);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("AUCTPL0001", Assert.Single(result.Diagnostics).Code);
+        Assert.Empty(Directory.EnumerateFileSystemEntries(workspace.Root));
+        Assert.Throws<ArgumentException>(() => renderer.CreatePlan(options));
+    }
+
+    [Fact]
+    public void FrameworkLikeButNonReservedNamespaceIsAccepted()
+    {
+        using var workspace = new TemplateSmokeWorkspace();
+        var renderer = new ApplicationTemplateRenderer();
+
+        var result = renderer.Render(new ApplicationTemplateOptions
+        {
+            AppName = "Cityscape",
+            RootNamespace = "AtomUI.Cityscape",
+            OutputPath = workspace.Root,
+        });
+
+        Assert.True(result.Succeeded);
+    }
+
+    [Theory]
+    [InlineData("abc")]
+    [InlineData("net")]
+    [InlineData("net10")]
+    [InlineData("net10.x")]
+    [InlineData("net10.0-")]
+    [InlineData("net10.0-windows-")]
+    public void ApplicationTemplateRejectsMalformedTargetFramework(string targetFramework)
+    {
+        using var workspace = new TemplateSmokeWorkspace();
+        var renderer = new ApplicationTemplateRenderer();
+
+        var result = renderer.Render(new ApplicationTemplateOptions
+        {
+            AppName = "SalesClient",
+            RootNamespace = "Company.SalesClient",
+            OutputPath = workspace.Root,
+            TargetFramework = targetFramework,
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("targetFramework", Assert.Single(result.Diagnostics).Context["variable"]);
+        Assert.Empty(Directory.EnumerateFileSystemEntries(workspace.Root));
+    }
+
+    [Fact]
+    public void FailedResultRequiresDiagnosticAndNeverReportsSuccess()
+    {
+        Assert.Throws<ArgumentException>(() => TemplateRenderResult.Failed());
+
+        var result = TemplateRenderResult.Failed(new TemplateDiagnostic("AUCTPL9999", "Failure."));
+
+        Assert.False(result.Succeeded);
+        Assert.Null(result.Plan);
+        Assert.Empty(result.AppliedPaths);
+    }
+
+    private static ApplicationTemplateOptions CreateOptions(string outputPath, string appName = "SalesClient")
+    {
+        return new ApplicationTemplateOptions
+        {
+            AppName = appName,
+            RootNamespace = "Company.SalesClient",
+            OutputPath = outputPath,
+            TargetFramework = "net10.0",
+            IncludeTests = true,
+        };
     }
 
     private static async Task RunDotnetAsync(

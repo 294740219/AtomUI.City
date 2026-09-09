@@ -75,20 +75,25 @@ Templates 的生成结果必须可构建、可测试、符合 Build 约定，并
 - severity。
 - remediation message。
 
-### 3. 错误码建议
+### 3. 错误码登记
 
-| Code | 含义 |
-|---|---|
-| `AUCTPL0001` | 模板变量无效。 |
-| `AUCTPL0002` | `RootNamespace` 不能使用框架命名空间。 |
-| `AUCTPL0101` | RoutePath 无效。 |
-| `AUCTPL0201` | PluginId 无效。 |
-| `AUCTPL0301` | AOT 模式和动态插件配置冲突。 |
-| `AUCTPL0401` | 生成结果缺少测试矩阵。 |
-| `AUCTPL0501` | 生成结果不符合 Build 输出约定。 |
-| `AUCTPL1001` | 模板路径非法或逃逸 package root。 |
-| `AUCTPL1002` | 模板计划包含重复 normalized path。 |
-| `AUCTPL1003` | 模板计划包含不支持的 change type。 |
+下表中 `Current` 由当前源码产生；`Planned` 只为对应未实现 Feature 预留，不属于可依赖的 1.0 诊断合同。
+
+| Code | 含义 | 状态 |
+|---|---|---|
+| `AUCTPL0001` | 模板变量无效。 | Current |
+| `AUCTPL0002` | `RootNamespace` 不能使用框架命名空间。 | Current |
+| `AUCTPL0101` | RoutePath 无效。 | Planned / AUC-TEMPLATES-007 |
+| `AUCTPL0201` | PluginId 无效。 | Planned；当前由 PluginSystem Build 校验承接 |
+| `AUCTPL0301` | AOT 模式和动态插件配置冲突。 | Current |
+| `AUCTPL0401` | 生成结果缺少测试矩阵。 | Planned |
+| `AUCTPL0501` | 生成结果不符合 Build 输出约定。 | Planned |
+| `AUCTPL1001` | 模板路径非法或逃逸 package root。 | Current |
+| `AUCTPL1002` | 模板计划包含重复 normalized path。 | Current |
+| `AUCTPL1003` | 模板计划包含不支持的 change type。 | Current |
+| `AUCTPL1004` | 输出目标已存在。 | Current |
+| `AUCTPL1005` | 输出预检或写入失败。 | Current |
+| `AUCTPL1006` | 写入失败后的回滚失败。 | Current |
 
 ### 4. 测试类型
 
@@ -105,14 +110,14 @@ Templates 的生成结果必须可构建、可测试、符合 Build 约定，并
 必须覆盖：
 
 - 应用模板生成。
-- 模块模板生成。
-- 页面模板生成。
 - 插件模板生成。
 - 测试模板生成。
 - 生成后 restore。
 - 生成后 build。
 - manifest 生成。
 - 插件包 layout validation。
+
+模块、页面、本地化、配置和 Avalonia desktop smoke 在对应 Planned Feature 实现前不得列为已覆盖。
 
 ### 6. 禁止事项测试
 

@@ -4,6 +4,8 @@
 
 本专题属于 `AtomUI.City.Templates` 模块文档体系，必须与 [overview.md](overview.md)、[features.md](features.md)、[api-contracts.md](api-contracts.md)、[testing.md](testing.md) 保持一致。它只细化 `Page Template` 相关实现决策，不重新定义模块边界。
 
+Feature：`AUC-TEMPLATES-007`。状态：Planned。当前只有设计，必须等待 Presentation 生成合同稳定后实现和验收。
+
 ## 设计决策
 
 - 本专题必须绑定 Feature ID。

@@ -61,19 +61,18 @@
 
 ### 1. 目标
 
-应用模板用于创建一个可运行的 AtomUI.City 桌面应用。它必须体现框架默认编程范式，但不引入业务概念。
+当前应用模板用于创建一个可运行的 AtomUI.City Host 应用工作区。它体现框架默认启动、工程和测试范式，但不伪造尚未接线的 UI；真正的 Avalonia desktop lifetime 由 `AUC-TEMPLATES-010` 承接。
 
 ### 2. 默认结构
 
 ```text
 <AppName>.slnx
 Directory.Build.props
+Directory.Packages.props
 docs/<AppName>.md
 src/<AppName>/
   <AppName>.csproj
   Program.cs
-  App.axaml
-  App.axaml.cs
   Modules/
   Routes/
   Resources/
@@ -93,22 +92,20 @@ tests/<AppName>.Tests/
 - Lifecycle 接入。
 - ModuleSystem 接入。
 - Routing 接入。
-- Presentation 接入。
 - Localization 接入。
 - `AtomUI.City.Build` 引用。
 - 测试项目。
-- 最小 App root。
-- solution、Directory.Build 对齐项和 docs entry。
+- 可运行的 Host 入口。
+- solution、Directory.Build、Directory.Packages 隔离项和 docs entry。
 - 生成内容不包含机器绝对路径。
 
 可选启用：
 
-- Security。
-- Data。
-- EventBus。
 - PluginSystem。
 - Dynamic plugins。
-- Native AOT strict。
+- AOT-friendly metadata。
+
+Security、Data、EventBus 等业务模块当前由开发者在生成后显式添加，模板没有对应开关。
 
 ### 4. Program 入口
 
@@ -120,7 +117,7 @@ tests/<AppName>.Tests/
 - 不在入口中写业务代码。
 - 不直接构建 ServiceProvider 做服务解析。
 - 不在入口中执行插件加载细节。
-- 生命周期和 Presentation runtime 通过 Host 接入。
+- 生命周期通过 Host 接入；Presentation runtime 在 `AUC-TEMPLATES-010` 完成后接入。
 
 ### 5. 项目文件
 
@@ -129,7 +126,6 @@ tests/<AppName>.Tests/
 - `AtomUI.City.Core`
 - `AtomUI.City.Mvvm`
 - `AtomUI.City.Routing`
-- `AtomUI.City.Presentation`
 - `AtomUI.City.Localization`
 - `AtomUI.City.Build`
 
@@ -146,12 +142,9 @@ tests/<AppName>.Tests/
 项目默认启用：
 
 - manifest generation。
-- manifest validation。
-- source generation strict mode。
-- analyzer。
-- `output/` 输出约定。
+- 通过 `AtomUI.City.Build` 接入 analyzer 和 source generator 资产。
 
-Native AOT 是否开启由模板变量决定。
+`UseAot` 当前设置 `AtomUICityAotFriendly` 元数据，不等同于直接设置 `PublishAot=true`。
 
 ### 7. 测试项目
 
@@ -164,9 +157,7 @@ tests/<AppName>.Tests/
 测试项目必须包含：
 
 - `FeatureTestMatrix.md`
-- TestHost smoke test。
-- Host startup test。
-- Manifest generation smoke test。
+- 真实 Host start/stop smoke test。
 
 ### 8. Sample 策略
 
@@ -179,8 +170,9 @@ tests/<AppName>.Tests/
 | 功能点 | 测试类型 | 必测场景 |
 |---|---|---|
 | 应用生成 | Smoke | 文件结构完整。 |
-| Solution 和工程对齐 | Smoke | `.slnx`、`Directory.Build.props`、docs entry 均存在并只使用相对路径。 |
-| Host 启动 | Framework integration | TestHost 能启动最小应用。 |
-| Build 接入 | Build | manifest 生成、analyzer 启用。 |
+| Solution 和工程对齐 | Smoke | `.slnx`、`Directory.Build.props`、`Directory.Packages.props`、docs entry 均存在并只使用相对路径；父级 CPM 不得改变生成项目语义。 |
+| Host 启动 | Framework integration | 真实 Host 能启动并停止。 |
+| Avalonia desktop 启动 | Platform integration | 归属 `AUC-TEMPLATES-010`，当前为 Planned。 |
+| Build 接入 | Build | manifest 生成、Build 包和 analyzer 资产接入。 |
 | 测试项目 | Unit | `FeatureTestMatrix.md` 和 smoke test 存在。 |
-| 可选能力 | Unit/Build | 开关影响引用和配置。 |
+| 可选能力 | Unit/Build | tests、sample、AOT metadata 和 dynamic plugin 开关影响 plan、文件或项目引用。 |

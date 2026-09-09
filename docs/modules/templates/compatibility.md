@@ -10,12 +10,16 @@
 - 模板变量必须校验。
 - 输出不得包含机器绝对路径。
 - dry-run 不写文件。
-- 应用模板生成的 `<AppName>.slnx`、`Directory.Build.props`、`docs/<AppName>.md`、app project 和 test project 属于 1.0 generated output 兼容面；不得写入机器绝对路径。
+- 应用模板生成的 `<AppName>.slnx`、`Directory.Build.props`、`Directory.Packages.props`、`docs/<AppName>.md`、app project 和 test project 属于 1.0 generated output 兼容面；不得写入机器绝对路径，且必须阻断父目录 CPM 污染。
 - 应用模板生成结果必须能通过 AtomUI.City 本地包源或发布包源执行 restore、build 和 test。
 - 应用模板生成的测试项目必须引用 `AtomUI.City.Testing`，默认 smoke test 必须带 `TestLayerNames.TemplateSmoke` 标记，生产项目不得引用 Testing。
 - `TemplateChange.Create` 的路径规范化语义、`TemplatePlan.Validate` 返回的 `AUCTPL1001`、`AUCTPL1002`、`AUCTPL1003` 诊断码和 context 字段属于 1.0 兼容承诺。
 - `ApplicationTemplateOptions` 默认值、`EffectiveRootNamespace` 派生规则、`Validate` 诊断码 `AUCTPL0001`、`AUCTPL0002`、`AUCTPL0301` 及其 `variable`、`rawValue`、`rule` context 字段属于 1.0 兼容承诺。
-- 插件模板生成的 plugin csproj、`atomui-city/plugin.json`、module、test project、Plugin MSBuild 属性和 NuGet metadata 属于 1.0 generated output 兼容面。
+- 插件模板生成的 plugin csproj、`atomui-city/plugin.json`、module、test project、Plugin MSBuild 属性、NuGet README 和 package metadata 属于 1.0 generated output 兼容面。
+- `TemplateRenderResult.AppliedPaths`、成功结果要求 valid plan 且与 plan changes 完全一致、失败结果至少包含一个 diagnostic，属于 1.0 结果不变量。
+- `AUCTPL1004`、`AUCTPL1005`、`AUCTPL1006` 及其 `templateId`、`operationId`、`targetPath`、`path`、`errorType` 字段属于 1.0 兼容承诺。
+- 插件模板的项目命名 token 与 `PluginId` token 相互独立；`AtomUICityPlugin*` MSBuild 属性名不得随项目名变化。
+- 当前应用模板是无 UI Host 工作区；Avalonia `Application` 和 desktop lifetime 只有在 `AUC-TEMPLATES-010` 完成后才进入 generated output 兼容面。
 
 ## API 兼容规则
 

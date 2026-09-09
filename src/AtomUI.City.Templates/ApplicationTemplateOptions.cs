@@ -114,7 +114,8 @@ public sealed class ApplicationTemplateOptions
         }
 
         var rootNamespace = EffectiveRootNamespace;
-        if (rootNamespace.StartsWith("AtomUI.City", StringComparison.Ordinal))
+        if (rootNamespace.Equals("AtomUI.City", StringComparison.Ordinal) ||
+            rootNamespace.StartsWith("AtomUI.City.", StringComparison.Ordinal))
         {
             diagnostics.Add(CreateVariableDiagnostic(
                 "AUCTPL0002",
@@ -152,6 +153,22 @@ public sealed class ApplicationTemplateOptions
                 OutputPath,
                 "non-empty-path"));
         }
+        else
+        {
+            try
+            {
+                _ = Path.GetFullPath(OutputPath);
+            }
+            catch (Exception exception) when (exception is ArgumentException or NotSupportedException or PathTooLongException)
+            {
+                diagnostics.Add(CreateVariableDiagnostic(
+                    "AUCTPL0001",
+                    "OutputPath must be a valid file-system path.",
+                    "outputPath",
+                    OutputPath,
+                    "valid-file-system-path"));
+            }
+        }
 
         if (UseAot && UseDynamicPlugins)
         {
@@ -166,7 +183,7 @@ public sealed class ApplicationTemplateOptions
         return Array.AsReadOnly(diagnostics.ToArray());
     }
 
-    private static TemplateDiagnostic CreateVariableDiagnostic(
+    private TemplateDiagnostic CreateVariableDiagnostic(
         string code,
         string message,
         string variable,
@@ -178,6 +195,8 @@ public sealed class ApplicationTemplateOptions
             message,
             new Dictionary<string, object?>
             {
+                ["templateId"] = "atomui-city-app",
+                ["targetPath"] = OutputPath,
                 ["variable"] = variable,
                 ["rawValue"] = rawValue,
                 ["rule"] = rule,
@@ -213,10 +232,43 @@ public sealed class ApplicationTemplateOptions
 
     private static bool IsValidTargetFramework(string value)
     {
-        return !string.IsNullOrWhiteSpace(value) &&
-            !value.Contains("..", StringComparison.Ordinal) &&
-            !value.Contains('/', StringComparison.Ordinal) &&
-            !value.Contains('\\', StringComparison.Ordinal) &&
-            value.All(static current => char.IsLetterOrDigit(current) || current is '.' or '-');
+        if (string.IsNullOrWhiteSpace(value) ||
+            !value.StartsWith("net", StringComparison.Ordinal) ||
+            value.Contains("..", StringComparison.Ordinal) ||
+            value.Contains('/', StringComparison.Ordinal) ||
+            value.Contains('\\', StringComparison.Ordinal) ||
+            !value.All(static current => char.IsLetterOrDigit(current) || current is '.' or '-'))
+        {
+            return false;
+        }
+
+        var platformSeparator = value.IndexOf('-');
+        if (platformSeparator != value.LastIndexOf('-'))
+        {
+            return false;
+        }
+
+        var framework = platformSeparator < 0 ? value : value[..platformSeparator];
+        var version = framework.AsSpan(3);
+        var decimalSeparator = version.IndexOf('.');
+        if (decimalSeparator <= 0 ||
+            decimalSeparator >= version.Length - 1 ||
+            !version[..decimalSeparator].ToString().All(char.IsDigit) ||
+            !version[(decimalSeparator + 1)..].ToString().All(char.IsDigit))
+        {
+            return false;
+        }
+
+        if (platformSeparator < 0)
+        {
+            return true;
+        }
+
+        var platform = value.AsSpan(platformSeparator + 1);
+        return platform.Length > 0 &&
+            char.IsLetter(platform[0]) &&
+            platform[^1] != '.' &&
+            !platform.Contains("..", StringComparison.Ordinal) &&
+            platform.ToString().All(static character => char.IsLetterOrDigit(character) || character == '.');
     }
 }

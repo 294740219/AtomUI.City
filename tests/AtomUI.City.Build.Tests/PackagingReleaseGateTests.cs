@@ -240,14 +240,14 @@ public sealed class PackagingReleaseGateTests
     }
 
     [Fact]
-    public void TemplatesPackageDisablesSymbolsBecauseItContainsOnlyTemplateContent()
+    public void TemplatesPackageIncludesRuntimeApiAndTemplateContent()
     {
         var repositoryRoot = RepositoryPaths.FindRepositoryRoot();
         var templatesProject = XDocument.Load(Path.Combine(repositoryRoot, "src", "AtomUI.City.Templates", "AtomUI.City.Templates.csproj"));
         var properties = ReadProperties(templatesProject);
 
         Assert.Equal("Template", properties["PackageType"]);
-        Assert.Equal("false", properties["IncludeBuildOutput"]);
+        Assert.Equal("true", properties["IncludeBuildOutput"]);
         Assert.Equal("false", properties["IncludeSymbols"]);
     }
 

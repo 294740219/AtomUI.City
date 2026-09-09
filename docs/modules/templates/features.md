@@ -11,6 +11,11 @@
 | AUC-TEMPLATES-003 | Template Variables | Completed | ApplicationTemplateOptions, TemplateRenderResult | ApplicationTemplateBuildSmokeTests |
 | AUC-TEMPLATES-004 | Plugin Template | Completed | Plugin template package | TemplatePackageLayoutTests |
 | AUC-TEMPLATES-005 | Test Template | Completed | ApplicationTemplateRenderer, test project template | ApplicationTemplateBuildSmokeTests |
+| AUC-TEMPLATES-006 | Module Template | Planned | generated module source | Pending |
+| AUC-TEMPLATES-007 | Page Template | Planned | generated View/ViewModel/route source | Pending |
+| AUC-TEMPLATES-008 | Localization Template | Planned | generated localization package source | Pending |
+| AUC-TEMPLATES-009 | Configuration Template | Planned | generated Options source | Pending |
+| AUC-TEMPLATES-010 | Avalonia Desktop Application Template | Planned | Presentation desktop bootstrap output | Pending |
 
 ## Feature 硬门禁
 
@@ -33,14 +38,14 @@
 
 Feature ID: `AUC-TEMPLATES-001`
 Status: Completed
-Goal: 生成符合 AtomUI.City 架构和工程规范的应用项目。
+Goal: 生成符合 AtomUI.City 架构和工程规范、可独立运行的 Host 应用工作区。
 Public Contract: ApplicationTemplateOptions, ApplicationTemplateRenderer
-Runtime / Build Behavior: 输出 solution、app project、test project、docs entry、Directory.Build 对齐项；生成后可通过本地包源 restore/build/test。
-Failure Behavior: 项目名非法、目标冲突、模板资源缺失不写半成品。
-Threading / Cancellation: 文件写入可取消；取消后 result 包含已写入文件清单。
+Runtime / Build Behavior: 输出 solution、Host app project、test project、docs entry、Directory.Build 对齐项和禁止继承父级 CPM 的 `Directory.Packages.props`；生成后可通过本地包源 restore/build/test。Avalonia desktop lifetime 不属于本 Feature。
+Failure Behavior: 项目名非法、目标冲突、模板资源缺失不写半成品；默认不覆盖已有文件，失败时回滚本次已创建文件。
+Threading / Cancellation: 同一规范化目标目录的进程内渲染串行执行；文件写入可取消，取消后回滚并抛 `OperationCanceledException`。
 Diagnostics: diagnostic 必须包含 template id、target path 和 variable。
 Tests: `ApplicationTemplateBuildSmokeTests`
-Required Assertions: 已断言生成、restore/build/test、命名空间、包引用、solution、Directory.Build、docs entry 和无绝对路径。
+Required Assertions: 已断言生成、restore/build/test、命名空间、包引用、solution、Directory.Build、Directory.Packages、docs entry、无绝对路径、冲突、回滚和同目录并发。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 
 ## AUC-TEMPLATES-002 Package Layout
@@ -49,12 +54,12 @@ Feature ID: `AUC-TEMPLATES-002`
 Status: Completed
 Goal: 保证模板包内容完整且路径安全。
 Public Contract: TemplatePlan, TemplateChange
-Runtime / Build Behavior: 模板文件必须位于声明 root，plan 中每个 change 都有 normalized relative path；template metadata 必须提供稳定 identity 和 shortName。
+Runtime / Build Behavior: 模板文件必须位于声明 root，plan 中每个 change 都有 normalized portable relative path；template metadata 必须提供稳定 identity 和 shortName；NuGet 模板包同时包含 public renderer assembly。
 Failure Behavior: 路径逃逸返回 `AUCTPL1001` 或由 `TemplateChange.Create` 拒绝，重复 normalized path 返回 `AUCTPL1002`，非法 change type 返回 `AUCTPL1003`。
 Threading / Cancellation: layout 校验为纯 CPU/文件读取；可观察 token。
 Diagnostics: diagnostic 必须包含 raw path、normalized path 或 change type。
 Tests: `TemplatePackageLayoutTests`
-Required Assertions: 已断言 required files、路径规范化、重复文件、路径逃逸和 package id。
+Required Assertions: 已断言 required files、路径规范化、跨平台非法路径、大小写路径冲突、路径逃逸、package id 和运行时 assembly 包布局。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
 
 ## AUC-TEMPLATES-003 Template Variables
@@ -77,13 +82,19 @@ Feature ID: `AUC-TEMPLATES-004`
 Status: Completed
 Goal: 生成单 assembly 插件项目和 NuGet 打包约定。
 Public Contract: Plugin template package
-Runtime / Build Behavior: 输出插件 csproj、manifest、module、package metadata、plugin tests 和 pack properties。
+Runtime / Build Behavior: 输出插件 solution、csproj、manifest、module、package metadata、plugin tests 和 pack properties；项目命名 token 不得改写 `AtomUICityPlugin*` MSBuild 属性。
 Failure Behavior: plugin id 非法、capability 变量非法、package metadata 缺失失败。
-Threading / Cancellation: 文件写入可取消；pack smoke 可由后续测试执行。
+Threading / Cancellation: NuGet Template Engine 负责模板实例化；pack/安装/实例化由模板集成测试执行。
 Diagnostics: diagnostic 必须包含 plugin id、package id 和 contribution。
-Tests: `TemplatePackageLayoutTests`
-Required Assertions: 已断言单 assembly、NuGet metadata、manifest、msbuild 属性和测试项目。
+Tests: `TemplatePackageLayoutTests`, `DotnetNewTemplateIntegrationTests`
+Required Assertions: 已断言单 assembly、NuGet metadata、manifest、MSBuild 属性、测试项目、真实 `dotnet new install`、项目重命名和 PluginId 替换。
 Acceptance Criteria: API 行为、失败路径、诊断上下文、释放或撤销、兼容性影响均可由测试证明。
+
+## Planned Features
+
+`AUC-TEMPLATES-006` 到 `AUC-TEMPLATES-009` 分别承接 [module-template.md](module-template.md)、[page-template.md](page-template.md)、[localization-template.md](localization-template.md) 和 [configuration-template.md](configuration-template.md) 中的设计。它们已有设计稿，但当前没有 renderer、CLI command、模板包或测试，不得按 Completed 宣称。
+
+`AUC-TEMPLATES-010` 承接真正的 Avalonia `Application`、desktop lifetime、主窗口和 Presentation bootstrap。该 Feature 必须在 Presentation 启动合同稳定后实现；当前 `atomui-city-app` 只生成可运行的无 UI Host 应用骨架。
 
 ## AUC-TEMPLATES-005 Test Template
 

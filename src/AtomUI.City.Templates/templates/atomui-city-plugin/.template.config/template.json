@@ -5,13 +5,24 @@
   "identity": "AtomUI.City.Templates.Plugin",
   "name": "AtomUI.City Plugin",
   "shortName": "atomui-city-plugin",
-  "sourceName": "AtomUICityPlugin",
+  "sourceName": "TemplatePlugin",
   "preferNameDirectory": true,
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  },
   "symbols": {
     "PluginId": {
       "type": "parameter",
       "datatype": "text",
-      "defaultValue": "com.company.plugin"
+      "defaultValue": "com.company.plugin",
+      "replaces": "__PLUGIN_ID__"
+    },
+    "TargetFramework": {
+      "type": "parameter",
+      "datatype": "text",
+      "defaultValue": "net10.0",
+      "replaces": "__TARGET_FRAMEWORK__"
     }
   }
 }

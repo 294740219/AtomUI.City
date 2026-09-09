@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/TemplatePlugin/TemplatePlugin.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/TemplatePlugin.Tests/TemplatePlugin.Tests.csproj" />
+  </Folder>
+</Solution>

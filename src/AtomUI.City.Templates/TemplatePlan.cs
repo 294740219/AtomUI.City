@@ -9,15 +9,45 @@ public sealed class TemplatePlan
         string command,
         IReadOnlyDictionary<string, object?> inputs,
         IReadOnlyList<TemplateChange> changes)
+        : this(operationId, command, inputs, changes, [], [], [], [], [])
+    {
+    }
+
+    public TemplatePlan(
+        string operationId,
+        string command,
+        IReadOnlyDictionary<string, object?> inputs,
+        IReadOnlyList<TemplateChange> changes,
+        IReadOnlyList<string> buildTargets,
+        IReadOnlyList<string> testTargets,
+        IReadOnlyList<string> docsRequired,
+        IReadOnlyList<string> risks,
+        IReadOnlyList<string> rollback)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(operationId);
         ArgumentException.ThrowIfNullOrWhiteSpace(command);
+        ArgumentNullException.ThrowIfNull(inputs);
+        ArgumentNullException.ThrowIfNull(changes);
+        ArgumentNullException.ThrowIfNull(buildTargets);
+        ArgumentNullException.ThrowIfNull(testTargets);
+        ArgumentNullException.ThrowIfNull(docsRequired);
+        ArgumentNullException.ThrowIfNull(risks);
+        ArgumentNullException.ThrowIfNull(rollback);
+        if (changes.Any(static change => change is null))
+        {
+            throw new ArgumentException("Template changes cannot contain null entries.", nameof(changes));
+        }
 
         OperationId = operationId;
         Command = command;
         Inputs = new ReadOnlyDictionary<string, object?>(
             new Dictionary<string, object?>(inputs, StringComparer.Ordinal));
         Changes = Array.AsReadOnly(changes.ToArray());
+        BuildTargets = Array.AsReadOnly(buildTargets.ToArray());
+        TestTargets = Array.AsReadOnly(testTargets.ToArray());
+        DocsRequired = Array.AsReadOnly(docsRequired.ToArray());
+        Risks = Array.AsReadOnly(risks.ToArray());
+        Rollback = Array.AsReadOnly(rollback.ToArray());
     }
 
     public string SchemaVersion { get; } = "1.0";
@@ -30,20 +60,20 @@ public sealed class TemplatePlan
 
     public IReadOnlyList<TemplateChange> Changes { get; }
 
-    public IReadOnlyList<string> BuildTargets { get; } = [];
+    public IReadOnlyList<string> BuildTargets { get; }
 
-    public IReadOnlyList<string> TestTargets { get; } = [];
+    public IReadOnlyList<string> TestTargets { get; }
 
-    public IReadOnlyList<string> DocsRequired { get; } = [];
+    public IReadOnlyList<string> DocsRequired { get; }
 
-    public IReadOnlyList<string> Risks { get; } = [];
+    public IReadOnlyList<string> Risks { get; }
 
-    public IReadOnlyList<string> Rollback { get; } = [];
+    public IReadOnlyList<string> Rollback { get; }
 
     public IReadOnlyList<TemplateDiagnostic> Validate()
     {
         var diagnostics = new List<TemplateDiagnostic>();
-        var normalizedPaths = new Dictionary<string, string>(StringComparer.Ordinal);
+        var normalizedPaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var change in Changes)
         {
