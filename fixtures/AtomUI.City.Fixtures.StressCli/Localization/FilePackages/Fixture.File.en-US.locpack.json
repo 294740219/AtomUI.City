@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "packageId": "Fixture.File",
+  "culture": "en-US",
+  "version": "2.0.0",
+  "resources": {
+    "Provider.Source": "File provider",
+    "Provider.LongText": "A deterministic file-backed localization package used by the production stress fixture.",
+    "Provider.Formatted": "File batch {0} completed at {1:O}."
+  }
+}

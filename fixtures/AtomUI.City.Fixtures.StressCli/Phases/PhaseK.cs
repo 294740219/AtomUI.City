@@ -16,15 +16,15 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace AtomUI.City.Fixtures.StressCli;
 
-/// <summary>Localization 高频联合仿真：300 轮 culture、路由、事件、状态和动态文本。</summary>
+/// <summary>Localization 高频联合仿真：culture、路由、事件、状态和动态文本。</summary>
 public static class PhaseK
 {
-    private const int Iterations = 300;
     private const int LookupsPerIteration = 16;
     private const int DynamicTextCount = 12;
 
-    public static async Task RunAsync(CancellationToken cancellationToken)
+    public static async Task RunAsync(StressExecutionOptions options, CancellationToken cancellationToken)
     {
+        var iterations = options.SoakIterations;
         FixtureState.Reset();
         await using var host = StressHost.CreateBuilder().Build();
         await host.StartAsync(cancellationToken).ConfigureAwait(false);
@@ -134,7 +134,7 @@ public static class PhaseK
         var publishFailures = 0;
         var scopeChurns = 0;
 
-        for (var iteration = 0; iteration < Iterations; iteration++)
+        for (var iteration = 0; iteration < iterations; iteration++)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var chinese = iteration % 2 == 0;
@@ -252,7 +252,7 @@ public static class PhaseK
         }
 
         await WaitForAsync(
-            () => settingsViewModel.CountOf("event") == Iterations,
+            () => settingsViewModel.CountOf("event") == iterations,
             TimeSpan.FromSeconds(5),
             cancellationToken).ConfigureAwait(false);
 
@@ -284,26 +284,26 @@ public static class PhaseK
         await Task.Delay(50, cancellationToken).ConfigureAwait(false);
         stopwatch.Stop();
 
-        var switchOk = successfulSwitches == Iterations
-            && bridgeApplyBeforeRelease == Iterations
-            && cultureStateChangesBeforeRelease >= Iterations;
+        var switchOk = successfulSwitches == iterations
+            && bridgeApplyBeforeRelease == iterations
+            && cultureStateChangesBeforeRelease >= iterations;
         var dynamicOk = texts.Count == DynamicTextCount
-            && changesBeforeRelease == Iterations * DynamicTextCount
-            && dynamicChanges.Values.All(count => count == Iterations)
+            && changesBeforeRelease == iterations * DynamicTextCount
+            && dynamicChanges.Values.All(count => count == iterations)
             && texts[0].Value == "Save"
             && texts[4].Value == "Open the legacy operations panel.";
-        var lookupOkFinal = lookupCount == Iterations * LookupsPerIteration
+        var lookupOkFinal = lookupCount == iterations * LookupsPerIteration
             && lookupFailures == 0
             && provider.MaximumLoadCount == 1;
-        var navigationOk = navigationCount == Iterations && navigationFailures == 0;
-        var eventAndViewModelOk = publishCount == Iterations
+        var navigationOk = navigationCount == iterations && navigationFailures == 0;
+        var eventAndViewModelOk = publishCount == iterations
             && publishFailures == 0
-            && cultureEventsBeforeRelease == Iterations
-            && viewModelEventsBeforeRelease == Iterations
-            && settingsViewModel.CountOf("state-reaction") == Iterations;
+            && cultureEventsBeforeRelease == iterations
+            && viewModelEventsBeforeRelease == iterations
+            && settingsViewModel.CountOf("state-reaction") == iterations;
         var releaseOk = postReleaseSwitch.Succeeded
-            && scopeChurns == Iterations / 25
-            && formattedCount == Iterations * 2
+            && scopeChurns == iterations / 25
+            && formattedCount == iterations * 2
             && formatFailures == 0
             && dynamicChanges.Values.Sum() == changesBeforeRelease
             && cultureEvents == cultureEventsBeforeRelease
@@ -314,32 +314,32 @@ public static class PhaseK
 
         FixtureState.Report.Record(
             "K01-localization-switch-soak",
-            "300 次有效 culture commit 串行完成且 State 可观察",
+            $"{iterations} 次有效 culture commit 串行完成且 State 可观察",
             switchOk,
             $"switches={successfulSwitches} bridge={bridgeApplyBeforeRelease} stateChanges={cultureStateChangesBeforeRelease}");
         FixtureState.Report.Record(
             "K02-localization-dynamic-soak",
-            "12 个动态文案在 300 次切换中逐次、完整刷新",
+            $"12 个动态文案在 {iterations} 次切换中逐次、完整刷新",
             dynamicOk,
-            $"changes={changesBeforeRelease}/{Iterations * DynamicTextCount}");
+            $"changes={changesBeforeRelease}/{iterations * DynamicTextCount}");
         FixtureState.Report.Record(
             "K03-localization-lookup-soak",
-            "4,800 次跨 scope 并发查找值一致且每包只加载一次",
+            $"{iterations * LookupsPerIteration:N0} 次跨 scope 并发查找值一致且每包只加载一次",
             lookupOkFinal,
             $"lookups={lookupCount} failures={lookupFailures} uniqueLoads={provider.UniqueLoadCount} maxLoads={provider.MaximumLoadCount}");
         FixtureState.Report.Record(
             "K04-localization-routing-soak",
-            "300 次 Router 导航与 route localization context 保持一致",
+            $"{iterations} 次 Router 导航与 route localization context 保持一致",
             navigationOk,
             $"navigations={navigationCount} failures={navigationFailures}");
         FixtureState.Report.Record(
             "K05-localization-event-mvvm-soak",
-            "300 次 EventBus 通知、State reaction 与 MVVM activation 联合闭环",
+            $"{iterations} 次 EventBus 通知、State reaction 与 MVVM activation 联合闭环",
             eventAndViewModelOk,
             $"events={cultureEventsBeforeRelease} vmEvents={viewModelEventsBeforeRelease} vmState={settingsViewModel.CountOf("state-reaction")}");
         FixtureState.Report.Record(
             "K06-localization-release-soak",
-            "600 次格式化、12 次 scope churn 后释放资源且不再回调",
+            $"{iterations * 2} 次格式化、{scopeChurns} 次 scope churn 后释放资源且不再回调",
             releaseOk,
             $"formatted={formattedCount} churns={scopeChurns} elapsedMs={stopwatch.ElapsedMilliseconds}");
 

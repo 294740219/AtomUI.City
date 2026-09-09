@@ -116,7 +116,7 @@ public abstract class FixtureViewModelBase : ViewModelBase
     }
 }
 
-// 16 个实战 ViewModel：10 个原有工作区 + 6 个跨域运营工作区。
+// 16 个基础实战 ViewModel；第 17 个 RemoteOperationsViewModel 在 Data 场景中验证。
 
 public sealed class ShellViewModel : FixtureViewModelBase
 {

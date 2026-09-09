@@ -1,126 +1,94 @@
 # StressCli Localization 生产仿真设计
 
-版本：v1.0
+版本：v2.0
 执行边界：无 GUI 的真实 City Host
 目标模块：`AtomUI.City.Localization`，并联合 Core、State、EventBus、Routing、MVVM 验证
 
 ## 1. 目标
 
-本方案把 StressCli 模拟成一个支持中英文热切换的多租户运营控制台。测试不只验证 `GetStringAsync` 返回字符串，而是让语言包、作用域、动态文案、格式化消息、路由上下文、插件撤销、故障恢复和并发加载进入同一条业务链。
+StressCli 模拟支持多语言热切换的多租户运营控制台。测试覆盖语言包、作用域、动态文案、格式化、路由上下文、动态贡献、故障恢复、并发加载、生命周期和资源释放，不把 `GetStringAsync` 的 happy path 当作完成标准。
 
-所有场景运行在真实 `ApplicationHost` 和 Microsoft DI 中，不使用 GUI，也不绕过 `LocalizationService` 的生产注册路径。任一不变量失败时 CLI 返回非零退出码。
+所有业务场景运行在真实 `ApplicationHost` 和 Microsoft DI 中，不绕过 `LocalizationService` 的生产注册路径。每项能力由不变量判定，任一不变量失败时 CLI 返回非零退出码。
 
-## 2. 规模
+## 2. 固定规模
 
 | 对象 | 规模 | 说明 |
 | --- | ---: | --- |
-| Culture | 4 | `en-US`、`en`、`zh-CN`、`zh-Hans` |
-| LanguagePackageDescriptor | 30 | Host、Presentation、Module、Route、Window、Plugin 六类 scope |
-| 不同业务文案 key | 至少 120 | 菜单、命令、状态、错误、订单、支付、支持、路由、窗口和插件文案 |
-| 语言包资源项 | 至少 250 | 同一 key 在不同 culture/scope 下具有独立值 |
-| 活动 scope | 10 | 3 Module/Plugin/Window + 7 Route/组合上下文 |
-| 动态 `ILocalizedText` | 功能阶段 6 个，soak 阶段 12 个 | 普通文本和格式化消息同时刷新 |
-| 功能不变量 | 12 | `I19` 到 `I30` |
-| Soak 轮次 | 300 | 每轮切换 culture、导航、并发 lookup、格式化和 EventBus 通知 |
+| Culture | 11 | `en-US/en`、`zh-CN/zh-Hans`、`fr-FR/fr`、`zh-TW/zh-Hant`、`de-DE`、`ja-JP`、`ar-SA` |
+| 启动 descriptor | 93 | Host、Presentation、Module、Route、Window、Plugin 六类 scope |
+| 不同业务 key | 388 | 菜单、命令、状态、错误、订单、支付、库存、支持、报表、审计等 |
+| 启动资源项 | 2,055 | 不同 culture/scope 的独立文案 |
+| 真实 Provider 包 | 4 | Generator 注册的 Assembly 双语言包与 File 双语言包 |
+| 动态 `ILocalizedText` | 96 | Chaos 阶段同时刷新和主动 Refresh |
+| 并发 load waiter | 64 | 四分之一调用方在共享 load 中途取消 |
+| 操作轨迹 | 512 | 失败时输出最后 512 条带 worker/operation 的可复现轨迹 |
 
-## 3. 语言包拓扑
+## 3. 资源拓扑
+
+固定资源包括 Host、Presentation、Operations、Billing、Support、Orders、Payments、Search、Reports、MainWindow、ExportWindow 和 SalesPlugin。扩展 culture 覆盖 Host、Presentation、三个 Module、三个 Route 和 MainWindow。
+
+`fr-FR -> fr`、`zh-TW -> zh-Hant` 有意把部分 key 只放在父包，验证动态 scoped fallback。Route、Window、Plugin、Module 使用相同 marker 验证以下稳定优先级：
 
 ```text
-Host.Core                 en-US -> en, zh-CN -> zh-Hans，另有 en/zh-Hans parent 包
-Presentation.Shell        en-US, zh-CN
-Module.Operations         en-US -> en, zh-CN -> zh-Hans，另有 en/zh-Hans parent 包
-Module.Billing            en-US, zh-CN
-Module.Support            en-US, zh-CN
-Route.Orders              en-US, zh-CN
-Route.Payments            en-US, zh-CN
-Route.Search              en-US, zh-CN
-Route.Support             en-US, zh-CN
-Route.Reports             en-US, zh-CN
-Window.Main               en-US, zh-CN
-Window.Export             en-US, zh-CN
-Plugin.Sales              en-US, zh-CN，contribution=fixtures.plugin.sales.localization
+Route > Window > Plugin > Module > Host > Presentation
 ```
 
-合计 30 个 descriptor。`Host` 和 `Presentation` 全局可见；其余 descriptor 必须同时满足 scope lease 存活和 `LocalizationLookupContext` id 匹配。
+Assembly 语言包由 `[LanguagePackage]`、`[LocalizedResource]` 和 Generator 产生 `GeneratedLocalizationManifest`；File 语言包从构建输出目录读取，声明 allowed root、version 和运行时计算的 SHA-256。
 
-## 4. 文案业务模型
+## 4. 执行阶段
 
-文案按真实运营软件用途分组：
-
-- 全局外壳：菜单、保存、删除、查询、刷新、登录状态、网络错误和权限错误；
-- Presentation：主题、窗口、导航、对话框、通知区域和布局方向；
-- 运营中心：订单处理、批量操作、导出、审计、任务状态和兼容提示；
-- 财务：结算、税额、退款、支付状态、发票和金额格式化；
-- 客服：工单、优先级、分配、回复、关闭和 SLA；
-- Route：Orders、Payments、Search、Support、Reports 的标题、描述、空状态、过滤器、动作和状态；
-- Window：主窗口、导出窗口及其独立命令；
-- Plugin：销售插件看板、预测、佣金、导出和插件状态。
-
-多个 scope 有意覆盖 `Common.Save`、`Common.Export` 和 `Route.ContextMarker`，用于验证确定性的 scope priority 与 context 隔离。
-
-## 5. Phase J：完整业务矩阵
-
-| 不变量 | 场景 | 必须证明 |
+| Phase | 场景 | 关键证明 |
 | --- | --- | --- |
-| I19 | Catalog 完整性 | 30 个 descriptor、至少 120 个 key、至少 250 个资源项，六类 scope 均存在 |
-| I20 | Manifest-only startup | Host 启动后 loaded package 为空；首次全局查找不加载 scoped package |
-| I21 | Scope priority | Route > Window > Plugin > Module > Host > Presentation；无 lease 时退回全局资源 |
-| I22 | Context isolation | 多个 Route 同时 active 时只命中当前 context 的 `Route.ContextMarker` |
-| I23 | Recursive fallback | `en-US -> en`、`zh-CN -> zh-Hans` 的 scoped parent key 正确命中 |
-| I24 | Dynamic text | culture 切换后普通文本与格式化文本按同一 revision 刷新，不出现半中文半英文 |
-| I25 | Concurrent load | 64 个首次并发 lookup 合并为同一个 `(culture, packageId)` provider load |
-| I26 | Pre-commit failure | provider 失败和调用方取消都保留旧 culture，不发布部分状态 |
-| I27 | Post-commit completion | bridge 内取消调用方 token 后，已提交 culture、bridge 和全部文本刷新仍完成 |
-| I28 | Bridge failure | Presentation apply 失败不回滚 culture，返回失败 Result、继续刷新并产生诊断 |
-| I29 | Plugin revoke | contribution 撤销后旧文本立即 fallback，重复撤销为 0，cache/registry 不复活 |
-| I30 | Diagnostics and release | missing、format、load、switch reject、bridge、revoke 诊断齐全；lease/text Dispose 后不再回调 |
+| J | 基础合同矩阵 | lazy load、scope、fallback、动态文本、取消、Bridge 失败、撤销和诊断 |
+| K | 六模块 Soak | culture → State → text → Router → lookup → message → EventBus → MVVM 完整闭环 |
+| L | 真实 Provider | Generator、Assembly、File、checksum、路径约束、scope priority 和运行时撤销 |
+| M | 确定性竞态 | switch/switch、共享 load/cancel、load/revoke、lookup/lease、callback/dispose、mutation/service dispose |
+| N | Seeded Chaos | 多 worker 随机交叉执行查找、切换、导航、事件、状态、动态贡献、取消和 Provider 故障 |
+| O | 生命周期 | 多轮完整 Host start/stop/dispose、并发关闭、在途 load 收束、释放后合同和弱引用回收 |
 
-## 6. Phase K：高频联合 Soak
+Phase M 使用显式 `TaskCompletionSource` gate 控制交错，不依赖线程调度偶然命中。Phase N 每个 worker 使用由 `seed + worker` 派生的独立随机序列；异常报告包含 seed 和最后操作轨迹。
 
-每轮执行：
+## 5. 压力档位
 
-```text
-SetCulture(en-US/zh-CN alternating)
--> CultureState subscriber observes one revision
--> 12 LocalizedText handles refresh
--> Router navigates Orders/Payments/Reports/Search
--> 16 parallel lookup requests use route/module/window/plugin contexts
--> formatted order/payment/support messages render
--> EventBus publishes SettingsChanged(culture)
--> invariant checks current culture, route title and text family
-```
+| Profile | Soak iterations | Chaos operations | Workers | Host cycles | Race repeats | Phase timeout |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| quick | 100 | 5,000 | 8 | 2 | 25 | 1 min |
+| standard | 1,000 | 50,000 | 32 | 10 | 100 | 5 min |
+| extreme | 5,000 | 100,000 | 64 | 30 | 250 | 15 min |
 
-300 轮至少产生：
+可使用 `--operations`、`--workers`、`--timeout` 覆盖对应值，使用 `--seed` 固定 Chaos 序列。默认 seed 为 `20260908`。
 
-- 300 次有效 culture commit；
-- 3,600 次动态文本刷新；
-- 4,800 次并发 lookup；
-- 300 次 Router navigation；
-- 300 次 EventBus 通知；
-- 600 次格式化消息；
-- 多次 scope lease 释放和重新激活。
+## 6. 故障注入
 
-结束时释放全部 lease、`ILocalizedText`、EventBus owner 和 DI scope，再执行一次 culture switch，证明无释放后回调；Host 必须确定性 Stop/Dispose。
+故障仅通过公开 contract 和 fixture provider/bridge 注入：
 
-## 7. 故障注入
+- provider 返回 `PackageLoadFailed`、直接抛异常、延迟或忽略取消；
+- 64 个 waiter 共享 load 时独立取消；
+- Bridge 阻塞、返回失败、取消调用方或在 mutation callback 中重入；
+- contribution 在 package load 未完成时撤销；
+- `ILocalizedText` handler 阻塞，同时从外部 Dispose；
+- Host Dispose 遇到忽略取消的在途 load；
+- File provider 遇到错误 checksum、越界路径和缺失文件。
 
-`StressLanguagePackageProvider` 是可计数、可延迟、可单次失败的 InMemory provider，用于观察真实 service cache/in-flight 行为。`StressPresentationLocalizationBridge` 可以记录 state、单次失败，并在 apply callback 内取消发起方 token。
-
-故障只通过公开 contract 注入：
-
-- provider 返回 `PackageLoadFailed`；
-- provider 延迟期间调用方取消；
-- bridge 返回 `PresentationApplyFailed`；
-- formatter 抛出异常；
-- lookup 缺失 key；
-- plugin contribution 在文本仍被持有时撤销。
-
-## 8. 命令和验收
+## 7. CLI
 
 ```text
-dotnet run --project fixtures/AtomUI.City.Fixtures.StressCli -c Release -- localization
-dotnet run --project fixtures/AtomUI.City.Fixtures.StressCli -c Release -- localization-soak
-dotnet run --project fixtures/AtomUI.City.Fixtures.StressCli -c Release -- run-all
+dotnet run --project fixtures/AtomUI.City.Fixtures.StressCli -c Release -f net10.0 -- localization-suite --profile quick
+dotnet run --project fixtures/AtomUI.City.Fixtures.StressCli -c Release -f net8.0 -- localization-suite --profile standard --seed 20260908
+dotnet run --project fixtures/AtomUI.City.Fixtures.StressCli -c Release -f net10.0 -- localization-extreme --seed 20260909
 ```
 
-冻结门禁：三条命令均返回 0；Localization、State、Presentation、Generators 专项测试继续全绿；fixture Release 构建零 warning/零 error；同一进程和多进程重复执行结果确定。
+专项命令为 `localization`、`localization-soak`、`localization-providers`、`localization-races`、`localization-chaos` 和 `localization-lifecycle`。`phase <j-o>` 保留用于定位单一阶段。
+
+退出码：`0` 全部通过；`1` 异常或 watchdog 超时；`2` 参数错误；`3` 不变量失败。
+
+## 8. 冻结门禁
+
+- `net8.0`、`net10.0` 的 standard suite 均返回 0；
+- `net10.0` 使用 `20260908`、`20260909`、`20260910` 三个 seed 执行 extreme；
+- 两个目标框架分别执行 `run-all`，standard suite 另做十次独立进程重复；
+- Localization、Core、State、EventBus、Routing、MVVM、Generators、Presentation 专项测试全绿；
+- fixture Release 构建零 warning/零 error，`git diff --check` 和仓库治理门禁通过；
+- 最终无未观察任务异常、无在途 provider/bridge、Dispose 后无 callback，动态文案统一收敛到同一 revision。
+
+本夹具证明 Localization 引擎及无 GUI 跨模块集成，不替代 Avalonia VisualTree 的实际刷新测试。

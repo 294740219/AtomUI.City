@@ -7,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace AtomUI.City.Fixtures.StressCli;
 
 /// <summary>
-/// Phase D：72 个状态对象（54 registry + 10 computed + 8 collection）的大规模验证——
+/// Phase D：84 个状态对象（66 registry + 10 computed + 8 collection）的大规模验证——
 /// I5（4×500 并发写版本完整性 + authority 越权拒绝 + 快照恢复）、
 /// I6（三层 computed 链失效一致性）、I7（集合快照冻结 + bulk 1000）。
 /// </summary>
@@ -46,8 +46,8 @@ public static class PhaseD
             System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static).Length;
         FixtureState.Report.Record(
             "I07-catalog",
-            "54 个 registry state 均已注册",
-            declaredStateKeys == 54,
+            "66 个 registry state 均已注册",
+            declaredStateKeys == 66,
             $"declared={declaredStateKeys}");
 
         // 10 个 computed：链式、跨域、首次失败恢复和运行期循环防护。
@@ -325,6 +325,18 @@ public static class PhaseD
         registry.Add(StateDefinition.Create(StateCatalog.SupportOpenTickets, 0));
         registry.Add(StateDefinition.Create(StateCatalog.WorkflowRunning, 0));
         registry.Add(StateDefinition.Create(StateCatalog.NavigationCurrentRoute, "fixtures.routes.dashboard"));
+        registry.Add(StateDefinition.Create(StateCatalog.RemoteProductsLoaded, 0));
+        registry.Add(StateDefinition.Create(StateCatalog.RemoteOrdersSubmitted, 0));
+        registry.Add(StateDefinition.Create(StateCatalog.RemoteInventory, 0));
+        registry.Add(StateDefinition.Create(StateCatalog.RemoteRevenue, 0m));
+        registry.Add(StateDefinition.Create(StateCatalog.RemotePendingOptimistic, 0));
+        registry.Add(StateDefinition.Create(StateCatalog.RemoteFailures, 0));
+        registry.Add(StateDefinition.Create(StateCatalog.RemoteRealtimeUpdates, 0));
+        registry.Add(StateDefinition.Create(StateCatalog.RemotePrincipal, "user-a"));
+        registry.Add(StateDefinition.Create(StateCatalog.RemotePrincipalRevision, "r1"));
+        registry.Add(StateDefinition.Create(StateCatalog.RemoteStatus, "idle"));
+        registry.Add(StateDefinition.Create(StateCatalog.RemoteMessage, string.Empty));
+        registry.Add(StateDefinition.Create(StateCatalog.RemoteLastOrderId, string.Empty));
     }
 
     public static class StateCatalog
@@ -383,5 +395,17 @@ public static class PhaseD
         public static readonly StateKey<int> SupportOpenTickets = new("fixtures.state.support-open-tickets");
         public static readonly StateKey<int> WorkflowRunning = new("fixtures.state.workflow-running");
         public static readonly StateKey<string> NavigationCurrentRoute = new("fixtures.state.navigation-current-route");
+        public static readonly StateKey<int> RemoteProductsLoaded = new("fixtures.state.remote-products-loaded");
+        public static readonly StateKey<int> RemoteOrdersSubmitted = new("fixtures.state.remote-orders-submitted");
+        public static readonly StateKey<int> RemoteInventory = new("fixtures.state.remote-inventory");
+        public static readonly StateKey<decimal> RemoteRevenue = new("fixtures.state.remote-revenue");
+        public static readonly StateKey<int> RemotePendingOptimistic = new("fixtures.state.remote-pending-optimistic");
+        public static readonly StateKey<int> RemoteFailures = new("fixtures.state.remote-failures");
+        public static readonly StateKey<int> RemoteRealtimeUpdates = new("fixtures.state.remote-realtime-updates");
+        public static readonly StateKey<string> RemotePrincipal = new("fixtures.state.remote-principal");
+        public static readonly StateKey<string> RemotePrincipalRevision = new("fixtures.state.remote-principal-revision");
+        public static readonly StateKey<string> RemoteStatus = new("fixtures.state.remote-status");
+        public static readonly StateKey<string> RemoteMessage = new("fixtures.state.remote-message");
+        public static readonly StateKey<string> RemoteLastOrderId = new("fixtures.state.remote-last-order-id");
     }
 }

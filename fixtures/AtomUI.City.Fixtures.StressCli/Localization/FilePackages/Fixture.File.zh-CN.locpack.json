@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "packageId": "Fixture.File",
+  "culture": "zh-CN",
+  "version": "2.0.0",
+  "resources": {
+    "Provider.Source": "文件语言包",
+    "Provider.LongText": "生产压力测试程序使用的确定性文件语言包。",
+    "Provider.Formatted": "文件批次 {0} 已于 {1:O} 完成。"
+  }
+}

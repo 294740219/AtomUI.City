@@ -21,11 +21,11 @@ public static class PhaseH
 
         var registry = host.Services.GetRequiredService<IRouteRegistry>();
         var initialGraph = registry.CurrentSnapshot;
-        var idsAreStable = initialGraph.Routes.Select(route => route.RouteId).Distinct(StringComparer.Ordinal).Count() == 30 &&
+        var idsAreStable = initialGraph.Routes.Select(route => route.RouteId).Distinct(StringComparer.Ordinal).Count() == 31 &&
                            initialGraph.Routes.All(route => route.RouteId.StartsWith("fixtures.routes.", StringComparison.Ordinal));
         FixtureState.Report.Record(
             "I12-manifest",
-            "RouteMap generator manifest 恰好生成 30 条稳定路由",
+            "RouteMap generator manifest 恰好生成 31 条稳定路由",
             initialGraph.Routes.Count == StressCliProgram.RouteCount && idsAreStable,
             $"routes={initialGraph.Routes.Count} version={initialGraph.Version}");
 

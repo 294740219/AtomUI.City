@@ -5,9 +5,10 @@ namespace AtomUI.City.Fixtures.StressCli.Localization;
 
 public static class StressLocalizationCatalog
 {
-    public const int DescriptorCount = 30;
-    public const int MinimumDistinctKeyCount = 120;
-    public const int MinimumResourceEntryCount = 250;
+    public const int DescriptorCount = 93;
+    public const int CultureCount = 11;
+    public const int MinimumDistinctKeyCount = 350;
+    public const int MinimumResourceEntryCount = 1_900;
 
     public const string OperationsModuleId = "fixtures.module.operations";
     public const string BillingModuleId = "fixtures.module.billing";
@@ -21,6 +22,36 @@ public static class StressLocalizationCatalog
     public const string ExportWindowId = "fixtures.window.export";
     public const string SalesPluginId = "fixtures.plugin.sales";
     public const string SalesContributionId = "fixtures.plugin.sales.localization";
+
+    public static IReadOnlyList<string> ExtendedLeafCultureNames { get; } =
+        Array.AsReadOnly(["fr-FR", "de-DE", "ja-JP", "ar-SA", "zh-TW"]);
+
+    private static readonly ExtendedPackageGroup[] ExtendedGroups =
+    [
+        new("Host.Core", ResourceScope.Host, null),
+        new("Presentation.Shell", ResourceScope.Presentation, null),
+        new("Module.Operations", ResourceScope.Module, OperationsModuleId),
+        new("Module.Billing", ResourceScope.Module, BillingModuleId),
+        new("Module.Support", ResourceScope.Module, SupportModuleId),
+        new("Route.Orders", ResourceScope.Route, OrdersRouteId),
+        new("Route.Payments", ResourceScope.Route, PaymentsRouteId),
+        new("Route.Reports", ResourceScope.Route, ReportsRouteId),
+        new("Window.Main", ResourceScope.Window, MainWindowId),
+    ];
+
+    public static IReadOnlyList<string> ExtendedPackageIds { get; } =
+        Array.AsReadOnly(ExtendedGroups.Select(group => group.PackageId).ToArray());
+
+    private static readonly string[] ExtendedBusinessKeys =
+    [
+        "Workspace.Open", "Workspace.Close", "Workspace.SwitchTenant", "Workspace.Sync",
+        "Orders.Create", "Orders.Cancel", "Orders.Reprice", "Orders.Export",
+        "Inventory.Reserve", "Inventory.Release", "Inventory.Reconcile", "Inventory.Shortage",
+        "Payments.Authorize", "Payments.Capture", "Payments.Refund", "Payments.Dispute",
+        "Support.Assign", "Support.Reply", "Support.Escalate", "Support.Resolve",
+        "Reports.Generate", "Reports.Schedule", "Reports.Download", "Reports.Archive",
+        "Audit.Actor", "Audit.Timestamp", "Diagnostics.Correlation", "Formatted.Summary",
+    ];
 
     private static readonly TextEntry[] HostTexts =
     [
@@ -54,6 +85,18 @@ public static class StressLocalizationCatalog
         new("Errors.Network", "The network is unavailable.", "网络不可用。"),
         new("Errors.Unauthorized", "You are not authorized.", "你没有操作权限。"),
         new("Errors.Validation", "Some fields are invalid.", "部分字段无效。"),
+        new("Data.Status.Loading", "Loading remote data", "正在加载远程数据"),
+        new("Data.Status.Ready", "Remote data is ready", "远程数据已就绪"),
+        new("Data.Status.Submitting", "Submitting order", "正在提交订单"),
+        new("Data.Status.Realtime", "Realtime connection is active", "实时连接已启用"),
+        new("Data.ProductLoaded", "Product {0} loaded; inventory {1:N0}.", "商品 {0} 已加载；库存 {1:N0}。"),
+        new("Data.OrderSubmitted", "Order {0} submitted; amount {1:N2}.", "订单 {0} 已提交；金额 {1:N2}。"),
+        new("Data.PrincipalSwitched", "Switched to account {0} ({1}).", "已切换到账户 {0}（{1}）。"),
+        new("Data.Errors.Network", "The remote service is unavailable.", "远程服务不可用。"),
+        new("Data.Errors.Authentication", "The current account cannot access remote data.", "当前账户无法访问远程数据。"),
+        new("Data.Errors.Conflict", "Remote data changed; refresh and try again.", "远程数据已变化；请刷新后重试。"),
+        new("Data.Errors.Cancelled", "The remote operation was cancelled.", "远程操作已取消。"),
+        new("Data.Errors.Unknown", "The remote operation failed.", "远程操作失败。"),
     ];
 
     private static readonly TextEntry[] PresentationTexts =
@@ -184,7 +227,64 @@ public static class StressLocalizationCatalog
         AddPrimaryPair(descriptors, "Window.Export", ResourceScope.Window, ExportWindowId, null, ExportWindowTexts);
         AddPrimaryPair(descriptors, "Plugin.Sales", ResourceScope.Plugin, SalesPluginId, SalesContributionId, SalesPluginTexts);
 
+        foreach (var group in ExtendedGroups)
+        {
+            AddExtendedDescriptor(descriptors, group, "fr", fallbackCultureName: null);
+            AddExtendedDescriptor(descriptors, group, "zh-Hant", fallbackCultureName: null);
+            AddExtendedDescriptor(descriptors, group, "fr-FR", fallbackCultureName: "fr");
+            AddExtendedDescriptor(descriptors, group, "de-DE", fallbackCultureName: null);
+            AddExtendedDescriptor(descriptors, group, "ja-JP", fallbackCultureName: null);
+            AddExtendedDescriptor(descriptors, group, "ar-SA", fallbackCultureName: null);
+            AddExtendedDescriptor(descriptors, group, "zh-TW", fallbackCultureName: "zh-Hant");
+        }
+
         return Array.AsReadOnly(descriptors.ToArray());
+    }
+
+    public static LocalizationLookupContext CreateContext(string packageId)
+    {
+        var group = ExtendedGroups.Single(group => string.Equals(group.PackageId, packageId, StringComparison.Ordinal));
+        return group.Scope switch
+        {
+            ResourceScope.Host or ResourceScope.Presentation => LocalizationLookupContext.Global,
+            ResourceScope.Module => new LocalizationLookupContext(moduleId: group.ScopeId),
+            ResourceScope.Route => new LocalizationLookupContext(routeId: group.ScopeId),
+            ResourceScope.Window => new LocalizationLookupContext(windowId: group.ScopeId),
+            _ => throw new InvalidOperationException($"Unsupported extended scope '{group.Scope}'."),
+        };
+    }
+
+    public static string GetExtendedKey(string packageId, int index)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(index);
+        if (index >= ExtendedBusinessKeys.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(index));
+        }
+
+        return $"Stress.{packageId.Replace('.', '_')}.{ExtendedBusinessKeys[index]}";
+    }
+
+    public static string GetExtendedValue(string packageId, string cultureName, int index)
+    {
+        var label = cultureName switch
+        {
+            "fr-FR" or "fr" => "Operation commerciale",
+            "de-DE" => "Geschaeftsvorgang",
+            "ja-JP" => "Business operation",
+            "ar-SA" => "Business operation",
+            "zh-TW" or "zh-Hant" => "商務作業",
+            _ => "Business operation",
+        };
+        var prefix = $"[{cultureName}|{packageId}] {label} {index:D2}";
+        return index == ExtendedBusinessKeys.Length - 1
+            ? prefix + " amount={0:N2} date={1:d}"
+            : prefix;
+    }
+
+    public static bool ExtendedLeafContainsKey(string cultureName, int index)
+    {
+        return cultureName is not ("fr-FR" or "zh-TW") || index % 7 != 0;
     }
 
     private static TextEntry[] CreateRouteTexts(string prefix, string englishName, string chineseName)
@@ -262,6 +362,37 @@ public static class StressLocalizationCatalog
         });
     }
 
+    private static void AddExtendedDescriptor(
+        ICollection<LanguagePackageDescriptor> descriptors,
+        ExtendedPackageGroup group,
+        string cultureName,
+        string? fallbackCultureName)
+    {
+        var resources = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["Stress.ScopeMarker"] = $"[{cultureName}|{group.PackageId}] scope-marker",
+        };
+        for (var index = 0; index < ExtendedBusinessKeys.Length; index++)
+        {
+            if (!ExtendedLeafContainsKey(cultureName, index))
+            {
+                continue;
+            }
+
+            resources[GetExtendedKey(group.PackageId, index)] = GetExtendedValue(group.PackageId, cultureName, index);
+        }
+
+        AddDescriptor(
+            descriptors,
+            group.PackageId,
+            cultureName,
+            fallbackCultureName,
+            group.Scope,
+            group.ScopeId,
+            contributionId: null,
+            resources);
+    }
+
     private static IReadOnlyDictionary<string, string> ToResources(
         IEnumerable<TextEntry> texts,
         bool english)
@@ -273,4 +404,6 @@ public static class StressLocalizationCatalog
     }
 
     private sealed record TextEntry(string Key, string English, string Chinese);
+
+    private sealed record ExtendedPackageGroup(string PackageId, ResourceScope Scope, string? ScopeId);
 }

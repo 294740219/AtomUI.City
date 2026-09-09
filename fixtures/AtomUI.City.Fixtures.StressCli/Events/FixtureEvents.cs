@@ -1,9 +1,10 @@
 using AtomUI.City.EventBus;
+using AtomUI.City.Fixtures.StressCli.DataIntegration;
 using AtomUI.City.Fixtures.StressCli.Modules;
 
 namespace AtomUI.City.Fixtures.StressCli.Events;
 
-// 36 条事件契约：契约 id + 所有者模块（[EventContract] 特性由 generator/校验器消费）。
+// 43 条事件契约：契约 id + 所有者模块（[EventContract] 特性由 generator/校验器消费）。
 
 [EventContract("fixtures.events.orders.submitted", typeof(OrdersModule))]
 public sealed record OrderSubmitted(string Sku, int Quantity, decimal Price);
@@ -112,3 +113,24 @@ public sealed record FraudFlagged(string Subject, decimal Score);
 
 [EventContract("fixtures.events.support.opened", typeof(SupportModule))]
 public sealed record SupportTicketOpened(string Subject, string TicketId);
+
+[EventContract("fixtures.events.remote.product-loaded", typeof(OperationsModule))]
+public sealed record RemoteProductLoaded(StressProductSnapshot Product);
+
+[EventContract("fixtures.events.remote.order-submitted", typeof(OperationsModule))]
+public sealed record RemoteOrderSubmitted(StressOrderReceipt Receipt);
+
+[EventContract("fixtures.events.remote.data-failed", typeof(OperationsModule))]
+public sealed record RemoteDataFailed(string Operation, string ErrorKind, string MessageKey);
+
+[EventContract("fixtures.events.remote.inventory-changed", typeof(OperationsModule))]
+public sealed record RemoteInventoryChanged(string Sku, int Quantity, long Sequence, string PrincipalRevision);
+
+[EventContract("fixtures.events.remote.price-changed", typeof(OperationsModule))]
+public sealed record RemotePriceChanged(string Sku, decimal Price, long Sequence, string PrincipalRevision);
+
+[EventContract("fixtures.events.remote.shipment-progressed", typeof(OperationsModule))]
+public sealed record RemoteShipmentProgressed(string OrderId, string Status, long Sequence, string PrincipalRevision);
+
+[EventContract("fixtures.events.remote.principal-switched", typeof(OperationsModule))]
+public sealed record RemotePrincipalSwitched(string PreviousRevision, string CurrentPrincipal, string CurrentRevision);

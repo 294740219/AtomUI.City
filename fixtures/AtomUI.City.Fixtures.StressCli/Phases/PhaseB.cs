@@ -1,10 +1,12 @@
 using AtomUI.City.Fixtures.StressCli.Infrastructure;
+using AtomUI.City.Fixtures.StressCli.DataIntegration;
 using AtomUI.City.Fixtures.StressCli.Services;
+using AtomUI.City.Fixtures.StressCli.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace AtomUI.City.Fixtures.StressCli;
 
-/// <summary>Phase B：61 个业务服务的解析、生命周期、跨域接线和行为验证。</summary>
+/// <summary>Phase B：67 个业务服务的解析、生命周期、跨域接线和行为验证。</summary>
 public static class PhaseB
 {
     private static readonly Type[] SingletonServices =
@@ -18,6 +20,8 @@ public static class PhaseB
         typeof(IIdentityDirectory), typeof(ITenantDirectory), typeof(IProductCatalog), typeof(IPriceBook),
         typeof(IShipmentTracker), typeof(IPaymentGateway), typeof(IReturnPolicy), typeof(ISearchIndex),
         typeof(ISupportDesk), typeof(IWorkflowEngine), typeof(INavigationAudit), typeof(IOperationsFacade),
+        typeof(IStressAccessTokenSession), typeof(IStressDataRequestProbe), typeof(IStressRemoteOperations),
+        typeof(IStressRemoteProjection), typeof(IStressDataConnectionFactory),
     ];
 
     private static readonly Type[] ScopedServices =
@@ -33,6 +37,7 @@ public static class PhaseB
         typeof(IOrderPricing), typeof(ITaxPolicy), typeof(IReportFormatter), typeof(ITrendDetector),
         typeof(IFlakyProbe), typeof(ITokenIssuer), typeof(IPromotionEngine), typeof(IShippingQuote),
         typeof(IRecommendationEngine), typeof(IFraudScorer),
+        typeof(RemoteOperationsViewModel),
     ];
 
     public static async Task RunAsync(CancellationToken cancellationToken)
@@ -42,10 +47,10 @@ public static class PhaseB
         await host.StartAsync(cancellationToken);
 
         var provider = host.Services;
-        Record("I03-resolve", "61 个业务服务全部可解析", () => ResolveAll(provider));
-        Record("I03-singleton", "36 个 Singleton 两次解析为同一实例", () => CheckSingletons(provider));
+        Record("I03-resolve", "67 个业务服务全部可解析", () => ResolveAll(provider));
+        Record("I03-singleton", "41 个 Singleton 两次解析为同一实例", () => CheckSingletons(provider));
         Record("I03-scoped", "15 个 Scoped 在 scope 内相同、跨 scope 不同", () => CheckScoped(provider));
-        Record("I03-transient", "10 个 Transient 每次解析为新实例", () => CheckTransients(provider));
+        Record("I03-transient", "11 个 Transient 每次解析为新实例", () => CheckTransients(provider));
         Record("I03-cross-domain", "高层服务获得正确的跨模块依赖", () => CheckCrossDomain(provider));
         Record("I03-behavior", "服务联合业务行为产生确定结果", () => CheckBehavior(provider));
 

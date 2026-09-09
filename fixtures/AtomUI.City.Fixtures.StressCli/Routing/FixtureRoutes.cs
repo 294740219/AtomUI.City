@@ -84,6 +84,9 @@ public static partial class FixtureRoutes
     [RouteMiddleware(typeof(FixtureRouteMiddleware))]
     public static partial RouteReference Workflow();
 
+    [Route("remote-data", typeof(RemoteOperationsViewModel), Id = "fixtures.routes.remote-data", Parent = nameof(Operations))]
+    public static partial RouteReference RemoteData();
+
     [Route("settings", typeof(SettingsViewModel), Id = "fixtures.routes.settings", Parent = nameof(Shell))]
     public static partial RouteReference Settings();
 

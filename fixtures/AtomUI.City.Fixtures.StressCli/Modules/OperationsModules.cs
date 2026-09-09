@@ -1,6 +1,10 @@
 using AtomUI.City.Core.Modularity;
+using AtomUI.City.Data;
+using AtomUI.City.Fixtures.StressCli.DataIntegration;
 using AtomUI.City.Fixtures.StressCli.Services;
 using AtomUI.City.Fixtures.StressCli.Routing;
+using AtomUI.City.Fixtures.StressCli.ViewModels;
+using AtomUI.City.Security;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace AtomUI.City.Fixtures.StressCli.Modules;
@@ -202,10 +206,34 @@ public sealed class NavigationModule : FixtureModule
 [DependsOn(typeof(RecommendationsModule))]
 [DependsOn(typeof(SupportModule))]
 [DependsOn(typeof(WorkflowModule))]
+[DependsOn(typeof(DataModule))]
 public sealed class OperationsModule : FixtureModule
 {
     public override string FixtureName => "Operations";
 
-    public override void ConfigureServices(ServiceConfigurationContext context) =>
+    public override void ConfigureServices(ServiceConfigurationContext context)
+    {
         context.Services.AddSingleton<IOperationsFacade, OperationsFacadeService>();
+        context.Services.AddSingleton<StressAccessTokenSession>();
+        context.Services.AddSingleton<IStressAccessTokenSession>(provider =>
+            provider.GetRequiredService<StressAccessTokenSession>());
+        context.Services.AddSingleton<IAccessTokenProvider>(provider =>
+            provider.GetRequiredService<StressAccessTokenSession>());
+        context.Services.AddSingleton<StressDataRequestHandler>();
+        context.Services.AddSingleton<IStressDataRequestProbe>(provider =>
+            provider.GetRequiredService<StressDataRequestHandler>());
+        context.Services.AddSingleton<IDataRequestHandler>(provider =>
+            provider.GetRequiredService<StressDataRequestHandler>());
+        context.Services.AddSingleton<IStressRemoteOperations, StressRemoteOperations>();
+        context.Services.AddSingleton<IStressRemoteProjection, StressRemoteProjection>();
+        context.Services.AddSingleton<IStressDataConnectionFactory, StressDataConnectionFactory>();
+        context.Services.AddTransient<RemoteOperationsViewModel>();
+    }
+
+    public override void OnApplicationInitialization(ApplicationInitializationContext context)
+    {
+        base.OnApplicationInitialization(context);
+        context.Services.GetRequiredService<DataClientDescriptorCatalog>().RegisterGenerated<
+            global::AtomUI.City.Generated.GeneratedDataClientRegistrar_AtomUI_City_Fixtures_StressCli_07DD3519>();
+    }
 }

@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "packageId": "Fixture.Generated",
+  "culture": "zh-CN",
+  "version": "1.0.0",
+  "resources": {
+    "Generated.Title": "生成式程序集运营",
+    "Generated.Formatted": "程序集订单 {0} 包含 {1:N0} 项。",
+    "Provider.Source": "程序集语言包"
+  }
+}

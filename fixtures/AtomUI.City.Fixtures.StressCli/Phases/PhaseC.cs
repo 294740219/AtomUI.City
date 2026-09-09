@@ -8,7 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace AtomUI.City.Fixtures.StressCli;
 
 /// <summary>
-/// Phase C：36 条事件契约的交付与调度验证
+/// Phase C：43 条事件契约的交付与调度验证
 /// + 发布对账（I4-delivery）+ Serialized 无交叠（I4-serialized）
 /// + 错误策略差异化（I4-errorpolicy）+ owner scope 释放退订（I4-unsubscribe）。
 /// </summary>
@@ -53,7 +53,7 @@ public static class PhaseC
         using var telemetryOwner = ownerRoot.CreateChild(LifecycleScopeKind.Subscription, "owner-telemetry");
         using var disposableOwner = ownerRoot.CreateChild(LifecycleScopeKind.Subscription, "owner-disposable");
 
-        // 36 条契约各 1 个基础订阅（Current 策略，计数对账基线）。
+        // 43 条契约各 1 个基础订阅（Current 策略，计数对账基线）。
         IEventSubscription Subscribe<TEvent>(LifecycleScope owner, string counterKey)
             where TEvent : notnull
         {
@@ -105,6 +105,13 @@ public static class PhaseC
             Subscribe<RecommendationProduced>(telemetryOwner, "recommendation.produced"),
             Subscribe<FraudFlagged>(auditOwner, "fraud.flagged"),
             Subscribe<SupportTicketOpened>(auditOwner, "support.opened"),
+            Subscribe<RemoteProductLoaded>(ordersOwner, "remote.product-loaded"),
+            Subscribe<RemoteOrderSubmitted>(ordersOwner, "remote.order-submitted"),
+            Subscribe<RemoteDataFailed>(auditOwner, "remote.data-failed"),
+            Subscribe<RemoteInventoryChanged>(ordersOwner, "remote.inventory-changed"),
+            Subscribe<RemotePriceChanged>(ordersOwner, "remote.price-changed"),
+            Subscribe<RemoteShipmentProgressed>(ordersOwner, "remote.shipment-progressed"),
+            Subscribe<RemotePrincipalSwitched>(auditOwner, "remote.principal-switched"),
         };
 
         if (baselineSubscriptions.Count != StressCliProgram.EventContractCount)
@@ -129,7 +136,7 @@ public static class PhaseC
             },
             EventSubscriptionOptions.Serialized.WithHandlerTimeout(TimeSpan.FromSeconds(5)));
 
-        // 发布全部 36 条契约（Serialized 额外 3 次连续发布制造交叠压力）。
+        // 发布全部 43 条契约（Serialized 额外 3 次连续发布制造交叠压力）。
         await eventBus.PublishAsync(new OrderSubmitted("SKU-001", 2, 19.9m), cancellationToken: cancellationToken);
         await eventBus.PublishAsync(new OrderConfirmed("SKU-001"), cancellationToken: cancellationToken);
         await eventBus.PublishAsync(new InventoryReserved("SKU-001", 2), cancellationToken: cancellationToken);
@@ -171,6 +178,17 @@ public static class PhaseC
         await eventBus.PublishAsync(new RecommendationProduced("operator-a", "SKU-0001"), cancellationToken: cancellationToken);
         await eventBus.PublishAsync(new FraudFlagged("operator-a", 0.2m), cancellationToken: cancellationToken);
         await eventBus.PublishAsync(new SupportTicketOpened("operator-a", "ticket-1"), cancellationToken: cancellationToken);
+        await eventBus.PublishAsync(
+            new RemoteProductLoaded(new DataIntegration.StressProductSnapshot("SKU-0001", 20m, 100, "operator-a", 1)),
+            cancellationToken: cancellationToken);
+        await eventBus.PublishAsync(
+            new RemoteOrderSubmitted(new DataIntegration.StressOrderReceipt("remote-1", "SKU-0001", 1, 20m, "operator-a", 2)),
+            cancellationToken: cancellationToken);
+        await eventBus.PublishAsync(new RemoteDataFailed("query", "NetworkUnavailable", "Errors.Network"), cancellationToken: cancellationToken);
+        await eventBus.PublishAsync(new RemoteInventoryChanged("SKU-0001", 99, 1, "r1"), cancellationToken: cancellationToken);
+        await eventBus.PublishAsync(new RemotePriceChanged("SKU-0001", 20.1m, 1, "r1"), cancellationToken: cancellationToken);
+        await eventBus.PublishAsync(new RemoteShipmentProgressed("remote-1", "packed", 1, "r1"), cancellationToken: cancellationToken);
+        await eventBus.PublishAsync(new RemotePrincipalSwitched("r1", "operator-b", "r2"), cancellationToken: cancellationToken);
 
         // I04-delivery：36 条契约计数全部为 1（Serialized 探针 3 次另计）。
         var deliveryFailures = new List<string>();
@@ -189,6 +207,10 @@ public static class PhaseC
                      ("payment.authorized", 1), ("payment.captured", 1), ("return.requested", 1),
                      ("search.executed", 1), ("recommendation.produced", 1), ("fraud.flagged", 1),
                      ("support.opened", 1),
+                     ("remote.product-loaded", 1), ("remote.order-submitted", 1),
+                     ("remote.data-failed", 1), ("remote.inventory-changed", 1),
+                     ("remote.price-changed", 1), ("remote.shipment-progressed", 1),
+                     ("remote.principal-switched", 1),
                  })
         {
             if (CountOf(key) != expected)
@@ -204,7 +226,7 @@ public static class PhaseC
 
         FixtureState.Report.Record(
             "I04-delivery",
-            "36 条契约交付计数与发布数一致",
+            "43 条契约交付计数与发布数一致",
             deliveryFailures.Count == 0,
             deliveryFailures.Count == 0 ? null : string.Join("; ", deliveryFailures.Take(5)));
 

@@ -9,14 +9,32 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/AtomUI.City.Core/AtomUI.City.Core.csproj" />
+    <ProjectReference Include="../../src/AtomUI.City.Data/AtomUI.City.Data.csproj" />
     <ProjectReference Include="../../src/AtomUI.City.EventBus/AtomUI.City.EventBus.csproj" />
     <ProjectReference Include="../../src/AtomUI.City.State/AtomUI.City.State.csproj" />
     <ProjectReference Include="../../src/AtomUI.City.Mvvm/AtomUI.City.Mvvm.csproj" />
     <ProjectReference Include="../../src/AtomUI.City.Routing/AtomUI.City.Routing.csproj" />
+    <ProjectReference Include="../../src/AtomUI.City.Security/AtomUI.City.Security.csproj" />
     <ProjectReference Include="../../src/AtomUI.City.Localization/AtomUI.City.Localization.csproj" />
     <ProjectReference Include="../../src/AtomUI.City.Generators/AtomUI.City.Generators.csproj"
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Google.Protobuf" />
+    <PackageReference Include="Grpc.AspNetCore" />
+    <PackageReference Include="Grpc.Net.Client" />
+    <PackageReference Include="Grpc.Tools" PrivateAssets="all" />
+    <Protobuf Include="DataIntegration/Protos/stress_data.proto" GrpcServices="Both" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Localization/AssemblyPackages/*.locpack.json" />
+    <Content Include="Localization/FilePackages/*.locpack.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>

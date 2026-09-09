@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+option csharp_namespace = "AtomUI.City.Fixtures.StressCli.DataIntegration.Grpc";
+
+package stressdata;
+
+service StressDataProbe {
+  rpc Inventory (InventoryRequest) returns (InventoryReply);
+  rpc PriceStream (PriceStreamRequest) returns (stream PriceUpdate);
+  rpc InventoryDuplex (stream InventoryDelta) returns (stream InventoryReply);
+}
+
+message InventoryRequest {
+  string sku = 1;
+}
+
+message InventoryReply {
+  string sku = 1;
+  int32 quantity = 2;
+  int64 sequence = 3;
+}
+
+message PriceStreamRequest {
+  string sku = 1;
+  int32 count = 2;
+}
+
+message PriceUpdate {
+  string sku = 1;
+  double price = 2;
+  int64 sequence = 3;
+}
+
+message InventoryDelta {
+  string sku = 1;
+  int32 delta = 2;
+  int64 sequence = 3;
+}

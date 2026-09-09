@@ -1,6 +1,8 @@
 using AtomUI.City.Core.Hosting;
 using AtomUI.City.Core.Modularity;
+using AtomUI.City.Data;
 using AtomUI.City.EventBus;
+using AtomUI.City.Fixtures.StressCli.DataIntegration;
 using AtomUI.City.Fixtures.StressCli.Modules;
 using AtomUI.City.Fixtures.StressCli.Localization;
 using AtomUI.City.Core.Lifecycle;
@@ -12,14 +14,14 @@ using Microsoft.Extensions.DependencyInjection;
 namespace AtomUI.City.Fixtures.StressCli.Infrastructure;
 
 /// <summary>
-/// 实战压测的统一 Host 构建入口：六模块基础设施 + 40 个业务模块 + 固定 ApplicationId。
+/// 实战压测的统一 Host 构建入口：七模块基础设施 + 40 个业务模块 + 固定 ApplicationId。
 /// </summary>
 public static class StressHost
 {
     public const string ApplicationId = "fixtures.stress";
     public const string ApplicationName = "AtomUI.City.Fixtures.StressCli";
 
-    public static IApplicationHostBuilder CreateBuilder()
+    public static IApplicationHostBuilder CreateBuilder(StressDataEndpoints? dataEndpoints = null)
     {
         var builder = ApplicationHost.CreateBuilder([]);
 
@@ -31,6 +33,12 @@ public static class StressHost
 
         builder.ConfigureServices(services =>
         {
+            var endpoints = dataEndpoints ?? new StressDataEndpoints(
+                new Uri("http://127.0.0.1:1"),
+                new Uri("http://127.0.0.1:1"));
+            services.AddSingleton(endpoints);
+            services.AddHttpClient(StressRemoteOperations.ClientName, client => client.BaseAddress = endpoints.Http)
+                .RemoveAllLoggers();
             services.AddState();
             services.AddRouting(AtomUI.City.Generated.GeneratedRoutingRouteManifest.CreateDescriptors());
             services.AddSingleton<StressLanguagePackageProvider>();
@@ -54,6 +62,7 @@ public static class StressHost
         });
 
         builder
+            .UseModule<DataModule>()
             .UseModule<EventBusModule>()
             .UseModule<RoutingModule>()
             .UseModule<FoundationModule>()

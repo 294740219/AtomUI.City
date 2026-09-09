@@ -287,7 +287,7 @@ public static class PhaseJ
 
         FixtureState.Report.Record(
             "I19-localization-catalog",
-            "Localization catalog 覆盖 30 包、120+ key、250+ 资源和六类 scope",
+            $"Localization catalog 覆盖 {StressLocalizationCatalog.DescriptorCount} 包、350+ key、1,900+ 资源和六类 scope",
             catalogOk,
             $"descriptors={descriptors.Count} keys={distinctKeys} entries={resourceEntries} scopes={scopes.Count}");
         FixtureState.Report.Record(

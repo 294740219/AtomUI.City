@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "packageId": "Fixture.Generated",
+  "culture": "en-US",
+  "version": "1.0.0",
+  "resources": {
+    "Generated.Title": "Generated assembly operations",
+    "Generated.Formatted": "Assembly order {0} contains {1:N0} items.",
+    "Provider.Source": "Assembly provider"
+  }
+}

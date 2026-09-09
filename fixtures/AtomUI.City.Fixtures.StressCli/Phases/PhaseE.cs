@@ -10,7 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace AtomUI.City.Fixtures.StressCli;
 
-/// <summary>Phase E：16 个 ViewModel 的激活、命令、交互和订阅释放矩阵。</summary>
+/// <summary>Phase E：16 个基础 ViewModel 的激活、命令、交互和订阅释放矩阵。</summary>
 public static class PhaseE
 {
     public static async Task RunAsync(CancellationToken cancellationToken)
@@ -27,7 +27,7 @@ public static class PhaseE
         var owner = host.Services.GetRequiredService<LifecycleScope>();
 
         var viewModels = CreateViewModels(eventBus, owner, state, writer, diagnostics);
-        if (viewModels.Count != StressCliProgram.ViewModelCount)
+        if (viewModels.Count != StressCliProgram.BaseViewModelCount)
         {
             throw new InvalidOperationException($"ViewModel catalog contains {viewModels.Count} entries.");
         }
